@@ -5,27 +5,38 @@ import com.intellij.feedback.new_ui.dialog.NewUIFeedbackDialog
 import com.intellij.ide.IdeBundle
 import com.intellij.ide.ui.LafManager
 import com.intellij.ide.ui.UISettings
+import com.intellij.openapi.extensions.ExtensionPointName
 import com.intellij.openapi.options.BoundSearchableConfigurable
 import com.intellij.openapi.options.Configurable
 import com.intellij.openapi.ui.DialogPanel
 import com.intellij.openapi.util.SystemInfo
 import com.intellij.ui.components.JBCheckBox
+import com.intellij.ui.dsl.builder.*
 import com.intellij.ui.dsl.builder.Cell
-import com.intellij.ui.dsl.builder.bindSelected
-import com.intellij.ui.dsl.builder.panel
-import com.intellij.ui.dsl.builder.selected
 
 /**
  * @author Konstantin Bulenkov
  */
-internal class ExperimentalUIConfigurable : BoundSearchableConfigurable(
-  IdeBundle.message("configurable.new.ui.name"),
-  "reference.settings.ide.settings.new.ui"), Configurable.Beta {
+open class ExperimentalUIConfigurable : BoundSearchableConfigurable(IdeBundle.message("configurable.new.ui.name"), "reference.settings.ide.settings.new.ui"), Configurable.Beta {
+
+  companion object {
+    @JvmStatic
+    val EP_NAME: ExtensionPointName<ExperimentalUIConfigurable> = ExtensionPointName.create("com.intellij.newUIConfigurable")
+  }
+
+  open fun isEnabled() = true
+
+  private fun getFirstEnabledConfigurable() = EP_NAME.extensions.firstOrNull { it.isEnabled() }
 
   override fun createPanel(): DialogPanel {
-    //Iterate over ExperimentalUIConfigurableEP and if at least one record exists
-    //and enabled, then create and return DialogPanel from it
-    //Otherwise return IJ's panel
+    val conf = getFirstEnabledConfigurable()
+    if (conf != null) {
+      return conf.createPanelInternal()
+    }
+    return createPanelInternal()
+  }
+
+  open fun createPanelInternal(): DialogPanel {
     return panel {
       lateinit var newUiCheckBox: Cell<JBCheckBox>
 
@@ -35,14 +46,14 @@ internal class ExperimentalUIConfigurable : BoundSearchableConfigurable(
             { ExperimentalUI.isNewUI() },
             { ExperimentalUI.setNewUI(it) })
           .comment(IdeBundle.message("checkbox.enable.new.ui.description"))
-      }
+      }.comment(IdeBundle.message("ide.restart.required.comment"))
 
       indent {
         row {
           checkBox(IdeBundle.message("checkbox.compact.mode"))
             .bindSelected(UISettings.getInstance()::compactMode)
             .enabledIf(newUiCheckBox.selected)
-          comment(IdeBundle.message("checkbox.compact.mode.description"))
+            .comment(IdeBundle.message("checkbox.compact.mode.description"))
         }
         if (SystemInfo.isWindows || SystemInfo.isXWindow) {
           row {
@@ -57,16 +68,27 @@ internal class ExperimentalUIConfigurable : BoundSearchableConfigurable(
         }
       }
 
-      row { browserLink(IdeBundle.message("new.ui.blog.changes.and.issues"), "https://youtrack.jetbrains.com/articles/IDEA-A-156/Main-changes-and-known-issues") }
-      row { link(IdeBundle.message("new.ui.submit.feedback")) { NewUIFeedbackDialog(null, false).show() } }
+      row { browserLink(getMainChangesAndKnowIssuesLabel(), getMainChangesAndKnownIssuesUrl()) }
+        .topGap(TopGap.MEDIUM)
+      row { link(IdeBundle.message("new.ui.submit.feedback")) { onSubmitFeedback() } }
     }
   }
 
+  open fun getMainChangesAndKnownIssuesUrl() = "https://youtrack.jetbrains.com/articles/IDEA-A-156/Main-changes-and-known-issues"
+  open fun getMainChangesAndKnowIssuesLabel() = IdeBundle.message("new.ui.blog.changes.and.issues")
+  open fun onSubmitFeedback() = NewUIFeedbackDialog(null, false).show()
+
+
   override fun getHelpTopic(): String? {
+    val conf = getFirstEnabledConfigurable()
+    if (conf != null) {
+      return conf.helpTopic
+    }
     return null
   }
 
   override fun apply() {
+    getFirstEnabledConfigurable()?.apply()
     val uiSettingsChanged = isModified
     super.apply()
     if (uiSettingsChanged) {

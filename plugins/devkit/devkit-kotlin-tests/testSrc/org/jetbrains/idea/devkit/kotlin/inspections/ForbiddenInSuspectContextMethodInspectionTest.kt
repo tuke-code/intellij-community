@@ -1,6 +1,7 @@
 // Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.idea.devkit.kotlin.inspections
 
+import com.intellij.codeInspection.LocalInspectionTool
 import com.intellij.openapi.module.Module
 import com.intellij.openapi.roots.ContentEntry
 import com.intellij.openapi.roots.LanguageLevelModuleExtension
@@ -23,7 +24,10 @@ class ForbiddenInSuspectContextMethodInspectionTest : LightJavaCodeInsightFixtur
 
   @Before
   fun initInspection() {
-    myFixture.enableInspections(ForbiddenInSuspectContextMethodInspection())
+    @Suppress("UNCHECKED_CAST")
+    myFixture.enableInspections(
+      Class.forName("org.jetbrains.idea.devkit.kotlin.inspections.ForbiddenInSuspectContextMethodInspection") as Class<LocalInspectionTool>
+    )
 
     myFixture.addClass("""
       package com.intellij.util.concurrency.annotations;
@@ -33,8 +37,19 @@ class ForbiddenInSuspectContextMethodInspectionTest : LightJavaCodeInsightFixtur
     """.trimIndent())
   }
 
-  private val progressManagerDescr = "Do not call 'ProgressManager.checkCanceled' in suspend context. Use top-level 'checkCanceled' function"
-  private val progressManagerFix = "Replace 'ProgressManager.checkCanceled' with coroutine-friendly 'checkCanceled'"
+  private val progressManagerDescr = "Do not call 'ProgressManager.checkCanceled' in suspend context. Use top-level 'checkCancelled' function"
+  private val progressManagerFix = "Replace 'ProgressManager.checkCanceled' with coroutine-friendly 'checkCancelled'"
+
+  private val invokeAndWaitDescr = "'invokeAndWait' can block current coroutine. Use 'Dispatchers.EDT' instead"
+  private val invokeAndWaitFix = "Replace 'invokeAndWait' call with 'withContext(Dispatchers.EDT) {}'"
+
+  private val defaultModalityDescr = "'defaultModalityState()' does not work in suspend context. If it is really necessary, use 'contextModality()'"
+
+  private val navigateToSuspendContextFix = "Navigate to suspend context"
+
+  private val invokeLaterDescr = "'invokeLater' is not idiomatic in suspend context. Use 'Dispatchers.EDT' instead"
+  private val invokeLaterFixWithContext = "(May change semantics) Replace 'invokeLater' call with 'withContext(Dispatchers.EDT) {}'"
+  private val invokeLaterFixLaunch = "Replace 'invokeLater' with 'launch(Dispatchers.EDT)'"
 
   @Test
   fun `progress manager checkCanceled in suspend function`() {
@@ -346,6 +361,449 @@ class ForbiddenInSuspectContextMethodInspectionTest : LightJavaCodeInsightFixtur
     myFixture.testHighlighting()
   }
 
+  @Test
+  fun `progress manager checkCanceled inside runBlockingCancellable`() {
+    addCheckCanceledFunctions()
+
+    myFixture.configureByText("file.kt", """
+      import com.intellij.openapi.progress.*
+      import com.intellij.util.concurrency.annotations.*
+      
+      @RequiresBlockingContext
+      fun blockingFun() {
+        runBlockingCancellable {
+          ProgressManager.<warning descr="$progressManagerDescr">checkC<caret>anceled</warning>()
+        }
+      }
+    """.trimIndent())
+    myFixture.testHighlighting()
+
+    val intention = myFixture.getAvailableIntention(progressManagerFix)
+    assertNotNullK(intention)
+    myFixture.checkPreviewAndLaunchAction(intention)
+
+    myFixture.checkResult("""
+      import com.intellij.openapi.progress.*
+      import com.intellij.util.concurrency.annotations.*
+      
+      @RequiresBlockingContext
+      fun blockingFun() {
+        runBlockingCancellable {
+          checkCancelled()
+        }
+      }
+    """.trimIndent())
+  }
+
+  @Test
+  fun `progress manager checkCanceled inside inline lambda`() {
+    addCheckCanceledFunctions()
+
+    myFixture.configureByText("file.kt", """
+      import com.intellij.openapi.progress.*
+      
+      suspend fun process(items: List<Int>) {
+        items.map {
+          ProgressManager.<warning descr="$progressManagerDescr">checkC<caret>anceled</warning>()
+          it + 1
+        }
+      }
+    """.trimIndent())
+    myFixture.testHighlighting()
+
+    val intention = myFixture.getAvailableIntention(progressManagerFix)
+    assertNotNullK(intention)
+    myFixture.checkPreviewAndLaunchAction(intention)
+
+    myFixture.configureByText("file.kt", """
+      import com.intellij.openapi.progress.*
+      
+      suspend fun process(items: List<Int>) {
+        items.map {
+          checkCancelled()
+          it + 1
+        }
+      }
+    """.trimIndent())
+  }
+
+  @Test
+  fun `progress manager checkCanceled inside crossinline lambda`() {
+    addCheckCanceledFunctions()
+
+    myFixture.configureByText("file.kt", """
+      @file:Suppress("UNUSED_VARIABLE", "UNUSED_PARAMETER")
+      import com.intellij.openapi.progress.*
+      
+      inline fun a(crossinline l: () -> Unit) {
+        
+      }
+      
+      suspend fun process() {
+        a {
+          ProgressManager.checkC<caret>anceled()
+        }
+      }
+    """.trimIndent())
+    myFixture.testHighlighting()
+  }
+
+  @Test
+  fun `invokeAndWait with lambda argument`() {
+    addApplicationAndEtc()
+
+    myFixture.configureByText("file.kt", """
+      import com.intellij.openapi.application.*
+      
+      suspend fun a() {
+        ApplicationManager.getApplication().<warning descr="$invokeAndWaitDescr">invokeAnd<caret>Wait</warning> {
+          println()
+        }
+      }
+    """.trimIndent())
+    myFixture.testHighlighting()
+
+    val intention = myFixture.getAvailableIntention(invokeAndWaitFix)
+    assertNotNullK(intention)
+    myFixture.checkPreviewAndLaunchAction(intention)
+
+    myFixture.checkResult("""
+      import com.intellij.openapi.application.*
+      import kotlinx.coroutines.Dispatchers
+      import kotlinx.coroutines.withContext
+      
+      suspend fun a() {
+        withContext(Dispatchers.EDT) {
+          println()
+        }
+      }
+    """.trimIndent())
+  }
+
+  @Test
+  fun `invokeAndWait with modality argument`() {
+    addApplicationAndEtc()
+
+    myFixture.configureByText("file.kt", """
+      import com.intellij.openapi.application.*
+      
+      suspend fun a() {
+        ApplicationManager.getApplication().<warning descr="$invokeAndWaitDescr">invokeAnd<caret>Wait</warning>({
+          println()
+        }, null)
+      }
+    """.trimIndent())
+    myFixture.testHighlighting()
+
+    val intention = myFixture.getAvailableIntention(invokeAndWaitFix)
+    assertNotNullK(intention)
+    myFixture.checkPreviewAndLaunchAction(intention)
+
+    myFixture.configureByText("file.kt", """
+      import com.intellij.openapi.application.*
+      import kotlinx.coroutines.Dispatchers
+      import kotlinx.coroutines.withContext
+      
+      suspend fun a() {
+        withContext(Dispatchers.EDT) {
+          println()
+        }
+      }
+    """.trimIndent())
+  }
+
+  @Test
+  fun `invokeAndWait on Application receiver`() {
+    addApplicationAndEtc()
+
+    myFixture.configureByText("file.kt", """
+      import com.intellij.openapi.application.*
+      
+      suspend fun Application.a() {
+        <warning descr="$invokeAndWaitDescr">invokeAnd<caret>Wait</warning> {
+          println()
+        }
+      }
+    """.trimIndent())
+    myFixture.testHighlighting()
+
+    val intention = myFixture.getAvailableIntention(invokeAndWaitFix)
+    assertNotNullK(intention)
+    myFixture.checkPreviewAndLaunchAction(intention)
+
+    myFixture.configureByText("file.kt", """
+      import com.intellij.openapi.application.*
+      import kotlinx.coroutines.Dispatchers
+      import kotlinx.coroutines.withContext
+      
+      suspend fun Application.a() {
+        withContext(Dispatchers.EDT) {
+          println()
+        }
+      }
+    """.trimIndent())
+  }
+
+  @Test
+  fun `invokeAndWaitIfNeeded with modality parameter`() {
+    addApplicationAndEtc()
+
+    myFixture.configureByText("file.kt", """
+      import com.intellij.openapi.application.*
+      
+      suspend fun a() {
+        <warning descr="$invokeAndWaitDescr">invokeAn<caret>dWaitIfNeeded</warning>(ModalityState.any()) {
+          println()
+        }
+      }
+    """.trimIndent())
+    myFixture.testHighlighting()
+
+    val intention = myFixture.getAvailableIntention(invokeAndWaitFix)
+    assertNotNullK(intention)
+    myFixture.checkPreviewAndLaunchAction(intention)
+
+    myFixture.checkResult(""" 
+      import com.intellij.openapi.application.*
+      import kotlinx.coroutines.Dispatchers
+      import kotlinx.coroutines.withContext
+      
+      suspend fun a() {
+        withContext(Dispatchers.EDT) {
+          println()
+        }
+      }
+    """.trimIndent())
+  }
+
+  @Test
+  fun `defaultModalityState in suspend context`() {
+    addApplicationAndEtc()
+
+    myFixture.configureByText("file.kt", """
+      @file:Suppress("UNUSED_VARIABLE", "UNUSED_PARAMETER")
+      
+      import com.intellij.openapi.application.*
+      import kotlinx.coroutines.*
+      
+      class MyService {
+        suspend fun fn() {
+          val state: ModalityState = ModalityState.<warning descr="$defaultModalityDescr">default<caret>ModalityState</warning>()
+        } 
+      }
+    """.trimIndent())
+    myFixture.testHighlighting()
+  }
+
+  @Test
+  fun `getDefaultModalityState in suspend context`() {
+    addApplicationAndEtc()
+
+    myFixture.configureByText("file.kt", """
+      @file:Suppress("UNUSED_VARIABLE", "UNUSED_PARAMETER")
+      
+      import com.intellij.openapi.application.*
+      import kotlinx.coroutines.*
+      
+      class MyService {
+        suspend fun fn() {
+          val state: ModalityState = ApplicationManager.getApplication().<warning descr="$defaultModalityDescr">getDefault<caret>ModalityState</warning>()
+        } 
+      }
+    """.trimIndent())
+    myFixture.testHighlighting()
+  }
+
+  @Test
+  fun `check in called non-suspend function`() {
+    addCheckCanceledFunctions()
+
+    myFixture.configureByText("file.kt", """
+      @file:Suppress("UNUSED_VARIABLE", "UNUSED_PARAMETER")
+      
+      import com.intellij.openapi.progress.*
+      
+      class MyClass {
+        suspend fun a() {
+          b()
+          b()
+          b()
+          b()
+          b()
+        }
+         
+        fun b() {
+          ProgressManager.<warning descr="$progressManagerDescr">check<caret>Canceled</warning>()
+        }
+      }
+      
+      fun b() {
+        ProgressManager.checkCanceled()
+      }
+    """.trimIndent())
+    myFixture.testHighlighting()
+
+    val intention = myFixture.getAvailableIntention(navigateToSuspendContextFix)
+    assertNotNullK(intention)
+    myFixture.launchAction(intention)
+
+    myFixture.checkResult("""
+      @file:Suppress("UNUSED_VARIABLE", "UNUSED_PARAMETER")
+      
+      import com.intellij.openapi.progress.*
+      
+      class MyClass {
+        suspend fun a() {
+          <caret>b()
+          b()
+          b()
+          b()
+          b()
+        }
+         
+        fun b() {
+          ProgressManager.checkCanceled()
+        }
+      }
+      
+      fun b() {
+        ProgressManager.checkCanceled()
+      }
+    """.trimIndent())
+  }
+
+  @Test
+  fun `invokeLater replace withContext`() {
+    addApplicationAndEtc()
+
+    myFixture.configureByText("file.kt", """
+      import com.intellij.openapi.application.*
+      
+      suspend fun a() {
+        ApplicationManager.getApplication().<warning descr="$invokeLaterDescr">inv<caret>okeLater</warning> {
+          println()
+        }
+      }
+    """.trimIndent())
+    myFixture.testHighlighting()
+
+    val intention = myFixture.getAvailableIntention(invokeLaterFixWithContext)
+    assertNotNullK(intention)
+    myFixture.checkPreviewAndLaunchAction(intention)
+
+    myFixture.checkResult("""
+      import com.intellij.openapi.application.*
+      import kotlinx.coroutines.Dispatchers
+      import kotlinx.coroutines.withContext
+      
+      suspend fun a() {
+        withContext(Dispatchers.EDT) {
+          println()
+        }
+      }
+    """.trimIndent())
+  }
+
+  @Test
+  fun `invokeLater with launch`() {
+    addApplicationAndEtc()
+
+    myFixture.configureByText("file.kt", """
+      import com.intellij.openapi.application.*
+      import kotlinx.coroutines.*
+      
+      suspend fun CoroutineScope.a() {
+        ApplicationManager.getApplication().<warning descr="$invokeLaterDescr">inv<caret>okeLater</warning> {
+          println()
+        }
+      }
+    """.trimIndent())
+    myFixture.testHighlighting()
+
+    val intention = myFixture.getAvailableIntention(invokeLaterFixLaunch)
+    assertNotNullK(intention)
+    myFixture.checkPreviewAndLaunchAction(intention)
+
+    myFixture.checkResult("""
+      import com.intellij.openapi.application.*
+      import kotlinx.coroutines.*
+      
+      suspend fun CoroutineScope.a() {
+          launch(Dispatchers.EDT) {
+            println()
+          }
+      }
+    """.trimIndent())
+  }
+
+  private fun addApplicationAndEtc() {
+    myFixture.addClass("""
+        package com.intellij.openapi.progress;
+        
+        public class ProcessCanceledException extends RuntimeException {
+          public ProcessCanceledException() { }
+        }
+      """.trimIndent())
+
+    myFixture.addClass("""
+        package com.intellij.openapi.application;
+        
+        import com.intellij.util.concurrency.annotations.RequiresBlockingContext;
+        import com.intellij.openapi.progress.ProcessCanceledException;
+        
+        public interface Application {
+            @RequiresBlockingContext
+            void invokeAndWait(Runnable runnable, ModalityState modalityState) throws ProcessCanceledException;
+            
+            @RequiresBlockingContext
+            void invokeAndWait(Runnable runnable) throws ProcessCanceledException;
+            
+            @RequiresBlockingContext
+            ModalityState getDefaultModalityState();
+            
+            @RequiresBlockingContext
+            void invokeLater(Runnable runnable);
+        }
+      """.trimIndent())
+
+    myFixture.addClass("""
+        package com.intellij.openapi.application;
+        
+        public class ApplicationManager {
+          public static Application getApplication() {
+            return null;
+          }
+        }
+      """.trimIndent())
+
+    myFixture.addClass("""
+        package com.intellij.openapi.application;
+        
+        import com.intellij.util.concurrency.annotations.RequiresBlockingContext;
+        
+        public abstract class ModalityState {
+          @RequiresBlockingContext
+          public static ModalityState defaultModalityState() {
+            return null;
+          }
+          
+          public static ModalityState any() {
+            return null;
+          }
+        }
+      """.trimIndent())
+
+    myFixture.configureByText("utils.kt", """
+      package com.intellij.openapi.application
+      
+      import com.intellij.util.concurrency.annotations.RequiresBlockingContext
+      
+      @RequiresBlockingContext
+      fun <T> invokeAndWaitIfNeeded(modalityState: ModalityState? = null, runnable: () -> T): T {
+      }
+    """.trimIndent())
+  }
+
   private fun addCheckCanceledFunctions() {
     myFixture.addClass("""
       package com.intellij.openapi.progress;
@@ -363,9 +821,14 @@ class ForbiddenInSuspectContextMethodInspectionTest : LightJavaCodeInsightFixtur
 
     myFixture.configureByText("utils.kt", /*language=kotlin*/ """
       package com.intellij.openapi.progress
-      
+      import kotlinx.coroutines.*
+
       @Suppress("RedundantSuspendModifier")
       suspend fun checkCancelled(): Unit = Unit
+      
+      fun <T> runBlockingCancellable(action: suspend CoroutineScope.() -> T): T {
+        throw RuntimeException("Unimplemented")
+      }
     """.trimIndent())
   }
 }
@@ -376,3 +839,4 @@ private val PROJECT_DESCRIPTOR_WITH_KOTLIN = object : DefaultLightProjectDescrip
     model.getModuleExtension(LanguageLevelModuleExtension::class.java).languageLevel = LanguageLevel.JDK_17
   }
 }.withKotlinStdlib()
+  .withRepositoryLibrary("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.4")

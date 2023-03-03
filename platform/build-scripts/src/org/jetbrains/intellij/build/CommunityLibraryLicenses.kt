@@ -112,6 +112,10 @@ object CommunityLibraryLicenses {
                    url = "https://www.antlr.org").newBsd("https://www.antlr.org/license.html"),
     LibraryLicense(name = "ap-validation", libraryName = "ap-validation",
                    url = "https://github.com/JetBrains/ap-validation").apache("https://github.com/JetBrains/ap-validation/blob/master/LICENSE"),
+
+    LibraryLicense(libraryName = "apache.logging.log4j.to.slf4j", url = "https://ant.apache.org/")
+      .apache("https://logging.apache.org/log4j/log4j-2.2/license.html"),
+
     LibraryLicense(name = "Apache Ant", version = "1.9", libraryName = "Ant", url = "https://ant.apache.org/")
       .apache("https://ant.apache.org/license.html"),
     LibraryLicense(name = "Apache Axis", libraryName = "axis-1.4", version = "1.4", url = "https://axis.apache.org/axis/")
@@ -697,9 +701,8 @@ object CommunityLibraryLicenses {
       .newBsd("https://github.com/google/protobuf/blob/master/LICENSE"),
     LibraryLicense(name = "Protocol Buffers", libraryName = "protobuf-java6", url = "https://developers.google.com/protocol-buffers")
       .newBsd("https://github.com/protocolbuffers/protobuf/blob/v3.5.1/LICENSE"),
-    LibraryLicense(name = "Proxy Vole (JetBrains's fork)", libraryName = "proxy-vole",
-                   url = "https://github.com/JetBrains/intellij-deps-proxy-vole")
-      .apache("https://github.com/MarkusBernhardt/proxy-vole/blob/master/LICENSE.md"),
+    LibraryLicense(name = "Proxy Vole", libraryName = "proxy-vole", url = "https://github.com/akuhtz/proxy-vole")
+      .apache("https://github.com/akuhtz/proxy-vole/blob/master/LICENSE.md"),
     LibraryLicense(name = "pty4j", libraryName = "pty4j",
                    url = "https://github.com/JetBrains/pty4j")
       .eplV1("https://github.com/JetBrains/pty4j/blob/master/LICENSE"),

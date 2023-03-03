@@ -69,18 +69,29 @@ class JCefImageViewer(private val myFile: VirtualFile,
     private const val IMAGE_PATH = "/image"
     private const val SCROLLBARS_CSS_PATH = "/scrollbars.css"
     private const val CHESSBOARD_CSS_PATH = "/chessboard.css"
+    private const val GRID_CSS_PATH = "/pixel_grid.css"
 
     private const val VIEWER_URL = "$PROTOCOL://$HOST_NAME$VIEWER_PATH"
     private const val IMAGE_URL = "$PROTOCOL://$HOST_NAME$IMAGE_PATH"
     private const val SCROLLBARS_STYLE_URL = "$PROTOCOL://$HOST_NAME$SCROLLBARS_CSS_PATH"
     private const val CHESSBOARD_STYLE_URL = "$PROTOCOL://$HOST_NAME$CHESSBOARD_CSS_PATH"
+    private const val GRID_STYLE_URL = "$PROTOCOL://$HOST_NAME$GRID_CSS_PATH"
+
+    private val ourCefClient = JBCefApp.getInstance().createClient()
+
+    init {
+      Disposer.register(ApplicationManager.getApplication(), ourCefClient)
+    }
+
+    @JvmStatic
+    fun isDebugMode() = RegistryManager.getInstance().`is`("ide.browser.jcef.svg-viewer.debug")
   }
 
   private val myDocument: Document = FileDocumentManager.getInstance().getDocument(myFile)!!
-  private val myCefClient: JBCefClient = JBCefApp.getInstance().createClient()
-  private val myBrowser: JBCefBrowser = JBCefBrowserBuilder().setClient(myCefClient).build()
+  private val myBrowser: JBCefBrowser = JBCefBrowserBuilder().setClient(ourCefClient).setEnableOpenDevToolsMenuItem(isDebugMode()).build()
   private val myUIComponent: JCefImageViewerUI
   private val myViewerStateJSQuery: JBCefJSQuery
+  private val myRequestHandler: CefRequestHandler
 
   private var myState = ViewerState()
   private var myEditorState: ImageFileEditorState = ImageFileEditorState(
@@ -117,21 +128,14 @@ class JCefImageViewer(private val myFile: VirtualFile,
         return
       }
 
-      if (options.isSmartZooming) {
-        val zoomFactor = options.getSmartZoomFactor(
-          Rectangle(Point(0, 0), Dimension(myState.imageSize.width, myState.imageSize.height)),
-          Dimension(myState.viewportSize.width, myState.viewportSize.height),
-          5
-        )
-        execute("setZoom(${zoomFactor});")
-      }
-      else {
+      if (!options.isSmartZooming) {
         execute("setZoom(${state.zoomFactor});")
       }
     }
   }
 
   override fun dispose() {
+    ourCefClient.removeRequestHandler(myRequestHandler, myBrowser.cefBrowser)
     myViewerStateJSQuery.clearHandlers()
     myDocument.removeDocumentListener(this)
   }
@@ -179,23 +183,27 @@ class JCefImageViewer(private val myFile: VirtualFile,
 
   init {
     myDocument.addDocumentListener(this)
-    val resourceRequestHandler = CefLocalRequestHandler(PROTOCOL, HOST_NAME)
+    myRequestHandler = CefLocalRequestHandler(PROTOCOL, HOST_NAME)
 
-    resourceRequestHandler.addResource(VIEWER_PATH) {
+    myRequestHandler.addResource(VIEWER_PATH) {
       javaClass.getResourceAsStream("resources/image_viewer.html")?.let {
         CefStreamResourceHandler(it, "text/html", this@JCefImageViewer)
       }
     }
 
-    resourceRequestHandler.addResource(SCROLLBARS_CSS_PATH) {
+    myRequestHandler.addResource(SCROLLBARS_CSS_PATH) {
       CefStreamResourceHandler(ByteArrayInputStream(buildScrollbarsStyle().toByteArray(StandardCharsets.UTF_8)), "text/css", this)
     }
 
-    resourceRequestHandler.addResource(CHESSBOARD_CSS_PATH) {
+    myRequestHandler.addResource(CHESSBOARD_CSS_PATH) {
       CefStreamResourceHandler(ByteArrayInputStream(buildChessboardStyle().toByteArray(StandardCharsets.UTF_8)), "text/css", this)
     }
 
-    resourceRequestHandler.addResource(IMAGE_PATH) {
+    myRequestHandler.addResource(GRID_CSS_PATH) {
+      CefStreamResourceHandler(ByteArrayInputStream(buildGridStyle().toByteArray(StandardCharsets.UTF_8)), "text/css", this)
+    }
+
+    myRequestHandler.addResource(IMAGE_PATH) {
       var stream: InputStream? = null
       try {
         stream = if (FileUtilRt.isTooLarge(myFile.length)) myFile.inputStream
@@ -217,15 +225,16 @@ class JCefImageViewer(private val myFile: VirtualFile,
       }
     }
 
-    myCefClient.addRequestHandler(resourceRequestHandler, myBrowser.cefBrowser)
+    ourCefClient.addRequestHandler(myRequestHandler, myBrowser.cefBrowser)
 
-    myUIComponent = JCefImageViewerUI(myBrowser.cefBrowser.uiComponent, this)
+    myUIComponent = JCefImageViewerUI(myBrowser.component, this)
     Disposer.register(this, myUIComponent)
+    Disposer.register(this, myBrowser)
 
     @Suppress("DEPRECATION")
     myViewerStateJSQuery = JBCefJSQuery.create(myBrowser)
     myViewerStateJSQuery.addHandler { s: String ->
-      val oldStatus = myState.status
+      val oldState = myState
       try {
         myState = jsonParser.decodeFromString(s)
       }
@@ -234,8 +243,15 @@ class JCefImageViewer(private val myFile: VirtualFile,
         return@addHandler JBCefJSQuery.Response(null, 255, "Failed to parse the viewer state")
       }
 
-      // Init the viewer zoom factor
-      if (oldStatus == ViewerState.Status.INIT && oldStatus != myState.status) setState(myEditorState)
+      val zoomOptions = OptionsManager.getInstance().options.editorOptions.zoomOptions
+      if (oldState.status == ViewerState.Status.INIT && zoomOptions.isSmartZooming) {
+        val zoomFactor = zoomOptions.getSmartZoomFactor(
+          Rectangle(Point(0, 0), Dimension(myState.imageSize.width, myState.imageSize.height)),
+          Dimension(myState.viewportSize.width, myState.viewportSize.height),
+          5
+        )
+        execute("setZoom(${zoomFactor});")
+      }
 
       SwingUtilities.invokeLater {
         if (myState.status == ViewerState.Status.OK) {
@@ -253,18 +269,20 @@ class JCefImageViewer(private val myFile: VirtualFile,
       JBCefJSQuery.Response(null)
     }
 
-    myCefClient.addLoadHandler(object : CefLoadHandlerAdapter() {
+    ourCefClient.addLoadHandler(object : CefLoadHandlerAdapter() {
       override fun onLoadEnd(browser: CefBrowser, frame: CefFrame, httpStatusCode: Int) {
-        reloadStyles()
-        execute("sendInfo = function(info_text) {${myViewerStateJSQuery.inject("info_text")};}")
-        execute("setImageUrl('$IMAGE_URL');")
-        isGridVisible = myEditorState.isGridVisible
-        isTransparencyChessboardVisible = myEditorState.isBackgroundVisible
-        setBorderVisible(ShowBorderAction.isBorderVisible())
+        if (frame.isMain) {
+          reloadStyles()
+          execute("sendInfo = function(info_text) {${myViewerStateJSQuery.inject("info_text")};}")
+          execute("setImageUrl('$IMAGE_URL');")
+          isGridVisible = myEditorState.isGridVisible
+          isTransparencyChessboardVisible = myEditorState.isBackgroundVisible
+          setBorderVisible(ShowBorderAction.isBorderVisible())
+        }
       }
     }, myBrowser.cefBrowser)
 
-    if (RegistryManager.getInstance().`is`("ide.browser.jcef.svg-viewer.debug")) {
+    if (isDebugMode()) {
       myBrowser.loadURL("$VIEWER_URL?debug")
     }
     else {
@@ -409,10 +427,27 @@ class JCefImageViewer(private val myFile: VirtualFile,
     """.trimIndent()
   }
 
+  private fun buildGridStyle(): String {
+    val color = colorToCSS(OptionsManager.getInstance().options.editorOptions.gridOptions.lineColor)
+    return /*language=css*/ """
+      #pixel_grid {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        background-image: linear-gradient(to right, ${color} 1px, transparent 1px),
+        linear-gradient(to bottom, ${color} 1px, transparent 1px);
+        background-size: 1px 1px;
+        mix-blend-mode: normal;
+      }
+      """.trimIndent()
+  }
+
   private fun reloadStyles() {
     execute("""
       loadScrollbarsStyle('$SCROLLBARS_STYLE_URL');
       loadChessboardStyle('$CHESSBOARD_STYLE_URL');
+      loadPixelGridStyle('$GRID_STYLE_URL');
     """.trimIndent())
   }
 }

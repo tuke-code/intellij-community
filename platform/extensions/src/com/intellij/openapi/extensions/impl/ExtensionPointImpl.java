@@ -287,7 +287,7 @@ public abstract class ExtensionPointImpl<T extends @NotNull Object> implements E
 
   public final void processWithPluginDescriptor(boolean shouldBeSorted, @NotNull BiConsumer<? super T, ? super PluginDescriptor> consumer) {
     if (isInReadOnlyMode()) {
-      for (T extension : cachedExtensions) {
+      for (T extension : cachedExtensionsAsArray) {
         consumer.accept(extension, pluginDescriptor /* doesn't matter for tests */);
       }
       return;
@@ -303,7 +303,7 @@ public abstract class ExtensionPointImpl<T extends @NotNull Object> implements E
 
   public final void processImplementations(boolean shouldBeSorted, @NotNull BiConsumer<? super Supplier<? extends @Nullable T>, ? super PluginDescriptor> consumer) {
     if (isInReadOnlyMode()) {
-      for (T extension : cachedExtensions) {
+      for (T extension : cachedExtensionsAsArray) {
         consumer.accept((Supplier<T>)() -> extension, pluginDescriptor /* doesn't matter for tests */);
       }
       return;
@@ -368,14 +368,14 @@ public abstract class ExtensionPointImpl<T extends @NotNull Object> implements E
 
   @Override
   public final @NotNull Stream<T> extensions() {
-    List<T> result = cachedExtensions;
-    return result == null ? StreamSupport.stream(spliterator(), false) : result.stream();
+    T[] result = cachedExtensionsAsArray;
+    return result == null ? StreamSupport.stream(spliterator(), false) : Arrays.stream(result);
   }
 
   @Override
   public final int size() {
-    List<T> cache = cachedExtensions;
-    return cache == null ? adapters.size() : cache.size();
+    T[] cache = cachedExtensionsAsArray;
+    return cache == null ? adapters.size() : cache.length;
   }
 
   public final @NotNull List<ExtensionComponentAdapter> getSortedAdapters() {
@@ -542,9 +542,10 @@ public abstract class ExtensionPointImpl<T extends @NotNull Object> implements E
     List<ExtensionComponentAdapter> oldAdapters = adapters;
     boolean oldAdaptersAreSorted = adaptersAreSorted;
 
-    cachedExtensions = ContainerUtil.immutableList(newList);
     //noinspection unchecked
-    cachedExtensionsAsArray = newList.toArray((T[])Array.newInstance(getExtensionClass(), 0));
+    T[] newArray = newList.toArray((T[])Array.newInstance(getExtensionClass(), 0));
+    cachedExtensionsAsArray = newArray;
+    cachedExtensions = ContainerUtil.immutableList(newArray);
     adapters = ContainerUtil.map(newList, it -> new ObjectComponentAdapter<>(it, pluginDescriptor, LoadingOrder.ANY));
     adaptersAreSorted = true;
 
@@ -978,7 +979,7 @@ public abstract class ExtensionPointImpl<T extends @NotNull Object> implements E
       }
     }
 
-    List<T> extensionsCache = cachedExtensions;
+    T[] extensionsCache = cachedExtensionsAsArray;
     if (extensionsCache == null) {
       for (ExtensionComponentAdapter adapter : getSortedAdapters()) {
         // findExtension is called for a lot of extension point - do not fail if listeners were added (e.g., FacetTypeRegistryImpl)
@@ -1004,7 +1005,7 @@ public abstract class ExtensionPointImpl<T extends @NotNull Object> implements E
 
     if (isRequired) {
       @NonNls String message = "cannot find extension implementation " + aClass + "(epName=" + getName() + ", extensionCount=" + size();
-      List<T> cache = cachedExtensions;
+      T[] cache = cachedExtensionsAsArray;
       if (cache != null) {
         message += ", cachedExtensions";
       }
@@ -1018,7 +1019,7 @@ public abstract class ExtensionPointImpl<T extends @NotNull Object> implements E
   }
 
   public final <V> @NotNull List<@NotNull T> findExtensions(@NotNull Class<V> aClass) {
-    List<T> extensionsCache = cachedExtensions;
+    T[] extensionsCache = cachedExtensionsAsArray;
     if (extensionsCache == null) {
       List<T> suitableInstances = new ArrayList<>();
       for (ExtensionComponentAdapter adapter : getSortedAdapters()) {
@@ -1043,7 +1044,7 @@ public abstract class ExtensionPointImpl<T extends @NotNull Object> implements E
   }
 
   private @Nullable T findExtensionByExactClass(@NotNull Class<? extends T> aClass) {
-    List<T> cachedExtensions = this.cachedExtensions;
+    T[] cachedExtensions = this.cachedExtensionsAsArray;
     if (cachedExtensions == null) {
       for (ExtensionComponentAdapter adapter : getSortedAdapters()) {
         Object classOrName = adapter.implementationClassOrName;

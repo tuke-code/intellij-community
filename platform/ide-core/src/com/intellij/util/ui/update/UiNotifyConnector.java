@@ -15,6 +15,7 @@ import java.awt.*;
 import java.awt.event.HierarchyEvent;
 import java.awt.event.HierarchyListener;
 import java.lang.ref.WeakReference;
+import java.util.Objects;
 
 public class UiNotifyConnector implements Disposable, HierarchyListener {
   @NotNull
@@ -22,9 +23,65 @@ public class UiNotifyConnector implements Disposable, HierarchyListener {
   private Activatable myTarget;
   private boolean myDeferred = true;
 
+  /**
+   * @param sig parameter is used to avoid clash with the deprecated constructor
+   */
+  protected UiNotifyConnector(@NotNull Component component, @NotNull Activatable target, Void sig) {
+    myComponent = new WeakReference<>(component);
+    myTarget = target;
+  }
+
+  /**
+   * @param sig parameter is used to avoid clash with the deprecated constructor
+   */
+  protected UiNotifyConnector(@NotNull Component component, @NotNull Activatable target, boolean deferred, Void sig) {
+    this(component, target, sig);
+    myDeferred = deferred;
+  }
+
+  public static UiNotifyConnector installOn(@NotNull Component component, @NotNull Activatable target, boolean deferred) {
+    UiNotifyConnector connector = new UiNotifyConnector(component, target, deferred, null);
+    connector.setupListeners();
+    return connector;
+  }
+
+  public static UiNotifyConnector installOn(@NotNull Component component, @NotNull Activatable target) {
+    UiNotifyConnector connector = new UiNotifyConnector(component, target, null);
+    connector.setupListeners();
+    return connector;
+  }
+
+  /**
+   * @deprecated Use the static method {@link UiNotifyConnector#installOn(Component, Activatable, boolean)}.
+   * <p>
+   * For inheritance use the non-deprecated constructor.
+   * <p>
+   * Also, note that non-deprecated constructor is side effect free, and you should call for {@link UiNotifyConnector#setupListeners()}
+   * method
+   */
+  @Deprecated
   public UiNotifyConnector(@NotNull Component component, @NotNull Activatable target) {
     myComponent = new WeakReference<>(component);
     myTarget = target;
+    setupListeners();
+  }
+
+  /**
+   * @deprecated Use the static method {@link UiNotifyConnector#installOn(Component, Activatable, boolean)}.
+   * <p>
+   * For inheritance use the non-deprecated constructor.
+   * <p>
+   * Also, note that non-deprecated constructor is side effect free, and you should call for {@link UiNotifyConnector#setupListeners()}
+   * method
+   */
+  @Deprecated
+  public UiNotifyConnector(@NotNull Component component, @NotNull Activatable target, boolean deferred) {
+    this(component, target);
+    myDeferred = deferred;
+  }
+
+  public void setupListeners() {
+    Component component = Objects.requireNonNull(myComponent.get());
     if (UIUtil.isShowing(component, false)) {
       showNotify();
     }
@@ -35,11 +92,6 @@ public class UiNotifyConnector implements Disposable, HierarchyListener {
       return;
     }
     component.addHierarchyListener(this);
-  }
-
-  public UiNotifyConnector(@NotNull Component component, @NotNull Activatable target, boolean deferred) {
-    this(component, target);
-    myDeferred = deferred;
   }
 
   @Override
@@ -112,6 +164,28 @@ public class UiNotifyConnector implements Disposable, HierarchyListener {
     private boolean myShown;
     private boolean myHidden;
 
+    /**
+     * Use {@link Once#installOn(Component, Activatable, boolean) method}
+     * @param sig parameter is used to avoid clash with the deprecated constructor
+     */
+    private Once(final Component component, final Activatable target, Void sig) {
+      super(component, target);
+    }
+
+    @SuppressWarnings("MethodOverridesStaticMethodOfSuperclass")
+    public static Once installOn(final @NotNull Component component, final @NotNull Activatable target) {
+      Once once = new Once(component, target, null);
+      once.setupListeners();
+      return once;
+    }
+
+    /**
+     * @deprecated Use the static method {@link Once#installOn(Component, Activatable, boolean)}.
+     * <p>
+     * Also, note that non-deprecated constructor is side effect free, and you should call for {@link Once#setupListeners()}
+     * method
+     */
+    @Deprecated
     public Once(final Component component, final Activatable target) {
       super(component, target);
     }
@@ -158,13 +232,14 @@ public class UiNotifyConnector implements Disposable, HierarchyListener {
   }
 
   private static void doWhenFirstShown(@NotNull Component c, @NotNull Activatable activatable, @Nullable Disposable parent) {
-    UiNotifyConnector connector = new UiNotifyConnector(c, activatable) {
+    UiNotifyConnector connector = new UiNotifyConnector(c, activatable, null) {
       @Override
       protected void showNotify() {
         super.showNotify();
         Disposer.dispose(this);
       }
     };
+    connector.setupListeners();
     if (parent != null) {
       Disposer.register(parent, connector);
     }

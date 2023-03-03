@@ -18,10 +18,7 @@ import com.intellij.ide.ui.laf.IntelliJLaf
 import com.intellij.ide.ui.laf.darcula.DarculaLaf
 import com.intellij.idea.DirectoryLock.CannotActivateException
 import com.intellij.jna.JnaLoader
-import com.intellij.openapi.application.ApplicationInfo
-import com.intellij.openapi.application.ApplicationNamesInfo
-import com.intellij.openapi.application.ConfigImportHelper
-import com.intellij.openapi.application.PathManager
+import com.intellij.openapi.application.*
 import com.intellij.openapi.application.ex.ApplicationInfoEx
 import com.intellij.openapi.application.ex.ApplicationManagerEx
 import com.intellij.openapi.application.impl.*
@@ -191,6 +188,12 @@ fun CoroutineScope.startApplication(args: List<String>,
     updateFrameClassAndWindowIconAndPreloadSystemFonts(initLafJob)
   }
 
+  if (System.getProperty("idea.enable.coroutine.dump", "true").toBoolean()) {
+    launch(CoroutineName("coroutine debug probes init")) {
+      enableCoroutineDump()
+    }
+  }
+
   loadSystemLibsAndLogInfoAndInitMacApp(logDeferred, appInfoDeferred, initLafJob, args)
 
   // async - handle error separately
@@ -233,7 +236,16 @@ fun CoroutineScope.startApplication(args: List<String>,
 
     val rwLockHolder = rwLockHolderDeferred.await()
     val app = runActivity("app instantiation") {
-      ApplicationImpl(isInternal, AppMode.isHeadless(), AppMode.isCommandLine(), rwLockHolder)
+      val app = ApplicationImpl(isInternal, AppMode.isHeadless(), AppMode.isCommandLine(), rwLockHolder)
+      // acquire IW lock on EDT indefinitely in legacy mode
+      if (!isImplicitReadOnEDTDisabled) {
+        subtask("AppDelayQueue instantiation", RawSwingDispatcher) {
+          app.acquireWriteIntentLock(null)
+        }
+      }
+      ApplicationImpl.postInit(app)
+      ApplicationManager.setApplication(app)
+      app
     }
 
     runActivity("telemetry waiting") {

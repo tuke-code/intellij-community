@@ -1133,6 +1133,11 @@ public class RenameTestGenerated extends AbstractRenameTest {
         runTest("testData/refactoring/rename/renameKotlinValPropertyInObject/renameKotlinValPropertyInObject.test");
     }
 
+    @TestMetadata("renameKotlinValPropertyWithKDoc/renameKotlinValPropertyWithKDoc.test")
+    public void testRenameKotlinValPropertyWithKDoc_RenameKotlinValPropertyWithKDoc() throws Exception {
+        runTest("testData/refactoring/rename/renameKotlinValPropertyWithKDoc/renameKotlinValPropertyWithKDoc.test");
+    }
+
     @TestMetadata("renameKotlinValProperty/renameAsJavaGetterForExplicitGetter.test")
     public void testRenameKotlinValProperty_RenameAsJavaGetterForExplicitGetter() throws Exception {
         runTest("testData/refactoring/rename/renameKotlinValProperty/renameAsJavaGetterForExplicitGetter.test");
@@ -1206,6 +1211,11 @@ public class RenameTestGenerated extends AbstractRenameTest {
     @TestMetadata("renameReferencedResourceFile/renameReferencedResourceFile.test")
     public void testRenameReferencedResourceFile_RenameReferencedResourceFile() throws Exception {
         runTest("testData/refactoring/rename/renameReferencedResourceFile/renameReferencedResourceFile.test");
+    }
+
+    @TestMetadata("renameSamConstructorDescriptor/renameSamConstructorDescriptor.test")
+    public void testRenameSamConstructorDescriptor_RenameSamConstructorDescriptor() throws Exception {
+        runTest("testData/refactoring/rename/renameSamConstructorDescriptor/renameSamConstructorDescriptor.test");
     }
 
     @TestMetadata("renameSet/set.test")

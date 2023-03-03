@@ -7,7 +7,7 @@ import java.nio.file.Path
 
 class EntityCodeGenTest : CodeGenerationTestBase() {
   override val testDataDirectory: File
-    get() = File(PathManagerEx.getCommunityHomePath() + "/plugins/devkit/intellij.devkit.workspaceModel/tests/testData/$testDirectoryName")
+    get() = File(PathManagerEx.getCommunityHomePath() + "/plugins/devkit/intellij.devkit.workspaceModel/tests/testData/codeGen/$testDirectoryName")
 
   override fun setUp() {
     super.setUp()
@@ -67,6 +67,14 @@ class EntityCodeGenTest : CodeGenerationTestBase() {
   }
 
   fun testBothLinksAreChildren() {
+    assertThrows(IllegalStateException::class.java) { doTest() }
+  }
+
+  fun testVarFieldForbidden() {
+    assertThrows(IllegalStateException::class.java) { doTest() }
+  }
+
+  fun testSymbolicIdNotDeclared() {
     assertThrows(IllegalStateException::class.java) { doTest() }
   }
 

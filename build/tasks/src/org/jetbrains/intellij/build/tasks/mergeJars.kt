@@ -202,7 +202,6 @@ private fun getIgnoredNames(): Set<String> {
   set.add("pom.xml")
   set.add("about.html")
   set.add("module-info.class")
-  set.add("META-INF/versions/9/module-info.class")
   set.add("META-INF/services/javax.xml.parsers.SAXParserFactory")
   set.add("META-INF/services/javax.xml.stream.XMLEventFactory")
   set.add("META-INF/services/javax.xml.parsers.DocumentBuilderFactory")
@@ -285,7 +284,6 @@ private fun checkName(name: String,
 
          // XmlRPC lib
          !name.startsWith("org/xml/sax/") &&
-         !name.startsWith("kotlinx/coroutines/repackaged/") &&
 
          !name.startsWith("native/") &&
          !name.startsWith("licenses/") &&

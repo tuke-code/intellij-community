@@ -115,6 +115,8 @@ class BuildOptions {
 
     const val ARCHIVE_PLUGINS = "archivePlugins"
 
+    const val VALIDATE_PLUGINS_TO_BE_PUBLISHED = "validatePluginsToBePublished"
+
     /**
      * Publish artifacts to TeamCity storage while the build is still running, immediately after the artifacts are built.
      * Comprises many small publication steps.
@@ -156,6 +158,11 @@ class BuildOptions {
      * @see [org.jetbrains.intellij.build.impl.CompilationContextImpl.classesOutputDirectory]
      */
     const val USE_COMPILED_CLASSES_PROPERTY = "intellij.build.use.compiled.classes"
+
+    /**
+     * By default, if the incremental compilation fails, a clean rebuild is attempted.
+     */
+    const val INCREMENTAL_COMPILATION_FALLBACK_REBUILD_PROPERTY = "intellij.build.incremental.compilation.fallback.rebuild"
 
     /**
      * Enables module structure validation, false by default
@@ -248,6 +255,12 @@ class BuildOptions {
    * If `true` the project modules will be compiled incrementally
    */
   var incrementalCompilation = SystemProperties.getBooleanProperty("intellij.build.incremental.compilation", false)
+
+  /**
+   * If `true`, and the incremental compilation fails, fallback to downloading Portable Compilation Cache and full rebuild.
+   */
+  var incrementalCompilationFallbackRebuild =
+    SystemProperties.getBooleanProperty(INCREMENTAL_COMPILATION_FALLBACK_REBUILD_PROPERTY, true)
 
   /**
    * Build number without product code (e.g. '162.500.10'), if `null` '&lt;baseline&gt;.SNAPSHOT' will be used. Use [BuildContext.buildNumber] to

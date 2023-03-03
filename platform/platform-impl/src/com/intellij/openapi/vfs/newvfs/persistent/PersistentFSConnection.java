@@ -47,7 +47,7 @@ final public class PersistentFSConnection {
   static final AttrPageAwareCapacityAllocationPolicy REASONABLY_SMALL = new AttrPageAwareCapacityAllocationPolicy();
   private static final int FIRST_ATTR_ID_OFFSET = FSRecords.bulkAttrReadSupport ? RESERVED_ATTR_ID : 0;
 
-  private static final boolean USE_GENTLE_FLUSHER = SystemProperties.getBooleanProperty("vfs.flushing.use-gentle-flusher", false);
+  private static final boolean USE_GENTLE_FLUSHER = SystemProperties.getBooleanProperty("vfs.flushing.use-gentle-flusher", true);
 
 
   private final IntList myFreeRecords;
@@ -240,7 +240,7 @@ final public class PersistentFSConnection {
       myAttributesStorage.force();
       myContents.force();
       if (myContentHashesEnumerator != null) myContentHashesEnumerator.force();
-      markClean();
+      writeConnectionState();
       myRecords.force();
     }
   }
@@ -255,7 +255,7 @@ final public class PersistentFSConnection {
       flushingTask.close();
     }
 
-    markClean(); 
+    writeConnectionState();
     closeStorages(myRecords,
                   myNames,
                   myAttributesStorage,
@@ -302,7 +302,7 @@ final public class PersistentFSConnection {
     }
   }
 
-  void markClean() throws IOException {
+  private void writeConnectionState() throws IOException {
     // no synchronization, it's ok to have race here
     if (myDirty) {
       myDirty = false;
@@ -497,7 +497,7 @@ final public class PersistentFSConnection {
           }
         }
 
-        markClean();
+        writeConnectionState();
         myRecords.force();
 
         unspentContentionQuota -= competingThreads();

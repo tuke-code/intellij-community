@@ -193,7 +193,7 @@ internal suspend fun createPlatformLayout(addPlatformCoverage: Boolean,
   layout.withProjectLibrary(libraryName = "aalto-xml", jarName = UTIL_8_JAR)
 
   // used by intellij.database.jdbcConsole -
-  // cannot be in UTIL_8_JAR, because this JAR must contain classes for java versions <= 8 only
+  // cannot be in 3rd-party-rt.jar, because this JAR must contain classes for java versions <= 7 only
   layout.withProjectLibrary(libraryName = "jbr-api", jarName = UTIL_JAR)
   // util.jar is loaded by JVM classloader as part of loading our custom PathClassLoader class - reduce file size
   addModule(UTIL_JAR, listOf(
@@ -208,15 +208,11 @@ internal suspend fun createPlatformLayout(addPlatformCoverage: Boolean,
   addModule("externalProcess-rt.jar", listOf(
     "intellij.platform.externalProcessAuthHelper.rt"
   ), productLayout = productLayout, layout = layout)
-
-  // ap-validation
   addModule("stats.jar", listOf(
     "intellij.platform.statistics",
     "intellij.platform.statistics.uploader",
     "intellij.platform.statistics.config",
   ), productLayout = productLayout, layout = layout)
-  layout.withProjectLibrary("ap-validation", "stats.jar")
-
   if (!productLayout.excludedModuleNames.contains("intellij.java.guiForms.rt")) {
     layout.withModule("intellij.java.guiForms.rt", "forms_rt.jar")
   }
@@ -445,9 +441,7 @@ private suspend fun getProductPluginContentModules(context: BuildContext, produc
   val modules = content.children("module")
   val result = LinkedHashSet<ModuleItem>()
   for (module in modules) {
-    result.add(ModuleItem(moduleName = module.attributes.get("name") ?: continue,
-                          relativeOutputFile = "modules.jar",
-                          reason = "productModule"))
+    result.add(ModuleItem(moduleName = module.attributes.get("name") ?: continue, relativeOutputFile = APP_JAR, reason = "productModule"))
   }
   return result
 }

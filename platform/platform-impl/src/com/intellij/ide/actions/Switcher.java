@@ -163,7 +163,7 @@ public final class Switcher extends BaseSwitcherAction {
       pinned = !onKeyRelease.isEnabled();
       boolean onlyEdited = Boolean.TRUE.equals(onlyEditedFiles);
       myTitle = title;
-      mySpeedSearch = recent && is("ide.recent.files.speed.search") ? new SwitcherSpeedSearch(this) : null;
+      mySpeedSearch = recent && is("ide.recent.files.speed.search") ? SwitcherSpeedSearch.Companion.installOn(this) : null;
       cbShowOnlyEditedFiles = !recent || !Experiments.getInstance().isFeatureEnabled("recent.and.edited.files.together")
                                       ? null : new JCheckBox(IdeBundle.message("recent.files.checkbox.label"));
 
@@ -808,7 +808,7 @@ public final class Switcher extends BaseSwitcherAction {
 
     @TestOnly
     static List<VirtualFile> getFilesToShowForTest(@NotNull Project project) {
-      return ContainerUtil.map2List(getFilesToShow(project, false, 10, true), SwitcherVirtualFile::getFile);
+      return ContainerUtil.map(getFilesToShow(project, false, 10, true), SwitcherVirtualFile::getFile);
     }
 
     @TestOnly

@@ -6,6 +6,7 @@ import com.intellij.navigation.TargetPresentation
 import com.intellij.psi.PsiElement
 
 class ItemWithPresentation(val item: Any, var presentation: TargetPresentation) : Pointer<PsiElement?> {
+
   override fun dereference(): PsiElement? {
     return if (item is Pointer<*>) item.dereference() as PsiElement? else null
   }

@@ -18,6 +18,7 @@ import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.util.IconLoader;
 import com.intellij.openapi.util.NlsContexts;
 import com.intellij.openapi.util.SystemInfo;
+import com.intellij.openapi.util.registry.Registry;
 import com.intellij.openapi.wm.IdeFocusManager;
 import com.intellij.ui.GuiUtils;
 import com.intellij.ui.UIBundle;
@@ -90,8 +91,10 @@ public class ComponentWithBrowseButton<Comp extends JComponent> extends JPanel i
     if (ScreenReader.isActive()) {
       myBrowseButton.setFocusable(true);
       myBrowseButton.getAccessibleContext().setAccessibleName(UIBundle.message("component.with.browse.button.accessible.name"));
+    } else if (Registry.is("ide.browse.button.always.focusable", false)) {
+      myBrowseButton.setFocusable(true);
     }
-    new LazyDisposable(this);
+    LazyDisposable.installOn(this);
 
     Insets insets = myComponent.getInsets();
     Gaps visualPaddings = new Gaps(insets.top, insets.left, insets.bottom, inlineBrowseButton ? insets.right : myBrowseButton.getInsets().right);
@@ -326,7 +329,11 @@ public class ComponentWithBrowseButton<Comp extends JComponent> extends JPanel i
 
     private LazyDisposable(ComponentWithBrowseButton<?> component) {
       reference = new WeakReference<>(component);
-      new UiNotifyConnector.Once(component, this);
+    }
+
+    private static void installOn(ComponentWithBrowseButton<?> component) {
+      LazyDisposable disposable = new LazyDisposable(component);
+      UiNotifyConnector.Once.installOn(component, disposable);
     }
 
     @Override

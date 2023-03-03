@@ -173,11 +173,6 @@ final class ZipResourceFile implements ResourceFile {
     public byte @NotNull [] getBytes() throws IOException {
       return entry.getData();
     }
-
-    @Override
-    public @NotNull ByteBuffer getByteBuffer() throws IOException {
-      return entry.getByteBuffer();
-    }
   }
 
   private static final class MyJarUrlStreamHandler extends URLStreamHandler {

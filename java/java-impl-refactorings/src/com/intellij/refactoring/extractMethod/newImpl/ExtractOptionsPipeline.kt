@@ -2,11 +2,12 @@
 package com.intellij.refactoring.extractMethod.newImpl
 
 import com.intellij.codeInsight.AnnotationUtil.*
+import com.intellij.codeInsight.daemon.impl.analysis.HighlightingFeature
 import com.intellij.codeInsight.daemon.impl.analysis.JavaHighlightUtil
 import com.intellij.codeInsight.daemon.impl.quickfix.AnonymousTargetClassPreselectionUtil
-import com.intellij.codeInsight.navigation.NavigationUtil
-import com.intellij.ide.util.PsiClassListCellRenderer
+import com.intellij.codeInsight.navigation.PsiTargetNavigator
 import com.intellij.openapi.editor.Editor
+import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.TextRange
 import com.intellij.openapi.util.text.StringUtil
 import com.intellij.pom.java.LanguageLevel
@@ -31,6 +32,7 @@ import com.intellij.refactoring.extractMethod.newImpl.structures.ExtractOptions
 import com.intellij.refactoring.extractMethod.newImpl.structures.InputParameter
 import com.intellij.refactoring.util.RefactoringUtil
 import com.intellij.refactoring.util.VariableData
+import com.siyeh.ig.psiutils.ClassUtils
 import java.util.concurrent.CompletableFuture
 
 object ExtractMethodPipeline {
@@ -148,7 +150,7 @@ object ExtractMethodPipeline {
       .toList()
   }
 
-  fun selectOptionWithTargetClass(editor: Editor, options: List<ExtractOptions>): CompletableFuture<ExtractOptions> {
+  fun selectOptionWithTargetClass(editor: Editor, project: Project, options: List<ExtractOptions>): CompletableFuture<ExtractOptions> {
     require(options.isNotEmpty())
     if (options.size == 1) {
       return CompletableFuture.completedFuture(options.first())
@@ -165,9 +167,9 @@ object ExtractMethodPipeline {
     }
 
     val preselection = findDefaultTargetCandidate(classToOptionMap.keys.toList())
-    NavigationUtil
-      .getPsiElementPopup(classToOptionMap.keys.toTypedArray(), PsiClassListCellRenderer(),
-                          RefactoringBundle.message("choose.destination.class"), processor, preselection)
+    PsiTargetNavigator(classToOptionMap.keys.toTypedArray()).selection(preselection)
+      .createPopup(project,
+                          RefactoringBundle.message("choose.destination.class"), processor)
       .showInBestPositionFor(editor)
 
     return selectedOption
@@ -221,14 +223,19 @@ object ExtractMethodPipeline {
 
   fun withForcedStatic(analyzer: CodeFragmentAnalyzer, extractOptions: ExtractOptions): ExtractOptions? {
     val targetClass = PsiTreeUtil.getParentOfType(extractOptions.anchor, PsiClass::class.java)!!
-    if (PsiUtil.isLocalOrAnonymousClass(targetClass) || PsiUtil.isInnerClass(targetClass)) return null
+    val isInnerClass = PsiUtil.isLocalOrAnonymousClass(targetClass) || PsiUtil.isInnerClass(targetClass)
+    if (isInnerClass && !HighlightingFeature.INNER_STATICS.isAvailable(targetClass)) return null
     val memberUsages = analyzer.findInstanceMemberUsages(targetClass, extractOptions.elements)
-    if (memberUsages.any { usage -> PsiUtil.isAccessedForWriting(usage.reference)}) return null
+    if (memberUsages.any(::isNotExtractableUsage)) return null
     val addedParameters = memberUsages.groupBy(MemberUsage::member).entries
       .map { (member: PsiMember, usages: List<MemberUsage>) ->
         createInputParameter(member, usages.map(MemberUsage::reference)) ?: return null
       }
     return extractOptions.copy(inputParameters = extractOptions.inputParameters + addedParameters, isStatic = true)
+  }
+
+  private fun isNotExtractableUsage(usage: MemberUsage): Boolean {
+    return PsiUtil.isAccessedForWriting(usage.reference) || (usage.member is PsiClass && ClassUtils.isNonStaticClass(usage.member))
   }
 
   private fun createInputParameter(member: PsiMember, usages: List<PsiExpression>): InputParameter? {

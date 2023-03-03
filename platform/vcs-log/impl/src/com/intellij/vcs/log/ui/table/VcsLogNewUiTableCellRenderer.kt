@@ -29,7 +29,7 @@ internal class VcsLogNewUiTableCellRenderer(
   private var isRight = false
   private var isLeft = false
   private var cachedRenderer: JComponent? = null
-  private var hasRootColumn: Boolean = false;
+  private var hasRootColumn: Boolean = false
 
   private lateinit var selectablePanel: SelectablePanel
 
@@ -81,7 +81,7 @@ internal class VcsLogNewUiTableCellRenderer(
     }
   }
 
-  private fun createWrappablePanel(renderer: JComponent, isLeft: Boolean = false, isRight: Boolean = false): BorderLayoutPanel {
+  private fun createWrappablePanel(renderer: JComponent, isLeft: Boolean, isRight: Boolean): BorderLayoutPanel {
     val panel = BorderLayoutPanel().addToCenter(renderer).andTransparent()
     if (isLeft) {
       panel.addToLeft(createEmptyPanel())
@@ -93,8 +93,8 @@ internal class VcsLogNewUiTableCellRenderer(
   }
 
   override fun getCellController(): VcsLogCellController? {
-    if (cachedRenderer != null && cachedRenderer is VcsLogCellRenderer) {
-      return (cachedRenderer as VcsLogCellRenderer).cellController
+    if (delegate is VcsLogCellRenderer) {
+      return (delegate as VcsLogCellRenderer).cellController
     }
     return null
   }
@@ -136,6 +136,10 @@ internal class VcsLogNewUiTableCellRenderer(
   }
 
   companion object {
+    @JvmStatic
+    val additionalGap
+      get() = 8
+
     private val INSETS
       get() = 4
 
@@ -147,10 +151,10 @@ internal class VcsLogNewUiTableCellRenderer(
         isOpaque = false
       }
 
-      override fun getPreferredSize(): Dimension = JBDimension(8, 0)
+      override fun getPreferredSize(): Dimension = JBDimension(additionalGap, 0)
     }
 
-    private const val ROOT_COLUMN_INDEX = 0
+    const val ROOT_COLUMN_INDEX = 0
   }
 
   private enum class SelectedRowType {

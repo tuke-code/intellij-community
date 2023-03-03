@@ -1,4 +1,4 @@
-// Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.codeInspection;
 
 import com.intellij.ProjectTopics;
@@ -260,8 +260,6 @@ public class InspectionApplicationBase implements CommandLineInspectionProgressR
 
     ApplicationManager.getApplication().invokeAndWait(() -> VirtualFileManager.getInstance().refreshWithoutFileWatcher(false));
 
-    ApplicationManager.getApplication().invokeAndWait(() -> PatchProjectUtil.patchProject(project));
-
     reportMessage(1, InspectionsBundle.message("inspection.done"));
     return project;
   }
@@ -447,6 +445,7 @@ public class InspectionApplicationBase implements CommandLineInspectionProgressR
         configurator.configureProject(project, context);
       }
     }
+    ApplicationManager.getApplication().invokeAndWait(() -> PatchProjectUtil.patchProject(project));
     waitForInvokeLaterActivities();
   }
 
@@ -491,7 +490,7 @@ public class InspectionApplicationBase implements CommandLineInspectionProgressR
     // convert report
     if (reportConverter != null) {
       try {
-        List<File> results = ContainerUtil.map2List(inspectionsResults, Path::toFile);
+        List<File> results = ContainerUtil.map(inspectionsResults, Path::toFile);
         reportConverter.convert(resultsDataPath.toString(), myOutPath, context.getTools(),
                                 results);
         InspectResultsConsumer.runConsumers(context.getTools(), results, project);

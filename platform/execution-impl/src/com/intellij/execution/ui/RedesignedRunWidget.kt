@@ -9,6 +9,7 @@ import com.intellij.execution.impl.ExecutionManagerImpl
 import com.intellij.execution.impl.isOfSameType
 import com.intellij.icons.AllIcons
 import com.intellij.ide.IdeBundle
+import com.intellij.ide.ui.laf.darcula.ui.ToolbarComboWidgetUiSizes
 import com.intellij.openapi.actionSystem.*
 import com.intellij.openapi.actionSystem.ex.CustomComponentAction
 import com.intellij.openapi.actionSystem.impl.ActionButton
@@ -25,6 +26,7 @@ import com.intellij.openapi.util.NlsActions
 import com.intellij.openapi.util.registry.Registry
 import com.intellij.openapi.wm.ToolWindowId
 import com.intellij.openapi.wm.impl.customFrameDecorations.header.toolbar.getHeaderBackgroundColor
+import com.intellij.openapi.wm.impl.headertoolbar.adjustIconForHeader
 import com.intellij.psi.PsiDocumentManager
 import com.intellij.ui.*
 import com.intellij.ui.popup.util.PopupImplUtil
@@ -40,6 +42,8 @@ import java.awt.geom.RoundRectangle2D
 import javax.swing.Icon
 import javax.swing.JComponent
 import javax.swing.SwingConstants
+
+const val CONFIGURATION_NAME_NON_TRIM_MAX_LENGTH = 25
 
 val isContrastRunWidget: Boolean get() = Registry.`is`("ide.experimental.ui.contrast.run.widget")
 
@@ -201,8 +205,7 @@ private class RunWidgetButtonLook(private val isCurrentConfigurationRunning: () 
     val g2 = g.create() as Graphics2D
 
     try {
-      g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
-      g2.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL, RenderingHints.VALUE_STROKE_NORMALIZE)
+      GraphicsUtil.setupAAPainting(g2)
       g2.color = color
       val arc = buttonArc.float
       val width = rect.width
@@ -242,6 +245,11 @@ private class RunWidgetButtonLook(private val isCurrentConfigurationRunning: () 
 
   override fun paintIcon(g: Graphics, actionButton: ActionButtonComponent, icon: Icon, x: Int, y: Int) {
     if (icon.iconWidth == 0 || icon.iconHeight == 0) {
+      return
+    }
+
+    if (!isContrastRunWidget && actionButton is ActionButton && actionButton.action is RedesignedRunConfigurationSelector) {
+      super.paintIcon(g, actionButton, icon, x, y)
       return
     }
 
@@ -391,15 +399,17 @@ private class RedesignedRunConfigurationSelector : TogglePopupAction(), CustomCo
     if (!isContrastRunWidget) {
       val icon = e.presentation.icon
       if (icon != null) {
-        e.presentation.icon = PreparedIcon(if (icon is InvalidRunConfigurationIcon) {
-          InvalidRunConfigurationIcon(IconUtil.toStrokeIcon(icon.mainIcon, JBUI.CurrentTheme.RunWidget.FOREGROUND))
-        }
-                                           else {
-          IconUtil.toStrokeIcon(icon, JBUI.CurrentTheme.RunWidget.FOREGROUND)
-        })
+        e.presentation.icon = adjustIconForHeader(icon)
       }
     }
-    e.presentation.setDescription(ExecutionBundle.messagePointer("choose.run.configuration.action.new.ui.button.description"))
+    val configurationName = e.project?.let { RunManager.getInstance(it) }?.selectedConfiguration?.name
+    if (configurationName?.length?.let { it > CONFIGURATION_NAME_NON_TRIM_MAX_LENGTH } == true) {
+      e.presentation.setDescription(ExecutionBundle.messagePointer("choose.run.configuration.action.new.ui.button.description.long",
+                                                                   configurationName))
+    }
+    else {
+      e.presentation.setDescription(ExecutionBundle.messagePointer("choose.run.configuration.action.new.ui.button.description"))
+    }
   }
 
   override fun getActionUpdateThread() = ActionUpdateThread.BGT
@@ -416,7 +426,7 @@ private class RedesignedRunConfigurationSelector : TogglePopupAction(), CustomCo
     }) {
 
       override fun getMargins(): Insets = JBInsets.create(0, 8)
-      override fun iconTextSpace(): Int = JBUI.scale(6)
+      override fun iconTextSpace(): Int = ToolbarComboWidgetUiSizes.gapAfterLeftIcons
       override fun shallPaintDownArrow() = true
       override fun getInactiveTextColor() = JBUI.CurrentTheme.RunWidget.DISABLED_FOREGROUND
       override fun getDownArrowIcon(): Icon = PreparedIcon(super.getDownArrowIcon())

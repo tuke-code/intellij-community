@@ -155,12 +155,6 @@ internal class LightEditFrameWrapper(
 
   override fun getTitleInfoProviders(): List<TitleInfoProvider> = emptyList()
 
-  override fun windowClosing(project: Project) {
-    if (closeHandler.asBoolean) {
-      super.windowClosing(project)
-    }
-  }
-
   override fun dispose() {
     Disposer.dispose(editPanel!!)
   }

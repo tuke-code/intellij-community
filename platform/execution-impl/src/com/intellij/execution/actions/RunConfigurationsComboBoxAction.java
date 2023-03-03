@@ -137,7 +137,7 @@ public class RunConfigurationsComboBoxAction extends ComboBoxAction implements D
         }
       }
       else {
-        name = StringUtil.shortenTextWithEllipsis(settings.getName(), 25, 8, true);
+        name = StringUtil.shortenTextWithEllipsis(settings.getName(), RedesignedRunWidgetKt.CONFIGURATION_NAME_NON_TRIM_MAX_LENGTH, 8, true);
       }
       presentation.setText(name, false);
       if (!ApplicationManager.getApplication().isUnitTestMode()) {
@@ -273,12 +273,9 @@ public class RunConfigurationsComboBoxAction extends ComboBoxAction implements D
           group.add(createAction.apply(settings));
         }
         if (group != actionGroup) {
-          allConfigurationsNumber++;
           actionGroup.add(group);
         }
-        else {
-          allConfigurationsNumber += configurationsList.size();
-        }
+        allConfigurationsNumber += configurationsList.size();
       }
 
       allActionsGroup.add(actionGroup);

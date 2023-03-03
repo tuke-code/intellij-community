@@ -343,6 +343,10 @@ public class MavenProject {
     return myState.myMavenId;
   }
 
+  boolean isNew() {
+    return null == myState.myMavenId;
+  }
+
   public @Nullable MavenId getParentId() {
     return myState.myParentId;
   }
@@ -871,7 +875,7 @@ public class MavenProject {
   }
 
   public @NotNull Set<String> getSupportedDependencyScopes() {
-    Set<String> result = ContainerUtil.set(MavenConstants.SCOPE_COMPILE,
+    Set<String> result = ContainerUtil.newHashSet(MavenConstants.SCOPE_COMPILE,
                                            MavenConstants.SCOPE_PROVIDED,
                                            MavenConstants.SCOPE_RUNTIME,
                                            MavenConstants.SCOPE_TEST,
@@ -1160,7 +1164,7 @@ public class MavenProject {
 
   @Override
   public String toString() {
-    return getMavenId().toString();
+    return null == myState.myMavenId ? myFile.getPath() : getMavenId().toString();
   }
 
   private static class State implements Cloneable, Serializable {

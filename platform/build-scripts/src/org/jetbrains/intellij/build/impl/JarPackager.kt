@@ -9,11 +9,8 @@ import com.intellij.util.io.URLUtil
 import com.intellij.util.io.sanitizeFileName
 import io.opentelemetry.api.common.AttributeKey
 import kotlinx.collections.immutable.*
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
-import kotlinx.coroutines.withContext
-import org.jetbrains.intellij.build.BuildContext
-import org.jetbrains.intellij.build.BuildOptions
+import kotlinx.coroutines.*
+import org.jetbrains.intellij.build.*
 import org.jetbrains.intellij.build.TraceManager.spanBuilder
 import org.jetbrains.intellij.build.impl.projectStructureMapping.*
 import org.jetbrains.intellij.build.tasks.*
@@ -75,8 +72,6 @@ private val notImportantKotlinLibs = persistentSetOf(
 
 private val predefinedMergeRules = persistentMapOf<String, (String) -> Boolean>().mutate { map ->
   map.put("groovy.jar") { it.startsWith("org.codehaus.groovy:") }
-  // an agent lib should be packed into separate jar, and AuthAgent depends on SSHPacket
-  map.put("sshj.jar") { it == "jsch-agent-proxy-sshj" || it == "SSHJ" }
   map.put("jsch-agent.jar") { it.startsWith("jsch-agent") }
   map.put("rd.jar") { it.startsWith("rd-") }
   // all grpc garbage into one jar

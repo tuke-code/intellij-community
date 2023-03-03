@@ -1,24 +1,27 @@
 // Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.plugins.gitlab.mergerequest.ui.timeline
 
-import com.intellij.collaboration.ui.codereview.BaseHtmlEditorPane
+import com.intellij.collaboration.ui.SimpleHtmlPane
+import com.intellij.collaboration.ui.codereview.CodeReviewTitleUIUtil
 import com.intellij.collaboration.ui.codereview.comment.RoundedPanel
 import com.intellij.collaboration.ui.codereview.details.RequestState
 import com.intellij.collaboration.ui.codereview.details.ReviewDetailsUIUtil
 import com.intellij.collaboration.ui.util.bindText
+import com.intellij.collaboration.ui.util.bindTextHtml
 import com.intellij.collaboration.ui.util.bindVisibility
 import com.intellij.collaboration.ui.util.emptyBorders
-import com.intellij.openapi.util.NlsSafe
-import com.intellij.openapi.util.text.HtmlBuilder
-import com.intellij.openapi.util.text.HtmlChunk
-import com.intellij.ui.ColorUtil
-import com.intellij.util.ui.*
+import com.intellij.util.ui.JBFont
+import com.intellij.util.ui.JBUI
+import com.intellij.util.ui.SingleComponentCenteringLayout
+import com.intellij.util.ui.UIUtil
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.map
+import net.miginfocom.layout.AC
 import net.miginfocom.layout.CC
 import net.miginfocom.layout.LC
 import net.miginfocom.swing.MigLayout
 import org.jetbrains.plugins.gitlab.mergerequest.data.GitLabMergeRequest
+import org.jetbrains.plugins.gitlab.util.GitLabBundle
 import javax.swing.JComponent
 import javax.swing.JLabel
 import javax.swing.JPanel
@@ -26,13 +29,19 @@ import javax.swing.JPanel
 // TODO: extract common code with GitHub (see org.jetbrains.plugins.github.pullrequest.ui.timeline.GHPRTitleComponent)
 internal object GitLabMergeRequestTimelineTitleComponent {
   fun create(scope: CoroutineScope, mr: GitLabMergeRequest): JComponent {
-    val titleLabel = BaseHtmlEditorPane().apply {
+    val titleLabel = SimpleHtmlPane().apply {
+      name = "Review timeline title panel"
       font = JBFont.h2().asBold()
-      bindText(scope, mr.title.map { title ->
-        createTitleText(title, mr.number, mr.url)
+      bindTextHtml(scope, mr.title.map { title ->
+        CodeReviewTitleUIUtil.createTitleText(
+          title = title,
+          reviewNumber = "!${mr.number}",
+          url = mr.url,
+          tooltip = GitLabBundle.message("open.on.gitlab.tooltip")
+        )
       })
     }
-    val mergeRequestStateLabel = JLabel().apply {
+    val stateLabel = JLabel().apply {
       font = JBFont.small()
       foreground = UIUtil.getContextHelpForeground()
       border = JBUI.Borders.empty(0, 4)
@@ -50,23 +59,13 @@ internal object GitLabMergeRequestTimelineTitleComponent {
       }
     }
 
-    return JPanel(MigLayout(LC().emptyBorders().fillX())).apply {
+    return JPanel(MigLayout(
+      LC().emptyBorders().fillX().hideMode(3),
+      AC().gap("push")
+    )).apply {
       isOpaque = false
-      add(titleLabel, CC().grow().push())
-      add(mergeRequestStateLabel, CC())
+      add(titleLabel)
+      add(stateLabel, CC().alignY("top"))
     }
-  }
-
-  private fun createTitleText(title: @NlsSafe String, reviewNumber: @NlsSafe String, url: String): @NlsSafe String {
-    return HtmlBuilder()
-      .append(title)
-      .nbsp()
-      .append(
-        HtmlChunk
-          .link(url, "!${reviewNumber}")
-          .wrapWith(HtmlChunk.font(ColorUtil.toHex(NamedColorUtil.getInactiveTextColor())))
-      )
-      .wrapWithHtmlBody()
-      .toString()
   }
 }
