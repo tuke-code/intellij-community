@@ -81,6 +81,7 @@
                      groupPath="Kotlin"
                      groupBundle="messages.KotlinBundle" groupKey="group.names.style.issues"
                      enabledByDefault="true"
+                     level="WEAK WARNING"
                      language="kotlin"
                      key="inspection.replace.get.or.set.display.name" bundle="messages.KotlinBundle"/>
 
@@ -226,6 +227,14 @@
                      level="WARNING"
                      cleanupTool="true" editorAttributes="NOT_USED_ELEMENT_ATTRIBUTES"
                      language="kotlin" key="inspection.remove.redundant.qualifier.name.display.name" bundle="messages.KotlinBundle"/>
+
+    <localInspection implementationClass="org.jetbrains.kotlin.idea.k2.codeinsight.inspections.KotlinEqualsBetweenInconvertibleTypesInspection"
+                     groupPath="Kotlin"
+                     groupBundle="messages.KotlinBundle" groupKey="group.names.probable.bugs"
+                     enabledByDefault="true"
+                     level="WARNING"
+                     suppressId="EqualsBetweenInconvertibleTypes"
+                     language="kotlin" key="inspection.kotlin.equals.between.inconvertible.types.display.name" bundle="messages.KotlinBundle"/>
 
   </extensions>
 </idea-plugin>

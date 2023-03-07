@@ -698,6 +698,7 @@ public final class JBUI {
     }
 
     public interface IconBadge {
+      Color NEW_UI = JBColor.namedColor("IconBadge.newUiBackground", 0x8F5AE5, 0x8F5AE5);
       Color ERROR = JBColor.namedColor("IconBadge.errorBackground", 0xE55765, 0xDB5C5C);
       Color WARNING = JBColor.namedColor("IconBadge.warningBackground", 0xFFAF0F, 0xF2C55C);
       Color INFORMATION = JBColor.namedColor("IconBadge.infoBackground", 0x588CF3, 0x548AF7);
@@ -1099,6 +1100,14 @@ public final class JBUI {
 
     public static final class CompletionPopup {
 
+      public static @NotNull Insets selectionInnerInsets() {
+        return insets(selectionInnerInsetsKey(), insets(2));
+      }
+
+      public static @NotNull String selectionInnerInsetsKey() {
+        return "CompletionPopup.selectionInnerInsets";
+      }
+
       public static final class Advertiser {
 
         public static @NotNull Color background() {
@@ -1391,7 +1400,12 @@ public final class JBUI {
       }
 
       private static @NotNull JBInsets borderInsets() {
-        return insets("Popup.Advertiser.borderInsets", isNewUI() ? insets(6, 20) : insets(5, 10, 5, 15));
+        return insets(borderInsetsKey(), isNewUI() ? insets(6, 20) : insets(5, 10, 5, 15));
+      }
+
+      @NotNull
+      public static String borderInsetsKey() {
+        return "Popup.Advertiser.borderInsets";
       }
 
       public static @NotNull Color borderColor() {

@@ -38,3 +38,19 @@ class MixedConstantNonConstantArg {
     new MixedConstantNonConstantArg().foo(1, x());
   }
 }
+
+class SingleArg {
+  void foo(Integer... bar) { }
+
+  public static void main(String[] args) {
+    new SingleArg().foo(null);
+  }
+}
+
+class SingleArgNotNull {
+  void foo(Integer... bar) { }
+
+  public static void main(String[] args) {
+    new SingleArgNotNull().foo(0);
+  }
+}

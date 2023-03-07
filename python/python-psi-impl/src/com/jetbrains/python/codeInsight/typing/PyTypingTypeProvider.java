@@ -234,106 +234,72 @@ public class PyTypingTypeProvider extends PyTypeProviderWithCustomContext<PyTypi
   @Override
   @Nullable
   public Ref<PyType> getParameterType(@NotNull PyNamedParameter param, @NotNull PyFunction func, @NotNull Context context) {
-    final Ref<PyType> typeFromAnnotation = getParameterTypeFromAnnotation(param, context);
-    if (typeFromAnnotation != null) {
-      return typeFromAnnotation;
+    @Nullable PyExpression typeHint = getAnnotationValue(param, context.myContext);
+    if (typeHint == null) {
+      String paramTypeCommentHint = param.getTypeCommentAnnotation();
+      if (paramTypeCommentHint != null) {
+        typeHint = toExpression(paramTypeCommentHint, param);
+      }
     }
-
-    final Ref<PyType> typeFromTypeComment = getParameterTypeFromTypeComment(param, context);
-    if (typeFromTypeComment != null) {
-      return typeFromTypeComment;
-    }
-
-    final PyFunctionTypeAnnotation annotation = getFunctionTypeAnnotation(func);
-    if (annotation != null) {
-      PyParameterTypeList list = annotation.getParameterTypeList();
-      List<PyExpression> paramTypes = list.getParameterTypes();
-      if (paramTypes.size() == 1) {
-        final PyNoneLiteralExpression noneExpr = as(paramTypes.get(0), PyNoneLiteralExpression.class);
-        if (noneExpr != null && noneExpr.isEllipsis()) {
+    if (typeHint == null) {
+      PyFunctionTypeAnnotation annotation = getFunctionTypeAnnotation(func);
+      if (annotation != null) {
+        PyExpression funcTypeCommentParamHint = findParamTypeHintInFunctionTypeComment(annotation, param, func);
+        if (funcTypeCommentParamHint == null) {
           return Ref.create();
         }
-      }
-      final int startOffset = omitFirstParamInTypeComment(func, annotation) ? 1 : 0;
-      final List<PyParameter> funcParams = Arrays.asList(func.getParameterList().getParameters());
-      final int i = funcParams.indexOf(param) - startOffset;
-      if (i >= 0 && i < paramTypes.size()) {
-        return getParameterTypeFromFunctionComment(paramTypes.get(i), context);
+        typeHint = funcTypeCommentParamHint;
       }
     }
+    if (typeHint == null) {
+      return null;
+    }
+    if (typeHint instanceof PyReferenceExpression ref && ref.isQualified() && (
+      param.isPositionalContainer() && "args".equals(ref.getReferencedName()) ||
+      param.isKeywordContainer() && "kwargs".equals(ref.getReferencedName())
+    )) {
+      typeHint = Objects.requireNonNull(ref.getQualifier());
+    }
+    PyType type = Ref.deref(getType(typeHint, context));
+    if (param.isPositionalContainer() && !(type instanceof PyParamSpecType)) {
+      return Ref.create(PyTypeUtil.toPositionalContainerType(param, type));
+    }
+    if (param.isKeywordContainer() && !(type instanceof PyParamSpecType)) {
+      return Ref.create(PyTypeUtil.toKeywordContainerType(param, type));
+    }
+    if (PyNames.NONE.equals(param.getDefaultValueText())) {
+      return Ref.create(PyUnionType.union(type, PyNoneType.INSTANCE));
+    }
+    return Ref.create(type);
+  }
 
+  private static @Nullable PyExpression findParamTypeHintInFunctionTypeComment(@NotNull PyFunctionTypeAnnotation annotation,
+                                                                               @NotNull PyNamedParameter param,
+                                                                               @NotNull PyFunction func) {
+    List<PyExpression> paramTypes = annotation.getParameterTypeList().getParameterTypes();
+    if (paramTypes.size() == 1 && paramTypes.get(0) instanceof PyNoneLiteralExpression noneExpr && noneExpr.isEllipsis()) {
+      return null;
+    }
+    int startOffset = omitFirstParamInTypeComment(func, annotation) ? 1 : 0;
+    List<PyParameter> funcParams = Arrays.asList(func.getParameterList().getParameters());
+    int i = funcParams.indexOf(param) - startOffset;
+    if (i >= 0 && i < paramTypes.size()) {
+      PyExpression paramTypeHint = paramTypes.get(i);
+      if (paramTypeHint instanceof PyStarExpression starExpression) {
+        return starExpression.getExpression();
+      }
+      else if (paramTypeHint instanceof PyDoubleStarExpression doubleStarExpression) {
+        return doubleStarExpression.getExpression();
+      }
+      else {
+        return paramTypeHint;
+      }
+    }
     return null;
   }
 
   public static boolean isGenerator(@NotNull final PyType type) {
     return type instanceof PyCollectionType && GENERATOR.equals(((PyClassLikeType)type).getClassQName());
-  }
-
-  @Nullable
-  private static Ref<PyType> getParameterTypeFromFunctionComment(@NotNull PyExpression expression, @NotNull Context context) {
-    final PyStarExpression starExpr = as(expression, PyStarExpression.class);
-    if (starExpr != null) {
-      final PyExpression inner = starExpr.getExpression();
-      if (inner != null) {
-        return Ref.create(PyTypeUtil.toPositionalContainerType(expression, Ref.deref(getType(inner, context))));
-      }
-    }
-    final PyDoubleStarExpression doubleStarExpr = as(expression, PyDoubleStarExpression.class);
-    if (doubleStarExpr != null) {
-      final PyExpression inner = doubleStarExpr.getExpression();
-      if (inner != null) {
-        return Ref.create(PyTypeUtil.toKeywordContainerType(expression, Ref.deref(getType(inner, context))));
-      }
-    }
-    return getType(expression, context);
-  }
-
-  @Nullable
-  private static Ref<PyType> getParameterTypeFromTypeComment(@NotNull PyNamedParameter parameter, @NotNull Context context) {
-    final String typeComment = parameter.getTypeCommentAnnotation();
-
-    if (typeComment != null) {
-      final PyType type = Ref.deref(getStringBasedType(typeComment, parameter, context));
-
-      if (parameter.isPositionalContainer()) {
-        return Ref.create(PyTypeUtil.toPositionalContainerType(parameter, type));
-      }
-
-      if (parameter.isKeywordContainer()) {
-        return Ref.create(PyTypeUtil.toKeywordContainerType(parameter, type));
-      }
-
-      return Ref.create(type);
-    }
-
-    return null;
-  }
-
-  @Nullable
-  private static Ref<PyType> getParameterTypeFromAnnotation(@NotNull PyNamedParameter parameter, @NotNull Context context) {
-    final Ref<PyType> annotationValueTypeRef = Optional
-      .ofNullable(getAnnotationValue(parameter, context.myContext))
-      .map(text -> getType(text, context))
-      .orElse(null);
-
-    if (annotationValueTypeRef != null) {
-      final PyType annotationValueType = annotationValueTypeRef.get();
-      if (parameter.isPositionalContainer()) {
-        return Ref.create(PyTypeUtil.toPositionalContainerType(parameter, annotationValueType));
-      }
-
-      if (parameter.isKeywordContainer()) {
-        return Ref.create(PyTypeUtil.toKeywordContainerType(parameter, annotationValueType));
-      }
-
-      if (PyNames.NONE.equals(parameter.getDefaultValueText())) {
-        return Ref.create(PyUnionType.union(annotationValueType, PyNoneType.INSTANCE));
-      }
-
-      return Ref.create(annotationValueType);
-    }
-
-    return null;
   }
 
   @NotNull
@@ -983,7 +949,7 @@ public class PyTypingTypeProvider extends PyTypeProviderWithCustomContext<PyTypi
                                                                    : PsiTreeUtil.getStubOrPsiParentOfType(typeHintContext, PyClass.class);
       if (containingClass == null) return null;
 
-      PyClassLikeType scopeClassType = containingClass.getType(context.getTypeContext());
+      PyClassType scopeClassType = as(containingClass.getType(context.getTypeContext()), PyClassType.class);
       if (scopeClassType == null) return null;
 
       return Ref.create(new PySelfType(scopeClassType));
@@ -1045,11 +1011,11 @@ public class PyTypingTypeProvider extends PyTypeProviderWithCustomContext<PyTypi
     PyTargetExpression targetExpr = context.getTypeAliasStack().isEmpty() ? null : context.getTypeAliasStack().peek();
     final PyGenericType typeVar = as(type, PyGenericType.class);
     if (typeVar != null) {
-      return typeVar.withScopeOwner(getTypeVarScope(typeVar.getName(), typeHint, context)).withTargetExpression(targetExpr);
+      return typeVar.withScopeOwner(getTypeParameterScope(typeVar.getName(), typeHint, context)).withTargetExpression(targetExpr);
     }
     final PyParamSpecType paramSpec = as(type, PyParamSpecType.class);
     if (paramSpec != null) {
-      return paramSpec.withTargetExpression(targetExpr);
+      return paramSpec.withScopeOwner(getTypeParameterScope(paramSpec.getName(), typeHint, context)).withTargetExpression(targetExpr);
     }
     return type;
   }
@@ -1549,7 +1515,7 @@ public class PyTypingTypeProvider extends PyTypeProviderWithCustomContext<PyTypi
             final PyExpression firstArgument = arguments[0];
             if (firstArgument instanceof PyStringLiteralExpression) {
               final String name = ((PyStringLiteralExpression)firstArgument).getStringValue();
-              return new PyGenericType(name, getGenericTypeBound(arguments, context));
+              return new PyTypeVarTypeImpl(name, getGenericTypeBound(arguments, context));
             }
           }
         }
@@ -1560,31 +1526,31 @@ public class PyTypingTypeProvider extends PyTypeProviderWithCustomContext<PyTypi
 
   // See https://peps.python.org/pep-0484/#scoping-rules-for-type-variables
   @Nullable
-  private static PyQualifiedNameOwner getTypeVarScope(@NotNull String name, @NotNull PyExpression typeHint, @NotNull Context context) {
+  private static PyQualifiedNameOwner getTypeParameterScope(@NotNull String name, @NotNull PyExpression typeHint, @NotNull Context context) {
     PsiElement typeHintContext = getStubRetainedTypeHintContext(typeHint);
     // TODO: type aliases
-    List<PyQualifiedNameOwner> typeVarOwnerCandidates =
+    List<PyQualifiedNameOwner> typeParamOwnerCandidates =
       StreamEx.iterate(typeHintContext, Objects::nonNull, owner -> PsiTreeUtil.getStubOrPsiParentOfType(owner, ScopeOwner.class))
         .filter(owner -> owner instanceof PyFunction || owner instanceof PyClass)
         .select(PyQualifiedNameOwner.class)
         .toList();
 
-    PyQualifiedNameOwner closestOwner = ContainerUtil.getFirstItem(typeVarOwnerCandidates);
+    PyQualifiedNameOwner closestOwner = ContainerUtil.getFirstItem(typeParamOwnerCandidates);
     if (closestOwner instanceof PyClass) {
       return closestOwner;
     }
-    return StreamEx.of(typeVarOwnerCandidates)
+    return StreamEx.of(typeParamOwnerCandidates)
       .skip(1)
-      .map(owner -> findSameTypeVarInDefinition(owner, name, context))
+      .map(owner -> findSameTypeParameterInDefinition(owner, name, context))
       .nonNull()
       .findFirst()
-      .map(PyGenericType::getScopeOwner)
+      .map(PyTypeParameterType::getScopeOwner)
       .orElse(closestOwner);
   }
 
-  private static @Nullable PyGenericType findSameTypeVarInDefinition(@NotNull PyQualifiedNameOwner owner,
-                                                                     @NotNull String name,
-                                                                     @NotNull Context context) {
+  private static @Nullable PyTypeParameterType findSameTypeParameterInDefinition(@NotNull PyQualifiedNameOwner owner,
+                                                                                 @NotNull String name,
+                                                                                 @NotNull Context context) {
     // At this moment, the definition of the TypeVar should be the type alias at the top of the stack.
     // While evaluating type hints of enclosing functions' parameters, resolving to the same TypeVar
     // definition shouldn't trigger the protection against recursive aliases, so we manually remove
@@ -1593,7 +1559,7 @@ public class PyTypingTypeProvider extends PyTypeProviderWithCustomContext<PyTypi
     try {
       if (owner instanceof PyClass) {
         return StreamEx.of(collectGenericTypes((PyClass)owner, context))
-          .select(PyGenericType.class)
+          .select(PyTypeParameterType.class)
           .findFirst(type -> name.equals(type.getName()))
           .orElse(null);
       }
@@ -1603,7 +1569,7 @@ public class PyTypingTypeProvider extends PyTypeProviderWithCustomContext<PyTypi
           .map(parameter -> new PyTypingTypeProvider().getParameterType(parameter, (PyFunction)owner, context))
           .map(Ref::deref)
           .map(paramType -> PyTypeChecker.collectGenerics(paramType, context.getTypeContext()))
-          .flatMap(generics -> StreamEx.of(generics.getTypeVars()))
+          .flatMap(generics -> StreamEx.<PyTypeParameterType>of(generics.getTypeVars()).append(generics.getParamSpecs()))
           .findFirst(type -> name.equals(type.getName()))
           .orElse(null);
       }

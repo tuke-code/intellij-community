@@ -348,7 +348,7 @@ object CommunityLibraryLicenses {
     LibraryLicense(name = "Gson", libraryName = "gson", url = "https://github.com/google/gson")
       .apache("https://github.com/google/gson/blob/master/LICENSE"),
     LibraryLicense(libraryName = "Guava", url = "https://github.com/google/guava")
-      .apache("https://github.com/google/guava/blob/master/COPYING"),
+      .apache("https://raw.githubusercontent.com/google/guava/master/LICENSE"),
     LibraryLicense(name = "Hamcrest", libraryName = "hamcrest", url = "https://hamcrest.org/")
       .newBsd("https://github.com/hamcrest/JavaHamcrest/blob/master/LICENSE.txt"),
     LibraryLicense(name = "HDR Histogram", libraryName = "HdrHistogram", license = "CC0 1.0 Universal",
@@ -495,7 +495,7 @@ object CommunityLibraryLicenses {
                    url = "https://github.com/JetBrains/jps-javac-extension/")
       .apache("https://github.com/JetBrains/jps-javac-extension/blob/master/LICENSE.txt"),
     LibraryLicense(name = "JSch", libraryName = "JSch", url = "https://www.jcraft.com/jsch/",
-                   licenseUrl = "https://www.jcraft.com/jsch/LICENSE.txt").newBsd(),
+                   licenseUrl = "http://www.jcraft.com/jsch/LICENSE.txt").newBsd(),
     LibraryLicense(name = "jsch-agent-proxy", libraryName = "jsch-agent-proxy",
                    url = "https://github.com/ymnk/jsch-agent-proxy",
                    licenseUrl = "https://github.com/ymnk/jsch-agent-proxy/blob/master/LICENSE.txt").newBsd(),
@@ -523,7 +523,7 @@ object CommunityLibraryLicenses {
                    url = "https://code.google.com/archive/p/juniversalchardet",
                    license = "MPL 1.1", licenseUrl = "https://www.mozilla.org/MPL/MPL-1.1.html"),
     LibraryLicense(name = "jzlib", libraryName = "jzlib", url = "https://www.jcraft.com/jzlib/",
-                   licenseUrl = "https://www.jcraft.com/jzlib/LICENSE.txt").newBsd(),
+                   licenseUrl = "http://www.jcraft.com/jzlib/LICENSE.txt").newBsd(),
     LibraryLicense(name = "Kodein-DI", libraryName = "kodein-di-jvm", url = "https://github.com/kosi-libs/Kodein")
       .mit("https://github.com/kosi-libs/Kodein/blob/master/LICENSE.txt"),
     LibraryLicense(name = "Kotlin Coroutines for Guava", libraryName = "kotlinx-coroutines-guava",
@@ -586,8 +586,6 @@ object CommunityLibraryLicenses {
                    url = "https://github.com/lz4/lz4-java")
       .apache("https://github.com/lz4/lz4-java/blob/master/LICENSE.txt"),
 
-    LibraryLicense(name = "markdown4j", libraryName = "markdown4j", url = "https://code.google.com/p/markdown4j/").newBsd(),
-    LibraryLicense(name = "MarkdownJ", libraryName = "markdownj", version = "0.4.2", url = "https://github.com/myabc/markdownj").newBsd(),
     LibraryLicense(name = "MathJax", attachedTo = "intellij.python", version = "2.6.1",
                    url = "git://github.com/mathjax/MathJax",
                    licenseUrl = "https://github.com/mathjax/MathJax/blob/master/LICENSE").apache(),
@@ -629,7 +627,7 @@ object CommunityLibraryLicenses {
                    license = "GPLv2 (used as hg extension called from hg executable)",
                    url = "https://github.com/willemv/mercurial_prompthooks",
                    licenseUrl = "https://github.com/willemv/mercurial_prompthooks/blob/master/LICENSE.txt"),
-    LibraryLicense(name = "Microba", libraryName = "microba", version = "0.4.2", url = "https://microba.sourceforge.net/",
+    LibraryLicense(libraryName = "microba", url = "https://microba.sourceforge.net/",
                    licenseUrl = "https://microba.sourceforge.net/license.txt").newBsd(),
     LibraryLicense(name = "MigLayout", libraryName = "miglayout-swing",
                    url = "https://www.miglayout.com/", licenseUrl = "https://www.miglayout.com/mavensite/license.html").newBsd(),
@@ -648,7 +646,7 @@ object CommunityLibraryLicenses {
 
     LibraryLicense(libraryName = "NanoXML", license = "zlib/libpng",
                    url = "https://mvnrepository.com/artifact/be.cyberelf.nanoxml/nanoxml/2.2.3",
-                   licenseUrl = "https://www.opensource.org/licenses/zlib-license.html"),
+                   licenseUrl = "https://raw.githubusercontent.com/saulhidalgoaular/nanoxml/master/LICENSE.txt"),
     LibraryLicense(name = "nest_asyncio", attachedTo = "intellij.python.community.impl",
                    url = "https://github.com/erdewit/nest_asyncio", license = "BSD 2-Clause License",
                    licenseUrl = "https://github.com/erdewit/nest_asyncio/blob/master/LICENSE",
@@ -759,9 +757,9 @@ object CommunityLibraryLicenses {
                    licenseUrl = "https://github.com/benjaminp/six/blob/master/LICENSE")
       .mit("https://github.com/benjaminp/six/blob/master/LICENSE"),
     LibraryLicense(libraryName = "Slf4j", url = "https://slf4j.org/")
-      .mit("https://slf4j.org/license.html"),
+      .mit("https://www.slf4j.org/license.html"),
     LibraryLicense(libraryName = "slf4j-jdk14", url = "https://slf4j.org/")
-      .mit("https://slf4j.org/license.html"),
+      .mit("https://www.slf4j.org/license.html"),
     LibraryLicense(name = "SnakeYAML", libraryName = "snakeyaml",
                    url = "https://bitbucket.org/snakeyaml/snakeyaml/")
       .apache("https://bitbucket.org/snakeyaml/snakeyaml/src/master/LICENSE.txt"),
