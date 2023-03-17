@@ -198,6 +198,7 @@ object CommunityRepositoryModules {
       spec.withModule("intellij.devkit.uiDesigner")
       spec.withModule("intellij.devkit.workspaceModel")
       spec.withModule("intellij.platform.workspaceModel.codegen")
+      spec.withModule("intellij.platform.workspaceModel.codegen.impl")
       spec.withModule("intellij.java.devkit")
       spec.withModule("intellij.groovy.devkit")
       spec.withModule("intellij.kotlin.devkit")
@@ -277,9 +278,7 @@ object CommunityRepositoryModules {
     plugin(listOf(
       "intellij.searchEverywhereMl",
       "intellij.searchEverywhereMl.yaml",
-      "intellij.searchEverywhereMl.vcs",
-      "intellij.searchEverywhereMl.java",
-      "intellij.searchEverywhereMl.kotlin",
+      "intellij.searchEverywhereMl.vcs"
     )),
     plugin("intellij.platform.testFramework.ui") { spec ->
       spec.withModuleLibrary("intellij.remoterobot.remote.fixtures", spec.mainModule, "")

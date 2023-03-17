@@ -38,15 +38,6 @@ public interface MavenServerEmbedder extends Remote {
                                                                     @Nullable Properties userProperties, MavenToken token)
     throws RemoteException;
 
-  void customizeComponents(MavenToken token) throws RemoteException;
-
-  @NotNull
-  List<String> retrieveAvailableVersions(@NotNull String groupId,
-                                         @NotNull String artifactId,
-                                         @NotNull List<MavenRemoteRepository> remoteRepositories, MavenToken token)
-    throws RemoteException;
-
-
   @NotNull
   Collection<MavenServerExecutionResult> resolveProject(@NotNull Collection<File> files,
                                                         @NotNull Collection<String> activeProfiles,
@@ -94,11 +85,6 @@ public interface MavenServerEmbedder extends Remote {
   void reset(MavenToken token) throws RemoteException;
 
   void release(MavenToken token) throws RemoteException;
-
-  void clearCaches(MavenToken token) throws RemoteException;
-
-  @Deprecated
-  void clearCachesFor(MavenId projectId, MavenToken token) throws RemoteException;
 
   @Nullable
   MavenModel readModel(File file, MavenToken token) throws RemoteException;

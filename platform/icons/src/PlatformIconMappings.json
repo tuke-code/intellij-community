@@ -136,7 +136,6 @@
       "editorConfig.svg": "nodes/editorconfig.svg",
       "diagram.svg": "fileTypes/diagram.svg",
       "freemaker.svg": "icons/freemarker-icon.svg",
-      "go.svg": "icons/go.svg",
       "gradle.svg": [
         "icons/gradle.svg",
         "icons/gradleFile.svg"
@@ -643,7 +642,6 @@
       "find.svg": "toolwindows/toolWindowFind.svg",
       "gradle.svg": "icons/toolWindowGradle.svg",
       "hierarchy.svg": "toolwindows/toolWindowHierarchy.svg",
-      "meetNewUi.svg": "toolwindows/meetNewUi.svg",
       "messages.svg": "toolwindows/toolWindowMessages.svg",
       "notifications.svg": "toolwindows/notifications.svg",
       "problems.svg": [

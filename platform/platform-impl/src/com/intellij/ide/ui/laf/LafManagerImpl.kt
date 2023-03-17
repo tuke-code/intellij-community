@@ -694,6 +694,7 @@ class LafManagerImpl : LafManager(), PersistentStateComponent<Element>, Disposab
       // popups
       defaults.put(JBUI.CurrentTheme.Popup.headerInsetsKey(), cmInsets(8, 10, 8, 10))
       defaults.put(JBUI.CurrentTheme.Advertiser.borderInsetsKey(), cmInsets(4, 20, 5, 20))
+      defaults.put(JBUI.CurrentTheme.BigPopup.advertiserBorderInsetsKey(), cmInsets(4, 20, 5, 20))
       defaults.put(JBUI.CurrentTheme.CompletionPopup.selectionInnerInsetsKey(), cmInsets(0, 2, 0, 2))
       // status bar
       defaults.put(JBUI.CurrentTheme.StatusBar.Widget.insetsKey(), cmInsets(4, 8, 3, 8))
@@ -702,7 +703,8 @@ class LafManagerImpl : LafManager(), PersistentStateComponent<Element>, Disposab
       // separate navbar
       defaults.put(JBUI.CurrentTheme.NavBar.itemInsetsKey(), cmInsets(2))
       // editor tabs
-      defaults.put("EditorTabs.tabInsets", cmInsets(1, 4, 2, 4))
+      defaults.put(JBUI.CurrentTheme.EditorTabs.tabInsetsKey(), cmInsets(-2, 4, -2, 4))
+      defaults.put(JBUI.CurrentTheme.EditorTabs.verticalTabInsetsKey(), cmInsets(2, 8, 1, 6))
       defaults.put(JBUI.CurrentTheme.EditorTabs.tabActionsInsetKey(), 0)
       defaults.put(JBUI.CurrentTheme.EditorTabs.fontKey(), Supplier { JBFont.medium() })
       // toolwindows
@@ -1024,8 +1026,8 @@ class LafManagerImpl : LafManager(), PersistentStateComponent<Element>, Disposab
     override fun actionPerformed(e: AnActionEvent) {
       val popup = JBPopupFactory.getInstance().createActionGroupPopup(IdeBundle.message("preferred.theme.text"), lafGroups, e.dataContext,
                                                                       true, null, Int.MAX_VALUE)
-      HelpTooltip.setMasterPopup(e.inputEvent.component, popup)
-      val component = e.inputEvent.component
+      val component = e.inputEvent!!.component
+      HelpTooltip.setMasterPopup(component, popup)
       if (component is ActionButtonComponent) {
         popup.showUnderneathOf(component)
       }

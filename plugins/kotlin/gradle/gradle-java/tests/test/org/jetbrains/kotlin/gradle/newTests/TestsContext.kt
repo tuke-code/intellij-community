@@ -13,9 +13,20 @@ interface KotlinMppTestsContext {
     val agpVersion: String
 
     val description: Description
+
+    /**
+     * Root of the actual project, i.e. a copy in the temp-directory, where the test runs
+     */
     val testProjectRoot: File
+
     val testProject: Project
+
+    /**
+     * Root of the project in the testdata, i.e. file somewhere in `intellij`-repo
+     */
     val testDataDirectory: File
+
+    val gradleJdkPath: File
 
     val testConfiguration: TestConfiguration
 }
@@ -27,6 +38,7 @@ class KotlinMppTestsContextImpl : KotlinMppTestsContext {
     override lateinit var testConfiguration: TestConfiguration
     override lateinit var testProjectRoot: File
     override lateinit var testProject: Project
+    override lateinit var gradleJdkPath: File
 
     override val gradleVersion: GradleVersion
         get() = testProperties.gradleVersion

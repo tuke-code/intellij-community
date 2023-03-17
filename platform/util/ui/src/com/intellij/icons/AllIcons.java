@@ -439,7 +439,7 @@ public class AllIcons {
     /** 16x16 */ public static final @NotNull Icon BalloonInformation = load("general/balloonInformation.svg", 1831996422, 2);
     /** 16x16 */ public static final @NotNull Icon BalloonWarning = load("general/balloonWarning.svg", 115955340, 2);
     /** 12x12 */ public static final @NotNull Icon BalloonWarning12 = load("general/balloonWarning12.svg", 1546892486, 2);
-    /** 32x15 */ public static final @NotNull Icon Beta = load("general/beta.svg", -2066663489, 0);
+    /** 32x15 */ public static final @NotNull Icon Beta = load("general/beta.svg", 1357994846, 0);
     /** 8x4 */ public static final @NotNull Icon ButtonDropTriangle = load("general/buttonDropTriangle.svg", 1709843202, 2);
     /** 16x16 */ public static final @NotNull Icon ChevronDown = load("general/chevron-down.svg", -357059705, 0);
     /** 16x16 */ public static final @NotNull Icon ChevronLeft = load("general/chevron-left.svg", 662433505, 0);
@@ -1145,7 +1145,6 @@ public class AllIcons {
     /** 13x13 */ public static final @NotNull Icon Documentation = load("toolwindows/documentation.svg", -109460896, 2);
     /** 13x13 */ public static final @NotNull Icon ErrorEvents = load("toolwindows/errorEvents.svg", -1325472331, 2);
     /** 13x13 */ public static final @NotNull Icon InfoEvents = load("toolwindows/infoEvents.svg", -1959104863, 2);
-    /** 16x16 */ public static final @NotNull Icon MeetNewUi = load("toolwindows/meetNewUi.svg", -919334031, 0);
     /** 13x13 */ public static final @NotNull Icon NoEvents = load("toolwindows/noEvents.svg", -54977595, 2);
     /** 13x13 */ public static final @NotNull Icon Notifications = load("toolwindows/notifications.svg", -1680199155, 2);
     /** 13x13 */ public static final @NotNull Icon NotificationsNew = load("toolwindows/notificationsNew.svg", 919374629, 2);
@@ -1231,6 +1230,11 @@ public class AllIcons {
     /** 24x24 */ public static final @NotNull Icon CreateNewProjectTabSelected = load("welcome/createNewProjectTabSelected.svg", -192851221, 0);
     /** 24x24 */ public static final @NotNull Icon FromVCSTab = load("welcome/fromVCSTab.svg", -695190002, 2);
     /** 24x24 */ public static final @NotNull Icon FromVCSTabSelected = load("welcome/fromVCSTabSelected.svg", -815523628, 0);
+
+    public static final class LearnTab {
+      /** 16x16 */ public static final @NotNull Icon JetBrainsAcademy = load("welcome/learnTab/jetBrainsAcademy.svg", 1610871461, 0);
+    }
+
     /** 24x24 */ public static final @NotNull Icon Open = load("welcome/open.svg", 1137367903, 2);
     /** 24x24 */ public static final @NotNull Icon OpenSelected = load("welcome/openSelected.svg", 210385900, 0);
 

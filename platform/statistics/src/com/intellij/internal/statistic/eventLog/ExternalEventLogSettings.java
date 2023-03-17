@@ -25,13 +25,18 @@ public interface ExternalEventLogSettings {
   /**
    * @deprecated Endpoint shouldn't depend on recorder id. Use {@link #getTemplateUrl()}
    */
-  @Deprecated
-  @Nullable String getTemplateUrl(@NotNull String recorderId);
+  @Deprecated(since = "2022.2")
+  default @Nullable String getTemplateUrl(@NotNull String recorderId) {
+    return null;
+  }
 
   /**
    * Provides a custom endpoint for fetching configuration
+   *
    * @return Remote endpoint URL or null if platform default should be used
+   * @deprecated functionality is disabled
    */
+  @Deprecated(since = "2023.1")
   default @Nullable String getTemplateUrl() {
     return getTemplateUrl("UNDEFINED");
   }
@@ -92,9 +97,11 @@ public interface ExternalEventLogSettings {
   /**
    * Provides implementations of {@link StatisticsEventLogListener} to be used in {@link EventLogListenersManager}
    * <br/>
-   * This method will be called only once.
+   * This method will be called only once per recorder on IDE start or plugin loading (for dynamic plugins)
+   *
+   * @param recorderId of a recorder which logs will trigger provided listener
    * */
-  default @Nullable StatisticsEventLogListener getEventLogListener() {
+  default @Nullable StatisticsEventLogListener getEventLogListener(@NotNull String recorderId) {
     return null;
   }
 }

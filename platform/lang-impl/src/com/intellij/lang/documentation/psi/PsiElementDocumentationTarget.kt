@@ -12,8 +12,9 @@ import com.intellij.lang.documentation.ExternalDocumentationProvider
 import com.intellij.model.Pointer
 import com.intellij.navigation.TargetPresentation
 import com.intellij.openapi.progress.ProgressManager
+import com.intellij.openapi.progress.blockingContextToIndicator
 import com.intellij.openapi.project.Project
-import com.intellij.platform.documentation.*
+import com.intellij.platform.backend.documentation.*
 import com.intellij.pom.Navigatable
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
@@ -73,6 +74,12 @@ class PsiElementDocumentationTarget private constructor(
   }
 
   override fun computeDocumentation(): DocumentationResult? {
+    return blockingContextToIndicator {
+      doComputeDocumentation()
+    }
+  }
+
+  private fun doComputeDocumentation(): DocumentationResult? {
     val provider = DocumentationManager.getProviderFromElement(targetElement, sourceElement)
     val localDoc = localDoc(provider) // compute in this read action
     if (provider !is ExternalDocumentationProvider) {

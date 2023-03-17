@@ -10357,6 +10357,11 @@ public abstract class K1QuickFixTestGenerated extends AbstractK1QuickFixTest {
                 runTest("testData/quickfix/modifiers/openMemberInFinalClass4.kt");
             }
 
+            @TestMetadata("openMemberInObject.kt")
+            public void testOpenMemberInObject() throws Exception {
+                runTest("testData/quickfix/modifiers/openMemberInObject.kt");
+            }
+
             @TestMetadata("openModifierInEnum.kt")
             public void testOpenModifierInEnum() throws Exception {
                 runTest("testData/quickfix/modifiers/openModifierInEnum.kt");
@@ -12616,6 +12621,16 @@ public abstract class K1QuickFixTestGenerated extends AbstractK1QuickFixTest {
         @TestMetadata("simple.kt")
         public void testSimple() throws Exception {
             runTest("testData/quickfix/reorderParameters/simple.kt");
+        }
+
+        @TestMetadata("withUnchangedParameter.kt")
+        public void testWithUnchangedParameter() throws Exception {
+            runTest("testData/quickfix/reorderParameters/withUnchangedParameter.kt");
+        }
+
+        @TestMetadata("withUnchangedParameter2.kt")
+        public void testWithUnchangedParameter2() throws Exception {
+            runTest("testData/quickfix/reorderParameters/withUnchangedParameter2.kt");
         }
     }
 

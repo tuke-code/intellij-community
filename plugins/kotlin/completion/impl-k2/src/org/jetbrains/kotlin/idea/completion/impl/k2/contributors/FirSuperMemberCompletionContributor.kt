@@ -12,7 +12,9 @@ import org.jetbrains.kotlin.analysis.api.symbols.markers.KtSymbolWithModality
 import org.jetbrains.kotlin.analysis.api.types.KtIntersectionType
 import org.jetbrains.kotlin.analysis.api.types.KtType
 import org.jetbrains.kotlin.analysis.api.types.KtUsualClassType
+import org.jetbrains.kotlin.config.LanguageFeature
 import org.jetbrains.kotlin.descriptors.Modality
+import org.jetbrains.kotlin.idea.base.projectStructure.languageVersionSettings
 import org.jetbrains.kotlin.idea.completion.ItemPriority
 import org.jetbrains.kotlin.idea.completion.checkers.CompletionVisibilityChecker
 import org.jetbrains.kotlin.idea.completion.context.FirBasicCompletionContext
@@ -21,7 +23,6 @@ import org.jetbrains.kotlin.idea.completion.contributors.helpers.collectNonExten
 import org.jetbrains.kotlin.idea.completion.lookups.CallableInsertionOptions
 import org.jetbrains.kotlin.idea.completion.lookups.CallableInsertionStrategy
 import org.jetbrains.kotlin.idea.completion.weighers.WeighingContext
-import org.jetbrains.kotlin.idea.completion.weighers.WeighingContext.Companion.createWeighingContext
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.name.StandardClassIds
 import org.jetbrains.kotlin.psi.KtNamedFunction
@@ -31,17 +32,17 @@ internal class FirSuperMemberCompletionContributor(
     basicContext: FirBasicCompletionContext,
     priority: Int
 ) : FirCompletionContributorBase<FirSuperReceiverNameReferencePositionContext>(basicContext, priority) {
-    override fun KtAnalysisSession.complete(positionContext: FirSuperReceiverNameReferencePositionContext) = with(positionContext) {
+
+    private val excludeEnumEntries =
+        !basicContext.project.languageVersionSettings.supportsFeature(LanguageFeature.EnumEntries)
+
+    override fun KtAnalysisSession.complete(
+        positionContext: FirSuperReceiverNameReferencePositionContext,
+        weighingContext: WeighingContext
+    ) = with(positionContext) {
         val superReceiver = positionContext.superExpression
-        val expectedType = nameExpression.getExpectedType()
         val visibilityChecker = CompletionVisibilityChecker.create(basicContext, positionContext)
         val superType = superReceiver.getKtType() ?: return
-        val weighingContext = createWeighingContext(
-            superReceiver,
-            expectedType,
-            emptyList(), // Implicit receivers do not match for this completion contributor.
-            fakeKtFile
-        )
 
         val (nonExtensionMembers: Iterable<Pair<KtType, KtCallableSymbol>>, namesNeedDisambiguation: Set<Name>) = if (superType !is KtIntersectionType) {
             getNonExtensionsMemberSymbols(superType, visibilityChecker).map { superType to it }.asIterable() to emptySet()
@@ -92,7 +93,7 @@ internal class FirSuperMemberCompletionContributor(
     ): Sequence<KtCallableSymbol> {
         val scope = receiverType.getTypeScope()?.getDeclarationScope() ?: return emptySequence()
         val syntheticJavaPropertiesScope = receiverType.getSyntheticJavaPropertiesScope()?.getDeclarationScope()
-        return collectNonExtensions(scope, syntheticJavaPropertiesScope, visibilityChecker, scopeNameFilter)
+        return collectNonExtensions(scope, syntheticJavaPropertiesScope, visibilityChecker, scopeNameFilter, excludeEnumEntries)
     }
 
     private fun KtAnalysisSession.collectCallToSuperMember(

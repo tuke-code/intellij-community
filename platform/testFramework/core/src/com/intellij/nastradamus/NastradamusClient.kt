@@ -27,7 +27,9 @@ class NastradamusClient(
     private val jacksonMapper: ObjectMapper = jacksonObjectMapper()
   }
 
-  private lateinit var sortedClassesCachedResult: Map<Class<*>, Int>
+  /** Classes for current bucket. Map<Class to Sorting order> */
+  private lateinit var sortedClassesInCurrentBucket: Set<Class<*>>
+  private lateinit var allSortedClasses: Map<Class<*>, Int>
 
   fun collectTestRunResults(): TestResultRequestEntity {
     val tests = teamCityClient.getTestRunInfo()
@@ -47,7 +49,6 @@ class NastradamusClient(
         status = TestStatus.fromString(json.findValue("status").asText()),
         runOrder = json.findValue("runOrder").asInt(),
         duration = json.findValue("duration")?.asLong() ?: 0,
-        buildType = teamCityClient.buildTypeId,
         buildStatusMessage = build.findValue("statusText").asText(),
         isMuted = json.findValue("currentlyMuted")?.asBoolean() ?: false,
         bucketId = bucketId,
@@ -55,15 +56,14 @@ class NastradamusClient(
       )
     }
 
-    return TestResultRequestEntity(testRunResults = testResultEntities)
+    return TestResultRequestEntity(buildInfo = getBuildInfo(), testRunResults = testResultEntities)
   }
 
   fun sendTestRunResults(testResultRequestEntity: TestResultRequestEntity) {
     val uri = URIBuilder(baseUrl.resolve("/result/").normalize())
-      .addParameter("build_id", teamCityClient.buildId)
       .build()
 
-    val stringJson = jacksonMapper.writeValueAsString(testResultRequestEntity.testRunResults)
+    val stringJson = jacksonMapper.writeValueAsString(testResultRequestEntity)
 
     val httpPost = HttpPost(uri).apply {
       addHeader("Content-Type", "application/json")
@@ -197,7 +197,8 @@ class NastradamusClient(
     return BuildInfo(buildId = teamCityClient.buildId,
                      aggregatorBuildId = aggregatorBuildId,
                      branchName = branchName,
-                     os = teamCityClient.os)
+                     os = teamCityClient.os,
+                     buildType = teamCityClient.buildTypeId)
   }
 
   fun getRankedClasses(): Map<Class<*>, Int> {
@@ -222,10 +223,13 @@ class NastradamusClient(
           )
 
           var rank = 1
-          val ranked = sortedCases.associate { case -> case.name to rank++ }
-          sortedClassesCachedResult = unsortedClasses.associateWith { clazz -> ranked[clazz.name] ?: Int.MAX_VALUE }
+          val rankedTestClassesForCurrentBucket = sortedCases.associate { case -> case.name to rank++ }
+
+          sortedClassesInCurrentBucket = unsortedClasses.filter { it.name in rankedTestClassesForCurrentBucket.keys }.toSet()
+
+          allSortedClasses = unsortedClasses.associateWith { clazz -> rankedTestClassesForCurrentBucket[clazz.name] ?: Int.MAX_VALUE }
           println("Fetching sorted test classes from Nastradamus completed")
-          sortedClassesCachedResult
+          allSortedClasses
         },
         fallbackOnThresholdReached = { fallback() }
       )
@@ -233,21 +237,22 @@ class NastradamusClient(
     catch (e: Throwable) {
       // fallback in case of any failure (just to get aggregator running)
       System.err.println("Failure during sorting test classes via Nastradamus. Fallback to simple natural sorting.")
-      sortedClassesCachedResult = fallback()
-      sortedClassesCachedResult
+      allSortedClasses = fallback()
+      allSortedClasses
     }
   }
 
-  fun isClassInBucket(testIdentifier: String): Boolean {
-    if (!this::sortedClassesCachedResult.isInitialized) getRankedClasses()
+  fun isClassInBucket(testIdentifier: String, fallbackFunc: (String) -> Boolean): Boolean {
+    if (!this::allSortedClasses.isInitialized) getRankedClasses()
 
     val isMatch: Boolean = withErrorThreshold(
       objName = "NastradamusClient-isClassInBucket",
       errorThreshold = 1,
-      action = {
-        sortedClassesCachedResult.keys.any { it.name == testIdentifier }
-      },
-      fallbackOnThresholdReached = { throw RuntimeException("Couldn't find appropriate bucket for $testIdentifier via Nastradamus") }
+      action = { sortedClassesInCurrentBucket.any { it.name == testIdentifier } },
+      fallbackOnThresholdReached = {
+        System.err.println("Couldn't find appropriate bucket for $testIdentifier via Nastradamus")
+        fallbackFunc(testIdentifier)
+      }
     )
 
     if (TestCaseLoader.IS_VERBOSE_LOG_ENABLED) {

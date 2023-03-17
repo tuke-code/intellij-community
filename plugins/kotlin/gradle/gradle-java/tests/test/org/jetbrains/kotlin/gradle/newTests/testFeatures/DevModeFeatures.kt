@@ -4,6 +4,7 @@ package org.jetbrains.kotlin.gradle.newTests.testFeatures
 import com.intellij.testFramework.UsefulTestCase
 import org.jetbrains.kotlin.gradle.newTests.TestConfigurationDslScope
 import org.jetbrains.kotlin.gradle.newTests.TestFeature
+import org.jetbrains.kotlin.gradle.newTests.testFeatures.DevModeTweaks.Companion.WRITE_PROJECTS_TO_ENV_PROPERTY
 import org.jetbrains.kotlin.gradle.newTests.testProperties.AndroidGradlePluginVersionTestsProperty
 import org.jetbrains.kotlin.gradle.newTests.testProperties.GradleVersionTestsProperty
 import org.jetbrains.kotlin.gradle.newTests.testProperties.KotlinGradlePluginVersionTestsProperty
@@ -11,25 +12,33 @@ import org.jetbrains.kotlin.gradle.newTests.writeAccess
 import org.jetbrains.plugins.gradle.settings.GradleSystemSettings
 import java.io.File
 
-object DevModeTestFeature : TestFeature<DevModeTweaksImpl>  {
-    override fun createDefaultConfiguration(): DevModeTweaksImpl = DevModeTweaksImpl()
-}
-
+/**
+ * Provides `dev`-block with assorted utilities for **local** development.
+ *
+ * Those tweaks are not supposed to be run on CI, usually. Use `dev(allowOnTeamcity = true) { ... }`
+ * if you know what you're doing.
+ */
 interface DevModeTweaks {
     /**
-     * If non-null, the preprocessed test project (with all TestProperties substituted with actual values)
-     * will be written to the destination '[path]/$testName'
-     * If [overwriteExisting] is specified, '[path]/$testName' is *completely deleted* before writing
+     * Writes the preprocessed test project (with all TestProperties substituted with actual values)
+     * to the destination 'actualPath/$testName', where 'actualPath' is computed as following:
+     *   - actualPath = [toPath] if [toPath] is not null
+     *   - actualPath = value of the env property [WRITE_PROJECTS_TO_ENV_PROPERTY] otherwise
+     *
+     * If [overwriteExisting] is specified, '[toPath]/$testName' is *completely deleted* before writing
      */
-    fun writeTestProjectTo(path: String, overwriteExisting: Boolean = false)
+    fun dumpTestProject(toPath: String? = null, overwriteExisting: Boolean = false)
 
     /**
      * Can be used to override the versions used in tests
      *
      * NB: if you use dev { ... } block to configure this in test, test name won't be changed
      * (impossible to do because test name has to be determined before test started).
+     *
      * If you want overridden version to be displayed in the test name, overwrite default values
      * in [DevModeTweaksImpl]
+     * Note that overwriting default values **will fail CI-runs** because of irreconcilable incompatibilities
+     * with how test runs are organized on the CI
      */
     var overrideGradleVersion: GradleVersionTestsProperty.Value?
     var overrideAgpVersion: AndroidGradlePluginVersionTestsProperty.Value?
@@ -39,6 +48,14 @@ interface DevModeTweaks {
      * Launches Gradle Daemon with suspend option, listening for debugger connection on [port]
      */
     fun enableGradleDebugWithSuspend(port: Int = 5005)
+
+    companion object {
+        const val WRITE_PROJECTS_TO_ENV_PROPERTY = "ORG_JETBRAINS_KOTLIN_MPP_TESTS_WRITE_PROJECTS_TO"
+    }
+}
+
+object DevModeTestFeature : TestFeature<DevModeTweaksImpl> {
+    override fun createDefaultConfiguration(): DevModeTweaksImpl = DevModeTweaksImpl()
 }
 
 class DevModeTweaksImpl : DevModeTweaks {
@@ -54,8 +71,13 @@ class DevModeTweaksImpl : DevModeTweaks {
     var writeTestProjectTo: File? = null
     var overwriteExistingProjectCopy: Boolean = false
 
-    override fun writeTestProjectTo(path: String, overwriteExisting: Boolean) {
-        writeTestProjectTo = File(path)
+    override fun dumpTestProject(toPath: String?, overwriteExisting: Boolean) {
+        val actualPath = toPath ?: System.getProperty(WRITE_PROJECTS_TO_ENV_PROPERTY)
+        ?: error(
+            "Can't find the path to write the test project.\n" +
+                    "Either provide the path explicitly in writeTestProjectTo, or set the env property $WRITE_PROJECTS_TO_ENV_PROPERTY"
+        )
+        writeTestProjectTo = File(actualPath)
         this.overwriteExistingProjectCopy = overwriteExisting
     }
 
@@ -79,8 +101,10 @@ class DevModeTweaksImpl : DevModeTweaks {
 interface DevModeTweaksDsl {
     fun TestConfigurationDslScope.dev(allowOnTeamcity: Boolean = false, config: DevModeTweaks.() -> Unit) {
         if (UsefulTestCase.IS_UNDER_TEAMCITY && !allowOnTeamcity) {
-            error("Error: dev-block normally shouldn't be used on CI, as it can break tests stability/reliability\n" +
-                          "Either remove it, or use dev(allowOnTeamcity = true) { ... } if you're absolutely sure what you're doing")
+            error(
+                "Error: dev-block normally shouldn't be used on CI, as it can break tests stability/reliability\n" +
+                        "Either remove it, or use dev(allowOnTeamcity = true) { ... } if you're absolutely sure what you're doing"
+            )
         }
         writeAccess.getConfiguration(DevModeTestFeature).config()
     }

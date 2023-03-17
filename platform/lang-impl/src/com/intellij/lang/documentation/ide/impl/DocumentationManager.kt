@@ -23,13 +23,14 @@ import com.intellij.openapi.components.service
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
-import com.intellij.platform.documentation.DocumentationTarget
-import com.intellij.platform.documentation.impl.DocumentationRequest
-import com.intellij.platform.documentation.impl.InternalResolveLinkResult
-import com.intellij.platform.documentation.impl.documentationRequest
-import com.intellij.platform.documentation.impl.resolveLink
+import com.intellij.platform.backend.documentation.DocumentationTarget
+import com.intellij.platform.backend.documentation.impl.DocumentationRequest
+import com.intellij.platform.backend.documentation.impl.InternalResolveLinkResult
+import com.intellij.platform.backend.documentation.impl.documentationRequest
+import com.intellij.platform.backend.documentation.impl.resolveLink
 import com.intellij.platform.ide.documentation.DOCUMENTATION_TARGETS
 import com.intellij.ui.popup.AbstractPopup
+import com.intellij.util.childScope
 import com.intellij.util.ui.EDT
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.Flow
@@ -40,7 +41,7 @@ import java.lang.ref.WeakReference
 
 @ApiStatus.Internal
 @Service
-class DocumentationManager(private val project: Project) : Disposable {
+class DocumentationManager(private val project: Project, private val cs: CoroutineScope) : Disposable {
 
   companion object {
 
@@ -50,9 +51,8 @@ class DocumentationManager(private val project: Project) : Disposable {
     var skipPopup: Boolean by propComponentProperty(name = "documentation.skip.popup", defaultValue = false)
   }
 
-  private val cs: CoroutineScope = CoroutineScope(SupervisorJob())
   // separate scope is needed for the ability to cancel its children
-  private val popupScope: CoroutineScope = CoroutineScope(SupervisorJob(parent = cs.coroutineContext.job))
+  private val popupScope: CoroutineScope = cs.childScope()
 
   override fun dispose() {
     cs.cancel()

@@ -8,8 +8,8 @@ import com.intellij.lang.jvm.annotation.JvmAnnotationArrayValue
 import com.intellij.lang.jvm.annotation.JvmAnnotationConstantValue
 import com.intellij.lang.jvm.annotation.JvmAnnotationEnumFieldValue
 import com.intellij.openapi.components.Service
-import com.intellij.openapi.fileTypes.FileType
 import com.intellij.openapi.project.Project
+import com.intellij.psi.PsiAnnotation
 import com.intellij.psi.PsiAnnotation.DEFAULT_REFERENCED_METHOD_NAME
 import com.intellij.psi.PsiElementFactory
 import com.intellij.psi.PsiFile
@@ -17,9 +17,6 @@ import com.intellij.psi.PsiType
 import com.intellij.psi.search.GlobalSearchScope
 import kotlinx.coroutines.CoroutineScope
 import org.jetbrains.idea.devkit.DevKitBundle
-import org.jetbrains.kotlin.idea.KotlinFileType
-import org.jetbrains.kotlin.name.ClassId
-import org.jetbrains.kotlin.name.Name
 
 internal class MismatchedLightServiceLevelAndCtorInspection : DevKitJvmInspection() {
 
@@ -31,17 +28,20 @@ internal class MismatchedLightServiceLevelAndCtorInspection : DevKitJvmInspectio
         if (!method.isConstructor) return true
         val file: PsiFile = method.sourceElement?.containingFile ?: return true
         val containingClass = method.containingClass ?: return true
-        val serviceAnnotation = containingClass.annotations.find { it.qualifiedName == Service::class.java.canonicalName } ?: return true
-        val level = getLevel(serviceAnnotation, file.fileType)
-        if (level !in listOf(Level.PROJECT, Level.APP_AND_PROJECT)) {
+        val annotation = containingClass.getAnnotation(Service::class.java.canonicalName) ?: return true
+        val annotationName = (annotation as? PsiAnnotation)?.nameReferenceElement
+        val level = getLevel(annotation)
+        if (annotationName != null && level !in listOf(Level.PROJECT, Level.APP_AND_PROJECT)) {
           val isProjectParamCtor = (method.parameters.singleOrNull()?.type as? PsiType)?.canonicalText == Project::class.java.canonicalName
           if (isProjectParamCtor) {
             val projectLevelFqn = "${Service.Level::class.java.canonicalName}.${Service.Level.PROJECT}"
-            val request = annotationRequest(Service::class.java.canonicalName,
-                                            constantAttribute(DEFAULT_REFERENCED_METHOD_NAME, projectLevelFqn))
-            val actions = createAddAnnotationActions(containingClass, request)
+            val request = constantAttribute(DEFAULT_REFERENCED_METHOD_NAME, projectLevelFqn)
+            val actions = createChangeAnnotationAttributeActions(annotation, 0, request)
             val fixes = IntentionWrapper.wrapToQuickFixes(actions.toTypedArray(), file)
-            sink.highlight(DevKitBundle.message("inspection.mismatched.light.service.level.and.ctor.project.level.required"), *fixes)
+            val holder = (sink as HighlightSinkImpl).holder
+            holder.registerProblem(annotationName,
+                                   DevKitBundle.message("inspection.mismatched.light.service.level.and.ctor.project.level.required"),
+                                   *fixes)
           }
         }
         if (level == Level.APP || level == Level.APP_AND_PROJECT) {
@@ -69,20 +69,19 @@ internal class MismatchedLightServiceLevelAndCtorInspection : DevKitJvmInspectio
         return method.parameters.isEmpty() || (method.parameters.singleOrNull()?.type as? PsiType)?.canonicalText == CoroutineScope::class.java.canonicalName
       }
 
-      private fun getLevel(annotation: JvmAnnotation, fileType: FileType): Level {
+      private fun getLevel(annotation: JvmAnnotation): Level {
         val levels = when (val attributeValue = annotation.findAttribute(DEFAULT_REFERENCED_METHOD_NAME)?.attributeValue) {
-          is JvmAnnotationArrayValue ->
-            if (fileType == KotlinFileType.INSTANCE)
-              attributeValue.values
-                .filterIsInstance<JvmAnnotationConstantValue>()
-                .map { it.constantValue }
-                .filterIsInstance<Pair<ClassId, Name>>()
-                .filter { (classId, name) ->
-                  classId.asFqNameString() == Service.Level::class.java.canonicalName &&
-                  name.identifier in listOf(Service.Level.APP.name, Service.Level.PROJECT.name)
-                }
-                .map { (_, name) -> name.identifier }
-            else
+          is JvmAnnotationArrayValue -> {
+            val kotlinLevels = attributeValue.values
+              .filterIsInstance<JvmAnnotationConstantValue>()
+              .map { it.constantValue }
+              .filterIsInstance<Pair<*, *>>()
+              .filter { (first, second) ->
+                first.toString() == Service.Level::class.java.name.replace('.', '/').replace('$', '.') &&
+                second.toString() in listOf(Service.Level.APP.name, Service.Level.PROJECT.name)
+              }
+              .map { (_, second) -> second.toString() }
+            kotlinLevels.ifEmpty {
               attributeValue.values
                 .filterIsInstance<JvmAnnotationEnumFieldValue>()
                 .filter {
@@ -90,6 +89,8 @@ internal class MismatchedLightServiceLevelAndCtorInspection : DevKitJvmInspectio
                   it.fieldName in listOf(Service.Level.APP.name, Service.Level.PROJECT.name)
                 }
                 .map { it.fieldName!! }
+            }
+          }
           is JvmAnnotationEnumFieldValue -> {
             if (attributeValue.containingClassName == Service.Level::class.java.canonicalName &&
                 attributeValue.fieldName in listOf(Service.Level.APP.name, Service.Level.PROJECT.name))

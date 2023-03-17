@@ -87,7 +87,7 @@ internal object GHPRDetailsCommitsComponentFactory {
         }
       })
       bindDisabled(scope, commitsVm.reviewCommits.map { commits ->
-        commits.size == 1
+        commits.size <= 1
       })
       addActionListener(createCommitPopupAction(scope, commitsVm, diffBridge))
     }
@@ -118,8 +118,14 @@ internal object GHPRDetailsCommitsComponentFactory {
         }
       )
 
-      commitsVm.selectCommit(selectedCommit)
-      diffBridge.activeTree = GHPRDiffController.ActiveTree.COMMITS
+      if (selectedCommit == null) {
+        diffBridge.activeTree = GHPRDiffController.ActiveTree.FILES
+        commitsVm.selectAllCommits()
+      }
+      else {
+        diffBridge.activeTree = GHPRDiffController.ActiveTree.COMMITS
+        commitsVm.selectCommit(selectedCommit)
+      }
     }
   }
 

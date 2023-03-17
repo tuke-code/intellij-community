@@ -746,7 +746,9 @@
           <group id="CustomLayoutsGroup" class="com.intellij.ide.actions.CustomLayoutsActionGroup" />
           <separator/>
           <action id="RestoreDefaultLayout" class="com.intellij.ide.actions.RestoreDefaultLayoutAction"/>
-          <action id="StoreDefaultLayout" class="com.intellij.ide.actions.StoreDefaultLayoutAction"/>
+          <action id="StoreDefaultLayout" class="com.intellij.ide.actions.StoreDefaultLayoutAction">
+            <synonym key="action.StoreDefaultLayout.synonym" />
+          </action>
           <action id="StoreNewLayout" class="com.intellij.ide.actions.StoreNewLayoutAction" />
         </group>
         <separator/>
@@ -852,7 +854,7 @@
         <separator/>
         <action id="HelpTopics" class="com.intellij.ide.actions.HelpTopicsAction" icon="AllIcons.Actions.Help"/>
         <action id="WhatsNewAction" class="com.intellij.ide.actions.WhatsNewAction"/>
-        <action id="ActivateMeetNewUIToolWindow" class="com.intellij.ide.ui.experimental.meetNewUi.ActivateMeetNewUIToolWindowAction"/>
+        <action id="MeetNewUIAction" class="com.intellij.ide.ui.experimental.meetNewUi.MeetNewUIAction"/>
         <action id="OnlineDocAction" class="com.intellij.ide.actions.OnlineDocAction"/>
         <action id="Help.JetBrainsTV" class="com.intellij.ide.actions.JetBrainsTvAction"/>
         <action id="Help.KeymapReference" class="com.intellij.ide.actions.RefCardAction"/>
@@ -1117,6 +1119,15 @@
     </group>
 
     <group id="FileChooserToolbar">
+      <action id="FileChooser.GoBackward" class="com.intellij.openapi.fileChooser.actions.GoToHistoryAction$Backward"
+              icon="AllIcons.Actions.Back" use-shortcut-of="Back"/>
+      <action id="FileChooser.GoForward" class="com.intellij.openapi.fileChooser.actions.GoToHistoryAction$Forward"
+              icon="AllIcons.Actions.Forward" use-shortcut-of="Forward"/>
+      <action id="FileChooser.GoToParent" class="com.intellij.openapi.fileChooser.actions.GoToParentDirectoryAction"
+              icon="AllIcons.Nodes.UpFolder"/>
+      <action id="FileChooser.GoToRoot" class="com.intellij.openapi.fileChooser.actions.GoToRootDirectoryAction"
+              icon="AllIcons.Nodes.Servlet"/>
+      <separator/>
       <action id="FileChooser.GotoHome" class="com.intellij.openapi.fileChooser.actions.GotoHomeAction"
               icon="AllIcons.Nodes.HomeFolder"/>
       <action id="FileChooser.GoToWslHome" class="com.intellij.openapi.fileChooser.actions.GoToWslHomeAction"
@@ -1138,15 +1149,7 @@
       <action id="FileChooser.ShowHidden" class="com.intellij.openapi.fileChooser.actions.ToggleVisibilityAction"
               icon="AllIcons.Actions.ToggleVisibility"/>
       <action id="FileChooser.TogglePathBar" class="com.intellij.openapi.fileChooser.actions.TogglePathShowingAction"
-              icon="AllIcons.Debugger.Console"/>
-
-      <add-to-group group-id="Other.KeymapGroup"/>
-    </group>
-
-    <group id="FileChooserList">
-      <action id="FileChooserList.Root" class="com.intellij.openapi.fileChooser.impl.FileChooserPanelActions$Root"/>
-      <action id="FileChooserList.LevelUp" class="com.intellij.openapi.fileChooser.impl.FileChooserPanelActions$LevelUp"
-              icon="AllIcons.Nodes.UpFolder"/>
+              icon="AllIcons.Nodes.Console"/>
 
       <add-to-group group-id="Other.KeymapGroup"/>
     </group>
@@ -1561,6 +1564,7 @@
 
     <group id="ActivateToolWindowActions" searchable="false">
       <action id="ActivateFindToolWindow" class="com.intellij.find.actions.ActivateFindToolWindowAction"/>
+      <action id="ActivateMeetNewUIToolWindow" class="com.intellij.ide.ui.experimental.meetNewUi.ActivateMeetNewUIToolWindowAction"/>
     </group>
 
     <action class="com.intellij.diagnostic.ResetWindowsDefenderNotification" id="ResetWindowsDefenderNotification"/>

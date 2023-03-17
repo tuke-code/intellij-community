@@ -82,9 +82,10 @@ class FilenameToolbarWidgetAction: DumbAwareAction(), CustomComponentAction {
       val recentFiles = getInstance(project).fileList.asReversed()
       if (recentFiles.size > 1) {
         val files = recentFiles.subList(1, recentFiles.lastIndex + 1)
-        JBPopupFactory.getInstance()
-          .createListPopup(RecentFilesListPopupStep(project, files))
-          .showUnderneathOf(component)
+        JBPopupFactory.getInstance().createListPopup(RecentFilesListPopupStep(project, files)).apply {
+          clickSource = component
+          showUnderneathOf(component)
+        }
       }
     }
   }
@@ -99,10 +100,7 @@ class FilenameToolbarWidgetAction: DumbAwareAction(), CustomComponentAction {
       return FileStatusManager.getInstance(project).getStatus(value).color
     }
 
-    override fun getTextFor(value: VirtualFile?): String {
-      if (value == null) return ""
-      return VfsPresentationUtil.getUniquePresentableNameForUI(project, value)
-    }
+    override fun getTextFor(value: VirtualFile?) = value?.presentableName ?: ""
 
     override fun onChosen(selectedValue: VirtualFile?, finalChoice: Boolean): PopupStep<*>? {
       if (selectedValue != null && finalChoice) FileEditorManager.getInstance(project).openFile(selectedValue, true)

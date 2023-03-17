@@ -22,32 +22,68 @@ import org.jetbrains.kotlin.idea.codeInsight.gradle.PluginTargetVersionsRule
 import org.jetbrains.kotlin.idea.codeMetaInfo.clearTextFromDiagnosticMarkup
 import org.jetbrains.kotlin.idea.test.KotlinTestUtils
 import org.jetbrains.kotlin.konan.target.HostManager
+import org.jetbrains.kotlin.test.TestMetadata
 import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
 import org.jetbrains.plugins.gradle.importing.GradleImportingTestCase
 import org.jetbrains.plugins.gradle.settings.GradleSystemSettings
+import org.junit.Assert
 import org.junit.Assume.assumeTrue
 import org.junit.Rule
+import org.junit.Test
 import org.junit.runner.Description
 import org.junit.runner.RunWith
 import java.io.File
 import java.io.PrintStream
+import java.util.TreeSet
+import java.util.*
+import kotlin.Comparator
 
+/**
+ * The base class for Kotlin MPP Import-based tests.
+ *
+ * # Usage
+ * 1. inherit it in your test-suite
+ *
+ * 2. Add `@TestMetadata` on the test suite to define a subpath relative to
+ * `community/plugins/kotlin/idea/tests/testData/gradle`
+ *
+ * 3. Define tests inside as usual
+ *
+ * 4. In each test, call `doTest()` to run the test.
+ * It will by default execute all [TestFeature]s and [AbstractTestChecker]s declared in [installedFeatures]
+ *
+ * 5. You can override [defaultTestConfiguration] to tweak the checks globally for all the tests in suite,
+ * or `doTest { ... }`-block to tweak it locally for the specific test
+ *
+ * # Overrides, JUnit `@Rule`s, inheritance, extensibility
+ *
+ * This class **is explicitly designed to forbid extension by inheritance**. Most of overrides from [GradleImportingTestCase]
+ * are intentionally `final`. Some methods and fields are not private due to JUnit restrictions, but it is heavily discouraged to
+ * tweak them in inheritors.
+ *
+ * Avoid using [Rule] in inheritors to not complicate lifecycle any further, instead use [TestFeatureWithSetUpTearDown].
+ * [KotlinMppTestsContext.description] should cover common needs for [Rule]
+ *
+ * Sharing of the test suite capabilities should be done via standalone composable modularized [TestFeature]s
+ */
 @RunWith(KotlinMppTestsJUnit4Runner::class)
 @TestDataPath("\$PROJECT_ROOT/community/plugins/kotlin/idea/tests/testData/gradle")
 abstract class AbstractKotlinMppGradleImportingTest :
     GradleImportingTestCase(), WorkspaceChecksDsl, GradleProjectsPublishingDsl, GradleProjectsLinkingDsl, HighlightingCheckDsl,
-    TestWithKotlinPluginAndGradleVersions, DevModeTweaksDsl {
+    TestWithKotlinPluginAndGradleVersions, DevModeTweaksDsl, AllFilesUnderContentRootConfigurationDsl {
 
     internal val installedFeatures = listOf<TestFeature<*>>(
         GradleProjectsPublishingTestsFeature,
         LinkedProjectPathsTestsFeature,
         NoErrorEventsDuringImportFeature,
+        CustomImportChecker, // NB: Disabled by default in most suites to not pollute the DSL
 
         ContentRootsChecker,
         KotlinFacetSettingsChecker,
         OrderEntriesChecker,
         TestTasksChecker,
         HighlightingChecker,
+        AllFilesAreUnderContentRootChecker,
     )
 
     private val context: KotlinMppTestsContextImpl = KotlinMppTestsContextImpl()
@@ -72,14 +108,14 @@ abstract class AbstractKotlinMppGradleImportingTest :
 
     open fun TestConfigurationDslScope.defaultTestConfiguration() {}
 
-    protected fun doTest(configuration: TestConfigurationDslScope.() -> Unit = { }) {
+    protected fun doTest(runImport: Boolean = true, configuration: TestConfigurationDslScope.() -> Unit = { }) {
         val defaultConfig = TestConfiguration().apply { defaultTestConfiguration() }
         val testConfig = defaultConfig.copy().apply { configuration() }
         context.testConfiguration = testConfig
-        context.doTest()
+        context.doTest(runImport)
     }
 
-    private fun KotlinMppTestsContextImpl.doTest() {
+    private fun KotlinMppTestsContextImpl.doTest(runImport: Boolean) {
         installedFeatures.forEach { feature -> with(feature) { context.beforeTestExecution() } }
         createProjectSubFile(
             "local.properties",
@@ -93,7 +129,7 @@ abstract class AbstractKotlinMppGradleImportingTest :
 
         installedFeatures.forEach { feature -> with(feature) { context.beforeImport() } }
 
-        importProject()
+        if (runImport) importProject()
 
         installedFeatures.forEach { feature ->
             with(feature) {
@@ -102,21 +138,17 @@ abstract class AbstractKotlinMppGradleImportingTest :
         }
     }
 
+    @Suppress("RedundantIf")
     private fun KotlinMppTestsContextImpl.isCheckerEnabled(checker: AbstractTestChecker<*>): Boolean {
         // Temporary mute TEST_TASKS checks due to issues with hosts on CI. See KT-56332
         if (checker is TestTasksChecker) return false
 
         val config = testConfiguration.getConfiguration(GeneralWorkspaceChecks)
-        return when {
-            config.disableCheckers != null -> checker !in config.disableCheckers!!
-
-            config.onlyCheckers != null -> checker in config.onlyCheckers!!
-                    // Highlighting checker should be disabled explicitly, because it's rarely the intention to not run
-                    // highlighting when you have sources and say 'onlyCheckers(OrderEntriesCheckers)'
-                    || checker is HighlightingChecker
-
-            else -> true
-        }
+        if (config.disableCheckers != null && checker in config.disableCheckers!!) return false
+        // Highlighting checker should be disabled explicitly, because it's rarely the intention to not run
+        // highlighting when you have sources and say 'onlyCheckers(OrderEntriesCheckers)'
+        if (config.onlyCheckers != null && checker !in config.onlyCheckers!! && checker !is HighlightingChecker) return false
+        return true
     }
 
     final override fun findJdkPath(): String {
@@ -133,15 +165,16 @@ abstract class AbstractKotlinMppGradleImportingTest :
         // Hack: usually this is set-up by JUnit's Parametrized magic, but
         // our tests source versions from `kotlinTestPropertiesService`, not from
         // @Parametrized
-        this.gradleVersion = context.gradleVersion.version
+        (this as GradleImportingTestCase).gradleVersion = context.gradleVersion.version
         super.setUp()
 
         context.testProject = myProject
         context.testProjectRoot = myProjectRoot.toNioPath().toFile()
+        context.gradleJdkPath = File(findJdkPath())
 
         // Otherwise Gradle Daemon fails with Metaspace exhausted periodically
         GradleSystemSettings.getInstance().gradleVmOptions =
-            "-XX:MaxMetaspaceSize=512m -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=${System.getProperty("user.dir")}"
+            "-XX:MaxMetaspaceSize=1024m -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=${System.getProperty("user.dir")}"
     }
 
     private fun KotlinMppTestsContext.configureByFiles(): List<VirtualFile> {
@@ -225,6 +258,45 @@ abstract class AbstractKotlinMppGradleImportingTest :
     // override it to preserve line breaks in output of Gradle-process
     final override fun printOutput(stream: PrintStream, text: String) {
         stream.println(text)
+    }
+
+    @Test
+    fun testSuiteMethodsAndTestdataFoldersConsistency() {
+        fun mutableCaseInsensitiveStringSet(): MutableSet<String> =
+            TreeSet(Comparator { o1: String, o2: String -> o1.compareTo(o2, ignoreCase = true) })
+
+        // will point to <testdata-folder of this class>/<methodsAndFoldersAreInOneToOneCorrespondence> (doesn't exist)
+        val testDataFolderForThisTest = computeTestDataDirectory(context.description, strict = false)
+
+        val testDataFolderForThisSuite = testDataFolderForThisTest.parentFile
+
+        val actualTestDataFoldersNames = testDataFolderForThisSuite.listFiles()!!
+            .mapTo(mutableCaseInsensitiveStringSet()) { it.name }
+
+        val testClass = context.description.testClass
+        // NB: Inherited methods are not supported here
+        val expectedTestFolders = testClass.declaredMethods.asSequence()
+            .filter { it.name.startsWith("test") }
+            .mapTo(mutableCaseInsensitiveStringSet()) { getTestFolderName(it.name, it.getAnnotation(TestMetadata::class.java)) }
+
+        val folderNamesPresentOnDiskButNoMethod = actualTestDataFoldersNames - expectedTestFolders
+
+        val errors = buildString {
+            if (folderNamesPresentOnDiskButNoMethod.isNotEmpty()) {
+                appendLine(
+                    "The following folders don't have corresponding test method in ${testClass.simpleName},\n" +
+                            "but are present in ${testDataFolderForThisSuite.absolutePath}"
+                )
+                appendLine("    ${folderNamesPresentOnDiskButNoMethod.joinToString()}")
+            }
+        }
+
+        if (errors.isNotEmpty()) {
+            Assert.fail(
+                "Error! Test methods in the test suite are not consistent with test data on disk\n"
+                        + errors
+            )
+        }
     }
 
     class TestDescriptionProviderJUnitRule(private val testContext: KotlinMppTestsContextImpl) : KotlinBeforeAfterTestRuleWithDescription {

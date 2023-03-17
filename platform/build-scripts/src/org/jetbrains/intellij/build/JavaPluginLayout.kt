@@ -49,7 +49,9 @@ object JavaPluginLayout {
         "intellij.java.psi",
         "intellij.java",
         "intellij.jsp",
-        "intellij.platform.uast"
+        "intellij.platform.uast",
+        "intellij.platform.uast.ide",
+        "intellij.java.uast.ide",
       ))
 
       spec.withModules(listOf(
@@ -73,7 +75,8 @@ object JavaPluginLayout {
         "intellij.java.uast",
         "intellij.java.structuralSearch",
         "intellij.java.typeMigration",
-        "intellij.java.featuresTrainer"
+        "intellij.java.featuresTrainer",
+        "intellij.java.performancePlugin"
       ))
 
       spec.withModuleLibrary("debugger-agent", "intellij.java.debugger.agent.holder", "rt")

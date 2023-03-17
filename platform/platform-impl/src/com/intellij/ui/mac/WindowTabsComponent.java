@@ -10,6 +10,7 @@ import com.intellij.openapi.project.DumbAwareAction;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.project.ProjectManager;
 import com.intellij.openapi.ui.AbstractPainter;
+import com.intellij.openapi.ui.popup.JBPopup;
 import com.intellij.openapi.ui.popup.util.PopupUtil;
 import com.intellij.openapi.util.ActionCallback;
 import com.intellij.openapi.util.Disposer;
@@ -39,7 +40,6 @@ import com.intellij.ui.tabs.impl.*;
 import com.intellij.ui.tabs.impl.singleRow.SingleRowLayout;
 import com.intellij.ui.tabs.impl.singleRow.WindowTabsLayout;
 import com.intellij.ui.tabs.impl.themes.DefaultTabTheme;
-import com.intellij.util.ObjectUtils;
 import com.intellij.util.ui.GraphicsUtil;
 import com.intellij.util.ui.JBFont;
 import com.intellij.util.ui.JBUI;
@@ -58,19 +58,10 @@ import java.util.*;
 /**
  * @author Alexander Lobas
  */
-public class WindowTabsComponent extends JBTabsImpl {
+public final class WindowTabsComponent extends JBTabsImpl {
   private static final String TITLE_LISTENER_KEY = "TitleListener";
 
   private static final int TAB_HEIGHT = 30;
-
-  private static final Icon CLOSE_ICON = ExperimentalUI.isNewUI() ?
-                                         IconManager.getInstance().getIcon("expui/general/closeSmall_dark.svg", AllIcons.class) :
-                                         AllIcons.Actions.Close;
-
-  private static final Icon CLOSE_HOVERED_ICON = ExperimentalUI.isNewUI() ?
-                                                 IconManager.getInstance()
-                                                   .getIcon("expui/general/closeSmallHovered_dark.svg", AllIcons.class) :
-                                                 AllIcons.Actions.CloseHovered;
 
   private static DockManagerImpl myDockManager;
 
@@ -154,11 +145,10 @@ public class WindowTabsComponent extends JBTabsImpl {
               Component c = SwingUtilities.getDeepestComponentAt(e.getComponent(), e.getX(), e.getY());
               if (c instanceof InplaceButton) return;
               myTabs.select(info, true);
-              ObjectUtils.consumeIfNotNull(PopupUtil.getPopupContainerFor(label), popup -> {
-                if (ClientProperty.isTrue(popup.getContent(), MorePopupAware.class)) {
-                  popup.cancel();
-                }
-              });
+              JBPopup container = PopupUtil.getPopupContainerFor(label);
+              if (container != null && ClientProperty.isTrue(container.getContent(), MorePopupAware.class)) {
+                container.cancel();
+              }
             }
             else {
               handlePopup(e);
@@ -393,8 +383,14 @@ public class WindowTabsComponent extends JBTabsImpl {
     };
 
     Presentation presentation = closeAction.getTemplatePresentation();
-    presentation.setIcon(CLOSE_ICON);
-    presentation.setHoveredIcon(CLOSE_HOVERED_ICON);
+    boolean isNewUi = ExperimentalUI.isNewUI();
+    presentation.setIcon(isNewUi ?
+                         IconManager.getInstance().getIcon("expui/general/closeSmall_dark.svg", AllIcons.class.getClassLoader()) :
+                         AllIcons.Actions.Close);
+    presentation.setHoveredIcon(isNewUi
+                                ? IconManager.getInstance()
+                                  .getIcon("expui/general/closeSmallHovered_dark.svg", AllIcons.class.getClassLoader())
+                                : AllIcons.Actions.CloseHovered);
 
     DefaultActionGroup group = new DefaultActionGroup();
     group.add(closeAction);

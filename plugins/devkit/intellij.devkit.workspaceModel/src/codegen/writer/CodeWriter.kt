@@ -22,13 +22,10 @@ import com.intellij.psi.impl.source.codeStyle.CodeEditUtil
 import com.intellij.util.concurrency.annotations.RequiresWriteLock
 import com.intellij.util.containers.FactoryMap
 import com.intellij.util.containers.MultiMap
-import com.intellij.workspaceModel.codegen.SKIPPED_TYPES
 import com.intellij.workspaceModel.codegen.deft.meta.CompiledObjModule
-import com.intellij.workspaceModel.codegen.engine.GeneratedCode
-import com.intellij.workspaceModel.codegen.engine.GenerationProblem
+import com.intellij.workspaceModel.codegen.engine.*
 import com.intellij.workspaceModel.codegen.engine.impl.CodeGeneratorImpl
 import com.intellij.workspaceModel.codegen.javaFullName
-import com.intellij.workspaceModel.codegen.utils.Imports
 import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.psi.psiUtil.children
@@ -86,7 +83,8 @@ object CodeWriter {
             indicator.fraction = 0.2 * i / generatedCode.size
             if (code.target.name in SKIPPED_TYPES) return@forEachIndexed
 
-            val apiInterfaceName = code.target.javaFullName.decoded
+            val target = code.target
+            val apiInterfaceName = "${target.module.name}.${target.name}"
             val apiClass = ktClasses[apiInterfaceName] ?: error("Cannot find API class by $apiInterfaceName")
             val apiFile = apiClass.containingKtFile
             val apiImports = importsByFile.getValue(apiFile)

@@ -600,7 +600,19 @@ public final class JBUI {
       }
 
       public static Insets tabInsets() {
-        return insets("EditorTabs.tabInsets", isNewUI() ? insets(-3, 12, -4, 8) : insets(0, 8));
+        return insets(tabInsetsKey(), isNewUI() ? insets(-7, 12, -7, 8) : insets(0, 8));
+      }
+
+      public static String tabInsetsKey() {
+        return "EditorTabs.tabInsets";
+      }
+
+      public static Insets verticalTabInsets() {
+        return insets(verticalTabInsetsKey(), JBInsets.create(tabInsets()));
+      }
+
+      public static String verticalTabInsetsKey() {
+        return "EditorTabs.verticalTabInsets";
       }
 
       public static int tabActionsInset() {
@@ -1375,8 +1387,12 @@ public final class JBUI {
       }
 
       public static @NotNull Border advertiserBorder()  {
-        return new JBEmptyBorder(insets("SearchEverywhere.Advertiser.borderInsets",
+        return new JBEmptyBorder(insets(advertiserBorderInsetsKey(),
                                         isNewUI() ? insets(6, 20) : insets(5, 10, 5, 15)));
+      }
+
+      public static @NotNull String advertiserBorderInsetsKey() {
+        return "SearchEverywhere.Advertiser.borderInsets";
       }
 
       public static @NotNull Color advertiserBackground()  {

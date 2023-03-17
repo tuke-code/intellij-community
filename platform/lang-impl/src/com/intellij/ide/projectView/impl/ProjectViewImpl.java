@@ -32,6 +32,7 @@ import com.intellij.openapi.components.State;
 import com.intellij.openapi.components.Storage;
 import com.intellij.openapi.components.StoragePathMacros;
 import com.intellij.openapi.diagnostic.Logger;
+import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.editor.EditorFactory;
 import com.intellij.openapi.editor.ex.EditorEventMulticasterEx;
@@ -76,13 +77,13 @@ import com.intellij.ui.tree.TreeVisitor;
 import com.intellij.util.ArrayUtil;
 import com.intellij.util.IJSwingUtilities;
 import com.intellij.util.PlatformUtils;
-import com.intellij.util.ThreeState;
 import com.intellij.util.concurrency.AppExecutorUtil;
 import com.intellij.util.containers.ContainerUtil;
 import com.intellij.util.containers.JBIterable;
 import com.intellij.util.ui.UIUtil;
 import com.intellij.util.ui.tree.TreeUtil;
 import org.jdom.Element;
+import org.jetbrains.annotations.CalledInAny;
 import org.jetbrains.annotations.NonNls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -95,8 +96,10 @@ import java.awt.*;
 import java.awt.event.FocusEvent;
 import java.util.List;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 import static com.intellij.application.options.OptionId.PROJECT_VIEW_SHOW_VISIBILITY_ICONS;
 import static com.intellij.ui.tree.TreePathUtil.toTreePathArray;
@@ -498,14 +501,13 @@ public class ProjectViewImpl extends ProjectView implements PersistentStateCompo
 
   private final AutoScrollToSourceHandler myAutoScrollToSourceHandler;
   private final MyAutoScrollFromSourceHandler myAutoScrollFromSourceHandler;
-  private volatile ThreeState myCurrentSelectionObsolete = ThreeState.NO;
   private final AtomicBoolean myAutoScrollOnFocusEditor = new AtomicBoolean(true);
 
   private final IdeView myIdeView = new IdeViewForProjectViewPane(this::getCurrentProjectViewPane);
 
   private SimpleToolWindowPanel myPanel;
-  private final Map<String, AbstractProjectViewPane> myId2Pane = new LinkedHashMap<>();
-  private final Collection<AbstractProjectViewPane> myUninitializedPanes = new HashSet<>();
+  private final Map<String, AbstractProjectViewPane> myId2Pane = new ConcurrentHashMap<>();
+  private final Collection<AbstractProjectViewPane> myUninitializedPanes = ConcurrentHashMap.newKeySet();
 
   private DefaultActionGroup myActionGroup;
   private @Nullable String mySavedPaneId = null;
@@ -522,7 +524,9 @@ public class ProjectViewImpl extends ProjectView implements PersistentStateCompo
   private final MyPanel myDataProvider;
   private final SplitterProportionsData splitterProportions = new SplitterProportionsDataImpl();
   private final Map<String, Element> myUninitializedPaneState = new HashMap<>();
-  private final Map<String, SelectInTarget> mySelectInTargets = new LinkedHashMap<>();
+  private final Map<String, MySelectInTarget> mySelectInTargets = new ConcurrentHashMap<>();
+  private record MySelectInTarget(SelectInTarget target, int weight) {}
+  private static final Comparator<MySelectInTarget> TARGET_WEIGHT_COMPARATOR = Comparator.comparingInt(MySelectInTarget::weight);
   private ContentManager myContentManager;
 
   public ProjectViewImpl(@NotNull Project project) {
@@ -575,14 +579,9 @@ public class ProjectViewImpl extends ProjectView implements PersistentStateCompo
       @Override
       public void toolWindowShown(@NotNull ToolWindow toolWindow) {
         if (ToolWindowId.PROJECT_VIEW.equals(toolWindow.getId())) {
-          myCurrentSelectionObsolete = ThreeState.NO;
           AbstractProjectViewPane currentProjectViewPane = getCurrentProjectViewPane();
           if (currentProjectViewPane != null && isAutoscrollFromSource(currentProjectViewPane.getId())) {
-            SimpleSelectInContext context = myAutoScrollFromSourceHandler.findSelectInContext();
-            if (context != null) {
-              myCurrentSelectionObsolete = ThreeState.UNSURE;
-              context.selectInCurrentTarget(false);
-            }
+            myAutoScrollFromSourceHandler.scrollFromSource(false);
           }
         }
       }
@@ -698,12 +697,13 @@ public class ProjectViewImpl extends ProjectView implements PersistentStateCompo
   }
 
   @Override
+  @CalledInAny
   public synchronized void addProjectPane(@NotNull final AbstractProjectViewPane pane) {
     myUninitializedPanes.add(pane);
     SelectInTarget selectInTarget = pane.createSelectInTarget();
     String id = selectInTarget.getMinorViewId();
     if (pane.getId().equals(id)) {
-      mySelectInTargets.put(id, selectInTarget);
+      mySelectInTargets.put(id, new MySelectInTarget(selectInTarget, pane.getWeight()));
     }
     else {
       try {
@@ -713,7 +713,11 @@ public class ProjectViewImpl extends ProjectView implements PersistentStateCompo
       }
     }
     if (isInitialized) {
-      doAddUninitializedPanes();
+      if (ApplicationManager.getApplication().isDispatchThread()) {
+        doAddUninitializedPanes();
+      } else {
+        ApplicationManager.getApplication().invokeLater(this::doAddUninitializedPanes);
+      }
     }
   }
 
@@ -722,7 +726,7 @@ public class ProjectViewImpl extends ProjectView implements PersistentStateCompo
     ApplicationManager.getApplication().assertIsDispatchThread();
     myUninitializedPanes.remove(pane);
     //assume we are completely initialized here
-    String idToRemove = pane.getId();
+    @NotNull String idToRemove = pane.getId();
 
     if (!myId2Pane.containsKey(idToRemove)) return;
     for (int i = getContentManager().getContentCount() - 1; i >= 0; i--) {
@@ -796,7 +800,13 @@ public class ProjectViewImpl extends ProjectView implements PersistentStateCompo
     final ContentManager manager = getContentManager();
     for (index = 0; index < manager.getContentCount(); index++) {
       Content content = manager.getContent(index);
+      if (content == null) {
+        continue;
+      }
       String id = content.getUserData(ID_KEY);
+      if (id == null) {
+        continue;
+      }
       AbstractProjectViewPane pane = myId2Pane.get(id);
 
       int comp = PANE_WEIGHT_COMPARATOR.compare(pane, newPane);
@@ -807,7 +817,7 @@ public class ProjectViewImpl extends ProjectView implements PersistentStateCompo
       }
     }
 
-    final String id = newPane.getId();
+    final @NotNull String id = newPane.getId();
     myId2Pane.put(id, newPane);
     String[] subIds = newPane.getSubIds();
     subIds = subIds.length == 0 ? new String[]{null} : subIds;
@@ -1093,9 +1103,14 @@ public class ProjectViewImpl extends ProjectView implements PersistentStateCompo
   }
 
   @Override
+  @CalledInAny
   public AbstractProjectViewPane getProjectViewPaneById(String id) {
-    if (!ApplicationManager.getApplication().isUnitTestMode() && ApplicationManager.getApplication().isDispatchThread()) {
-      // most tests don't need all panes to be loaded, but also we should not initialize panes on background threads
+    if (id == null) {
+      return null;
+    }
+
+    if (!ApplicationManager.getApplication().isUnitTestMode()) {
+      // most tests don't need all panes to be loaded
       ensurePanesLoaded();
     }
 
@@ -1132,20 +1147,8 @@ public class ProjectViewImpl extends ProjectView implements PersistentStateCompo
     }
   }
 
-  private boolean isCurrentSelectionObsolete(boolean requestFocus) {
-    if (myCurrentSelectionObsolete == ThreeState.YES) {
-      myCurrentSelectionObsolete = ThreeState.NO;
-      return true;
-    }
-    if (myCurrentSelectionObsolete == ThreeState.UNSURE) {
-      myCurrentSelectionObsolete = requestFocus ? ThreeState.YES : ThreeState.NO;
-    }
-    return false;
-  }
-
   @Override
   public void select(final Object element, VirtualFile file, boolean requestFocus) {
-    if (isCurrentSelectionObsolete(requestFocus)) return;
     final AbstractProjectViewPane viewPane = getCurrentProjectViewPane();
     if (viewPane != null) {
       myAutoScrollOnFocusEditor.set(!requestFocus);
@@ -1156,7 +1159,6 @@ public class ProjectViewImpl extends ProjectView implements PersistentStateCompo
   @NotNull
   @Override
   public ActionCallback selectCB(Object element, VirtualFile file, boolean requestFocus) {
-    if (isCurrentSelectionObsolete(requestFocus)) return ActionCallback.REJECTED;
     final AbstractProjectViewPane viewPane = getCurrentProjectViewPane();
     if (viewPane instanceof AbstractProjectViewPaneWithAsyncSupport) {
       myAutoScrollOnFocusEditor.set(!requestFocus);
@@ -1181,7 +1183,7 @@ public class ProjectViewImpl extends ProjectView implements PersistentStateCompo
   }
 
   private SelectInTarget getSelectInTarget(String id) {
-    return mySelectInTargets.get(id);
+    return mySelectInTargets.get(id).target();
   }
 
   private ProjectViewSelectInTarget getProjectViewSelectInTarget(AbstractProjectViewPane pane) {
@@ -1608,6 +1610,9 @@ public class ProjectViewImpl extends ProjectView implements PersistentStateCompo
   @Override
   public boolean isUseFileNestingRules(String paneId) {
     if (!myCurrentState.getUseFileNestingRules()) return false;
+    if (paneId == null) {
+      return false;
+    }
     AbstractProjectViewPane pane = myId2Pane.get(paneId);
     return pane != null && pane.isFileNestingEnabled();
   }
@@ -1713,44 +1718,26 @@ public class ProjectViewImpl extends ProjectView implements PersistentStateCompo
     protected void selectElementFromEditor(@NotNull FileEditor fileEditor) {
       if (myProject.isDisposed() || !myViewContentPanel.isShowing()) return;
       if (isAutoscrollFromSource(getCurrentViewId()) && !isCurrentProjectViewPaneFocused()) {
-        SimpleSelectInContext context = getSelectInContext(fileEditor);
-        if (context != null) context.selectInCurrentTarget(false);
+        scrollFromSource(fileEditor, false);
       }
     }
 
     void scrollFromSource(boolean requestFocus) {
-      SimpleSelectInContext context = findSelectInContext();
-      if (context != null) context.selectInCurrentTarget(requestFocus);
+      scrollFromSource(null, requestFocus);
     }
 
-    @Nullable
-    SimpleSelectInContext findSelectInContext() {
+    void scrollFromSource(@Nullable FileEditor fileEditor, boolean requestFocus) {
+      var editorsToCheck = fileEditor == null ? allEditors() : List.of(fileEditor);
+      SelectorInCurrentTarget selector = new SelectorInCurrentTarget(editorsToCheck);
+      selector.selectInCurrentTarget(requestFocus);
+    }
+
+    private List<@Nullable FileEditor> allEditors() {
       FileEditorManager fileEditorManager = FileEditorManager.getInstance(myProject);
-      SimpleSelectInContext context = getSelectInContext(fileEditorManager.getSelectedEditor());
-      if (context != null) return context;
-      for (FileEditor fileEditor : fileEditorManager.getSelectedEditors()) {
-        context = getSelectInContext(fileEditor);
-        if (context != null) return context;
-      }
-      return null;
-    }
-
-    @Nullable
-    private SimpleSelectInContext getSelectInContext(@Nullable FileEditor fileEditor) {
-      if (fileEditor instanceof TextEditor textEditor) {
-        PsiFile psiFile = PsiDocumentManager.getInstance(myProject).getPsiFile(textEditor.getEditor().getDocument());
-        return psiFile == null ? null : new EditorSelectInContext(psiFile, textEditor.getEditor());
-      }
-      PsiFile psiFile = getPsiFile(getVirtualFile(fileEditor));
-      return psiFile == null ? null : new SimpleSelectInContext(psiFile);
-    }
-
-    private PsiFile getPsiFile(VirtualFile file) {
-      return file == null || !file.isValid() ? null : PsiManager.getInstance(myProject).findFile(file);
-    }
-
-    private VirtualFile getVirtualFile(FileEditor fileEditor) {
-      return fileEditor == null ? null : fileEditor.getFile();
+      var result = new ArrayList<@Nullable FileEditor>();
+      result.add(fileEditorManager.getSelectedEditor());
+      result.addAll(Arrays.asList(fileEditorManager.getSelectedEditors()));
+      return result;
     }
 
     private boolean isCurrentProjectViewPaneFocused() {
@@ -1779,6 +1766,95 @@ public class ProjectViewImpl extends ProjectView implements PersistentStateCompo
     }
   }
 
+  private class SelectorInCurrentTarget {
+
+    private final List<@Nullable FileEditor> myEditors;
+    private int myEditorIndex = 0;
+
+    SelectorInCurrentTarget(List<@Nullable FileEditor> editors) {
+      myEditors = editors;
+    }
+
+    public void selectInCurrentTarget(boolean requestFocus) {
+      var psiFileSupplierAndEditor = findNextPsiFileSupplierAndEditor();
+      if (psiFileSupplierAndEditor == null) return;
+      ReadAction
+        .nonBlocking(psiFileSupplierAndEditor.psiFileSupplier::get)
+        .withDocumentsCommitted(myProject)
+        .finishOnUiThread(ModalityState.defaultModalityState(), psiFile -> {
+          if (psiFile == null) {
+            ++myEditorIndex;
+            selectInCurrentTarget(requestFocus);
+          }
+          else {
+            createSelectInContext(psiFile, psiFileSupplierAndEditor.editor).selectInCurrentTarget(requestFocus);
+          }
+        })
+        .coalesceBy(SelectorInCurrentTarget.class, ProjectViewImpl.this)
+        .submit(AppExecutorUtil.getAppExecutorService());
+    }
+
+    private record PsiFileSupplierAndEditor(Supplier<PsiFile> psiFileSupplier, FileEditor editor) { }
+
+    private @Nullable PsiFileSupplierAndEditor findNextPsiFileSupplierAndEditor() {
+      Supplier<@Nullable PsiFile> psiFileSupplier = null;
+      @Nullable FileEditor editor = null;
+      while (myEditorIndex < myEditors.size()) {
+        editor = myEditors.get(myEditorIndex);
+        psiFileSupplier = getPsiFileSupplier(editor);
+        if (psiFileSupplier != null) {
+          break;
+        }
+        ++myEditorIndex;
+      }
+      if (psiFileSupplier == null) {
+        return null;
+      }
+      return new PsiFileSupplierAndEditor(psiFileSupplier, editor);
+    }
+
+    private @Nullable Supplier<@Nullable PsiFile> getPsiFileSupplier(@Nullable FileEditor fileEditor) {
+      if (fileEditor == null || !fileEditor.isValid()) {
+        return null;
+      }
+      if (fileEditor instanceof TextEditor textEditor) {
+        // EDT code
+        Editor editor = textEditor.getEditor();
+        if (editor.isDisposed()) {
+          return null;
+        }
+        Document document = editor.getDocument();
+        return () -> { // BGT code
+          var psiDocumentManager = PsiDocumentManager.getInstance(myProject);
+          if (psiDocumentManager == null) {
+            return null;
+          }
+          return psiDocumentManager.getPsiFile(document);
+        };
+      }
+      else {
+        // EDT code
+        VirtualFile file = fileEditor.getFile();
+        return () -> { // BGT code
+          if (file == null || !file.isValid()) {
+            return null;
+          }
+          return PsiManager.getInstance(myProject).findFile(file);
+        };
+      }
+    }
+
+    private @NotNull SimpleSelectInContext createSelectInContext(@NotNull PsiFile file, FileEditor fileEditor) {
+      if (fileEditor instanceof TextEditor textEditor) {
+        return new EditorSelectInContext(file, textEditor.getEditor());
+      }
+      else {
+        return new SimpleSelectInContext(file);
+      }
+    }
+
+  }
+
   private class SimpleSelectInContext extends SmartSelectInContext {
     SimpleSelectInContext(@NotNull PsiFile psiFile) {
       super(psiFile, psiFile);
@@ -1787,7 +1863,7 @@ public class ProjectViewImpl extends ProjectView implements PersistentStateCompo
     void selectInCurrentTarget(boolean requestFocus) {
       SelectInTarget target = getCurrentSelectInTarget();
       if (target != null && getPsiFile() != null) {
-        selectIn(target, requestFocus);
+        target.selectIn(this, requestFocus);
       }
     }
 
@@ -1871,9 +1947,8 @@ public class ProjectViewImpl extends ProjectView implements PersistentStateCompo
     return !isAutoscrollFromSourceEnabled(myCurrentViewId);
   }
 
-  @Nullable Runnable getSelectOpenedFile() {
-    SimpleSelectInContext context = myAutoScrollFromSourceHandler.findSelectInContext();
-    return context == null ? null : () -> context.selectInCurrentTarget(true);
+  void selectOpenedFile() {
+    myAutoScrollFromSourceHandler.scrollFromSource(true);
   }
 
   @NotNull
@@ -1884,17 +1959,18 @@ public class ProjectViewImpl extends ProjectView implements PersistentStateCompo
 
   @NotNull
   @Override
+  @CalledInAny
   public Collection<SelectInTarget> getSelectInTargets() {
     ensurePanesLoaded();
-    return mySelectInTargets.values();
+    return mySelectInTargets.values().stream().sorted(TARGET_WEIGHT_COMPARATOR).map(MySelectInTarget::target).toList();
   }
 
   @NotNull
   @Override
   public ActionCallback getReady(@NotNull Object requestor) {
-    AbstractProjectViewPane pane = myId2Pane.get(myCurrentViewSubId);
+    AbstractProjectViewPane pane = myCurrentViewSubId == null ? null : myId2Pane.get(myCurrentViewSubId);
     if (pane == null) {
-      pane = myId2Pane.get(myCurrentViewId);
+      pane = myCurrentViewId == null ? null : myId2Pane.get(myCurrentViewId);
     }
     return pane != null ? pane.getReady(requestor) : ActionCallback.DONE;
   }
@@ -1927,7 +2003,7 @@ public class ProjectViewImpl extends ProjectView implements PersistentStateCompo
     }
 
     boolean isEnabled(@Nullable String paneId) {
-      AbstractProjectViewPane pane = myId2Pane.get(paneId);
+      AbstractProjectViewPane pane = paneId == null ? null : myId2Pane.get(paneId);
       return pane != null ? isEnabled(pane) : ApplicationManager.getApplication().isUnitTestMode();
     }
 

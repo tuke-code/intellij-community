@@ -1,4 +1,4 @@
-// Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.ui.popup;
 
 import com.intellij.codeInsight.hint.HintUtil;
@@ -137,6 +137,7 @@ public class AbstractPopup implements JBPopup, ScreenAreaConsumer, AlignedPopup 
   private final List<Runnable> myResizeListeners = new ArrayList<>();
 
   private static final WeakList<JBPopup> all = new WeakList<>();
+  private @Nullable JComponent myClickSource;
 
   private boolean mySpeedSearchAlwaysShown;
   protected final SpeedSearch mySpeedSearch = new SpeedSearch() {
@@ -176,6 +177,7 @@ public class AbstractPopup implements JBPopup, ScreenAreaConsumer, AlignedPopup 
   }
 
   protected SearchTextField mySpeedSearchPatternField;
+  private PopupComponentFactory.PopupType myPopupType;
   private boolean myNativePopup;
   private boolean myMayBeParent;
   private JComponent myAdComponent;
@@ -1040,10 +1042,8 @@ public class AbstractPopup implements JBPopup, ScreenAreaConsumer, AlignedPopup 
 
     myRequestorComponent = owner;
 
-    boolean forcedDialog = myMayBeParent || SystemInfo.isMac && !(myOwner instanceof IdeFrame) && myOwner.isShowing();
-
-    PopupComponent.Factory factory = getFactory(myForcedHeavyweight || myResizable, forcedDialog);
-    myNativePopup = factory.isNativePopup();
+    myPopupType = getMostSuitablePopupType();
+    myNativePopup = myPopupType != PopupComponentFactory.PopupType.DIALOG;
     Component popupOwner = myOwner;
     if (popupOwner instanceof RootPaneContainer && !(popupOwner instanceof IdeFrame && !Registry.is("popup.fix.ide.frame.owner"))) {
       // JDK uses cached heavyweight popup for a window ancestor
@@ -1054,7 +1054,8 @@ public class AbstractPopup implements JBPopup, ScreenAreaConsumer, AlignedPopup 
     if (LOG.isDebugEnabled()) {
       LOG.debug("expected preferred size: " + myContent.getPreferredSize());
     }
-    myPopup = factory.getPopup(popupOwner, myContent, targetBounds.x, targetBounds.y, this);
+    PopupComponentFactory factory = PopupComponentFactory.getCurrentInstance();
+    myPopup = factory.createPopupComponent(myPopupType, popupOwner, myContent, targetBounds.x, targetBounds.y, this);
     if (LOG.isDebugEnabled()) {
       LOG.debug("  actual preferred size: " + myContent.getPreferredSize());
     }
@@ -1485,19 +1486,20 @@ public class AbstractPopup implements JBPopup, ScreenAreaConsumer, AlignedPopup 
     return null;
   }
 
-  private PopupComponent.@NotNull Factory getFactory(boolean forceHeavyweight, boolean forceDialog) {
+  private PopupComponentFactory.PopupType getMostSuitablePopupType() {
+    boolean forceDialog = myMayBeParent || SystemInfo.isMac && !(myOwner instanceof IdeFrame) && myOwner.isShowing();
     if (Registry.is("allow.dialog.based.popups")) {
       boolean noFocus = !myFocusable || !myRequestFocus;
       boolean cannotBeDialog = noFocus; // && SystemInfo.isXWindow
 
       if (!cannotBeDialog && (isPersistent() || forceDialog)) {
-        return new PopupComponent.Factory.Dialog();
+        return PopupComponentFactory.PopupType.DIALOG;
       }
     }
-    if (forceHeavyweight) {
-      return new PopupComponent.Factory.AwtHeavyweight();
+    if (myForcedHeavyweight || myResizable) {
+      return PopupComponentFactory.PopupType.HEAVYWEIGHT;
     }
-    return new PopupComponent.Factory.AwtDefault();
+    return PopupComponentFactory.PopupType.DEFAULT;
   }
 
   @Override
@@ -2339,5 +2341,15 @@ public class AbstractPopup implements JBPopup, ScreenAreaConsumer, AlignedPopup 
   private void forHorizontalScrollBar(@NotNull Consumer<? super JScrollBar> consumer) {
     JScrollBar bar = findHorizontalScrollBar();
     if (bar != null) consumer.consume(bar);
+  }
+
+  @Override
+  public void setClickSource(@Nullable JComponent component) {
+    myClickSource = component;
+  }
+
+  @Override
+  public @Nullable JComponent getClickSource() {
+    return myClickSource;
   }
 }

@@ -506,7 +506,6 @@ public class Maven30ServerEmbedderImpl extends Maven3ServerEmbedder {
       }
       ((CustomMaven30ArtifactResolver)getComponent(ArtifactResolver.class)).customize(workspaceMap, failOnUnresolvedDependency);
       ((CustomMaven3RepositoryMetadataManager)getComponent(RepositoryMetadataManager.class)).customize(workspaceMap);
-      //((CustomMaven3WagonManager)getComponent(WagonManager.class)).customize(failOnUnresolvedDependency);
 
       myWorkspaceMap = workspaceMap;
 
@@ -532,8 +531,7 @@ public class Maven30ServerEmbedderImpl extends Maven3ServerEmbedder {
     }
   }
 
-  @Override
-  public void customizeComponents(MavenToken token) throws RemoteException {
+  private void customizeComponents(MavenToken token) throws RemoteException {
     MavenServerUtil.checkToken(token);
     // replace some plexus components
     myContainer.addComponent(getComponent(ArtifactFactory.class, "ide"), ArtifactFactory.ROLE);
@@ -960,17 +958,6 @@ public class Maven30ServerEmbedderImpl extends Maven3ServerEmbedder {
         problems.add(MavenProjectProblem.createStructureProblem(path, each.getMessage()));
       }
     }
-    if (unresolvedArtifacts != null) {
-      unresolvedArtifacts.addAll(retrieveUnresolvedArtifactIds());
-    }
-  }
-
-  private Set<MavenId> retrieveUnresolvedArtifactIds() {
-    Set<MavenId> result = new HashSet<MavenId>();
-    // TODO collect unresolved artifacts
-    //((CustomMaven3WagonManager)getComponent(WagonManager.class)).getUnresolvedCollector().retrieveUnresolvedIds(result);
-    //((CustomMaven30ArtifactResolver)getComponent(ArtifactResolver.class)).getUnresolvedCollector().retrieveUnresolvedIds(result);
-    return result;
   }
 
   @NotNull
@@ -1195,7 +1182,6 @@ public class Maven30ServerEmbedderImpl extends Maven3ServerEmbedder {
       if (repositoryMetadataManager instanceof CustomMaven3RepositoryMetadataManager) {
         ((CustomMaven3RepositoryMetadataManager)repositoryMetadataManager).reset();
       }
-      //((CustomWagonManager)getComponent(WagonManager.class)).reset();
     }
     catch (Exception e) {
       throw wrapToSerializableRuntimeException(e);
@@ -1206,18 +1192,6 @@ public class Maven30ServerEmbedderImpl extends Maven3ServerEmbedder {
   public void release(MavenToken token) throws RemoteException {
     MavenServerUtil.checkToken(token);
     myContainer.dispose();
-  }
-
-  @Override
-  public void clearCaches(MavenToken token) throws RemoteException {
-    MavenServerUtil.checkToken(token);
-    // do nothing
-  }
-
-  @Override
-  public void clearCachesFor(final MavenId projectId, MavenToken token) throws RemoteException {
-    MavenServerUtil.checkToken(token);
-    // do nothing
   }
 
   @Override

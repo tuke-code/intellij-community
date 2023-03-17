@@ -1930,6 +1930,7 @@ public class HighlightVisitorImpl extends JavaElementVisitor implements Highligh
   @Override
   public void visitDefaultCaseLabelElement(@NotNull PsiDefaultCaseLabelElement element) {
     super.visitDefaultCaseLabelElement(element);
+    if (element.getParent() instanceof PsiCaseLabelElementList labelElementList && labelElementList.getElementCount() == 1) return;
     add(checkFeature(element, HighlightingFeature.PATTERNS_IN_SWITCH));
   }
 
@@ -2007,7 +2008,7 @@ public class HighlightVisitorImpl extends JavaElementVisitor implements Highligh
       if (myHolder.hasErrorResults()) return;
       PsiClass selectorClass = PsiUtil.resolveClassInClassTypeOnly(TypeConversionUtil.erasure(itemType));
       if (selectorClass != null && (selectorClass.hasModifierProperty(SEALED) || selectorClass.isRecord())) {
-        if (!PatternHighlightingModel.checkRecordExhaustiveness(Collections.singletonList(deconstructionPattern)).isExhausted()) {
+        if (!PatternHighlightingModel.checkRecordExhaustiveness(Collections.singletonList(deconstructionPattern)).isExhaustive()) {
           add(createPatternIsNotExhaustiveError(deconstructionPattern, patternType, itemType));
         }
       }

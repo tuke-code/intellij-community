@@ -3,7 +3,6 @@ package com.intellij.ide.ui.experimental.meetNewUi
 
 import com.intellij.ide.IdeBundle
 import com.intellij.ide.util.PropertiesComponent
-import com.intellij.openapi.application.ApplicationNamesInfo
 import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.isNotificationSilentMode
@@ -20,7 +19,7 @@ class MeetNewUiToolWindowFactory : ToolWindowFactory, DumbAware {
   }
 
   override fun createToolWindowContent(project: Project, toolWindow: ToolWindow) {
-    val title = IdeBundle.message("meetnewui.toolwindow.title", ApplicationNamesInfo.getInstance().fullProductName)
+    val title = IdeBundle.message("meetnewui.toolwindow.title")
     toolWindow.title = title
     toolWindow.stripeTitle = title
     val contentManager = toolWindow.contentManager
@@ -29,6 +28,8 @@ class MeetNewUiToolWindowFactory : ToolWindowFactory, DumbAware {
   }
 
   override fun init(toolWindow: ToolWindow) {
+    toolWindow.setIcon(ExperimentalUI.Icons.ToolWindow.MeetNewUi)
+
     val project = toolWindow.project
     val propertiesComponent = PropertiesComponent.getInstance()
     if (isNotificationSilentMode(project) || !propertiesComponent.getBoolean(ExperimentalUI.NEW_UI_FIRST_SWITCH)) {

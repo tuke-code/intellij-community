@@ -35,6 +35,8 @@ import java.nio.file.Path
 import java.util.*
 import java.util.concurrent.CompletableFuture
 
+const val CONTEXT_RECEIVER_PREFIX = "_context_receiver_"
+
 fun Location.isInKotlinSources(): Boolean {
     return declaringType().isInKotlinSources()
 }

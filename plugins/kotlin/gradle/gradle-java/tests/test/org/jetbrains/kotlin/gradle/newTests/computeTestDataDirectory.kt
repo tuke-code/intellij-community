@@ -13,7 +13,9 @@ import kotlin.io.path.Path
 import kotlin.io.path.exists
 
 /**
- * This service provides discovery of test-related folders.
+ * Finds the testdata-folder given the [testDescription].
+ *
+ * [strict]=true will make the function to throw an exception if the found folder doesn't exist
  *
  * General intuition:
  * - @TestDataPath always gives the first part of the path. $PROJECT_ROOT template is supported
@@ -22,19 +24,19 @@ import kotlin.io.path.exists
  *
  * - @TestMetadata give subsequent parts in order from the farthest supertype to the
  *   concrete class
- *   Tip: allows to "inherit" test data paths. E.g. some base test class for all
+ *   Tip: it allows to "inherit" test data paths. E.g. some base test class for all
  *   Gradle-related tests can be annotated with 'gradle' (giving `$PROJECT/allTests/gradle`
  *   together with @TestDataPath), and subsequent inheritors can add more specific paths,
  *   e.g. 'multiplatform' for `$PROJECT/allTests/gradle/multiplatform`
  *
  * - Last part is either test name without 'test' or @TestMetadata on test method
- *   Tip: use this if you want to have test method name to be different from the folder.
+ *   Tip: @TestMetadata on method if you want to have test method name to be different from the folder.
  *   This is most often useful when you want to run several tests against same testdata.
  *
  * Such an elaborate algorithm is used mostly to comply with DevKit heuristics, which,
  * specifically, enables 'Navigate To Testdata' actions & gutters.
  */
-fun computeTestDataDirectory(testDescription: Description): File {
+fun computeTestDataDirectory(testDescription: Description, strict: Boolean = true): File {
     require(testDescription.methodName.startsWith("test")) {
         "Test method names are expected to start with 'test', actual name: ${testDescription.methodName}\n" +
                 "Please add 'test' prefix, as it helps DevKit to work (e.g. provide " +
@@ -54,12 +56,13 @@ fun computeTestDataDirectory(testDescription: Description): File {
         testFolderName
     )
 
-    require(testFolderFullPath.exists()) {
+    if (strict && !testFolderFullPath.exists()) {
         val testMetadataValuesRenderedWithOwners =
             testMetadataOnClassesFromCurrentToSuper.joinToString(separator = "\n") { (value, clazz) ->
                 "value = $value, found on ${clazz.name}"
             }.nullize()
-        """Can't find test data directory
+        error(
+            """Can't find test data directory
                 | Full path = ${testFolderFullPath.toFile().canonicalPath}
                 |
                 | @TestDataPath.value = ${testDataPathAnnotationValue.first}
@@ -71,6 +74,7 @@ fun computeTestDataDirectory(testDescription: Description): File {
                 | testFolderName = ${testFolderName}
                 | testMethodName = ${testDescription.methodName}
             """.trimMargin()
+        )
     }
 
     return testFolderFullPath.toFile()
@@ -92,13 +96,18 @@ private fun getTestDataPathAnnotationValueWithOwner(description: Description): P
     return result.first.replace("\$PROJECT_ROOT", KotlinRoot.REPO.canonicalPath) to result.second
 }
 
-private fun getTestFolderName(description: Description): String {
-    val testMetadataOnMethod = description.getAnnotation(TestMetadata::class.java)?.value
+internal fun getTestFolderName(description: Description): String =
+    getTestFolderName(description.methodName, description.getAnnotation(TestMetadata::class.java))
+
+internal fun getTestFolderName(testMethodName: String, testMetadataIfAny: TestMetadata?): String {
+    val testMetadataOnMethod = testMetadataIfAny?.value
     return testMetadataOnMethod
-    // JUnit4 doesn't allow to have display name different
-        ?: testNamePattern.matchEntire(description.methodName)!!.groups[1]!!.value.decapitalizeAsciiOnly()
+    // JUnit4 doesn't allow to have display name different from the test name, so have to do some
+    // hoops to remove "parameters" in []
+        ?: testNamePattern.matchEntire(testMethodName)!!.groups[1]!!.value.decapitalizeAsciiOnly()
 }
 
 // expected pattern:
 //      testFoo[1.8.20-dev-3308, Gradle 7.5.1, AGP 7.4.0, any other string for describing versions]
-private val testNamePattern = """test([^\[].*)\[.*]""".toRegex()
+//      testFoo // can be used by infra, e.g. see [testSuiteMethodsAndTestdataFoldersConsistency]
+private val testNamePattern = """test([^\[]*)(\[.*])?""".toRegex()

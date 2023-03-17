@@ -5,7 +5,7 @@ import com.intellij.codeHighlighting.HighlightDisplayLevel;
 import com.intellij.codeInspection.ex.InspectionElementsMerger;
 import com.intellij.codeInspection.options.OptPane;
 import com.intellij.codeInspection.options.OptRegularComponent;
-import com.intellij.codeInspection.options.OptionController;
+import com.intellij.codeInspection.options.OptionContainer;
 import com.intellij.codeInspection.ui.InspectionOptionPaneRenderer;
 import com.intellij.configurationStore.XmlSerializer;
 import com.intellij.diagnostic.PluginException;
@@ -57,11 +57,12 @@ import java.util.*;
  * <p>
  * An inspection can have options that fine-tune its behavior, see {@link #getOptionsPane()}.
  *
+ * @see <a href="https://plugins.jetbrains.com/docs/intellij/code-inspections.html">Code Inspections (IntelliJ Platform Docs)</a>
  * @see LocalInspectionTool
  * @see GlobalInspectionTool
  */
 @Property(assertIfNoBindings = false)
-public abstract class InspectionProfileEntry implements BatchSuppressableTool {
+public abstract class InspectionProfileEntry implements BatchSuppressableTool, OptionContainer {
   private static final Logger LOG = Logger.getInstance(InspectionProfileEntry.class);
 
   private volatile static Set<String> ourBlackList;
@@ -364,23 +365,14 @@ public abstract class InspectionProfileEntry implements BatchSuppressableTool {
   /**
    * @return declarative representation of the inspection options. If this method returns a non-empty pane, then
    * {@link #createOptionsPanel()} is not used.
+   *
+   * @see <a href="https://plugins.jetbrains.com/docs/intellij/inspection-options.html">Inspection Options (IntelliJ Platform Docs)</a>
    * @see OptPane#pane(OptRegularComponent...)
    * @see InspectionOptionPaneRenderer#createOptionsPanel(InspectionProfileEntry, Disposable, Project)
    * @see #getOptionController() if you need custom logic to read/write options
    */
   public @NotNull OptPane getOptionsPane() {
     return OptPane.EMPTY;
-  }
-
-  /**
-   * @return a controller to process inspection options specified by {@link #getOptionsPane()}.
-   * The default implementation finds a field with the corresponding name and uses/updates its value.
-   * If you need to process some options specially, you can override this method in particular inspection
-   * and compose a new controller using methods like {@link OptionController#onPrefix} and
-   * {@link OptionController#onValue}.
-   */
-  public @NotNull OptionController getOptionController() {
-    return OptionController.fieldsOf(this);
   }
 
   /**

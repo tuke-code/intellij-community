@@ -28,11 +28,16 @@ import com.intellij.openapi.wm.ToolWindowId
 import com.intellij.openapi.wm.impl.customFrameDecorations.header.toolbar.getHeaderBackgroundColor
 import com.intellij.openapi.wm.impl.headertoolbar.adjustIconForHeader
 import com.intellij.psi.PsiDocumentManager
-import com.intellij.ui.*
+import com.intellij.ui.BadgeRectProvider
+import com.intellij.ui.ColorUtil
+import com.intellij.ui.LayeredIcon
+import com.intellij.ui.RetrievableIcon
+import com.intellij.ui.icons.IconReplacer
+import com.intellij.ui.icons.TextHoledIcon
+import com.intellij.ui.icons.TextIcon
 import com.intellij.ui.popup.util.PopupImplUtil
 import com.intellij.ui.scale.JBUIScale
 import com.intellij.util.IconUtil
-import com.intellij.util.TextIcon
 import com.intellij.util.ui.*
 import java.awt.*
 import java.awt.event.InputEvent
@@ -308,7 +313,7 @@ private abstract class TogglePopupAction : ToggleAction {
     val actionGroup = getActionGroup(e) ?: return
     val disposeCallback = { Toggleable.setSelected(presentation, false) }
     val popup = createPopup(actionGroup, e, disposeCallback)
-    PopupImplUtil.setPopupToggleButton(popup, e.inputEvent.component)
+    PopupImplUtil.setPopupToggleButton(popup, e.inputEvent!!.component)
     popup.setMinimumSize(JBDimension(MINIMAL_POPUP_WIDTH, 0))
     popup.showUnderneathOf(component)
   }
@@ -376,7 +381,7 @@ internal fun addAdditionalActionsToRunConfigurationOptions(project: Project,
 
 private class RedesignedRunConfigurationSelector : TogglePopupAction(), CustomComponentAction, DumbAware {
   override fun actionPerformed(e: AnActionEvent) {
-    if (e.inputEvent.modifiersEx and InputEvent.SHIFT_DOWN_MASK != 0) {
+    if (e.inputEvent!!.modifiersEx and InputEvent.SHIFT_DOWN_MASK != 0) {
       ActionManager.getInstance().getAction("editRunConfigurations").actionPerformed(e)
       return
     }

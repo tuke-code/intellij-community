@@ -22,6 +22,7 @@ import java.lang.invoke.MethodType
 import java.nio.file.Files
 import java.nio.file.NoSuchFileException
 import java.nio.file.Path
+import kotlin.io.path.exists
 import kotlin.time.Duration.Companion.seconds
 
 internal const val UNMODIFIED_MARK_FILE_NAME = ".unmodified"
@@ -36,7 +37,7 @@ data class BuildRequest(
                                                       ?: homePath.resolve("out/classes/production").toString()).toAbsolutePath(),
   @JvmField val keepHttpClient: Boolean = true,
   @JvmField val platformClassPathConsumer: ((classPath: Set<Path>, runDir: Path) -> Unit)? = null,
-  @JvmField val isPackagedLib: Boolean = false,
+  @JvmField val isPackagedLib: Boolean = true,
 )
 
 internal suspend fun buildProduct(productConfiguration: ProductConfiguration, request: BuildRequest) {
@@ -123,6 +124,10 @@ internal suspend fun buildProduct(productConfiguration: ProductConfiguration, re
       }
 
       val platformClassPathConsumer = request.platformClassPathConsumer
+
+      // PathManager.getBinPath() is used as a working dir for maven
+      Files.createDirectories(runDir.resolve("bin"))
+
       if (platformClassPathConsumer == null) {
         withContext(Dispatchers.IO) {
           val classPathFile = runDir.resolve("core-classpath.txt")
@@ -357,6 +362,13 @@ private fun CoroutineScope.prepareExistingRunDirForProduct(runDir: Path, usePlug
 }
 
 private fun getCommunityHomePath(homePath: Path): BuildDependenciesCommunityRoot {
-  val communityDotIdea = homePath.resolve("community/.idea")
+  var communityDotIdea = homePath.resolve("community/.idea")
+  // Handle Rider repository layout
+  if (!communityDotIdea.exists()) {
+    val riderSpecificCommunityDotIdea = homePath.parent.resolve("ultimate/community/.idea")
+    if (riderSpecificCommunityDotIdea.exists()) {
+      communityDotIdea = riderSpecificCommunityDotIdea
+    }
+  }
   return BuildDependenciesCommunityRoot(if (Files.isDirectory(communityDotIdea)) communityDotIdea.parent else homePath)
 }

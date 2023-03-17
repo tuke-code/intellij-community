@@ -309,11 +309,11 @@ internal class GitStagePanel(private val tracker: GitStageTracker,
     }
 
     fun editedCommitChanged() {
-      rebuildTree()
-
-      commitPanel.editedCommit?.let {
-        val node = TreeUtil.findNodeWithObject(root, it)
-        node?.let { expandPath(TreeUtil.getPathFromRoot(node)) }
+      requestRefresh {
+        commitPanel.editedCommit?.let {
+          val node = TreeUtil.findNodeWithObject(root, it)
+          node?.let { expandPath(TreeUtil.getPathFromRoot(node)) }
+        }
       }
     }
 

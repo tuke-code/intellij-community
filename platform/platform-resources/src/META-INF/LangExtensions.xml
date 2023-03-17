@@ -307,12 +307,15 @@
                     serviceImplementation="com.intellij.formatting.service.FormattingUiNotificationService"/>
 
     <projectService serviceInterface="com.intellij.codeInsight.daemon.impl.analysis.HighlightingLevelManager"
-                    serviceImplementation="com.intellij.codeInsight.daemon.impl.analysis.HighlightingSettingsPerFile"/>
+                    serviceImplementation="com.intellij.codeInsight.daemon.impl.analysis.HighlightingSettingsPerFile"
+                    preload="true"/>
 
     <projectService serviceImplementation="com.intellij.find.findInProject.FindInProjectManager"/>
     <projectService serviceImplementation="com.intellij.find.replaceInProject.ReplaceInProjectManager"/>
     <projectService serviceInterface="com.intellij.codeHighlighting.TextEditorHighlightingPassRegistrar"
-                    serviceImplementation="com.intellij.codeInsight.daemon.impl.TextEditorHighlightingPassRegistrarImpl"/>
+                    serviceImplementation="com.intellij.codeInsight.daemon.impl.TextEditorHighlightingPassRegistrarImpl"
+                    preload="true"/>
+
     <projectService serviceInterface="com.intellij.psi.codeStyle.CodeStyleManager"
                     serviceImplementation="com.intellij.psi.impl.source.codeStyle.CodeStyleManagerImpl"/>
     <projectService serviceInterface="com.intellij.psi.impl.include.FileIncludeManager"
@@ -1692,7 +1695,7 @@
     <inspectionResultsExportActionProvider implementation="com.intellij.codeInspection.ui.actions.ExportToHTMLAction"/>
     <inspectionResultsExportActionProvider implementation="com.intellij.codeInspection.ui.actions.ExportToXMLAction"/>
   </extensions>
-  <extensions defaultExtensionNs="com.intellij.platform">
+  <extensions defaultExtensionNs="com.intellij.platform.backend">
     <documentation.targetProvider
       implementation="com.intellij.lang.documentation.symbol.impl.DefaultTargetSymbolDocumentationTargetProvider"/>
     <documentation.linkHandler implementation="com.intellij.lang.documentation.psi.PsiDocumentationLinkHandler"/>

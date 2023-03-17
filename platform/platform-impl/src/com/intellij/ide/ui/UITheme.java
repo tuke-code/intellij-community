@@ -4,15 +4,18 @@ package com.intellij.ide.ui;
 import com.fasterxml.jackson.jr.ob.JSON;
 import com.intellij.ide.plugins.cl.PluginAwareClassLoader;
 import com.intellij.openapi.diagnostic.Logger;
-import com.intellij.openapi.ui.ImageDataByPathLoader;
 import com.intellij.openapi.util.IconLoader;
 import com.intellij.openapi.util.IconPathPatcher;
 import com.intellij.openapi.util.SystemInfoRt;
 import com.intellij.ui.ColorHexUtil;
 import com.intellij.ui.ExperimentalUI;
 import com.intellij.ui.Gray;
+import com.intellij.ui.icons.ImageDataByPathLoader;
+import com.intellij.ui.svg.SvgAttributePatcher;
+import com.intellij.ui.svg.SvgKt;
+import com.intellij.util.ArrayUtilRt;
+import com.intellij.util.InsecureHashBuilder;
 import com.intellij.util.SVGLoader;
-import com.intellij.util.io.DigestUtil;
 import com.intellij.util.ui.JBDimension;
 import com.intellij.util.ui.JBInsets;
 import com.intellij.util.ui.JBUI;
@@ -26,9 +29,6 @@ import java.awt.*;
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.Constructor;
-import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
 import java.util.*;
 import java.util.function.Function;
 
@@ -221,8 +221,7 @@ public final class UITheme {
 
   private static @NotNull UITheme loadFromJson(@NotNull UITheme theme,
                                                @Nullable ClassLoader provider,
-                                               @NotNull Function<? super String, String> iconsMapper)
-    throws IllegalStateException {
+                                               @NotNull Function<? super String, String> iconsMapper) throws IllegalStateException {
     if (provider != null) {
       theme.providerClassLoader = provider;
     }
@@ -231,29 +230,22 @@ public final class UITheme {
     PaletteScopeManager paletteScopeManager = new PaletteScopeManager();
 
     if (theme.iconColorsOnSelection != null && !theme.iconColorsOnSelection.isEmpty()) {
-      Map<String, String> colors = new HashMap<>(theme.iconColorsOnSelection.size());
+      Map<String, String> colors = new TreeMap<>();
       for (Map.Entry<String, Object> entry : theme.iconColorsOnSelection.entrySet()) {
         colors.put(entry.getKey(), entry.getValue().toString());
       }
 
-      Map<String, Integer> alpha = new HashMap<>(colors.size());
+      Map<String, Integer> alpha = new TreeMap<>();
       colors.forEach((key, value) -> alpha.put(value, 255));
       theme.selectionColorPatcher = new SVGLoader.SvgElementColorPatcherProvider() {
         @Override
-        public SVGLoader.@Nullable SvgElementColorPatcher forPath(@Nullable String path) {
-          MessageDigest hasher = DigestUtil.sha512();
+        public @Nullable SvgAttributePatcher attributeForPath(@Nullable String path) {
           PaletteScope scope = paletteScopeManager.getScopeByPath(path);
-          if (scope != null) hasher.update(scope.digest());
-          for (Map.Entry<String, String> entry : colors.entrySet()) {
-            hasher.update(entry.getKey().getBytes(StandardCharsets.UTF_8));
-            hasher.update(entry.getValue().getBytes(StandardCharsets.UTF_8));
-          }
-          for (Map.Entry<String, Integer> entry : alpha.entrySet()) {
-            hasher.update(entry.getKey().getBytes(StandardCharsets.UTF_8));
-            hasher.update(ByteBuffer.allocate(4).putInt(entry.getValue()).array());
-          }
-
-          return SVGLoader.newPatcher(hasher.digest(), colors, alpha);
+          InsecureHashBuilder hash = new InsecureHashBuilder()
+            .stringMap(colors)
+            .stringIntMap(alpha)
+            .update(scope == null ? ArrayUtilRt.EMPTY_LONG_ARRAY : scope.digest());
+          return SvgKt.newSvgPatcher(hash.build(), colors, alpha);
         }
       };
     }
@@ -326,10 +318,11 @@ public final class UITheme {
         }
 
         theme.colorPatcher = new SVGLoader.SvgElementColorPatcherProvider() {
+          @Nullable
           @Override
-          public @Nullable SVGLoader.SvgElementColorPatcher forPath(@Nullable String path) {
+          public SvgAttributePatcher attributeForPath(@Nullable String path) {
             PaletteScope scope = paletteScopeManager.getScopeByPath(path);
-            return scope == null ? null : SVGLoader.newPatcher(scope.digest(), scope.newPalette, scope.alphas);
+            return scope == null ? null : SvgKt.newSvgPatcher(scope.digest(), scope.newPalette, scope.alphas);
           }
         };
       }
@@ -451,8 +444,7 @@ public final class UITheme {
     return editorScheme;
   }
 
-  @Nullable
-  public String[] getAdditionalEditorSchemes() {
+  public String @Nullable [] getAdditionalEditorSchemes() {
     return additionalEditorSchemes;
   }
 
@@ -608,7 +600,7 @@ public final class UITheme {
       }
 
       if (value.endsWith(".png") || value.endsWith(".svg")) {
-        Icon icon = ImageDataByPathLoader.findIcon(value, classLoader, null);
+        Icon icon = ImageDataByPathLoader.Companion.findIconByPath(value, classLoader, null, null);
         if (icon != null) {
           return icon;
         }
@@ -770,36 +762,18 @@ public final class UITheme {
     final Map<String, String> newPalette = new HashMap<>();
     final Map<String, Integer> alphas = new HashMap<>();
 
-    private byte[] hash;
+    private long[] hash;
 
-    byte @NotNull [] digest() {
+    long @NotNull [] digest() {
       if (hash != null) {
         return hash;
       }
 
-      MessageDigest hasher = DigestUtil.sha512();
-      // order is significant
-      if (!newPalette.isEmpty()) {
-        for (Map.Entry<String, String> e : new TreeMap<>(newPalette).entrySet()) {
-          hasher.update(e.getKey().getBytes(StandardCharsets.UTF_8));
-          hasher.update(e.getValue().getBytes(StandardCharsets.UTF_8));
-        }
-      }
-      if (!alphas.isEmpty()) {
-        // order is significant
-        for (Map.Entry<String, Integer> e : new TreeMap<>(alphas).entrySet()) {
-          hasher.update(e.getKey().getBytes(StandardCharsets.UTF_8));
-          Integer value = e.getValue();
-          if (value != null) {
-            int i = value.intValue();
-            hasher.update((byte)i);
-            hasher.update((byte)(i >>> 8));
-            hasher.update((byte)(i >>> 16));
-            hasher.update((byte)(i >>> 24));
-          }
-        }
-      }
-      hash = hasher.digest();
+      // order is significant - use TreeMap
+      hash = new InsecureHashBuilder()
+        .stringMap(newPalette)
+        .stringIntMap(alphas)
+        .build();
       return hash;
     }
   }

@@ -23,7 +23,7 @@ import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.util.io.FileUtil
 import com.intellij.openapi.util.registry.Registry
-import com.intellij.platform.documentation.impl.computeDocumentationBlocking
+import com.intellij.platform.backend.documentation.impl.computeDocumentationBlocking
 import com.intellij.psi.PsiDocumentManager
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
@@ -468,7 +468,7 @@ fun CodeInsightTestFixture.testWebSymbolRename(fileAfter: String, newName: Strin
   checkResultByFile(fileAfter)
 }
 
-fun doCompletionItemsTest(fixture: CodeInsightTestFixture, fileName: String) {
+fun doCompletionItemsTest(fixture: CodeInsightTestFixture, fileName: String, goldFileWithExtension: Boolean = false) {
   val fileNameNoExt = FileUtil.getNameWithoutExtension(fileName)
   fixture.configureByFile(fileName)
   WriteAction.runAndWait<Throwable> { WebSymbolsQueryExecutorFactory.getInstance(fixture.project) }
@@ -500,7 +500,7 @@ fun doCompletionItemsTest(fixture: CodeInsightTestFixture, fileName: String) {
 
       fixture.checkListByFile(
         fixture.renderLookupItems(true, true, true),
-        "gold/${fileNameNoExt}.${index}.txt", !strict)
+        "gold/${if (goldFileWithExtension) fileName else fileNameNoExt}.${index}.txt", !strict)
 
       PlatformTestUtil.dispatchAllInvocationEventsInIdeEventQueue()
     }

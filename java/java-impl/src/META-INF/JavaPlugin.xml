@@ -279,6 +279,7 @@
     <extensionPoint qualifiedName="com.intellij.jarRepositoryAuthenticationDataProvider"
                     interface="com.intellij.jarRepository.JarRepositoryAuthenticationDataProvider" dynamic="true"/>
     <extensionPoint qualifiedName="com.intellij.jpsServerAuthExtension" interface="com.intellij.compiler.cache.client.JpsServerAuthExtension" dynamic="true"/>
+    <extensionPoint qualifiedName="com.intellij.execution.applicationRunLineMarkerHider" interface="com.intellij.execution.ApplicationRunLineMarkerHider" dynamic="true"/>
   </extensionPoints>
 
   <extensions defaultExtensionNs="com.intellij">
@@ -1669,7 +1670,7 @@
                      key="inspection.overwritten.key.display.name" bundle="messages.JavaBundle"/>
     <localInspection groupPathKey="group.path.names.java.language.level.specific.issues.and.migration.aids" language="JAVA" shortName="StaticPseudoFunctionalStyleMethod"
                      groupBundle="messages.InspectionsBundle"
-                     groupKey="group.names.language.level.specific.issues.and.migration.aids8" enabledByDefault="true" level="WARNING"
+                     groupKey="group.names.language.level.specific.issues.and.migration.aids8" enabledByDefault="false" level="WARNING"
                      implementationClass="com.intellij.codeInspection.java18StreamApi.StaticPseudoFunctionalStyleMethodInspection"
                      key="inspection.static.pseudo.functional.style.method.display.name" bundle="messages.JavaBundle"/>
     <localInspection groupPath="Java" language="JAVA" shortName="MagicConstant"
@@ -1881,7 +1882,7 @@
     <localInspection groupPath="Java" language="JAVA" shortName="ExtractMethodRecommender"
                      key="inspection.extract.method.inspection.name" bundle="messages.JavaAnalysisBundle"
                      groupKey="group.names.code.maturity.issues" groupBundle="messages.InspectionsBundle"
-                     enabledByDefault="false" level="WARNING" isInternal="true"
+                     enabledByDefault="true" level="WARNING" isInternal="true"
                      implementationClass="com.intellij.refactoring.extractMethod.ExtractMethodRecommenderInspection" />
     <localInspection groupPath="Java" language="JAVA" shortName="RedundantLabeledSwitchRuleCodeBlock"
                      key="inspection.labeled.switch.rule.redundant.code.block.display.name" bundle="messages.JavaBundle"
@@ -2342,6 +2343,7 @@
     <vcs.codeVisionLanguageContext language="JAVA" implementationClass="com.intellij.codeInsight.hints.JavaVcsCodeVisionContext"/>
     <codeInsight.codeVisionSettingsPreviewLanguage modelId="vcs.code.vision" language="JAVA"/>
     <codeInsight.daemonBoundCodeVisionProvider implementation="com.intellij.codeInsight.daemon.impl.JavaReferencesCodeVisionProvider"/>
+    <projectService serviceImplementation="com.intellij.codeInsight.daemon.impl.UsagesCountManager" />
     <codeInsight.codeVisionSettingsPreviewLanguage modelId="references" language="JAVA"/>
     <codeInsight.daemonBoundCodeVisionProvider implementation="com.intellij.codeInsight.daemon.impl.JavaInheritorsCodeVisionProvider"/>
     <codeInsight.codeVisionSettingsPreviewLanguage modelId="inheritors" language="JAVA"/>

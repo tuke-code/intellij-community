@@ -12,10 +12,8 @@ import com.intellij.openapi.fileTypes.FileTypeRegistry
 import com.intellij.openapi.project.DumbService
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.*
-import com.intellij.openapi.util.IconLoader.copy
 import com.intellij.openapi.util.IconLoader.filterIcon
 import com.intellij.openapi.util.IconLoader.getIcon
-import com.intellij.openapi.util.IconLoader.loadCustomVersion
 import com.intellij.openapi.util.IconLoader.patchColorsInCacheImageIcon
 import com.intellij.openapi.util.IconLoader.replaceCachedImageIcons
 import com.intellij.openapi.util.Iconable.IconFlags
@@ -24,9 +22,8 @@ import com.intellij.openapi.vfs.VFileProperty
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.WritingAccessProvider
 import com.intellij.ui.*
-import com.intellij.ui.icons.CompositeIcon
-import com.intellij.ui.icons.CopyableIcon
-import com.intellij.ui.icons.ImageDescriptor
+import com.intellij.ui.RowIcon
+import com.intellij.ui.icons.*
 import com.intellij.ui.paint.alignToInt
 import com.intellij.ui.scale.*
 import com.intellij.ui.scale.JBUIScale.getFontScale
@@ -44,7 +41,6 @@ import java.awt.geom.AffineTransform
 import java.awt.geom.Rectangle2D
 import java.awt.image.BufferedImage
 import java.awt.image.RGBImageFilter
-import java.lang.ref.WeakReference
 import java.util.*
 import java.util.function.Supplier
 import java.util.function.ToIntFunction
@@ -54,7 +50,6 @@ import javax.swing.JLabel
 import javax.swing.SwingConstants
 import kotlin.math.max
 import kotlin.math.min
-import kotlin.math.roundToInt
 import kotlin.math.roundToLong
 
 private val PROJECT_WAS_EVER_INITIALIZED = Key.create<Boolean>("iconDeferrer:projectWasEverInitialized")
@@ -97,7 +92,7 @@ object IconUtil {
       scale = hdpi.scale
       if (hdpi.delegate != null) image = hdpi.delegate
     }
-    val bi = ImageUtil.toBufferedImage(Objects.requireNonNull(image))
+    val bi = ImageUtil.toBufferedImage(image!!)
     val g = bi.createGraphics()
     val imageWidth = ImageUtil.getRealWidth(image)
     val imageHeight = ImageUtil.getRealHeight(image)
@@ -336,9 +331,7 @@ object IconUtil {
 
       override fun getIconHeight(): Int = iconUnderSelection.iconHeight
 
-      override fun toString(): String {
-        return "IconUtil.wrapToSelectionAwareIcon for $iconUnderSelection"
-      }
+      override fun toString(): String = "IconUtil.wrapToSelectionAwareIcon for $iconUnderSelection"
     }
   }
 
@@ -355,9 +348,7 @@ object IconUtil {
 
       override fun getIconHeight(): Int = (source.iconHeight * clampedScale).toInt()
 
-      override fun toString(): String {
-        return "IconUtil.scale for $source"
-      }
+      override fun toString(): String = "IconUtil.scale for $source"
     }
   }
 
@@ -374,9 +365,7 @@ object IconUtil {
 
       override fun getIconHeight(): Int = sizeValue.get()
 
-      override fun toString(): String {
-        return "IconUtil.resizeSquared for $source"
-      }
+      override fun toString(): String = "IconUtil.resizeSquared for $source"
     }
   }
 
@@ -385,14 +374,14 @@ object IconUtil {
    * @see CopyableIcon
    */
   @JvmStatic
-  fun copy(icon: Icon, ancestor: Component?): Icon = copy(icon = icon, ancestor = ancestor, deepCopy = false)
+  fun copy(icon: Icon, ancestor: Component?): Icon = copyIcon(icon = icon, ancestor = ancestor, deepCopy = false)
 
   /**
    * Returns a deep copy of the provided `icon`.
    * @see CopyableIcon
    */
   @JvmStatic
-  fun deepCopy(icon: Icon, ancestor: Component?): Icon = copy(icon = icon, ancestor = ancestor, deepCopy = true)
+  fun deepCopy(icon: Icon, ancestor: Component?): Icon = copyIcon(icon = icon, ancestor = ancestor, deepCopy = true)
 
   /**
    * Returns a scaled icon instance.
@@ -420,8 +409,12 @@ object IconUtil {
    */
   @JvmStatic
   fun scale(icon: Icon, ancestor: Component?, scale: Float): Icon {
+    if (icon is CachedImageIcon) {
+      return icon.scale(scale = scale, ancestor = ancestor)
+    }
+
     val ctx = if (ancestor == null && icon is ScaleContextAware) {
-      // In this case, the icon's context should be preserved, except the OBJ_SCALE.
+      // in this case, the icon's context should be preserved, except the OBJ_SCALE
       val usrCtx = icon.scaleContext
       ScaleContext.create(usrCtx)
     }
@@ -429,7 +422,7 @@ object IconUtil {
       ScaleContext.create(ancestor)
     }
     ctx.setScale(ScaleType.OBJ_SCALE.of(scale.toDouble()))
-    return scale(icon = icon, ctx = ctx)
+    return scale(icon = icon, scaleContext = ctx)
   }
 
   /**
@@ -439,28 +432,31 @@ object IconUtil {
    *
    * @see .scale
    * @param icon the icon to scale
-   * @param ctx the scale context to apply
+   * @param scaleContext the scale context to apply
    * @return the scaled icon
    */
   @JvmStatic
-  fun scale(icon: Icon, ctx: ScaleContext): Icon {
-    var icon = icon
-    var scaleContext = ctx
+  fun scale(icon: Icon, scaleContext: ScaleContext): Icon {
     val scale = scaleContext.getScale(ScaleType.OBJ_SCALE)
-    if (icon is CopyableIcon) {
-      icon = icon.deepCopy()
-      if (icon is ScalableIcon) {
-        if (icon is ScaleContextAware) {
-          scaleContext = scaleContext.copy()
-          // Reset OBJ_SCALE in the context to preserve ScalableIcon.scale(float) implementation
-          // from accumulation of the scales: OBJ_SCALE * scale.
-          scaleContext.setScale(ScaleType.OBJ_SCALE.of(1.0))
-          icon.updateScaleContext(scaleContext)
-        }
-        return icon.scale(scale.toFloat())
-      }
+    if (icon !is CopyableIcon) {
+      @Suppress("DEPRECATION")
+      return scale(source = icon, scale = scale)
     }
-    return scale(source = icon, scale = scale)
+
+    val copiedIcon = icon.deepCopy()
+    if (copiedIcon !is ScalableIcon) {
+      @Suppress("DEPRECATION")
+      return scale(source = copiedIcon, scale = scale)
+    }
+
+    if (copiedIcon is ScaleContextAware) {
+      val newScaleContext = scaleContext.copy<ScaleContext>()
+      // reset OBJ_SCALE in the context to preserve ScalableIcon.scale(float) implementation
+      // from accumulation of the scales: OBJ_SCALE * scale.
+      newScaleContext.setScale(ScaleType.OBJ_SCALE.of(1.0))
+      copiedIcon.updateScaleContext(newScaleContext)
+    }
+    return copiedIcon.scale(scale.toFloat())
   }
 
   /**
@@ -491,31 +487,6 @@ object IconUtil {
   @JvmStatic
   fun scaleByIconWidth(icon: Icon?, ancestor: Component?, defaultIcon: Icon): Icon {
     return scaleByIcon(icon, ancestor, defaultIcon) { it.iconWidth }
-  }
-
-  /**
-   * @param icon  the icon to scale
-   * @param scale the scale factor
-   * @return the scaled icon
-   */
-  @ApiStatus.Internal
-  fun scaleOrLoadCustomVersion(icon: Icon, scale: Float): Icon {
-    if (icon is CachedImageIcon) {
-      val oldWidth = icon.getIconWidth()
-      val oldHeight = icon.getIconHeight()
-      val newWidth = (scale * oldWidth).roundToInt()
-      val newHeight = (scale * oldHeight).roundToInt()
-      if (oldWidth == newWidth && oldHeight == newHeight) {
-        return icon
-      }
-
-      val version = loadCustomVersion(icon = icon, width = newWidth, height = newHeight)
-      if (version != null) {
-        return version
-      }
-    }
-
-    return if (icon is ScalableIcon) icon.scale(scale) else scale(icon = icon, ancestor = null, scale = scale)
   }
 
   /**
@@ -796,62 +767,6 @@ private fun filterFileIconFlags(file: VirtualFile, @IconFlags flags: Int): Int {
   val fileTypeFlagIgnoreMask = ICON_FLAG_IGNORE_MASK.get(fileTypeDataHolder, 0)
   val flagIgnoreMask = ICON_FLAG_IGNORE_MASK.get(file, fileTypeFlagIgnoreMask)
   return flags and flagIgnoreMask.inv()
-}
-
-class TextIcon(val text: String, component: Component, val fontSize: Float) : JBScalableIcon() {
-  private var font: Font? = null
-  private var metrics: FontMetrics? = null
-  private val componentRef = WeakReference(component)
-
-  init {
-    isIconPreScaled = false
-    scaleContext.addUpdateListener { update() }
-    update()
-  }
-
-  // x,y is in USR_SCALE
-  override fun paintIcon(c: Component?, g: Graphics, x: Int, y: Int) {
-    val customG = g.create()
-    try {
-      GraphicsUtil.setupAntialiasing(customG)
-      customG.font = font
-      UIUtil.drawStringWithHighlighting(customG,
-                                        this.text,
-                                        scaleVal(x.toDouble(), ScaleType.OBJ_SCALE).toInt() + scaleVal(2.0).toInt(),
-                                        scaleVal(y.toDouble(), ScaleType.OBJ_SCALE).toInt() + iconHeight - scaleVal(1.0).toInt(),
-                                        JBColor.foreground(),
-                                        JBColor.background())
-    }
-    finally {
-      customG.dispose()
-    }
-  }
-
-  override fun getIconWidth(): Int = metrics!!.stringWidth(this.text) + scaleVal(4.0).toInt()
-
-  override fun getIconHeight(): Int = metrics!!.height
-
-  private fun update() {
-    // fontSize is in USR_SCALE
-    font = JBFont.create(JBFont.label().deriveFont(scaleVal(fontSize.toDouble(), ScaleType.OBJ_SCALE).toFloat()))
-    metrics = (componentRef.get() ?: object : Component() {}).getFontMetrics(font)
-  }
-
-  override fun equals(other: Any?): Boolean {
-    if (this === other) return true
-    if (other !is TextIcon) return false
-    if (this.text != other.text) return false
-    return font == other.font
-  }
-
-  override fun hashCode(): Int {
-    var result = text.hashCode()
-    result = 31 * result + fontSize.hashCode()
-    result = 31 * result + (font?.hashCode() ?: 0)
-    result = 31 * result + (metrics?.hashCode() ?: 0)
-    result = 31 * result + componentRef.hashCode()
-    return result
-  }
 }
 
 private fun clampScale(scale: Double): Double = scale.coerceIn(0.1, 32.0)

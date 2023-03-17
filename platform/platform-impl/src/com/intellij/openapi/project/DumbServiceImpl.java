@@ -45,7 +45,7 @@ import java.util.concurrent.locks.LockSupport;
 
 @ApiStatus.Internal
 public class DumbServiceImpl extends DumbService implements Disposable, ModificationTracker, DumbServiceBalloon.Service {
-  private static final ExtensionPointName<StartupActivity.RequiredForSmartMode> REQUIRED_FOR_SMART_MODE_STARTUP_ACTIVITY
+  static final ExtensionPointName<StartupActivity.RequiredForSmartMode> REQUIRED_FOR_SMART_MODE_STARTUP_ACTIVITY
     = new ExtensionPointName<>("com.intellij.requiredForSmartModeStartupActivity");
 
   public static final boolean ALWAYS_SMART = SystemProperties.getBooleanProperty("idea.no.dumb.mode", false);
@@ -128,29 +128,20 @@ public class DumbServiceImpl extends DumbService implements Disposable, Modifica
     }
     myBalloon = new DumbServiceBalloon(project, this);
     myAlternativeResolveTracker = new DumbServiceAlternativeResolveTracker();
-    myState = new AtomicReference<>(project.isDefault() ? State.SMART : State.WAITING_PROJECT_SMART_MODE_STARTUP_TASKS);
+    // any project starts in dumb mode (except default project which is always smart)
+    // we assume that queueStartupActivitiesRequiredForSmartMode will be invoked to advance WAITING_FOR_FINISH > SMART
+    myState = new AtomicReference<>(project.isDefault() ? State.SMART : State.WAITING_FOR_FINISH);
   }
 
   void queueStartupActivitiesRequiredForSmartMode() {
-    boolean changed = myState.compareAndSet(State.WAITING_PROJECT_SMART_MODE_STARTUP_TASKS, State.RUNNING_PROJECT_SMART_MODE_STARTUP_TASKS);
-    LOG.assertTrue(changed, "actual state: " + myState.get() + ", project " + getProject());
-
-    List<StartupActivity.RequiredForSmartMode> activities = REQUIRED_FOR_SMART_MODE_STARTUP_ACTIVITY.getExtensionList();
-    for (StartupActivity.RequiredForSmartMode activity : activities) {
-      activity.runActivity(getProject());
-    }
+    queueTask(new InitialDumbTaskRequiredForSmartMode(getProject()));
 
     if (isSynchronousTaskExecution()) {
+      // This is the same side effects as produced by updateFinished (except updating icons). We apply them synchronously, because
       // invokeLaterAfterProjectInitialized(this::updateFinished) does not work well in synchronous environments (e.g. in unit tests): code
       // continues to execute without waiting for smart mode to start because of invoke*Later*. See, for example, DbSrcFileDialectTest
-      myState.compareAndSet(State.RUNNING_PROJECT_SMART_MODE_STARTUP_TASKS, State.SMART);
+      myState.compareAndSet(State.WAITING_FOR_FINISH, State.SMART);
       myTrackedEdtActivityService.submitTransaction(myPublisher::exitDumbMode);
-    } else {
-      // switch to smart mode and notify subscribers if no dumb mode tasks were scheduled
-      if (myState.compareAndSet(State.RUNNING_PROJECT_SMART_MODE_STARTUP_TASKS, State.WAITING_FOR_FINISH)) {
-        myTrackedEdtActivityService.setDumbStartModality(ModalityState.defaultModalityState());
-        myTrackedEdtActivityService.invokeLaterAfterProjectInitialized(this::updateFinished);
-      }
     }
   }
 
@@ -285,8 +276,7 @@ public class DumbServiceImpl extends DumbService implements Disposable, Modifica
     myTaskQueue.addTask(task);
     State state = myState.get();
     if (state == State.SMART ||
-        state == State.WAITING_FOR_FINISH ||
-        state == State.RUNNING_PROJECT_SMART_MODE_STARTUP_TASKS) {
+        state == State.WAITING_FOR_FINISH) {
       if (tryEnterDumbMode(modality, trace)) {
         // we need one more invoke later because we want to invoke LATER. I.e. right now one can invoke completeJustSubmittedTasks and
         // drain the queue synchronously under modal progress
@@ -368,7 +358,6 @@ public class DumbServiceImpl extends DumbService implements Disposable, Modifica
     Thread currentThread = Thread.currentThread();
     String initialThreadName = currentThread.getName();
     while (!(myState.get() == State.SMART ||
-             myState.get() == State.WAITING_PROJECT_SMART_MODE_STARTUP_TASKS ||
              myState.get() == State.WAITING_FOR_FINISH)
            && !myProject.isDisposed()) {
       ConcurrencyUtil.runUnderThreadName(initialThreadName + " [DumbService.cancelAllTasksAndWait(state = " + myState.get() + ")]", () -> {
@@ -394,10 +383,14 @@ public class DumbServiceImpl extends DumbService implements Disposable, Modifica
       throw new AssertionError("Don't invoke waitForSmartMode from a background startup activity");
     }
     CountDownLatch switched = new CountDownLatch(1);
-    myProject.getService(SmartModeScheduler.class).runWhenSmart(switched::countDown);
+    SmartModeScheduler smartModeScheduler = myProject.getService(SmartModeScheduler.class);
+    smartModeScheduler.runWhenSmart(switched::countDown);
 
     // we check getCurrentMode here because of tests which may hang because runWhenSmart needs EDT for scheduling
-    while (myProject.getService(SmartModeScheduler.class).getCurrentMode() != 0 && !myProject.isDisposed()) {
+    while (!myProject.isDisposed() && smartModeScheduler.getCurrentMode() != 0) {
+      // it is fine to unblock the caller when myProject.isDisposed, even if didn't reach smart mode: we are on background thread
+      // without read action. Dumb mode may start immediately after the caller is unblocked, so caller is prepared for this situation.
+
       try {
         if (switched.await(50, TimeUnit.MILLISECONDS)) break;
       }
@@ -546,7 +539,7 @@ public class DumbServiceImpl extends DumbService implements Disposable, Modifica
     /**
      * A state between entering dumb mode ({@link #queueTaskOnEdt}) and actually starting the background progress later ({@link #runBackgroundProcess}).
      * In this state, it's possible to call {@link #completeJustSubmittedTasks()} and perform all the submitted tasks synchronously.
-     * This state can happen after {@link #SMART}, {@link #WAITING_FOR_FINISH}, or {@link #RUNNING_PROJECT_SMART_MODE_STARTUP_TASKS}.
+     * This state can happen after {@link #SMART}, or {@link #WAITING_FOR_FINISH}.
      * Followed by {@link #RUNNING_DUMB_TASKS}.
      */
     SCHEDULED_TASKS,
@@ -559,19 +552,10 @@ public class DumbServiceImpl extends DumbService implements Disposable, Modifica
     /**
      * Set after background execution ({@link #RUNNING_DUMB_TASKS}) finishes, until the dumb mode can be exited
      * (in a write-safe context on EDT when project is initialized). If new tasks are queued at this state, it's switched to {@link #SCHEDULED_TASKS}.
+     * <p>
+     * This is also the initial state of the state machine in non-default project
      */
     WAITING_FOR_FINISH,
-
-    /**
-     * Indicates that project has been just loaded and
-     * {@link StartupActivity.RequiredForSmartMode}-s were not submitted to execution to ensure project smart mode.
-     */
-    WAITING_PROJECT_SMART_MODE_STARTUP_TASKS,
-
-    /**
-     * Indicates that project has been loaded and {@link StartupActivity.RequiredForSmartMode}-s were added to task queue.
-     */
-    RUNNING_PROJECT_SMART_MODE_STARTUP_TASKS
   }
 
   public static boolean isSynchronousTaskExecution() {

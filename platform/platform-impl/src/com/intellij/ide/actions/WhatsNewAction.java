@@ -110,6 +110,7 @@ public class WhatsNewAction extends AnAction implements DumbAware {
     }
   }
 
+  @ApiStatus.Internal
   public static void openWhatsNewPage(@NotNull Project project, @NotNull String url, @Nullable HTMLEditorProvider.JsQueryHandler queryHandler) {
     if (!JBCefApp.isSupported()) {
       throw new IllegalStateException("JCEF is not supported on this system");
@@ -124,10 +125,7 @@ public class WhatsNewAction extends AnAction implements DumbAware {
       theme += "-new-ui";
     }
     parameters.put("theme", theme);
-    var locale = Locale.getDefault();
-    if (locale != null) {
-      parameters.put("lang", locale.toLanguageTag().toLowerCase(Locale.ENGLISH));
-    }
+    parameters.put("lang", Locale.getDefault().toLanguageTag().toLowerCase(Locale.ENGLISH));
     var request = HTMLEditorProvider.Request.url(Urls.newFromEncoded(url).addParameters(parameters).toExternalForm());
 
     try (var stream = WhatsNewAction.class.getResourceAsStream("whatsNewTimeoutText.html")) {

@@ -19,6 +19,46 @@ import java.io.File
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.TimeUnit
 
+/**
+ * Allows running `publish`-tasks in the designated subprojects before import
+ *
+ * Subprojects should configure publishing manually
+ *
+ * Recommended configuration, suitable for most cases:
+ * ```
+ * // build.gradle.kts
+ * plugins {
+ *     id("maven-publish")
+ * }
+ *
+ * group = "org.jetbrains.kotlin.mpp.tests"
+ * version = "1.0"
+ *
+ * publishing {
+ *     repositories {
+ *         maven("$rootDir/repo")
+ *     }
+ * }
+ * ```
+ *
+ * If you want to publish MPP with Android-target, don't forget to
+ * define published variants:
+ * ```
+ * kotlin {
+ *     android {
+ *         publishLibraryVariants("release", "debug")
+ *     }
+ *     ...
+ * }
+ * ```
+ */
+interface GradleProjectsPublishingDsl {
+    fun TestConfigurationDslScope.publish(vararg subprojectNames: String) {
+        writeAccess.getConfiguration(GradleProjectsPublishingTestsFeature)
+            .publishedSubprojectNames.addAll(subprojectNames)
+    }
+}
+
 internal object GradleProjectsPublishingTestsFeature : TestFeature<ProjectsToPublish> {
     override fun createDefaultConfiguration(): ProjectsToPublish = ProjectsToPublish(mutableSetOf())
 
@@ -31,25 +71,15 @@ internal object GradleProjectsPublishingTestsFeature : TestFeature<ProjectsToPub
 
 class ProjectsToPublish(val publishedSubprojectNames: MutableSet<String>)
 
-interface GradleProjectsPublishingDsl {
-    fun TestConfigurationDslScope.publish(vararg subprojectNames: String) {
-        writeAccess.getConfiguration(GradleProjectsPublishingTestsFeature)
-            .publishedSubprojectNames.addAll(subprojectNames)
-    }
-}
 
-/**
- * For now, relies on projects exposing and properly configuring the
- * "publish"-task.
- *
- * It is highly recommended to not use 'mavenLocal' as target for
- * publishing.
- */
 object GradleProjectsPublisher {
 
     fun publishSubproject(subprojectName: String, importedProjectRoot: File, importedProject: Project) {
         val subprojectDirectory = importedProjectRoot.resolve(subprojectName)
         require(subprojectDirectory.exists()) { "Can't find subproject $subprojectName, checked at ${subprojectDirectory.canonicalPath}" }
+        requireNotNull(subprojectDirectory.walk().firstOrNull { it.isFile && it.extension == "kt" }) {
+            "Can't publish subproject $subprojectName because it doesn't have any .kt-sources"
+        }
 
         val output = runTaskAndGetErrorOutput(subprojectDirectory.toString(), importedProject, "publish")
         if (output.isNotEmpty()) {

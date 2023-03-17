@@ -185,6 +185,8 @@ object KotlinPluginBuilder {
     "kotlin.refactorings.common",
     "kotlin.refactorings.k2",
     "kotlin.refactorings.rename.k2",
+    "kotlin.performanceExtendedPlugin",
+    "kotlin.bundled-compiler-plugins-support",
   )
 
   @SuppressWarnings("SpellCheckingInspection")
@@ -273,7 +275,6 @@ object KotlinPluginBuilder {
           "kotlin-ultimate.javascript.nodeJs",
           "kotlin-ultimate.ultimate-plugin",
           "kotlin-ultimate.ultimate-native",
-          "kotlin.performanceExtendedPlugin",
         ))
       }
 

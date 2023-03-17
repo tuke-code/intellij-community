@@ -30,8 +30,8 @@ import com.intellij.rt.execution.junit.FileComparisonFailure;
 import com.intellij.testFramework.common.TestApplicationKt;
 import com.intellij.testFramework.common.ThreadUtil;
 import com.intellij.testFramework.fixtures.IdeaTestExecutionPolicy;
-import com.intellij.ui.CoreIconManager;
 import com.intellij.ui.IconManager;
+import com.intellij.ui.icons.CoreIconManager;
 import com.intellij.util.*;
 import com.intellij.util.containers.*;
 import com.intellij.util.io.PathKt;
@@ -39,7 +39,10 @@ import com.intellij.util.ui.UIUtil;
 import junit.framework.AssertionFailedError;
 import junit.framework.TestCase;
 import org.jdom.Element;
-import org.jetbrains.annotations.*;
+import org.jetbrains.annotations.ApiStatus;
+import org.jetbrains.annotations.Contract;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.junit.Assert;
 import org.junit.AssumptionViolatedException;
 import org.junit.ComparisonFailure;
@@ -222,7 +225,7 @@ public abstract class UsefulTestCase extends TestCase {
     if (isIconRequired()) {
       // ensure that IconLoader will not use fake empty icon
       try {
-        IconManager.activate(new CoreIconManager());
+        IconManager.Companion.activate(new CoreIconManager());
       }
       catch (Exception e) {
         throw e;
@@ -286,7 +289,7 @@ public abstract class UsefulTestCase extends TestCase {
     new RunAll(
       () -> {
         if (isIconRequired()) {
-          IconManager.deactivate();
+          IconManager.Companion.deactivate();
           IconLoader.clearCacheInTests();
         }
       },

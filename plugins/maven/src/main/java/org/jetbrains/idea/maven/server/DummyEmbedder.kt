@@ -33,16 +33,6 @@ abstract class DummyEmbedder(val myProject: Project) : MavenServerEmbedder {
     }
   }
 
-  override fun customizeComponents(token: MavenToken?) {
-  }
-
-  override fun retrieveAvailableVersions(groupId: String,
-                                         artifactId: String,
-                                         remoteRepositories: List<MavenRemoteRepository>,
-                                         token: MavenToken?): List<String> {
-    return emptyList()
-  }
-
   abstract override fun resolveProject(files: Collection<File>,
                                        activeProfiles: Collection<String>,
                                        inactiveProfiles: Collection<String>,
@@ -96,12 +86,6 @@ abstract class DummyEmbedder(val myProject: Project) : MavenServerEmbedder {
   }
 
   override fun release(token: MavenToken?) {
-  }
-
-  override fun clearCaches(token: MavenToken?) {
-  }
-
-  override fun clearCachesFor(projectId: MavenId?, token: MavenToken?) {
   }
 
   override fun readModel(file: File?, token: MavenToken?): MavenModel? {

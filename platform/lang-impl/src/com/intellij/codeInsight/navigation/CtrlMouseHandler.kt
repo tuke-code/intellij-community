@@ -40,7 +40,7 @@ import com.intellij.openapi.startup.ProjectActivity
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.util.NlsContexts.HintText
 import com.intellij.openapi.util.TextRange
-import com.intellij.platform.documentation.DocumentationTarget
+import com.intellij.platform.backend.documentation.DocumentationTarget
 import com.intellij.ui.LightweightHint
 import com.intellij.ui.ScreenUtil
 import com.intellij.ui.ScreenUtil.isMovementTowards
@@ -71,6 +71,7 @@ internal class InitCtrlMouseHandlerActivity : ProjectActivity {
 @Service
 class CtrlMouseHandler2(
   private val project: Project,
+  private val cs: CoroutineScope,
 ) : EditorMouseMotionListener,
     EditorMouseListener,
     FileEditorManagerListener,
@@ -159,8 +160,6 @@ class CtrlMouseHandler2(
     cancelAndClear()
   }
 
-  private val cs = CoroutineScope(SupervisorJob())
-
   private var myState: CtrlMouseState? = null
     get() {
       EDT.assertIsEdt()
@@ -177,7 +176,6 @@ class CtrlMouseHandler2(
   }
 
   override fun dispose() {
-    cs.cancel("CtrlMouseHandler disposal")
     clearState()
   }
 
@@ -210,7 +208,7 @@ class CtrlMouseHandler2(
     }
   }
 
-  private suspend fun compute(request: CtrlMouseRequest): CtrlMouseResult? = withContext(Dispatchers.IO) {
+  private suspend fun compute(request: CtrlMouseRequest): CtrlMouseResult? = withContext(Dispatchers.Default) {
     try {
       constrainedReadAction(ReadConstraint.withDocumentsCommitted(project)) {
         computeInReadAction(request)

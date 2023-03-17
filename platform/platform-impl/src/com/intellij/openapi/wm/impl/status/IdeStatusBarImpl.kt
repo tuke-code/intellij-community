@@ -161,11 +161,11 @@ open class IdeStatusBarImpl internal constructor(
     add(rightPanel, BorderLayout.EAST)
 
     infoAndProgressPanel = InfoAndProgressPanel(UISettings.shadowInstance)
-    ClientProperty.put(infoAndProgressPanel, WIDGET_ID, infoAndProgressPanel.ID())
-    centerPanel.add(infoAndProgressPanel)
+    ClientProperty.put(infoAndProgressPanel.component, WIDGET_ID, infoAndProgressPanel.ID())
+    centerPanel.add(infoAndProgressPanel.component)
     widgetMap.put(infoAndProgressPanel.ID(), WidgetBean(widget = infoAndProgressPanel,
                                                         position = Position.CENTER,
-                                                        component = infoAndProgressPanel,
+                                                        component = infoAndProgressPanel.component,
                                                         order = LoadingOrder.ANY))
     Disposer.register(frameHelper, infoAndProgressPanel)
 
@@ -246,7 +246,7 @@ open class IdeStatusBarImpl internal constructor(
     }
     widgetMap.put(id, WidgetBean(widget = widget, position = Position.CENTER, component = component, order = LoadingOrder.ANY))
     infoAndProgressPanel.setCentralComponent(component)
-    infoAndProgressPanel.revalidate()
+    infoAndProgressPanel.component.revalidate()
   }
 
   /**
@@ -483,7 +483,7 @@ open class IdeStatusBarImpl internal constructor(
 
   private fun paintWidgetEffectBackground(g: Graphics) {
     val effectComponent = effectComponent ?: return
-    if (!effectComponent.isEnabled || !UIUtil.isAncestor(this, effectComponent) || effectComponent is MemoryUsagePanel) {
+    if (!effectComponent.isEnabled || !UIUtil.isAncestor(this, effectComponent) || MemoryUsagePanel.isInstance(effectComponent)) {
       return
     }
 
@@ -816,7 +816,8 @@ private fun createDefaultEditorProvider(frameHelper: ProjectFrameHelper): () -> 
   }
 }
 
-private class IconPresentationComponent(private val presentation: IconPresentation) : WithIconAndArrows(), StatusBarWidgetWrapper {
+private class IconPresentationComponent(private val presentation: IconPresentation) : WithIconAndArrows(presentation::getTooltipText),
+                                                                                      StatusBarWidgetWrapper {
   init {
     setTextAlignment(CENTER_ALIGNMENT)
     border = JBUI.CurrentTheme.StatusBar.Widget.iconBorder()
@@ -850,7 +851,7 @@ private class TextPresentationComponent(
   }
 }
 
-private class MultipleTextValues(private val presentation: MultipleTextValuesPresentation) : WithIconAndArrows(), StatusBarWidgetWrapper {
+private class MultipleTextValues(private val presentation: MultipleTextValuesPresentation) : WithIconAndArrows(presentation::getTooltipText), StatusBarWidgetWrapper {
   init {
     isVisible = !presentation.getSelectedValue().isNullOrEmpty()
     setTextAlignment(CENTER_ALIGNMENT)

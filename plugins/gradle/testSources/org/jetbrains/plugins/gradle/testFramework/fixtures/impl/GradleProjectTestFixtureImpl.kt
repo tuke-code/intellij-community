@@ -7,7 +7,7 @@ import com.intellij.openapi.externalSystem.model.task.ExternalSystemTaskNotifica
 import com.intellij.openapi.externalSystem.service.notification.ExternalSystemProgressNotificationManager
 import com.intellij.openapi.module.Module
 import com.intellij.openapi.observable.operation.core.AtomicOperationTrace
-import com.intellij.openapi.observable.operation.core.getOperationPromise
+import com.intellij.openapi.observable.operation.core.whenOperationStarted
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.modules
 import com.intellij.openapi.util.Disposer
@@ -15,8 +15,8 @@ import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.testFramework.closeOpenedProjectsIfFailAsync
 import com.intellij.testFramework.closeProjectAsync
 import com.intellij.testFramework.common.runAll
-import com.intellij.testFramework.concurrency.waitForPromise
 import com.intellij.testFramework.fixtures.SdkTestFixture
+import com.intellij.testFramework.observable.operation.core.waitForOperationCompletionAndPumpEdt
 import com.intellij.testFramework.openProjectAsync
 import kotlinx.coroutines.runBlocking
 import org.gradle.util.GradleVersion
@@ -26,7 +26,7 @@ import org.jetbrains.plugins.gradle.testFramework.fixtures.GradleProjectTestFixt
 import org.jetbrains.plugins.gradle.testFramework.fixtures.GradleTestFixtureFactory
 import org.jetbrains.plugins.gradle.testFramework.util.refreshAndWait
 import org.jetbrains.plugins.gradle.util.awaitProjectReload
-import org.jetbrains.plugins.gradle.util.whenResolveTaskStarted
+import org.jetbrains.plugins.gradle.util.getGradleReloadOperation
 import kotlin.time.Duration.Companion.minutes
 
 internal class GradleProjectTestFixtureImpl private constructor(
@@ -75,7 +75,7 @@ internal class GradleProjectTestFixtureImpl private constructor(
   override fun tearDown() {
     runAll(
       { runBlocking { fileFixture.root.refreshAndWait() } },
-      { projectOperations.getOperationPromise(testDisposable).waitForPromise(1.minutes) },
+      { projectOperations.waitForOperationCompletionAndPumpEdt(1.minutes) },
       { if (_project.isInitialized) runBlocking { _project.closeProjectAsync() } },
       { Disposer.dispose(testDisposable) },
       { fileFixture.tearDown() },
@@ -99,10 +99,9 @@ internal class GradleProjectTestFixtureImpl private constructor(
   }
 
   private fun installProjectReloadWatcher() {
-    whenResolveTaskStarted(testDisposable) { _, workingDir ->
-      if (workingDir == fileFixture.root.path) {
-        fileFixture.addIllegalOperationError("Unexpected project reload: $workingDir")
-      }
+    val operation = getGradleReloadOperation(fileFixture.root.path, testDisposable)
+    operation.whenOperationStarted {
+      fileFixture.addIllegalOperationError("Unexpected project reload: $operation")
     }
   }
 

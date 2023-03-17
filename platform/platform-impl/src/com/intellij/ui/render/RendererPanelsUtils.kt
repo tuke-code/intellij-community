@@ -6,6 +6,7 @@ import com.intellij.ui.dsl.builder.DslComponentProperty
 import com.intellij.ui.dsl.gridLayout.Constraints
 import com.intellij.ui.dsl.gridLayout.Gaps
 import com.intellij.ui.dsl.gridLayout.GridLayout
+import com.intellij.ui.dsl.gridLayout.UnscaledGaps
 import com.intellij.ui.dsl.gridLayout.builders.RowsGridBuilder
 import com.intellij.ui.popup.list.SelectablePanel
 import com.intellij.util.ui.JBEmptyBorder
@@ -43,11 +44,13 @@ import kotlin.math.max
 class RendererPanelsUtils {
 
   companion object {
+    internal const val iconTextUnscaledGap = 4
+
     /**
      * Gap between icon and related text. Can be extracted into a separate UI constant later if needed
      */
     @JvmStatic
-    val iconTextGap: Int get() = JBUI.scale(4)
+    val iconTextGap: Int get() = JBUI.scale(iconTextUnscaledGap)
 
     /**
      * Calculate width of all non-resizeable components and gaps in the panel. Works only if layout is
@@ -84,7 +87,7 @@ class RendererPanelsUtils {
 /**
  * Gap between centered and right component. Can be changed by a separate UI constant later if needed
  */
-private val centerRightGap: Int get() = JBUI.scale(4)
+private const val centerRightGap = 4
 
 open class IconCompCompPanel<C1 : JComponent, C2 : JComponent>(val center: C1, val right: C2) : IconPanel() {
 
@@ -92,9 +95,9 @@ open class IconCompCompPanel<C1 : JComponent, C2 : JComponent>(val center: C1, v
     resetHorizontalInsets(center, right)
 
     createBuilder(this)
-      .cell(iconLabel, baselineAlign = false, gaps = Gaps(right = RendererPanelsUtils.iconTextGap))
+      .cell(iconLabel, baselineAlign = false, gaps = UnscaledGaps(right = RendererPanelsUtils.iconTextUnscaledGap))
       .cell(center, resizableColumn = true)
-      .cell(right, gaps = Gaps(left = centerRightGap))
+      .cell(right, gaps = UnscaledGaps(left = centerRightGap))
   }
 }
 
@@ -116,7 +119,7 @@ open class IconCompOptionalCompPanel<C1 : JComponent>(
 
       if (value != null) {
         resetHorizontalInsets(value)
-        add(value, Constraints((layout as GridLayout).rootGrid, 2, 0, baselineAlign = true, gaps = Gaps(left = centerRightGap)))
+        add(value, Constraints((layout as GridLayout).rootGrid, 2, 0, baselineAlign = true, gaps = UnscaledGaps(left = centerRightGap)))
       }
 
       field = value
@@ -126,7 +129,7 @@ open class IconCompOptionalCompPanel<C1 : JComponent>(
     resetHorizontalInsets(center)
 
     createBuilder(this)
-      .cell(iconLabel, baselineAlign = false, gaps = Gaps(right = RendererPanelsUtils.iconTextGap))
+      .cell(iconLabel, baselineAlign = false, gaps = UnscaledGaps(right = RendererPanelsUtils.iconTextUnscaledGap))
       .cell(center, resizableColumn = true)
   }
 }
