@@ -29,30 +29,37 @@ import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
 import org.jetbrains.annotations.*;
 
-import java.io.*;
+import java.io.ByteArrayOutputStream;
+import java.io.Closeable;
+import java.io.IOException;
+import java.io.PrintStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
 
 @ApiStatus.Internal
-final public class PersistentFSConnection {
+public final class PersistentFSConnection {
   private static final Logger LOG = Logger.getInstance(PersistentFSConnection.class);
 
-  static final int RESERVED_ATTR_ID = FSRecords.bulkAttrReadSupport ? 1 : 0;
+  static final int RESERVED_ATTR_ID = 0;
   static final AttrPageAwareCapacityAllocationPolicy REASONABLY_SMALL = new AttrPageAwareCapacityAllocationPolicy();
-  private static final int FIRST_ATTR_ID_OFFSET = FSRecords.bulkAttrReadSupport ? RESERVED_ATTR_ID : 0;
 
   private static final boolean USE_GENTLE_FLUSHER = SystemProperties.getBooleanProperty("vfs.flushing.use-gentle-flusher", true);
 
 
   private final IntList myFreeRecords;
-  @NotNull
-  private final VfsDependentEnum myAttributesList;
+  //@NotNull
+  //private final VfsDependentEnum myAttributesList;
   @NotNull
   private final PersistentFSPaths myPersistentFSPaths;
 
@@ -87,7 +94,6 @@ final public class PersistentFSConnection {
                          @Nullable ContentHashEnumerator contentHashesEnumerator,
                          @NotNull SimpleStringPersistentEnumerator enumeratedAttributes,
                          @NotNull IntList freeRecords,
-                         boolean markDirty,
                          @NotNull List<ConnectionInterceptor> interceptors) throws IOException {
     if (!(names instanceof Forceable) || !(names instanceof Closeable)) {
       //RC: there is no simple way to specify type like DataEnumerator & Forceable & Closeable in java,
@@ -105,12 +111,8 @@ final public class PersistentFSConnection {
     myFreeRecords = freeRecords;
     myEnumeratedAttributes = enumeratedAttributes;
 
-    if (markDirty) {
-      markDirty();
-    }
-    myAttributesList = new VfsDependentEnum(getPersistentFSPaths(), "attrib", 1);
-
-    if (FSRecords.backgroundVfsFlush) {
+    if (FSRecords.BACKGROUND_VFS_FLUSH) {
+      //MAYBE RC: move the flushing up, to FSRecordsImpl?
       final ScheduledExecutorService scheduler = AppExecutorUtil.getAppScheduledExecutorService();
       flushingTask = USE_GENTLE_FLUSHER ?
                      new GentleVFSFlusher(scheduler) :
@@ -196,9 +198,7 @@ final public class PersistentFSConnection {
   }
 
   void createBrokenMarkerFile(@Nullable Throwable reason) {
-    final File brokenMarker = myPersistentFSPaths.getCorruptionMarkerFile();
-
-    ByteArrayOutputStream out = new ByteArrayOutputStream();
+    final ByteArrayOutputStream out = new ByteArrayOutputStream();
     try (@SuppressWarnings("ImplicitDefaultCharsetUsage") PrintStream stream = new PrintStream(out)) {
       new Exception().printStackTrace(stream);
       if (reason != null) {
@@ -208,11 +208,20 @@ final public class PersistentFSConnection {
     }
     LOG.info("Creating VFS corruption marker; Trace=\n" + out);
 
-    try (@SuppressWarnings("ImplicitDefaultCharsetUsage") FileWriter writer = new FileWriter(brokenMarker)) {
-      writer.write("These files are corrupted and must be rebuilt from the scratch on next startup");
+
+    try {
+      final Path brokenMarker = myPersistentFSPaths.getCorruptionMarkerFile();
+      Files.write(
+        brokenMarker,
+        Collections.singletonList("These files are corrupted and must be rebuilt from the scratch on next startup"),
+        UTF_8,
+        StandardOpenOption.WRITE, StandardOpenOption.CREATE
+      );
     }
-    catch (IOException ignored) {
-    }  // No luck.
+    catch (IOException ex) {
+      // No luck:
+      LOG.info("Can't create VFS corruption marker", ex);
+    }
   }
 
   @TestOnly
@@ -239,7 +248,9 @@ final public class PersistentFSConnection {
       }
       myAttributesStorage.force();
       myContents.force();
-      if (myContentHashesEnumerator != null) myContentHashesEnumerator.force();
+      if (myContentHashesEnumerator != null) {
+        myContentHashesEnumerator.force();
+      }
       writeConnectionState();
       myRecords.force();
     }
@@ -312,9 +323,10 @@ final public class PersistentFSConnection {
     }
   }
 
-  int getAttributeId(@NotNull String attId) throws IOException {
+  int getAttributeId(@NotNull String attId) {
+    return myEnumeratedAttributes.enumerate(attId);
     // do not invoke FSRecords.requestVfsRebuild under read lock to avoid deadlock
-    return myAttributesList.getIdRaw(attId) + FIRST_ATTR_ID_OFFSET;
+    //return myAttributesList.getIdRaw(attId) + FIRST_ATTR_ID_OFFSET;
   }
 
   @Contract("_->fail")

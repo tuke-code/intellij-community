@@ -1,6 +1,4 @@
 // Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
-@file:Suppress("LiftReturnOrAssignment")
-
 package com.intellij.openapi.wm.impl
 
 import com.intellij.ide.RecentProjectsManager
@@ -183,10 +181,14 @@ open class ProjectFrameHelper internal constructor(
     if (SystemInfoRt.isMac) {
       frame.iconImage = null
     }
-    else if (SystemInfoRt.isLinux) {
-      IdeMenuBar.installAppMenuIfNeeded(frame)
-      // in production (not from sources) makes sense only on Linux
-      AppUIUtil.updateWindowIcon(frame)
+    else {
+      if (SystemInfoRt.isLinux) {
+        IdeMenuBar.installAppMenuIfNeeded(frame)
+      }
+
+      // in production (not from sources) it makes sense only on Linux
+      // or on Windows (for products that don't use a native launcher, e.g. MPS)
+      updateAppWindowIcon(frame)
     }
     return frame
   }

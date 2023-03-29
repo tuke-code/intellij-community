@@ -35,9 +35,8 @@ import com.intellij.ui.RetrievableIcon
 import com.intellij.ui.icons.IconReplacer
 import com.intellij.ui.icons.TextHoledIcon
 import com.intellij.ui.icons.TextIcon
-import com.intellij.ui.popup.util.PopupImplUtil
+import com.intellij.ui.icons.toStrokeIcon
 import com.intellij.ui.scale.JBUIScale
-import com.intellij.util.IconUtil
 import com.intellij.util.ui.*
 import java.awt.*
 import java.awt.event.InputEvent
@@ -244,7 +243,7 @@ private class RunWidgetButtonLook(private val isCurrentConfigurationRunning: () 
       return super.getDisabledIcon(icon)
     }
     return PreparedIcon(icon.iconWidth, icon.iconHeight) {
-      IconUtil.toStrokeIcon(icon, JBUI.CurrentTheme.RunWidget.DISABLED_FOREGROUND)
+      toStrokeIcon(icon, JBUI.CurrentTheme.RunWidget.DISABLED_FOREGROUND)
     }
   }
 
@@ -283,7 +282,7 @@ private class RunWidgetButtonLook(private val isCurrentConfigurationRunning: () 
       else {
         JBUI.CurrentTheme.RunWidget.FOREGROUND
       }
-      resultIcon = IconUtil.toStrokeIcon(resultIcon, resultColor)
+      resultIcon = toStrokeIcon(resultIcon, resultColor)
     }
 
     super.paintIcon(g, actionButton, resultIcon, x, y)
@@ -313,7 +312,6 @@ private abstract class TogglePopupAction : ToggleAction {
     val actionGroup = getActionGroup(e) ?: return
     val disposeCallback = { Toggleable.setSelected(presentation, false) }
     val popup = createPopup(actionGroup, e, disposeCallback)
-    PopupImplUtil.setPopupToggleButton(popup, e.inputEvent!!.component)
     popup.setMinimumSize(JBDimension(MINIMAL_POPUP_WIDTH, 0))
     popup.showUnderneathOf(component)
   }

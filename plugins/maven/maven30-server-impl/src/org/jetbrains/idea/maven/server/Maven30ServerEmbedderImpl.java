@@ -472,27 +472,11 @@ public class Maven30ServerEmbedderImpl extends Maven3ServerEmbedder {
       throw new RuntimeException(e);
       // Legacy code.
     }
-    //ArtifactRepositoryLayout layout = getComponent(ArtifactRepositoryLayout.class, "default");
-    //ArtifactRepositoryFactory factory = getComponent(ArtifactRepositoryFactory.class);
-    //
-    //String url = myMavenSettings.getLocalRepository();
-    //if (!url.startsWith("file:")) url = "file://" + url;
-    //
-    //ArtifactRepository localRepository = factory.createArtifactRepository("local", url, layout, null, null);
-    //
-    //boolean snapshotPolicySet = myMavenSettings.isOffline();
-    //if (!snapshotPolicySet && snapshotUpdatePolicy == MavenServerSettings.UpdatePolicy.ALWAYS_UPDATE) {
-    //  factory.setGlobalUpdatePolicy(ArtifactRepositoryPolicy.UPDATE_POLICY_ALWAYS);
-    //}
-    //factory.setGlobalChecksumPolicy(ArtifactRepositoryPolicy.CHECKSUM_POLICY_WARN);
-    //
-    //return localRepository;
   }
 
   @NotNull
   @Override
   public MavenServerPullProgressIndicator customizeAndGetProgressIndicator(@Nullable MavenWorkspaceMap workspaceMap,
-                                                                           boolean failOnUnresolvedDependency,
                                                                            boolean alwaysUpdateSnapshots,
                                                                            @Nullable Properties userProperties,
                                                                            MavenToken token) throws RemoteException {
@@ -504,7 +488,7 @@ public class Maven30ServerEmbedderImpl extends Maven3ServerEmbedder {
       if (artifactFactory instanceof CustomMaven3ArtifactFactory) {
         ((CustomMaven3ArtifactFactory)artifactFactory).customize();
       }
-      ((CustomMaven30ArtifactResolver)getComponent(ArtifactResolver.class)).customize(workspaceMap, failOnUnresolvedDependency);
+      ((CustomMaven30ArtifactResolver)getComponent(ArtifactResolver.class)).customize(workspaceMap, false);
       ((CustomMaven3RepositoryMetadataManager)getComponent(RepositoryMetadataManager.class)).customize(workspaceMap);
 
       myWorkspaceMap = workspaceMap;
@@ -562,8 +546,7 @@ public class Maven30ServerEmbedderImpl extends Maven3ServerEmbedder {
   @Override
   public Collection<MavenServerExecutionResult> resolveProject(@NotNull final Collection<File> files,
                                                                @NotNull Collection<String> activeProfiles,
-                                                               @NotNull Collection<String> inactiveProfiles,
-                                                               boolean forceResolveDependenciesSequentially, MavenToken token)
+                                                               @NotNull Collection<String> inactiveProfiles, MavenToken token)
     throws RemoteException {
     MavenServerUtil.checkToken(token);
     final DependencyTreeResolutionListener listener = new DependencyTreeResolutionListener(myConsoleWrapper);
@@ -1006,20 +989,30 @@ public class Maven30ServerEmbedderImpl extends Maven3ServerEmbedder {
   }
 
   @Override
-  public Collection<MavenArtifact> resolvePlugin(@NotNull final MavenPlugin plugin,
-                                                 @NotNull final List<MavenRemoteRepository> repositories,
-                                                 int nativeMavenProjectId,
-                                                 final boolean transitive, MavenToken token)
+  public List<PluginResolutionResponse> resolvePlugins(@NotNull Collection<PluginResolutionRequest> pluginResolutionRequests,
+                                                       MavenToken token)
     throws RemoteException {
     MavenServerUtil.checkToken(token);
+    List<PluginResolutionResponse> resolvedPlugins = new ArrayList<>();
+    for (PluginResolutionRequest pluginResolutionRequest : pluginResolutionRequests) {
+      MavenId mavenPluginId = pluginResolutionRequest.getMavenPluginId();
+      resolvedPlugins.add(resolvePlugin(mavenPluginId, pluginResolutionRequest.getNativeMavenProjectId()));
+    }
+    return resolvedPlugins;
+  }
+
+  private PluginResolutionResponse resolvePlugin(@NotNull final MavenId pluginId, int nativeMavenProjectId)
+    throws RemoteException {
+    List<MavenArtifact> artifacts = new ArrayList<MavenArtifact>();
+
     try {
       Plugin mavenPlugin = new Plugin();
-      mavenPlugin.setGroupId(plugin.getGroupId());
-      mavenPlugin.setArtifactId(plugin.getArtifactId());
-      mavenPlugin.setVersion(plugin.getVersion());
+      mavenPlugin.setGroupId(pluginId.getGroupId());
+      mavenPlugin.setArtifactId(pluginId.getArtifactId());
+      mavenPlugin.setVersion(pluginId.getVersion());
       MavenProject project = RemoteNativeMavenProjectHolder.findProjectById(nativeMavenProjectId);
 
-      Plugin pluginFromProject = project.getBuild().getPluginsAsMap().get(plugin.getGroupId() + ':' + plugin.getArtifactId());
+      Plugin pluginFromProject = project.getBuild().getPluginsAsMap().get(pluginId.getGroupId() + ':' + pluginId.getArtifactId());
       if (pluginFromProject != null) {
         mavenPlugin.setDependencies(pluginFromProject.getDependencies());
       }
@@ -1041,20 +1034,18 @@ public class Maven30ServerEmbedderImpl extends Maven3ServerEmbedder {
       PreorderNodeListGenerator nlg = new PreorderNodeListGenerator();
       node.accept(nlg);
 
-      List<MavenArtifact> res = new ArrayList<MavenArtifact>();
-
       for (org.sonatype.aether.artifact.Artifact artifact : nlg.getArtifacts(true)) {
-        if (!Objects.equals(artifact.getArtifactId(), plugin.getArtifactId()) ||
-            !Objects.equals(artifact.getGroupId(), plugin.getGroupId())) {
-          res.add(MavenModelConverter.convertArtifact(RepositoryUtils.toArtifact(artifact), getLocalRepositoryFile()));
+        if (!Objects.equals(artifact.getArtifactId(), pluginId.getArtifactId()) ||
+            !Objects.equals(artifact.getGroupId(), pluginId.getGroupId())) {
+          artifacts.add(MavenModelConverter.convertArtifact(RepositoryUtils.toArtifact(artifact), getLocalRepositoryFile()));
         }
       }
 
-      return res;
+      return new PluginResolutionResponse(pluginId, true, artifacts);
     }
     catch (Exception e) {
       Maven3ServerGlobals.getLogger().info(e);
-      return Collections.emptyList();
+      return new PluginResolutionResponse(pluginId, false, artifacts);
     }
   }
 

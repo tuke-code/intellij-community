@@ -24,9 +24,9 @@ import com.intellij.refactoring.JavaRefactoringSettings
 import com.intellij.refactoring.RefactoringBundle
 import com.intellij.refactoring.extractMethod.ExtractMethodDialog
 import com.intellij.refactoring.extractMethod.ExtractMethodHandler
-import com.intellij.refactoring.extractMethod.newImpl.ExtractMethodHelper.addSiblingAfter
 import com.intellij.refactoring.extractMethod.newImpl.ExtractMethodHelper.guessMethodName
 import com.intellij.refactoring.extractMethod.newImpl.ExtractMethodHelper.replacePsiRange
+import com.intellij.refactoring.extractMethod.newImpl.ExtractMethodPipeline.addMethodInBestPlace
 import com.intellij.refactoring.extractMethod.newImpl.ExtractMethodPipeline.findAllOptionsToExtract
 import com.intellij.refactoring.extractMethod.newImpl.ExtractMethodPipeline.selectOptionWithTargetClass
 import com.intellij.refactoring.extractMethod.newImpl.ExtractMethodPipeline.withFilteredAnnotations
@@ -111,9 +111,6 @@ class MethodExtractor {
     }
   }
 
-  val ExtractOptions.targetClass: PsiClass
-    get() = anchor.containingClass ?: throw IllegalStateException()
-
   private fun suggestSafeMethodNames(options: ExtractOptions): List<String> {
     val unsafeNames = guessMethodName(options)
     val safeNames = unsafeNames.filterNot { name -> hasConflicts(options.copy(methodName = name)) }
@@ -127,7 +124,7 @@ class MethodExtractor {
   private fun hasConflicts(options: ExtractOptions): Boolean {
     val (_, method) = prepareRefactoringElements(options)
     val conflicts = MultiMap<PsiElement, String>()
-    ConflictsUtil.checkMethodConflicts(options.anchor.containingClass, null, method, conflicts)
+    ConflictsUtil.checkMethodConflicts(options.targetClass, null, method, conflicts)
     return ! conflicts.isEmpty
   }
 
@@ -152,17 +149,13 @@ class MethodExtractor {
     CommandProcessor.getInstance().executeCommand(project, command, ExtractMethodHandler.getRefactoringName(), null)
   }
 
-  fun replaceElements(sourceElements: List<PsiElement>, callElements: List<PsiElement>, anchor: PsiMember, method: PsiMethod): ExtractedElements {
-    return WriteAction.compute<ExtractedElements, Throwable> {
-      val addedMethod = anchor.addSiblingAfter(method) as PsiMethod
-      val replacedCallElements = replacePsiRange(sourceElements, callElements)
-      ExtractedElements(replacedCallElements, addedMethod)
-    }
-  }
-
   fun extractMethod(extractOptions: ExtractOptions): ExtractedElements {
-    val elementsToExtract = prepareRefactoringElements(extractOptions)
-    return replaceElements(extractOptions.elements, elementsToExtract.callElements, extractOptions.anchor, elementsToExtract.method)
+    val preparedElements = prepareRefactoringElements(extractOptions)
+    return WriteAction.compute<ExtractedElements, Throwable> {
+      val method = addMethodInBestPlace(extractOptions.targetClass, extractOptions.elements.first(), preparedElements.method)
+      val callElements = replacePsiRange(extractOptions.elements, preparedElements.callElements)
+      ExtractedElements(callElements, method)
+    }
   }
 
   fun doTestExtract(
@@ -183,8 +176,8 @@ class MethodExtractor {
     if (elements.isEmpty()) throw ExtractException("Nothing to extract", file)
     val analyzer = CodeFragmentAnalyzer(elements)
     val allOptionsToExtract = findAllOptionsToExtract(elements)
-    var options = allOptionsToExtract.takeIf { targetClass != null }?.find { option -> option.anchor.containingClass == targetClass }
-                  ?: allOptionsToExtract.find { option -> option.anchor.containingClass !is PsiAnonymousClass }
+    var options = allOptionsToExtract.takeIf { targetClass != null }?.find { option -> option.targetClass == targetClass }
+                  ?: allOptionsToExtract.find { option -> option.targetClass !is PsiAnonymousClass }
                   ?: allOptionsToExtract.first()
     options = options.copy(methodName = "newMethod")
     if (isConstructor != options.isConstructor){
@@ -207,12 +200,6 @@ class MethodExtractor {
         inputParameters = options.inputParameters.filterIndexed { index, _ -> index !in disabledParameters }
       )
     }
-    if (visibility != null) {
-      options = options.copy(visibility = visibility)
-    }
-    if (options.anchor.containingClass?.isInterface == true) {
-      options = ExtractMethodPipeline.adjustModifiersForInterface(options.copy(visibility = PsiModifier.PRIVATE))
-    }
     if (doRefactor) {
       extractMethod(options)
     }
@@ -233,7 +220,7 @@ class MethodExtractor {
       )
     val method = SignatureBuilder(dependencies.project)
       .build(
-        dependencies.anchor.context,
+        dependencies.targetClass,
         dependencies.elements,
         dependencies.isStatic,
         dependencies.visibility,
@@ -242,8 +229,7 @@ class MethodExtractor {
         dependencies.methodName,
         dependencies.inputParameters,
         dependencies.dataOutput.annotations,
-        dependencies.thrownExceptions,
-        dependencies.anchor
+        dependencies.thrownExceptions
       )
     method.body?.replace(codeBlock)
 

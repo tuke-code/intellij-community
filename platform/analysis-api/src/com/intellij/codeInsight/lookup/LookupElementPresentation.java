@@ -26,7 +26,8 @@ public class LookupElementPresentation {
   private boolean myItemTextBold;
   private boolean myItemTextUnderlined;
   private boolean myItemTextItalic;
-  @Nullable private List<DecoratedTextRange> myItemDecorations;
+  @Nullable private List<DecoratedTextRange> myItemNameDecorations;
+  @Nullable private List<DecoratedTextRange> myItemTailDecorations;
   private boolean myTypeGrayed;
   @Nullable private List<TextFragment> myTail;
   private volatile boolean myFrozen;
@@ -57,15 +58,27 @@ public class LookupElementPresentation {
   }
 
   /**
-   * Adds a decoration to a lookup item at a specified text range.
+   * Adds a decoration to a lookup item at a specified text range. It will be applied to the name component
    */
   @ApiStatus.Internal
   public void decorateItemTextRange(@NotNull TextRange textRange, @NotNull LookupItemDecoration decoration) {
     ensureMutable();
-    if (myItemDecorations == null) {
-      myItemDecorations = new SmartList<>();
+    if (myItemNameDecorations == null) {
+      myItemNameDecorations = new SmartList<>();
     }
-    myItemDecorations.add(new DecoratedTextRange(textRange, decoration));
+    myItemNameDecorations.add(new DecoratedTextRange(textRange, decoration));
+  }
+
+  /**
+   * Adds a decoration to a lookup item at a specified text range. It will be applied to the tail component
+   */
+  @ApiStatus.Internal
+  public void decorateTailItemTextRange(@NotNull TextRange textRange, @NotNull LookupItemDecoration decoration) {
+    ensureMutable();
+    if (myItemTailDecorations == null) {
+      myItemTailDecorations = new SmartList<>();
+    }
+    myItemTailDecorations.add(new DecoratedTextRange(textRange, decoration));
   }
 
   public void setTailText(@Nullable String text) {
@@ -78,15 +91,11 @@ public class LookupElementPresentation {
   }
 
   public void appendTailText(@NotNull String text, boolean grayed) {
-    appendTailText(new TextFragment(text, grayed, false, false, null));
-  }
-
-  public void appendTailText(@NotNull String text, boolean grayed, boolean highlight) {
-    appendTailText(new TextFragment(text, grayed, false, highlight, null));
+    appendTailText(new TextFragment(text, grayed, false, null));
   }
 
   public void appendTailTextItalic(@NotNull String text, boolean grayed) {
-    appendTailText(new TextFragment(text, grayed, true, false, null));
+    appendTailText(new TextFragment(text, grayed, true, null));
   }
 
   private void appendTailText(@NotNull TextFragment fragment) {
@@ -102,14 +111,14 @@ public class LookupElementPresentation {
   public void setTailText(@Nullable String text, boolean grayed) {
     clearTail();
     if (text != null) {
-      appendTailText(new TextFragment(text, grayed, false, false, null));
+      appendTailText(new TextFragment(text, grayed, false, null));
     }
   }
 
   public void setTailText(@Nullable String text, @Nullable Color foreground) {
     clearTail();
     if (text != null) {
-      appendTailText(new TextFragment(text, false, false, false, foreground));
+      appendTailText(new TextFragment(text, false, false, foreground));
     }
   }
 
@@ -149,8 +158,17 @@ public class LookupElementPresentation {
 
   @ApiStatus.Internal
   @NotNull
-  public List<DecoratedTextRange> getItemDecorations() {
-    return myItemDecorations == null ? Collections.emptyList() : Collections.unmodifiableList(myItemDecorations);
+  public List<DecoratedTextRange> getItemNameDecorations() {
+    return myItemNameDecorations == null ? Collections.emptyList() : Collections.unmodifiableList(myItemNameDecorations);
+  }
+
+  /**
+   * @return decorators for tail
+   */
+  @ApiStatus.Internal
+  @NotNull
+  public List<DecoratedTextRange> getItemTailDecorations() {
+    return myItemTailDecorations == null ? Collections.emptyList() : Collections.unmodifiableList(myItemTailDecorations);
   }
 
   @NotNull
@@ -204,8 +222,11 @@ public class LookupElementPresentation {
     myTypeIcon = presentation.myTypeIcon;
     myItemText = presentation.myItemText;
 
-    List<DecoratedTextRange> thatDecoration = presentation.myItemDecorations;
-    myItemDecorations = thatDecoration == null ? null : new SmartList<>(thatDecoration);
+    List<DecoratedTextRange> thatNameDecoration = presentation.myItemNameDecorations;
+    myItemNameDecorations = thatNameDecoration == null ? null : new SmartList<>(thatNameDecoration);
+
+    List<DecoratedTextRange> thatTailDecoration = presentation.myItemTailDecorations;
+    myItemTailDecorations = thatTailDecoration == null ? null : new SmartList<>(thatTailDecoration);
 
     List<TextFragment> thatTail = presentation.myTail;
     myTail = thatTail == null ? null : new SmartList<>(thatTail);
@@ -269,16 +290,13 @@ public class LookupElementPresentation {
     public final String text;
     private final boolean myGrayed;
     private final boolean myItalic;
-
-    private final boolean myHighlighted;
     @Nullable private final Color myFgColor;
 
-    private TextFragment(String text, boolean grayed, boolean italic, boolean highlight, @Nullable Color fgColor) {
+    private TextFragment(String text, boolean grayed, boolean italic, @Nullable Color fgColor) {
       this.text = text;
       myGrayed = grayed;
       myItalic = italic;
       myFgColor = fgColor;
-      myHighlighted = highlight;
     }
 
     @Override
@@ -297,10 +315,6 @@ public class LookupElementPresentation {
 
     public boolean isItalic() {
       return myItalic;
-    }
-
-    public boolean isHighlighted() {
-      return myHighlighted;
     }
 
     @Nullable
@@ -333,8 +347,11 @@ public class LookupElementPresentation {
     /**
      * Indicates that the corresponding part of the item text will not be compilable right upon the insertion.
      */
-    ERROR
-    // Additional decorations may be added in the future
+    ERROR,
+    /**
+     * Indicates that some parts of the specified range will be highlighted according to an item pattern.
+     */
+    HIGHLIGHT_MATCHED
   }
 
   /**

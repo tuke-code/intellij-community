@@ -3,28 +3,29 @@
 
 package org.jetbrains.intellij.build.images
 
+import com.dynatrace.hash4j.hashing.Hashing
 import com.intellij.openapi.util.text.StringUtil
+import com.intellij.ui.icons.loadPng
 import com.intellij.ui.svg.getSvgDocumentSize
 import com.intellij.util.LineSeparator
 import com.intellij.util.containers.CollectionFactory
 import com.intellij.util.diff.Diff
 import com.intellij.util.io.directoryStreamIfExists
-import com.intellij.util.io.systemIndependentPath
-import com.intellij.util.loadPng
 import com.intellij.util.xml.dom.readXmlAsModel
+import it.unimi.dsi.fastutil.ints.IntOpenHashSet
 import org.jetbrains.jps.model.JpsSimpleElement
 import org.jetbrains.jps.model.java.JavaResourceRootType
 import org.jetbrains.jps.model.java.JavaSourceRootProperties
 import org.jetbrains.jps.model.java.JavaSourceRootType
 import org.jetbrains.jps.model.module.JpsModule
 import org.jetbrains.jps.util.JpsPathUtil
-import org.jetbrains.xxh3.Xxh3
 import java.io.File
 import java.nio.file.*
 import java.util.*
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicInteger
 import javax.xml.stream.XMLStreamException
+import kotlin.io.path.invariantSeparatorsPathString
 
 internal data class ModifiedClass(@JvmField val module: JpsModule,
                                   @JvmField val file: Path,
@@ -354,6 +355,7 @@ internal open class IconsClassGenerator(private val projectHome: Path,
     sortedKeys.sortWith(Comparator { o1, o2 -> getWeight(o1) - getWeight(o2) })
 
     var innerClassWasBefore = false
+    val hasher = IconHasher(sortedKeys.size)
     for (key in sortedKeys) {
       val group = nodeMap.get(key)
       if (group != null) {
@@ -386,14 +388,14 @@ internal open class IconsClassGenerator(private val projectHome: Path,
           innerClassWasBefore = false
           result.append('\n')
         }
-        appendImage(image, result, level, customLoad)
+        appendImage(image = image, result = result, level = level, customLoad = customLoad, hasher = hasher)
       }
     }
   }
 
   protected open fun isInlineClass(name: CharSequence) = false
 
-  private fun appendImage(image: ImageInfo, result: StringBuilder, level: Int, customLoad: Boolean) {
+  private fun appendImage(image: ImageInfo, result: StringBuilder, level: Int, customLoad: Boolean, hasher: IconHasher) {
     val file = image.basicFile ?: return
     if (!image.phantom && !isIcon(file)) {
       return
@@ -466,11 +468,11 @@ internal open class IconsClassGenerator(private val projectHome: Path,
         // don't mask any exception for svg file
         val data = loadAndNormalizeSvgFile(imageFile).toByteArray()
         val size = getSvgDocumentSize(data = data)
-        key = getImageKey(data, file.fileName.toString())
+        key = hasher.hash(data, file.fileName.toString())
         javaDoc = "/** ${size.width.toInt()}x${size.height.toInt()} */ "
       }
       else {
-        val loadedImage = Files.newInputStream(file).use { loadPng(it, scale = 1f) }
+        val loadedImage = Files.newInputStream(file).use { loadPng(it) }
         key = 0
         javaDoc = "/** ${loadedImage.width}x${loadedImage.height} */ "
       }
@@ -485,7 +487,7 @@ internal open class IconsClassGenerator(private val projectHome: Path,
     }
 
     val method = if (customLoad) "load" else "$ICON_MANAGER_CODE.getIcon"
-    val relativePath = rootPrefix + rootDir.relativize(imageFile).systemIndependentPath
+    val relativePath = rootPrefix + rootDir.relativize(imageFile).invariantSeparatorsPathString
     assert(relativePath.startsWith("/"))
     append(result, "${javaDoc}public static final @NotNull Icon $iconName = " +
                    "$method(\"${relativePath.removePrefix("/")}\", $key, ${image.getFlags()});", level)
@@ -657,12 +659,6 @@ private fun capitalize(name: String): String {
 
 private const val ICON_MANAGER_CODE = "IconManager.getInstance()"
 
-// grid-layout.svg duplicates grid-view.svg, but grid-layout_dark.svg differs from grid-view_dark.svg
-// so, add filename to image id to support such a scenario
-internal fun getImageKey(fileData: ByteArray, fileName: String): Int {
-  return Xxh3.hashLongs(longArrayOf(Xxh3.hash(fileData), Xxh3.hash(fileName))).toInt()
-}
-
 // remove line separators to unify line separators (\n vs \r\n), trim lines
 // normalization is required because a cache key is based on content
 internal fun loadAndNormalizeSvgFile(svgFile: Path): String {
@@ -718,4 +714,17 @@ private fun getPluginPackageIfPossible(module: JpsModule): String? {
     }
   }
   return null
+}
+
+private class IconHasher(expectedSize: Int) {
+  private val hashStream = Hashing.komihash4_3().hashStream()
+  private val uniqueGuard = IntOpenHashSet(expectedSize)
+
+  // grid-layout.svg duplicates grid-view.svg, but grid-layout_dark.svg differs from grid-view_dark.svg
+  // so, add filename to image id to support such a scenario
+  fun hash(data: ByteArray, fileName: String): Int {
+    val hash = hashStream.reset().putByteArray(data).putString(fileName).asInt
+    check(uniqueGuard.add(hash))
+    return hash
+  }
 }

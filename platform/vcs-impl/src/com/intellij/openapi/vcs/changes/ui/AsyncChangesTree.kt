@@ -10,9 +10,11 @@ import com.intellij.openapi.progress.coroutineToIndicator
 import com.intellij.openapi.project.Project
 import com.intellij.util.concurrency.annotations.RequiresBackgroundThread
 import com.intellij.util.concurrency.annotations.RequiresEdt
+import com.intellij.util.ui.JBUI
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
+import java.awt.Dimension
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 import java.util.function.Function
@@ -59,6 +61,13 @@ abstract class AsyncChangesTree : ChangesTree {
   }
 
 
+  override fun getPreferredScrollableViewportSize(): Dimension {
+    val size = super.getPreferredSize()
+    size.width = size.width.coerceAtLeast(JBUI.scale(350))
+    size.height = size.height.coerceAtLeast(JBUI.scale(400))
+    return size
+  }
+
   override fun shouldShowBusyIconIfNeeded(): Boolean = true
 
   override fun rebuildTree() {
@@ -70,47 +79,41 @@ abstract class AsyncChangesTree : ChangesTree {
   }
 
 
-  fun requestRefresh(): RequestId {
+  fun requestRefresh() {
     return requestRefreshImpl(treeStateStrategy = null,
                               onRefreshed = null)
   }
 
-  fun requestRefresh(treeStateStrategy: TreeStateStrategy<*>): RequestId {
+  fun requestRefresh(treeStateStrategy: TreeStateStrategy<*>) {
     return requestRefreshImpl(treeStateStrategy = treeStateStrategy,
                               onRefreshed = null)
   }
 
-  fun requestRefresh(onRefreshed: Runnable?): RequestId {
+  fun requestRefresh(onRefreshed: Runnable?) {
     return requestRefreshImpl(treeStateStrategy = null,
                               onRefreshed = onRefreshed)
   }
 
-  fun requestRefresh(treeStateStrategy: TreeStateStrategy<*>, onRefreshed: Runnable?): RequestId {
+  fun requestRefresh(treeStateStrategy: TreeStateStrategy<*>, onRefreshed: Runnable?) {
     return requestRefreshImpl(treeStateStrategy = treeStateStrategy,
                               onRefreshed = onRefreshed)
   }
 
   private fun requestRefreshImpl(treeStateStrategy: TreeStateStrategy<*>?,
-                                 onRefreshed: Runnable?): RequestId {
+                                 onRefreshed: Runnable?) {
     val refreshGrouping = grouping
     val requestId = lastRequestId.incrementAndGet()
     scope.launch {
       _requests.emit(Request(requestId, refreshGrouping, treeStateStrategy))
     }
 
-    val id = RequestIdImpl(requestId)
     if (onRefreshed != null) {
-      invokeAfterRefresh(id, onRefreshed)
+      invokeAfterRefresh(requestId, onRefreshed)
     }
-    return id
   }
 
   fun invokeAfterRefresh(callback: Runnable) {
     invokeAfterRefresh(lastRequestId.get(), callback)
-  }
-
-  fun invokeAfterRefresh(requestId: RequestId, callback: Runnable) {
-    invokeAfterRefresh((requestId as RequestIdImpl).requestId, callback)
   }
 
   /**
@@ -224,9 +227,6 @@ abstract class AsyncChangesTree : ChangesTree {
     val requestId: Int,
     val task: java.lang.Runnable
   )
-
-  interface RequestId
-  private class RequestIdImpl(val requestId: Int) : RequestId
 }
 
 interface AsyncChangesTreeModel {

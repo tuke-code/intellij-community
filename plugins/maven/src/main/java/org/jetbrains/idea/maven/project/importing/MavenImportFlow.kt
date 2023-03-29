@@ -26,7 +26,6 @@ import org.jetbrains.idea.maven.importing.MavenImportUtil
 import org.jetbrains.idea.maven.importing.MavenProjectImporter
 import org.jetbrains.idea.maven.model.MavenArtifact
 import org.jetbrains.idea.maven.model.MavenExplicitProfiles
-import org.jetbrains.idea.maven.model.MavenPlugin
 import org.jetbrains.idea.maven.project.*
 import org.jetbrains.idea.maven.project.actions.LookForNestedToggleAction
 import org.jetbrains.idea.maven.server.MavenWrapperDownloader
@@ -216,14 +215,15 @@ class MavenImportFlow {
     val consoleToBeRemoved = BTWMavenConsole(context.project, context.initialContext.generalSettings.outputLevel,
                                              context.initialContext.generalSettings.isPrintErrorStackTraces)
 
-    val unresolvedPlugins = Collections.synchronizedSet(LinkedHashSet<MavenPlugin>())
+    resolver.resolvePlugins(
+      context.nativeProjectHolder.map { Pair.create(it.first, it.second) },
+      embeddersManager,
+      consoleToBeRemoved,
+      context.initialContext.indicator,
+      false,
+      projectManager.forceUpdateSnapshots)
 
-    context.nativeProjectHolder.foreachParallel {
-      unresolvedPlugins.addAll(
-        resolver.resolvePlugins(it.first, it.second, embeddersManager, consoleToBeRemoved, context.initialContext.indicator, false,
-                                projectManager.forceUpdateSnapshots))
-    }
-    return MavenPluginResolvedContext(context.project, unresolvedPlugins, context)
+    return MavenPluginResolvedContext(context.project, context)
   }
 
   fun downloadArtifacts(context: MavenResolvedContext, sources: Boolean, javadocs: Boolean): MavenArtifactDownloader.DownloadResult {

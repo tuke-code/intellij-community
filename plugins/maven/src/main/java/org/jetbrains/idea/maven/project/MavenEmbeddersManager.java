@@ -3,7 +3,7 @@ package org.jetbrains.idea.maven.project;
 
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Key;
-import com.intellij.openapi.util.Trinity;
+import com.intellij.openapi.util.Pair;
 import com.intellij.util.Function;
 import com.intellij.util.containers.ContainerUtil;
 import org.jetbrains.annotations.NotNull;
@@ -22,7 +22,6 @@ public class MavenEmbeddersManager {
   public static final Key FOR_PLUGINS_RESOLVE = Key.create(MavenEmbeddersManager.class + ".FOR_PLUGINS_RESOLVE");
   public static final Key FOR_FOLDERS_RESOLVE = Key.create(MavenEmbeddersManager.class + ".FOR_FOLDERS_RESOLVE");
   public static final Key FOR_POST_PROCESSING = Key.create(MavenEmbeddersManager.class + ".FOR_POST_PROCESSING");
-  public static final Key FOR_GET_VERSIONS = Key.create(MavenEmbeddersManager.class + ".FOR_GET_VERSIONS");
   public static final Key FOR_MODEL_READ = Key.create(MavenEmbeddersManager.class + ".FOR_MODEL_READ");
 
   // will always regardless to 'work offline' setting
@@ -30,7 +29,7 @@ public class MavenEmbeddersManager {
 
   private final Project myProject;
 
-  private final Map<Trinity<Key, String, String>, MavenEmbedderWrapper> myPool = ContainerUtil.createSoftValueMap();
+  private final Map<Pair<Key, String>, MavenEmbedderWrapper> myPool = ContainerUtil.createSoftValueMap();
   private final Set<MavenEmbedderWrapper> myEmbeddersInUse = new HashSet<>();
 
   public MavenEmbeddersManager(Project project) {
@@ -44,26 +43,37 @@ public class MavenEmbeddersManager {
   @NotNull
   public synchronized MavenEmbedderWrapper getEmbedder(@NotNull MavenProject mavenProject, Key kind) {
     String baseDir = MavenUtil.getBaseDir(mavenProject.getDirectoryFile()).toString();
-    return getEmbedder(kind, baseDir, baseDir);
+    return getEmbedder(kind, baseDir);
   }
+
   @NotNull
-  public synchronized MavenEmbedderWrapper getEmbedder(Key kind, String workingDirectory,  @NotNull String multiModuleProjectDirectory) {
-    Trinity<Key, String, String> key = Trinity.create(kind, workingDirectory, multiModuleProjectDirectory);
+  public synchronized MavenEmbedderWrapper getEmbedder(Key kind, @NotNull String multiModuleProjectDirectory) {
+    Pair<Key, String> key = Pair.create(kind, multiModuleProjectDirectory);
     MavenEmbedderWrapper result = myPool.get(key);
     boolean alwaysOnline = kind == FOR_DOWNLOAD;
 
     if (result == null) {
-      result = MavenServerManager.getInstance().createEmbedder(myProject, alwaysOnline, workingDirectory, multiModuleProjectDirectory);
+      result = MavenServerManager.getInstance().createEmbedder(myProject, alwaysOnline, multiModuleProjectDirectory);
       myPool.put(key, result);
     }
 
     if (myEmbeddersInUse.contains(result)) {
       MavenLog.LOG.warn("embedder " + key + " is already used");
-      return MavenServerManager.getInstance().createEmbedder(myProject, alwaysOnline, workingDirectory, multiModuleProjectDirectory);
+      return MavenServerManager.getInstance().createEmbedder(myProject, alwaysOnline, multiModuleProjectDirectory);
     }
 
     myEmbeddersInUse.add(result);
     return result;
+  }
+
+  /**
+   * @deprecated use {@link MavenEmbeddersManager#getEmbedder(Key, String)} instead
+   */
+  @Deprecated
+  @NotNull
+  // used in third-party plugins
+  public synchronized MavenEmbedderWrapper getEmbedder(Key kind, String ignoredWorkingDirectory, @NotNull String multiModuleProjectDirectory) {
+    return getEmbedder(kind, multiModuleProjectDirectory);
   }
 
   public synchronized void release(@NotNull MavenEmbedderWrapper embedder) {
@@ -98,7 +108,7 @@ public class MavenEmbeddersManager {
   }
 
   private void forEachPooled(boolean includeInUse, Function<MavenEmbedderWrapper, ?> func) {
-    for (Trinity<Key, String, String> each : myPool.keySet()) {
+    for (var each : myPool.keySet()) {
       MavenEmbedderWrapper embedder = myPool.get(each);
       if (embedder == null) continue; // collected
       if (!includeInUse && myEmbeddersInUse.contains(embedder)) continue;

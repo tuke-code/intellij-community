@@ -14,7 +14,6 @@ import java.util.*
 
 abstract class DummyEmbedder(val myProject: Project) : MavenServerEmbedder {
   override fun customizeAndGetProgressIndicator(workspaceMap: MavenWorkspaceMap?,
-                                                failOnUnresolvedDependency: Boolean,
                                                 alwaysUpdateSnapshots: Boolean,
                                                 userProperties: Properties?,
                                                 token: MavenToken?): MavenServerPullProgressIndicator {
@@ -36,7 +35,6 @@ abstract class DummyEmbedder(val myProject: Project) : MavenServerEmbedder {
   abstract override fun resolveProject(files: Collection<File>,
                                        activeProfiles: Collection<String>,
                                        inactiveProfiles: Collection<String>,
-                                       forceResolveDependenciesSequentially: Boolean,
                                        token: MavenToken?): Collection<MavenServerExecutionResult>
 
   override fun evaluateEffectivePom(file: File,
@@ -63,11 +61,7 @@ abstract class DummyEmbedder(val myProject: Project) : MavenServerEmbedder {
     return MavenArtifactResolveResult(emptyList(), null)
   }
 
-  override fun resolvePlugin(plugin: MavenPlugin,
-                             repositories: List<MavenRemoteRepository>,
-                             nativeMavenProjectId: Int,
-                             transitive: Boolean,
-                             token: MavenToken?): Collection<MavenArtifact> {
+  override fun resolvePlugins(pluginResolutionRequests: Collection<PluginResolutionRequest>, token: MavenToken?): List<PluginResolutionResponse> {
     return emptyList()
   }
 
@@ -120,7 +114,6 @@ class UntrustedDummyEmbedder(myProject: Project) : DummyEmbedder(myProject) {
   override fun resolveProject(files: Collection<File>,
                               activeProfiles: Collection<String>,
                               inactiveProfiles: Collection<String>,
-                              forceResolveDependenciesSequentially: Boolean,
                               token: MavenToken?): Collection<MavenServerExecutionResult> {
     MavenProjectsManager.getInstance(myProject).syncConsole.addBuildIssue(
       object : BuildIssue {
@@ -146,7 +139,6 @@ class MisconfiguredPlexusDummyEmbedder(myProject: Project,
   override fun resolveProject(files: Collection<File>,
                               activeProfiles: Collection<String>,
                               inactiveProfiles: Collection<String>,
-                              forceResolveDependenciesSequentially: Boolean,
                               token: MavenToken?): Collection<MavenServerExecutionResult> {
 
     MavenProjectsManager.getInstance(myProject).syncConsole.addBuildIssue(

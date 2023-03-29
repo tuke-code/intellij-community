@@ -5,7 +5,6 @@ package com.intellij.ui.icons
 
 import com.intellij.AbstractBundle
 import com.intellij.DynamicBundle
-import com.intellij.diagnostic.StartUpMeasurer
 import com.intellij.icons.AllIcons
 import com.intellij.ide.IconLayerProvider
 import com.intellij.openapi.diagnostic.logger
@@ -25,9 +24,7 @@ import org.jetbrains.annotations.ApiStatus
 import java.awt.Color
 import java.awt.Graphics2D
 import java.awt.Paint
-import java.lang.ref.WeakReference
 import java.util.concurrent.CopyOnWriteArrayList
-import java.util.function.Function
 import java.util.function.Supplier
 import javax.swing.Icon
 
@@ -116,8 +113,8 @@ class CoreIconManager : IconManager, CoreAwareIconManager {
 
   override fun createEmptyIcon(icon: Icon): Icon = EmptyIcon.create(icon)
 
-  override fun <T> createDeferredIcon(base: Icon?, param: T, iconProducer: Function<in T, out Icon>): Icon {
-    return IconDeferrer.getInstance().defer(base, param, iconProducer)
+  override fun <T> createDeferredIcon(base: Icon?, param: T, iconProducer: (T) -> Icon?): Icon {
+    return IconDeferrer.getInstance().defer(base = base, param = param, evaluator = iconProducer)
   }
 
   override fun registerIconLayer(flagMask: Int, icon: Icon) {
@@ -202,33 +199,6 @@ private class IconDescriptionLoader(private val path: String) : Supplier<String?
 
 private val iconLayers = CopyOnWriteArrayList<IconLayer>()
 private const val FLAGS_LOCKED = 0x800
-
-// a reflective path is not supported, a result is not cached
-private fun createRasterizedImageDataLoader(path: String, classLoader: ClassLoader, cacheKey: Int, imageFlags: Int): ImageDataLoader {
-  val startTime = StartUpMeasurer.getCurrentTimeIfEnabled()
-  val patchedPath = CachedImageIcon.patchPath(originalPath = path, classLoader = classLoader)
-  val classLoaderWeakRef = WeakReference(classLoader)
-  val resolver = if (patchedPath == null) {
-    RasterizedImageDataLoader(path = path,
-                              classLoaderRef = classLoaderWeakRef,
-                              originalPath = path,
-                              originalClassLoaderRef = classLoaderWeakRef,
-                              cacheKey = cacheKey,
-                              flags = imageFlags)
-  }
-  else {
-    // not safe for now to decide should patchPath return a path with leading slash or not
-    createPatched(originalPath = path,
-                  originalClassLoaderRef = classLoaderWeakRef,
-                  patched = patchedPath,
-                  cacheKey = cacheKey,
-                  imageFlags = imageFlags)
-  }
-  if (startTime != -1L) {
-    IconLoadMeasurer.findIcon.end(startTime)
-  }
-  return resolver
-}
 
 private fun findIconDescription(path: String): String? {
   val pathWithoutExt = path.removeSuffix(".svg")

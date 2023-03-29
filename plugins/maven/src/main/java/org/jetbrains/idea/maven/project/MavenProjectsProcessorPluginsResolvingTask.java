@@ -16,27 +16,27 @@
 package org.jetbrains.idea.maven.project;
 
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.util.Pair;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.idea.maven.server.NativeMavenProjectHolder;
 import org.jetbrains.idea.maven.utils.MavenProcessCanceledException;
 import org.jetbrains.idea.maven.utils.MavenProgressIndicator;
 
-public class MavenProjectsProcessorPluginsResolvingTask extends MavenProjectsProcessorBasicTask {
-  private final NativeMavenProjectHolder myNativeMavenProject;
-  private final boolean forceUpdateSnapshots;
+import java.util.Collection;
 
-  public MavenProjectsProcessorPluginsResolvingTask(MavenProject project,
-                                                    NativeMavenProjectHolder nativeMavenProject,
-                                                    MavenProjectsTree tree,
-                                                    MavenProjectResolver resolver,
-                                                    boolean forceUpdateSnapshots) {
-    super(project, tree, resolver);
-    myNativeMavenProject = nativeMavenProject;
-    this.forceUpdateSnapshots = forceUpdateSnapshots;
+public class MavenProjectsProcessorPluginsResolvingTask implements MavenProjectsProcessorTask {
+  private final @NotNull Collection<Pair<MavenProject, NativeMavenProjectHolder>> myMavenProjects;
+  private final @NotNull MavenProjectResolver myResolver;
+
+  public MavenProjectsProcessorPluginsResolvingTask(@NotNull Collection<Pair<MavenProject, NativeMavenProjectHolder>> projects,
+                                                    @NotNull MavenProjectResolver resolver) {
+    myMavenProjects = projects;
+    myResolver = resolver;
   }
 
   @Override
   public void perform(Project project, MavenEmbeddersManager embeddersManager, MavenConsole console, MavenProgressIndicator indicator)
     throws MavenProcessCanceledException {
-    myResolver.resolvePlugins(myMavenProject, myNativeMavenProject, embeddersManager, console, indicator, true, forceUpdateSnapshots);
+    myResolver.resolvePlugins(myMavenProjects, embeddersManager, console, indicator, true, false);
   }
 }

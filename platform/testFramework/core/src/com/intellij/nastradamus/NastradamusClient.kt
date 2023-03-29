@@ -59,8 +59,9 @@ class NastradamusClient(
     return TestResultRequestEntity(buildInfo = getBuildInfo(), testRunResults = testResultEntities)
   }
 
-  fun sendTestRunResults(testResultRequestEntity: TestResultRequestEntity) {
+  fun sendTestRunResults(testResultRequestEntity: TestResultRequestEntity, wasNastradamusDataUsed: Boolean) {
     val uri = URIBuilder(baseUrl.resolve("/result/").normalize())
+      .addParameter("was_nastradamus_data_used", wasNastradamusDataUsed.toString())
       .build()
 
     val stringJson = jacksonMapper.writeValueAsString(testResultRequestEntity)
@@ -99,9 +100,13 @@ class NastradamusClient(
   /**
    * Will return tests for this particular bucket
    */
-  fun sendSortingRequest(sortRequestEntity: SortRequestEntity, bucketsCount: Int, currentBucketIndex: Int): List<TestCaseEntity> {
+  fun sendSortingRequest(sortRequestEntity: SortRequestEntity,
+                         bucketsCount: Int,
+                         currentBucketIndex: Int,
+                         wasNastradamusDataUsed: Boolean): List<TestCaseEntity> {
     val uri = URIBuilder(baseUrl.resolve("/sort/").normalize())
       .addParameter("buckets", bucketsCount.toString())
+      .addParameter("was_nastradamus_data_used", wasNastradamusDataUsed.toString())
       .build()
 
     val stringJson = jacksonMapper.writeValueAsString(sortRequestEntity)
@@ -219,7 +224,8 @@ class NastradamusClient(
           val sortedCases = sendSortingRequest(
             sortRequestEntity = SortRequestEntity(buildInfo = getBuildInfo(), changes = changesets, tests = cases),
             bucketsCount = TestCaseLoader.TEST_RUNNERS_COUNT,
-            currentBucketIndex = TestCaseLoader.TEST_RUNNER_INDEX
+            currentBucketIndex = TestCaseLoader.TEST_RUNNER_INDEX,
+            wasNastradamusDataUsed = TestCaseLoader.IS_NASTRADAMUS_TEST_DISTRIBUTOR_ENABLED
           )
 
           var rank = 1

@@ -8,10 +8,7 @@ import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.progress.blockingContext
 import com.intellij.openapi.progress.coroutineToIndicator
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.vcs.AbstractVcs
-import com.intellij.openapi.vcs.CheckinProjectPanel
-import com.intellij.openapi.vcs.FilePath
-import com.intellij.openapi.vcs.VcsBundle
+import com.intellij.openapi.vcs.*
 import com.intellij.openapi.vcs.VcsDataKeys.COMMIT_WORKFLOW_HANDLER
 import com.intellij.openapi.vcs.changes.*
 import com.intellij.openapi.vcs.changes.ChangesUtil.getFilePath
@@ -37,7 +34,7 @@ private val LOG = logger<AbstractCommitWorkflowHandler<*, *>>()
 
 // Need to support '_' for mnemonics as it is supported in DialogWrapper internally
 @Nls
-private fun String.fixUnderscoreMnemonic() = replace('_', '&')
+fun String.fixUnderscoreMnemonic() = replace('_', '&')
 
 internal fun CommitWorkflowUi.getDisplayedPaths(): List<FilePath> =
   getDisplayedChanges().map { getFilePath(it) } + getDisplayedUnversionedFiles()
@@ -70,7 +67,10 @@ abstract class AbstractCommitWorkflowHandler<W : AbstractCommitWorkflow, U : Com
   open fun isCommitEmpty(): Boolean = getIncludedChanges().isEmpty() && getIncludedUnversionedFiles().isEmpty()
 
   fun getCommitMessage(): String = ui.commitMessageUi.text
-  fun setCommitMessage(text: String?) = ui.commitMessageUi.setText(text)
+  fun setCommitMessage(text: String?) {
+    VcsConfiguration.getInstance(project).saveCommitMessage(text)
+    ui.commitMessageUi.setText(text)
+  }
 
   protected val commitContext get() = workflow.commitContext
   private val commitHandlers get() = workflow.commitHandlers

@@ -22,6 +22,7 @@ import com.intellij.openapi.roots.ProjectFileIndex
 import com.intellij.openapi.roots.ui.configuration.DefaultModulesProvider
 import com.intellij.openapi.startup.ProjectActivity
 import com.intellij.openapi.vfs.VfsUtil
+import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.psi.PsiDocumentManager
 import com.intellij.psi.PsiFile
 import com.intellij.psi.PsiJavaFile
@@ -52,12 +53,11 @@ class FileNotInSourceRootService(val project: Project) : Disposable {
   private fun checkEditor(editor: Editor) {
     if (editor.project !== project) return
     if (PropertiesComponent.getInstance(project).getBoolean(JAVA_DONT_CHECK_OUT_OF_SOURCE_FILES, false)) return
-    val virtualFile = editor.virtualFile
-    if (virtualFile == null) return
+    val virtualFile = editor.virtualFile ?: return
     ReadAction.run<RuntimeException> {
       val fileIndex = ProjectFileIndex.getInstance(project)
       if (fileIndex.isInSource(virtualFile) || fileIndex.isExcluded(virtualFile) || fileIndex.isUnderIgnored(virtualFile)) return@run
-      if (!fileIndex.getOrderEntriesForFile(virtualFile).isEmpty()) return@run
+      if (fileIndex.getOrderEntriesForFile(virtualFile).isNotEmpty()) return@run
       val psiFile = PsiDocumentManager.getInstance(project).getPsiFile(editor.document) as? PsiJavaFile ?: return@run
       val packageName = psiFile.packageName
       val module = fileIndex.getModuleForFile(virtualFile) ?: return@run
@@ -69,7 +69,7 @@ class FileNotInSourceRootService(val project: Project) : Disposable {
         root = VfsUtil.findRelativeFile(root, *packageName.split('.').toTypedArray()) ?: root
       }
       if (root.findChild(virtualFile.name) != null) return@run
-      val moveFileFix = MoveFileFix(virtualFile, root, JavaBundle.message("fix.move.to.source.root"))
+      val moveFileFix = MoveFileToSourceRootFix(virtualFile, root)
       val info = HighlightInfo.newHighlightInfo(HighlightInfoType.WARNING)
         .range(psiFile)
         .description(JavaBundle.message("warning.java.file.outside.source.root"))
@@ -85,6 +85,10 @@ class FileNotInSourceRootService(val project: Project) : Disposable {
 
   override fun dispose() {
   }
+
+  // Separate fix to differentiate in statistics  
+  class MoveFileToSourceRootFix(virtualFile: VirtualFile, root: VirtualFile): 
+    MoveFileFix(virtualFile, root, JavaBundle.message("fix.move.to.source.root"))
 
   class DismissFix: IntentionAction {
     override fun startInWriteAction(): Boolean = false

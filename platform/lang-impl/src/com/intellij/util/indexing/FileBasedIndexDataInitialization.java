@@ -55,8 +55,6 @@ final class FileBasedIndexDataInitialization extends IndexDataInitializer<IndexC
   private final IndexVersionRegistrationSink myRegistrationResultSink = new IndexVersionRegistrationSink();
   @NotNull
   private final IndexConfiguration myState = new IndexConfiguration();
-  @NotNull
-  private final PersistentDirtyFilesQueue myPersistentDirtyFilesQueue = new PersistentDirtyFilesQueue();
 
   FileBasedIndexDataInitialization(@NotNull FileBasedIndexImpl index, @NotNull RegisteredIndexes registeredIndexes) {
     super("file based index");
@@ -71,7 +69,7 @@ final class FileBasedIndexDataInitialization extends IndexDataInitializer<IndexC
     Iterator<FileBasedIndexExtension<?, ?>> extensions = extPoint.iterator();
     List<ThrowableRunnable<?>> tasks = new ArrayList<>(extPoint.size());
 
-    myDirtyFileIds.addAll(myPersistentDirtyFilesQueue.readIndexingQueue(ManagingFS.getInstance().getCreationTimestamp()));
+    myDirtyFileIds.addAll(PersistentDirtyFilesQueue.readIndexingQueue(PersistentDirtyFilesQueue.getQueueFile(), ManagingFS.getInstance().getCreationTimestamp()));
     // todo: init contentless indices first ?
     while (extensions.hasNext()) {
       FileBasedIndexExtension<?, ?> extension = extensions.next();
@@ -127,6 +125,7 @@ final class FileBasedIndexDataInitialization extends IndexDataInitializer<IndexC
     };
     ApplicationManager.getApplication().addApplicationListener(new MyApplicationListener(fileBasedIndex), disposable);
     Disposer.register(fs, disposable);
+    //Generally, Index will be shutdown by Disposer -- but to be sure we'll register a shutdown task also:
     myFileBasedIndex.setUpShutDownTask();
 
     Collection<ThrowableRunnable<?>> tasks = initAssociatedDataForExtensions();
@@ -188,7 +187,7 @@ final class FileBasedIndexDataInitialization extends IndexDataInitializer<IndexC
       myRegisteredIndexes.ensureLoadedIndexesUpToDate();
       myRegisteredIndexes.markInitialized();  // this will ensure that all changes to component's state will be visible to other threads
       saveRegisteredIndicesAndDropUnregisteredOnes(myState.getIndexIDs());
-      myPersistentDirtyFilesQueue.removeCurrentFile();
+      PersistentDirtyFilesQueue.removeCurrentFile(PersistentDirtyFilesQueue.getQueueFile());
     }
   }
 

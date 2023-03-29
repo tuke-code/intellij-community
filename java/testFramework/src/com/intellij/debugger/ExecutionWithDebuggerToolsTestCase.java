@@ -287,7 +287,7 @@ public abstract class ExecutionWithDebuggerToolsTestCase extends ExecutionTestCa
     }
     else {
       if (!SwingUtilities.isEventDispatchThread()) {
-        UIUtil.invokeAndWaitIfNeeded((Runnable)() -> pumpSwingThread());
+        UIUtil.invokeAndWaitIfNeeded(() -> pumpSwingThread());
       }
       else {
         SwingUtilities.invokeLater(() -> pumpSwingThread());
@@ -424,6 +424,12 @@ public abstract class ExecutionWithDebuggerToolsTestCase extends ExecutionTestCa
         if (breakpoint == null) {
           LOG.error("Unable to set a breakpoint at line " + (commentLine + 1));
           continue;
+        }
+
+        String enabled = comment.readValue("Enabled");
+        if (enabled != null) {
+          breakpoint.getXBreakpoint().setEnabled(Boolean.parseBoolean(enabled));
+          systemPrintln("Enabled = " + enabled);
         }
 
         String suspendPolicy = comment.readValue("suspendPolicy");

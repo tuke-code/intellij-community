@@ -2,16 +2,18 @@
 package com.intellij.collaboration.ui
 
 import com.intellij.application.subscribe
+import com.intellij.collaboration.async.nestedDisposable
 import com.intellij.collaboration.ui.codereview.comment.RoundedPanel
 import com.intellij.collaboration.ui.layout.SizeRestrictedSingleComponentLayout
 import com.intellij.collaboration.ui.util.DimensionRestrictions
 import com.intellij.collaboration.ui.util.JComponentOverlay
+import com.intellij.collaboration.ui.util.bindProgressIn
 import com.intellij.ide.ui.AntialiasingType
 import com.intellij.ide.ui.LafManagerListener
 import com.intellij.ide.ui.laf.darcula.DarculaUIUtil
 import com.intellij.ide.ui.laf.darcula.ui.DarculaButtonUI
 import com.intellij.openapi.Disposable
-import com.intellij.openapi.roots.ui.componentsList.components.ScrollablePanel
+import com.intellij.openapi.progress.util.ProgressWindow
 import com.intellij.openapi.ui.ComponentValidator
 import com.intellij.openapi.ui.ValidationInfo
 import com.intellij.openapi.util.Disposer
@@ -27,11 +29,14 @@ import com.intellij.ui.speedSearch.SpeedSearch
 import com.intellij.util.ui.*
 import com.intellij.util.ui.update.Activatable
 import com.intellij.util.ui.update.UiNotifyConnector
+import com.intellij.vcs.log.ui.frame.ProgressStripe
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.Flow
 import org.intellij.lang.annotations.Language
 import org.jetbrains.annotations.ApiStatus.Internal
 import org.jetbrains.annotations.Nls
 import java.awt.Color
+import java.awt.Insets
 import java.awt.Shape
 import java.awt.event.InputEvent
 import java.awt.event.KeyEvent
@@ -136,6 +141,16 @@ object CollaborationToolsUIUtil {
       component.isEnabled = !it
     }
     return JComponentOverlay.createCentered(component, busyLabel)
+  }
+
+  /**
+   * Show progress stripe above [component]
+   */
+  @Internal
+  fun wrapWithProgressStripe(scope: CoroutineScope, loadingFlow: Flow<Boolean>, component: JComponent): JComponent {
+    return ProgressStripe(component, scope.nestedDisposable(), ProgressWindow.DEFAULT_PROGRESS_DIALOG_POSTPONE_TIME_MILLIS).apply {
+      bindProgressIn(scope, loadingFlow)
+    }
   }
 
   /**
@@ -261,7 +276,7 @@ object CollaborationToolsUIUtil {
     return JBColor(color, ColorUtil.darker(color, 3))
   }
 
-  fun getLabelForeground(bg: Color): Color = if (ColorUtil.isDark(bg)) Color.white else Color.black
+  fun getLabelForeground(bg: Color): Color = if (ColorUtil.isDark(bg)) JBColor.WHITE else JBColor.BLACK
 
   /**
    * Use method for different sizes depending on the type of UI (old/new).
@@ -269,6 +284,13 @@ object CollaborationToolsUIUtil {
    * Must be used only as a property: `get()`
    */
   fun getSize(oldUI: Int, newUI: Int): Int = if (ExperimentalUI.isNewUI()) newUI else oldUI
+
+  /**
+   * Use method for different sizes depending on the type of UI (old/new).
+   *
+   * Must be used only as a property: `get()`
+   */
+  fun getInsets(oldUI: Insets, newUI: Insets): Insets = if (ExperimentalUI.isNewUI()) newUI else oldUI
 
   fun createTagLabel(text: @Nls String): JComponent =
     JLabel(text).apply {

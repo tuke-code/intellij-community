@@ -52,6 +52,7 @@ import com.intellij.psi.scope.util.PsiScopesUtil;
 import com.intellij.psi.search.GlobalSearchScope;
 import com.intellij.psi.templateLanguages.OuterLanguageElement;
 import com.intellij.psi.tree.IElementType;
+import com.intellij.psi.tree.TokenSet;
 import com.intellij.psi.util.InheritanceUtil;
 import com.intellij.psi.util.*;
 import com.intellij.refactoring.util.RefactoringChangeUtil;
@@ -97,6 +98,7 @@ public final class HighlightUtil {
     Set.of(PsiModifier.ABSTRACT, PsiModifier.STATIC, PsiModifier.NATIVE, PsiModifier.FINAL, PsiModifier.STRICTFP, PsiModifier.SYNCHRONIZED);
 
   private static final String SERIAL_PERSISTENT_FIELDS_FIELD_NAME = "serialPersistentFields";
+  public static final TokenSet BRACKET_TOKENS = TokenSet.create(JavaTokenType.LBRACKET, JavaTokenType.RBRACKET);
 
   static {
     ourClassIncompatibleModifiers.put(PsiModifier.ABSTRACT, Set.of(PsiModifier.FINAL));
@@ -1787,8 +1789,11 @@ public final class HighlightUtil {
 
   static HighlightInfo.Builder checkRecordComponentVarArg(@NotNull PsiRecordComponent recordComponent) {
     if (recordComponent.isVarArgs() && PsiTreeUtil.getNextSiblingOfType(recordComponent, PsiRecordComponent.class) != null) {
-      return HighlightInfo.newHighlightInfo(HighlightInfoType.ERROR).range(recordComponent)
+      HighlightInfo.Builder info = HighlightInfo.newHighlightInfo(HighlightInfoType.ERROR).range(recordComponent)
         .descriptionAndTooltip(JavaErrorBundle.message("record.component.vararg.not.last"));
+      IntentionAction action = getFixFactory().createMakeVarargParameterLastFix(recordComponent);
+      info.registerFix(action, null, null, null, null);
+      return info;
     }
     return null;
   }
@@ -1799,14 +1804,12 @@ public final class HighlightUtil {
     PsiElement start = null;
     PsiElement end = null;
     for (PsiElement element = identifier.getNextSibling(); element != null; element = element.getNextSibling()) {
-      if (start == null && PsiUtil.isJavaToken(element, JavaTokenType.LBRACKET)) {
-        start = element;
-      }
-      if (PsiUtil.isJavaToken(element, JavaTokenType.RBRACKET)) {
+      if (PsiUtil.isJavaToken(element, BRACKET_TOKENS)) {
+        if (start == null) start = element;
         end = element;
       }
     }
-    if (start != null && end != null) {
+    if (start != null) {
       HighlightInfo.Builder info = HighlightInfo.newHighlightInfo(HighlightInfoType.ERROR)
         .range(component, start.getTextRange().getStartOffset(), end.getTextRange().getEndOffset())
         .descriptionAndTooltip(JavaErrorBundle.message("record.component.cstyle.declaration"));

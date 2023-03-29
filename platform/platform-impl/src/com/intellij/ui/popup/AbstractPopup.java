@@ -26,6 +26,7 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.project.ProjectUtil;
 import com.intellij.openapi.ui.ComboBoxWithWidePopup;
 import com.intellij.openapi.ui.popup.*;
+import com.intellij.openapi.ui.popup.util.PopupUtil;
 import com.intellij.openapi.util.*;
 import com.intellij.openapi.util.registry.Registry;
 import com.intellij.openapi.util.text.HtmlChunk;
@@ -39,6 +40,7 @@ import com.intellij.ui.awt.RelativePoint;
 import com.intellij.ui.components.JBLabel;
 import com.intellij.ui.components.JBTextField;
 import com.intellij.ui.mac.touchbar.TouchbarSupport;
+import com.intellij.ui.popup.util.PopupImplUtil;
 import com.intellij.ui.scale.JBUIScale;
 import com.intellij.ui.speedSearch.ListWithFilter;
 import com.intellij.ui.speedSearch.SpeedSearch;
@@ -55,8 +57,8 @@ import javax.swing.border.EmptyBorder;
 import javax.swing.plaf.basic.BasicHTML;
 import java.awt.*;
 import java.awt.event.*;
-import java.util.*;
 import java.util.List;
+import java.util.*;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Supplier;
 
@@ -137,7 +139,6 @@ public class AbstractPopup implements JBPopup, ScreenAreaConsumer, AlignedPopup 
   private final List<Runnable> myResizeListeners = new ArrayList<>();
 
   private static final WeakList<JBPopup> all = new WeakList<>();
-  private @Nullable JComponent myClickSource;
 
   private boolean mySpeedSearchAlwaysShown;
   protected final SpeedSearch mySpeedSearch = new SpeedSearch() {
@@ -362,6 +363,11 @@ public class AbstractPopup implements JBPopup, ScreenAreaConsumer, AlignedPopup 
     myKeyEventHandler = keyEventHandler;
     debugState("popup initialized", State.NEW);
     myState = State.INIT;
+
+    Component clickSource = PopupImplUtil.getClickSourceFromLastInputEvent();
+    if (!(clickSource instanceof JList<?> || clickSource instanceof JTree)) {
+      PopupUtil.setPopupToggleComponent(this, clickSource);
+    }
     return this;
   }
 
@@ -1367,31 +1373,35 @@ public class AbstractPopup implements JBPopup, ScreenAreaConsumer, AlignedPopup 
       }
     };
     mySpeedSearchPatternField.getTextEditor().setFocusable(mySpeedSearchAlwaysShown);
+    customizeSearchFieldLook(mySpeedSearchPatternField, mySpeedSearchAlwaysShown);
 
-    JBTextField textField = mySpeedSearchPatternField.getTextEditor();
+    if (mySpeedSearchAlwaysShown) {
+      setHeaderComponent(mySpeedSearchPatternField);
+    }
+  }
+
+  public static void customizeSearchFieldLook(@NotNull SearchTextField searchTextField, boolean isAlwaysShown) {
+    JBTextField textField = searchTextField.getTextEditor();
+
     if (ExperimentalUI.isNewUI()) {
-      mySpeedSearchPatternField.setBackground(JBUI.CurrentTheme.Popup.BACKGROUND);
+      searchTextField.setBackground(JBUI.CurrentTheme.Popup.BACKGROUND);
       textField.setOpaque(false);
       textField.putClientProperty("TextFieldWithoutMargins", true);
       textField.putClientProperty(DarculaUIUtil.COMPACT_PROPERTY, true);
       textField.putClientProperty("TextField.NoMinHeightBounds", true);
       EmptyBorder outsideBorder = new EmptyBorder(JBUI.CurrentTheme.Popup.searchFieldBorderInsets());
       Border lineBorder = JBUI.Borders.customLine(JBUI.CurrentTheme.Popup.separatorColor(), 0, 0, 1, 0);
-      mySpeedSearchPatternField.setBorder(JBUI.Borders.compound(outsideBorder, lineBorder,
+      searchTextField.setBorder(JBUI.Borders.compound(outsideBorder, lineBorder,
                                                                 new EmptyBorder(JBUI.CurrentTheme.Popup.searchFieldInputInsets())));
       textField.setBorder(JBUI.Borders.empty());
     } else {
-      if (mySpeedSearchAlwaysShown) {
-        mySpeedSearchPatternField.setBorder(JBUI.Borders.customLine(JBUI.CurrentTheme.BigPopup.searchFieldBorderColor(), 1, 0, 1, 0));
+      if (isAlwaysShown) {
+        searchTextField.setBorder(JBUI.Borders.customLine(JBUI.CurrentTheme.BigPopup.searchFieldBorderColor(), 1, 0, 1, 0));
         textField.setBorder(JBUI.Borders.empty());
       }
     }
     if (SystemInfo.isMac) {
-      RelativeFont.TINY.install(mySpeedSearchPatternField);
-    }
-
-    if (mySpeedSearchAlwaysShown) {
-      setHeaderComponent(mySpeedSearchPatternField);
+      RelativeFont.TINY.install(searchTextField);
     }
   }
 
@@ -1777,7 +1787,7 @@ public class AbstractPopup implements JBPopup, ScreenAreaConsumer, AlignedPopup 
       switch (event.getID()) {
         case WINDOW_ACTIVATED, WINDOW_GAINED_FOCUS -> {
           if (myCancelOnWindow && myPopup != null && isCancelNeeded((WindowEvent)event, myPopup.getWindow())) {
-            cancel();
+            ApplicationManager.getApplication().invokeLater(() ->cancel());
           }
         }
         case MOUSE_ENTERED -> {
@@ -2341,15 +2351,5 @@ public class AbstractPopup implements JBPopup, ScreenAreaConsumer, AlignedPopup 
   private void forHorizontalScrollBar(@NotNull Consumer<? super JScrollBar> consumer) {
     JScrollBar bar = findHorizontalScrollBar();
     if (bar != null) consumer.consume(bar);
-  }
-
-  @Override
-  public void setClickSource(@Nullable JComponent component) {
-    myClickSource = component;
-  }
-
-  @Override
-  public @Nullable JComponent getClickSource() {
-    return myClickSource;
   }
 }

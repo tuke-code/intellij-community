@@ -38,6 +38,7 @@ import com.intellij.ui.icons.CoreIconManager
 import com.intellij.ui.mac.MacOSApplicationProvider
 import com.intellij.ui.scale.JBUIScale
 import com.intellij.ui.scale.ScaleContext
+import com.intellij.ui.updateAppWindowIcon
 import com.intellij.util.*
 import com.intellij.util.concurrency.SynchronizedClearableLazy
 import com.intellij.util.lang.ZipFilePool
@@ -582,9 +583,9 @@ private fun CoroutineScope.updateFrameClassAndWindowIconAndPreloadSystemFonts(in
 
     launch(CoroutineName("update window icon")) {
       // `updateWindowIcon` should be called after `initUiJob`, because it uses computed system font data for scale context
-      if (!AppUIUtil.isWindowIconAlreadyExternallySet() && !PluginManagerCore.isRunningFromSources()) {
+      if (!AppUIUtil.isWindowIconAlreadyExternallySet && !PluginManagerCore.isRunningFromSources()) {
         // most of the time is consumed by loading SVG and can be done in parallel
-        AppUIUtil.updateWindowIcon(JOptionPane.getRootFrame())
+        updateAppWindowIcon(JOptionPane.getRootFrame())
       }
     }
 
@@ -827,9 +828,16 @@ private fun logEssentialInfoAboutIde(log: Logger, appInfo: ApplicationInfo, args
     log.info("desktop: ${System.getenv("XDG_CURRENT_DESKTOP")}")
   }
 
-  ManagementFactory.getRuntimeMXBean().inputArguments?.let {
-    log.info("JVM options: ${it}")
+  // looks like exception here leads to deadlock on IDE start (happens from time to time in perf tests)
+  try {
+    ManagementFactory.getRuntimeMXBean().inputArguments?.let {
+      log.info("JVM options: ${it}")
+    }
   }
+  catch (e: Exception) {
+    log.error("Failed to get JVM options", e)
+  }
+
   log.info("args: ${args.joinToString(separator = " ")}")
   log.info("library path: ${System.getProperty("java.library.path")}")
   log.info("boot library path: ${System.getProperty("sun.boot.library.path")}")

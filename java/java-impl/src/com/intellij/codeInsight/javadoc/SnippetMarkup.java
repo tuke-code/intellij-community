@@ -3,14 +3,14 @@ package com.intellij.codeInsight.javadoc;
 
 import com.intellij.ide.nls.NlsMessages;
 import com.intellij.java.JavaBundle;
+import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.util.NlsContexts;
 import com.intellij.openapi.util.TextRange;
 import com.intellij.openapi.util.text.StringUtil;
-import com.intellij.psi.PsiElement;
-import com.intellij.psi.PsiFile;
-import com.intellij.psi.PsiReference;
+import com.intellij.psi.*;
 import com.intellij.psi.impl.FakePsiElement;
 import com.intellij.psi.javadoc.*;
+import com.intellij.psi.tree.IElementType;
 import com.intellij.psi.util.CachedValueProvider;
 import com.intellij.psi.util.CachedValuesManager;
 import com.intellij.util.containers.ContainerUtil;
@@ -190,24 +190,57 @@ public class SnippetMarkup {
    * An interface that specifies to which part of text content the {@link LocationMarkupNode} is applied
    */
   public sealed interface Selector {
+    /**
+     * @param string string to find the ranges
+     * @return non-overlapping sorted ranges inside the string matched by this selector
+     */
+    @NotNull List<TextRange> ranges(String string);
   }
 
   /**
    * Substring-selector; applicable to a specific substring
    * @param substring substring to apply to
    */
-  public record Substring(@NotNull String substring) implements Selector {}
+  public record Substring(@NotNull String substring) implements Selector {
+    @Override
+    public @NotNull List<TextRange> ranges(String string) {
+      int pos = 0;
+      List<TextRange> ranges = new ArrayList<>();
+      while (true) {
+        int nextPos = string.indexOf(substring, pos);
+        if (nextPos == -1) break;
+        ranges.add(TextRange.from(nextPos, substring.length()));
+        pos = nextPos + substring.length() + 1;
+      }
+      return ranges;
+    }
+  }
 
   /**
    * Regex-selector; applicable to a specific regex
    * @param pattern pattern to apply to
    */
-  public record Regex(@NotNull Pattern pattern) implements Selector {}
+  public record Regex(@NotNull Pattern pattern) implements Selector {
+    @Override
+    public @NotNull List<TextRange> ranges(String string) {
+      Matcher matcher = pattern.matcher(string);
+      List<TextRange> ranges = new ArrayList<>();
+      while (matcher.find()) {
+        ranges.add(TextRange.create(matcher.start(), matcher.end()));
+      }
+      return ranges;
+    }
+  }
 
   /**
    * Selector which is applicable to the whole line
    */
-  public record WholeLine() implements Selector {}
+  public record WholeLine() implements Selector {
+    @Override
+    public @NotNull List<TextRange> ranges(String string) {
+      return List.of(TextRange.create(0, string.length()));
+    }
+  }
 
   /**
    * A markup tag applicable to a particular part of original text
@@ -316,12 +349,26 @@ public class SnippetMarkup {
       return new CachedValueProvider.Result<>(markup, element);
     });
   }
-  
+
+  /**
+   * @param snippet snippet to create a markup for
+   * @return a markup from snippet. For hybrid snippet, markup is created from the external snippet.
+   * Returns null if there's no snippet body and no external snippet resolved
+   */
   public static @Nullable SnippetMarkup fromSnippet(@NotNull PsiSnippetDocTagValue snippet) {
-    PsiSnippetDocTagBody body = snippet.getBody();
-    if (body != null) {
-      return fromElement(body);
+    SnippetMarkup markup = fromExternalSnippet(snippet);
+    if (markup != null) {
+      return markup;
     }
+    PsiSnippetDocTagBody body = snippet.getBody();
+    return body != null ? fromElement(body) : null;
+  }
+  
+  /**
+   * @param snippet snippet to create a markup for
+   * @return markup from external snippet (ignoring body), null if there's no external snippet resolved.
+   */
+  public static @Nullable SnippetMarkup fromExternalSnippet(@NotNull PsiSnippetDocTagValue snippet) {
     PsiSnippetAttributeList list = snippet.getAttributeList();
     PsiSnippetAttribute refAttribute = list.getAttribute(PsiSnippetAttribute.CLASS_ATTRIBUTE);
     if (refAttribute == null) {
@@ -354,8 +401,31 @@ public class SnippetMarkup {
 
   private static @NotNull List<@NotNull PlainText> preparse(@NotNull PsiSnippetDocTagBody body) {
     List<PlainText> output = new ArrayList<>();
-    for (PsiElement element : body.getContent()) {
-      output.add(new PlainText(element.getTextRangeInParent(), element.getText()));
+    PsiElement[] children = body.getChildren();
+    boolean first = true;
+    for (PsiElement element : children) {
+      if (element instanceof PsiDocToken token) {
+        IElementType tokenType = token.getTokenType();
+        if (tokenType.equals(JavaDocTokenType.DOC_COMMENT_LEADING_ASTERISKS)) continue;
+        if (tokenType.equals(JavaDocTokenType.DOC_COMMENT_DATA)) {
+          output.add(new PlainText(element.getTextRangeInParent(), element.getText()));
+        }
+      }
+      else if (element instanceof PsiWhiteSpace) {
+        String text = element.getText();
+        if (text.contains("\n")) {
+          int idx = output.size() - 1;
+          if (idx >= 0 && !output.get(idx).content().endsWith("\n")) {
+            output.set(idx, new PlainText(output.get(idx).range(), output.get(idx).content() + "\n"));
+          }
+          else if (first) {
+            first = false;
+          }
+          else {
+            output.add(new PlainText(element.getTextRange(), "\n"));
+          }
+        }
+      }
     }
     return output;
   }
@@ -429,17 +499,14 @@ public class SnippetMarkup {
       start += attrPos;
       markupSpec = markupSpec.substring(attrPos);
     }
+    if (prev.content().isBlank() && !prev.content().isEmpty()) {
+      prev = new PlainText(TextRange.from(text.range().getEndOffset(), 0), "");
+    }
     if (hasColon) {
-      if (!prev.content().isBlank()) {
-        markupNodes.add(0, prev);
-      }
+      markupNodes.add(0, prev);
     }
-    else if (!prev.content().isBlank()) {
+    else {
       markupNodes.add(prev);
-    }
-    else if (ContainerUtil.exists(markupNodes, e -> e instanceof LocationMarkupNode lmn && lmn.region() == null)) {
-      // No colon and no previous content: still create node, as markup should apply to it
-      markupNodes.add(new PlainText(TextRange.create(prev.range().getStartOffset(), prev.range().getStartOffset()), ""));
     }
     return markupNodes.stream();
   }
@@ -567,9 +634,24 @@ public class SnippetMarkup {
    * @param region region to visit
    * @param visitor visitor to use
    */
-  public void visitSnippet(@Nullable String region, SnippetVisitor visitor) {
+  public void visitSnippet(@Nullable String region, @NotNull SnippetVisitor visitor) {
+    visitSnippet(region, false, visitor);
+  }
+
+  /**
+   * Visit elements of the snippet within given region
+   *
+   * @param region     region to visit
+   * @param preprocess if true, {@code @replace} tags will be processed automatically and not passed to the visitor;
+   *                   also common indent will be stripped automatically from {@link PlainText} nodes. This option
+   *                   is useful if you want to actually render markup. In this case, you only have to process
+   *                   {@link Highlight} and {@link Link} tags.
+   * @param visitor    visitor to use
+   */
+  public void visitSnippet(@Nullable String region, boolean preprocess, @NotNull SnippetVisitor visitor) {
     Stack<String> regions = new Stack<>();
     Map<String, List<LocationMarkupNode>> active = new LinkedHashMap<>();
+    int commonIndent = preprocess ? getCommonIndent(region) : 0;
     for (MarkupNode node : myNodes) {
       if (node instanceof StartRegion start) {
         regions.push(start.region());
@@ -594,7 +676,14 @@ public class SnippetMarkup {
       }
       else if (node instanceof PlainText plainText) {
         if (region == null || regions.contains(region)) {
-          visitor.visitPlainText(plainText, StreamEx.ofValues(active).toFlatList(Function.identity()));
+          plainText = stripIndent(plainText, commonIndent);
+          List<LocationMarkupNode> flatActive = StreamEx.ofValues(active).toFlatList(Function.identity());
+          if (preprocess) {
+            processReplacements(visitor, plainText, flatActive);
+          }
+          else {
+            visitor.visitPlainText(plainText, flatActive);
+          }
         }
         active.values().forEach(
           list -> list.replaceAll(
@@ -607,6 +696,62 @@ public class SnippetMarkup {
         }
       }
     }
+  }
+
+  private static PlainText stripIndent(PlainText plainText, int commonIndent) {
+    if (commonIndent <= 0) return plainText;
+    String content = plainText.content();
+    int curIndent = 0;
+    while (curIndent < commonIndent &&
+           curIndent < content.length() &&
+           content.charAt(curIndent) != '\n' &&
+           Character.isWhitespace(content.charAt(curIndent))) {
+      curIndent++;
+    }
+    if (curIndent == 0) return plainText;
+    content = content.substring(curIndent);
+    return new PlainText(TextRange.create(plainText.range().getStartOffset() + curIndent, plainText.range().getEndOffset()), content);
+  }
+
+  private static void processReplacements(@NotNull SnippetVisitor visitor, @NotNull PlainText plainText, @NotNull List<LocationMarkupNode> flatActive) {
+    Map<Boolean, List<LocationMarkupNode>> map = StreamEx.of(flatActive).partitioningBy(n -> n instanceof Replace);
+    flatActive = map.get(false);
+    String content = plainText.content();
+    for (LocationMarkupNode markupNode : map.get(true)) {
+      Replace replace = (Replace)markupNode;
+      Selector selector = replace.selector();
+      String replacement = replace.replacement();
+      if (selector instanceof Regex regex) {
+        boolean addLineBreak = false;
+        if (content.endsWith("\n")) {
+          content = content.substring(0, content.length() - 1);
+          addLineBreak = true;
+        }
+        try {
+          content = regex.pattern().matcher(StringUtil.newBombedCharSequence(content, 1000)).replaceAll(replacement);
+        }
+        catch (StackOverflowError | ProcessCanceledException e) {
+          ErrorMarkup replacementError = new ErrorMarkup(
+            replace.range(), JavaBundle.message("javadoc.snippet.error.regex.too.complex", "replace", regex.pattern().pattern()));
+          visitor.visitError(replacementError);
+        }
+        catch (IllegalArgumentException | IndexOutOfBoundsException e) {
+          ErrorMarkup replacementError = new ErrorMarkup(
+            replace.range(), JavaBundle.message("javadoc.snippet.error.malformed.replacement", "replace", replacement, e.getMessage()));
+          visitor.visitError(replacementError);
+        }
+        if (addLineBreak) {
+          content += "\n";
+        }
+      }
+      else if (selector instanceof Substring substring) {
+        content = content.replace(substring.substring(), replacement);
+      }
+      else {
+        content = replacement;
+      }
+    }
+    visitor.visitPlainText(new PlainText(plainText.range(), content), flatActive);
   }
 
   @Override

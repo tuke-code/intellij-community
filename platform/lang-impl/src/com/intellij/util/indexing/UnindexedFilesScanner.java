@@ -21,7 +21,6 @@ import com.intellij.openapi.roots.impl.PushedFilePropertiesUpdaterImpl;
 import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.util.Key;
 import com.intellij.openapi.util.Ref;
-import com.intellij.openapi.util.registry.Registry;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.vfs.VirtualFileManager;
@@ -57,11 +56,12 @@ import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
+import static com.intellij.openapi.project.UnindexedFilesScannerExecutor.shouldScanInSmartMode;
 import static com.intellij.openapi.roots.impl.PushedFilePropertiesUpdaterImpl.getImmediateValuesEx;
 import static com.intellij.openapi.roots.impl.PushedFilePropertiesUpdaterImpl.getModuleImmediateValues;
 
 @ApiStatus.Internal
-public class UnindexedFilesScanner implements MergeableQueueTask<UnindexedFilesScanner> {
+public class UnindexedFilesScanner implements FilesScanningTask {
   @VisibleForTesting
   public static final Key<Boolean> INDEX_PROJECT_WITH_MANY_UPDATERS_TEST_KEY = new Key<>("INDEX_PROJECT_WITH_MANY_UPDATERS_TEST_KEY");
 
@@ -108,7 +108,8 @@ public class UnindexedFilesScanner implements MergeableQueueTask<UnindexedFilesS
     }
   }
 
-  protected boolean isFullIndexUpdate() {
+  @Override
+  public boolean isFullIndexUpdate() {
     return myPredefinedIndexableFilesIterators == null;
   }
 
@@ -118,9 +119,11 @@ public class UnindexedFilesScanner implements MergeableQueueTask<UnindexedFilesS
   }
 
   @Override
-  public @Nullable UnindexedFilesScanner tryMergeWith(@NotNull UnindexedFilesScanner oldTask) {
-    if (oldTask.getClass() != getClass()) return null;
-    if (!myProject.equals(oldTask.myProject)) return null;
+  public @Nullable UnindexedFilesScanner tryMergeWith(@NotNull FilesScanningTask _oldTask) {
+    LOG.assertTrue(_oldTask.getClass() == getClass());
+    UnindexedFilesScanner oldTask = (UnindexedFilesScanner)_oldTask;
+
+    LOG.assertTrue(myProject.equals(oldTask.myProject));
     String reason;
     if (oldTask.isFullIndexUpdate()) {
       reason = oldTask.myIndexingReason;
@@ -266,10 +269,6 @@ public class UnindexedFilesScanner implements MergeableQueueTask<UnindexedFilesS
       // Already in dumb mode. Just invoke indexer
       myProject.getService(PerProjectIndexingQueue.class).flushNowSync(projectIndexingHistory, indicator);
     }
-  }
-
-  static boolean shouldScanInSmartMode() {
-    return !DumbServiceImpl.isSynchronousTaskExecution() && Registry.is("scanning.in.smart.mode", true);
   }
 
   private static @NotNull String getLogScanningCompletedStageMessage(@NotNull ProjectIndexingHistoryImpl projectIndexingHistory) {

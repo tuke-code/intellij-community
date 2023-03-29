@@ -13,8 +13,8 @@ import com.intellij.testFramework.ServiceContainerUtil;
 import com.intellij.util.Function;
 import com.intellij.util.containers.ContainerUtil;
 import com.intellij.util.indexing.customizingIteration.ExternalEntityIndexableIterator;
+import com.intellij.util.indexing.customizingIteration.GenericContentEntityIterator;
 import com.intellij.util.indexing.customizingIteration.ModuleAwareContentEntityIterator;
-import com.intellij.util.indexing.customizingIteration.ModuleUnawareContentEntityIterator;
 import com.intellij.util.indexing.roots.IndexableFilesIterator;
 import com.intellij.util.indexing.roots.origin.ModuleAwareContentEntityOrigin;
 import com.intellij.util.indexing.testEntities.IndexingTestEntity;
@@ -23,12 +23,10 @@ import com.intellij.workspaceModel.core.fileIndex.WorkspaceFileKind;
 import com.intellij.workspaceModel.core.fileIndex.WorkspaceFileSetRegistrar;
 import com.intellij.workspaceModel.core.fileIndex.impl.ModuleContentOrSourceRootData;
 import com.intellij.workspaceModel.core.fileIndex.impl.WorkspaceFileIndexImpl;
-import com.intellij.workspaceModel.ide.VirtualFileUrlManagerUtil;
 import com.intellij.workspaceModel.storage.EntityReference;
 import com.intellij.workspaceModel.storage.EntityStorage;
 import com.intellij.workspaceModel.storage.WorkspaceEntity;
 import com.intellij.workspaceModel.storage.url.VirtualFileUrl;
-import com.intellij.workspaceModel.storage.url.VirtualFileUrlManager;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -129,10 +127,10 @@ public class EntityIndexingServiceOnCustomEntitiesWithCustomizedIndexingTest ext
     }
 
     @Override
-    public @NotNull Collection<? extends ModuleUnawareContentEntityIterator> createModuleUnawareContentIterators(@NotNull EntityReference<IndexingTestEntity> reference,
-                                                                                                                 @NotNull Collection<? extends VirtualFile> roots,
-                                                                                                                 @Nullable Void customization) {
-      throw new IllegalStateException("createModuleUnawareContentIterators shouldn't be called");
+    public @NotNull Collection<? extends GenericContentEntityIterator> createGenericContentIterators(@NotNull EntityReference<IndexingTestEntity> reference,
+                                                                                                     @NotNull Collection<? extends VirtualFile> roots,
+                                                                                                     @Nullable Void customization) {
+      throw new IllegalStateException("createGenericContentIterators shouldn't be called");
     }
 
     @Override
@@ -179,11 +177,9 @@ public class EntityIndexingServiceOnCustomEntitiesWithCustomizedIndexingTest ext
                                            getTestRootDisposable());
     File root = createTempDir("customRoot");
     VirtualFile virtualRoot = Objects.requireNonNull(LocalFileSystem.getInstance().refreshAndFindFileByNioFile(root.toPath()));
-    VirtualFileUrlManager fileUrlManager = VirtualFileUrlManagerUtil.getInstance(VirtualFileUrlManager.Companion, myProject);
-    VirtualFileUrl url = fileUrlManager.fromUrl(virtualRoot.getUrl());
+    List<VirtualFileUrl> urls = getUrls(virtualRoot);
 
-    doTest(() -> EntityIndexingServiceOnCustomEntitiesTest.createAndRegisterEntity(Collections.singletonList(url), Collections.emptyList(),
-                                                                                   myProject),
+    doTest(() -> EntityIndexingServiceOnCustomEntitiesTest.createAndRegisterEntity(urls, Collections.emptyList(), myProject),
            (entity) -> {
              return Collections.singletonList(new MyModuleContentIterator(myModule, entity.createReference(),
                                                                           Collections.singletonList(virtualRoot)));

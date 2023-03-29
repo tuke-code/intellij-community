@@ -144,7 +144,8 @@ public class ConvertSwitchToIfIntention implements IntentionActionWithFixAllOpti
     else {
       hadSideEffects = totalCases == 0 && !sideEffectExpressions.isEmpty();
       declarationString = null;
-      expressionText = ParenthesesUtils.getPrecedence(switchExpression) > ParenthesesUtils.EQUALITY_PRECEDENCE
+      int exprPrecedence = useEquals ? ParenthesesUtils.METHOD_CALL_PRECEDENCE : ParenthesesUtils.EQUALITY_PRECEDENCE;
+      expressionText = ParenthesesUtils.getPrecedence(switchExpression) > exprPrecedence
                        ? '(' + switchExpression.getText() + ')'
                        : switchExpression.getText();
     }
@@ -193,6 +194,7 @@ public class ConvertSwitchToIfIntention implements IntentionActionWithFixAllOpti
     JavaCodeStyleManager javaCodeStyleManager = JavaCodeStyleManager.getInstance(project);
     if (hadSideEffects) {
       if (declarationString == null) {
+        sideEffectExpressions.forEach(commentTracker::markUnchanged);
         PsiStatement[] statements = StatementExtractor.generateStatements(sideEffectExpressions, switchExpression);
         for (PsiStatement statement : statements) {
           javaCodeStyleManager.shortenClassReferences(parent.addBefore(statement, switchStatement));

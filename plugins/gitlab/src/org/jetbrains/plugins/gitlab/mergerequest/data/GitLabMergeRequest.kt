@@ -20,6 +20,8 @@ import org.jetbrains.plugins.gitlab.util.GitLabProjectMapping
 private val LOG = logger<GitLabMergeRequest>()
 
 interface GitLabMergeRequest : GitLabMergeRequestDiscussionsContainer {
+  val isLoading: Flow<Boolean>
+
   val number: String
   val url: String
   val author: GitLabUserDTO
@@ -36,8 +38,10 @@ interface GitLabMergeRequest : GitLabMergeRequestDiscussionsContainer {
   val approvedBy: Flow<List<GitLabUserDTO>>
   val reviewers: Flow<List<GitLabUserDTO>>
   val pipeline: Flow<GitLabPipelineDTO?>
-
+  val userPermissions: Flow<GitLabMergeRequestPermissionsDTO>
   val changes: Flow<GitLabMergeRequestChanges>
+
+  fun refreshData()
 
   suspend fun merge(commitMessage: String)
 
@@ -75,9 +79,14 @@ internal class LoadedGitLabMergeRequest(
 
   private val glProject = projectMapping.repository
 
+  private val _isLoading: MutableStateFlow<Boolean> = MutableStateFlow(false)
+  override val isLoading: Flow<Boolean> = _isLoading.asSharedFlow()
+
   override val number: String = mergeRequest.iid
   override val url: String = mergeRequest.webUrl
   override val author: GitLabUserDTO = mergeRequest.author
+
+  private val mergeRequestRefreshRequest = MutableSharedFlow<Unit>()
 
   private val mergeRequestDetailsState: MutableStateFlow<GitLabMergeRequestFullDetails> =
     MutableStateFlow(GitLabMergeRequestFullDetails.fromGraphQL(mergeRequest))
@@ -102,7 +111,7 @@ internal class LoadedGitLabMergeRequest(
   override val approvedBy: Flow<List<GitLabUserDTO>> = mergeRequestDetailsState.map { it.approvedBy }
   override val reviewers: Flow<List<GitLabUserDTO>> = mergeRequestDetailsState.map { it.reviewers }
   override val pipeline: Flow<GitLabPipelineDTO?> = mergeRequestDetailsState.map { it.headPipeline }
-
+  override val userPermissions: Flow<GitLabMergeRequestPermissionsDTO> = mergeRequestDetailsState.map { it.userPermissions }
   override val changes: Flow<GitLabMergeRequestChanges> = mergeRequestDetailsState.map {
     GitLabMergeRequestChangesImpl(project, cs, api, projectMapping, it)
   }.modelFlow(cs, LOG)
@@ -117,6 +126,27 @@ internal class LoadedGitLabMergeRequest(
 
   private val milestoneEvents by lazy {
     cs.async(Dispatchers.IO) { api.loadMergeRequestMilestoneEvents(glProject, mergeRequest).body().orEmpty() }
+  }
+
+  init {
+    cs.launch(cs.coroutineContext + Dispatchers.IO) {
+      mergeRequestRefreshRequest.collectLatest {
+        try {
+          _isLoading.value = true
+          val updatedMergeRequest = api.loadMergeRequest(glProject, mergeRequestDetailsState.value).body()!!
+          mergeRequestDetailsState.value = GitLabMergeRequestFullDetails.fromGraphQL(updatedMergeRequest)
+        }
+        finally {
+          _isLoading.value = false
+        }
+      }
+    }
+  }
+
+  override fun refreshData() {
+    cs.launch {
+      mergeRequestRefreshRequest.emit(Unit)
+    }
   }
 
   override suspend fun merge(commitMessage: String) {

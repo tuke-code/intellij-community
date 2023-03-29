@@ -465,7 +465,7 @@
     <!-- Poetry -->
     <editorFactoryListener implementation="com.jetbrains.python.sdk.poetry.PyProjectTomlWatcher"/>
     <projectService serviceImplementation="com.jetbrains.python.sdk.poetry.PoetryConfigService"/>
-    <postStartupActivity implementation="com.jetbrains.python.sdk.poetry.PoetryConfigLoader" order="last"/>
+    <backgroundPostStartupActivity implementation="com.jetbrains.python.sdk.poetry.PoetryConfigLoader" order="last"/>
 
     <!-- Targets API -->
     <registryKey key="python.use.targets.api" defaultValue="true" description="Switches Python support to Targets API."/>
@@ -513,9 +513,6 @@
       serviceImplementation="com.jetbrains.python.run.PythonInterpreterTargetEnvironmentFactory$Available$Default"/>
 
     <registryKey key="python.new.run.config" defaultValue="true" description="Python Run configurations new UI"/>
-    <applicationService serviceInterface="com.intellij.toolWindow.DefaultToolWindowLayoutProvider"
-                        serviceImplementation="com.jetbrains.python.ui.PyCommToolWindowLayoutProvider"
-                        overrides="true"/>
   </extensions>
 
   <extensionPoints>
@@ -618,6 +615,10 @@
 
     <extensionPoint qualifiedName="Pythonid.pythonPackageManagerProvider"
                     interface="com.jetbrains.python.packaging.management.PythonPackageManagerProvider"
+                    dynamic="true"/>
+
+    <extensionPoint qualifiedName="Pythonid.customProcessHandlerProvider"
+                    interface="com.jetbrains.python.run.PyCustomProcessHandlerProvider"
                     dynamic="true"/>
   </extensionPoints>
 

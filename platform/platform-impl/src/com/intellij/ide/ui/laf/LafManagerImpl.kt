@@ -252,7 +252,7 @@ class LafManagerImpl : LafManager(), PersistentStateComponent<Element>, Disposab
       else {
         val laf = findLaf(currentLaf.className)
         if (laf != null) {
-          val needUninstall = StartupUiUtil.isUnderDarcula()
+          val needUninstall = StartupUiUtil.isUnderDarcula
           // setup default LAF or one specified by readExternal
           doSetLaF(lookAndFeelInfo = laf, installEditorScheme = false)
           updateWizardLAF(needUninstall)
@@ -305,7 +305,7 @@ class LafManagerImpl : LafManager(), PersistentStateComponent<Element>, Disposab
       return
     }
 
-    val currentIsDark = StartupUiUtil.isUnderDarcula() ||
+    val currentIsDark = StartupUiUtil.isUnderDarcula ||
                         (myCurrentLaf is UIThemeBasedLookAndFeelInfo && (myCurrentLaf as UIThemeBasedLookAndFeelInfo).theme.isDark)
     var expectedLaf: LookAndFeelInfo?
     if (systemIsDark) {
@@ -336,7 +336,7 @@ class LafManagerImpl : LafManager(), PersistentStateComponent<Element>, Disposab
       return
     }
 
-    if (StartupUiUtil.isUnderDarcula()) {
+    if (StartupUiUtil.isUnderDarcula) {
       DarculaInstaller.install()
     }
     else if (wasUnderDarcula) {
@@ -677,7 +677,7 @@ class LafManagerImpl : LafManager(), PersistentStateComponent<Element>, Disposab
       // main toolbar
       defaults.put(JBUI.CurrentTheme.Toolbar.experimentalToolbarButtonSizeKey(), cmSize(34, 34))
       defaults.put(JBUI.CurrentTheme.Toolbar.experimentalToolbarButtonIconSizeKey(), 16)
-      defaults.put(JBUI.CurrentTheme.Toolbar.experimentalToolbarFontKey(), Supplier { JBFont.medium() })
+      defaults.put(JBUI.CurrentTheme.Toolbar.experimentalToolbarFontKey(), Supplier { JBFont.medium().asUIResource() })
       defaults.put(JBUI.CurrentTheme.TitlePane.buttonPreferredSizeKey(), cmSize(44, 34))
       // tool window stripes
       defaults.put(JBUI.CurrentTheme.Toolbar.stripeToolbarButtonSizeKey(), cmSize(32, 32))
@@ -686,7 +686,7 @@ class LafManagerImpl : LafManager(), PersistentStateComponent<Element>, Disposab
       // Run Widget
       defaults.put(JBUI.CurrentTheme.RunWidget.toolbarHeightKey(), 26)
       defaults.put(JBUI.CurrentTheme.RunWidget.toolbarBorderHeightKey(), 4)
-      defaults.put(JBUI.CurrentTheme.RunWidget.configurationSelectorFontKey(), Supplier { JBFont.medium() })
+      defaults.put(JBUI.CurrentTheme.RunWidget.configurationSelectorFontKey(), Supplier { JBFont.medium().asUIResource() })
       // trees
       defaults.put(JBUI.CurrentTheme.Tree.rowHeightKey(), 22)
       // lists
@@ -695,24 +695,25 @@ class LafManagerImpl : LafManager(), PersistentStateComponent<Element>, Disposab
       defaults.put(JBUI.CurrentTheme.Popup.headerInsetsKey(), cmInsets(8, 10, 8, 10))
       defaults.put(JBUI.CurrentTheme.Advertiser.borderInsetsKey(), cmInsets(4, 20, 5, 20))
       defaults.put(JBUI.CurrentTheme.BigPopup.advertiserBorderInsetsKey(), cmInsets(4, 20, 5, 20))
+      defaults.put(JBUI.CurrentTheme.CompletionPopup.Advertiser.borderInsetsKey(), cmInsets(2, 12, 2, 8))
       defaults.put(JBUI.CurrentTheme.CompletionPopup.selectionInnerInsetsKey(), cmInsets(0, 2, 0, 2))
       // status bar
       defaults.put(JBUI.CurrentTheme.StatusBar.Widget.insetsKey(), cmInsets(4, 8, 3, 8))
       defaults.put(JBUI.CurrentTheme.StatusBar.Breadcrumbs.navBarInsetsKey(), cmInsets(1, 0, 1, 4))
-      defaults.put(JBUI.CurrentTheme.StatusBar.fontKey(), Supplier { JBFont.medium() })
+      defaults.put(JBUI.CurrentTheme.StatusBar.fontKey(), Supplier { JBFont.medium().asUIResource() })
       // separate navbar
       defaults.put(JBUI.CurrentTheme.NavBar.itemInsetsKey(), cmInsets(2))
       // editor tabs
       defaults.put(JBUI.CurrentTheme.EditorTabs.tabInsetsKey(), cmInsets(-2, 4, -2, 4))
       defaults.put(JBUI.CurrentTheme.EditorTabs.verticalTabInsetsKey(), cmInsets(2, 8, 1, 6))
       defaults.put(JBUI.CurrentTheme.EditorTabs.tabActionsInsetKey(), 0)
-      defaults.put(JBUI.CurrentTheme.EditorTabs.fontKey(), Supplier { JBFont.medium() })
+      defaults.put(JBUI.CurrentTheme.EditorTabs.fontKey(), Supplier { JBFont.medium().asUIResource() })
       // toolwindows
       defaults.put(JBUI.CurrentTheme.ToolWindow.headerHeightKey(), 32)
-      defaults.put(JBUI.CurrentTheme.ToolWindow.headerFontKey(), Supplier { JBFont.medium() })
+      defaults.put(JBUI.CurrentTheme.ToolWindow.headerFontKey(), Supplier { JBFont.medium().asUIResource() })
       // run, debug tabs
       defaults.put(JBUI.CurrentTheme.DebuggerTabs.tabHeightKey(), 32)
-      defaults.put(JBUI.CurrentTheme.DebuggerTabs.fontKey(), Supplier { JBFont.medium() })
+      defaults.put(JBUI.CurrentTheme.DebuggerTabs.fontKey(), Supplier { JBFont.medium().asUIResource() })
       // VCS log
       defaults.put(JBUI.CurrentTheme.VersionControl.Log.rowHeightKey(), 24)
       defaults.put(JBUI.CurrentTheme.VersionControl.Log.verticalPaddingKey(), 4)
@@ -736,7 +737,7 @@ class LafManagerImpl : LafManager(), PersistentStateComponent<Element>, Disposab
         return
       }
     }
-    val dark = StartupUiUtil.isUnderDarcula()
+    val dark = StartupUiUtil.isUnderDarcula
     val editorColorManager = EditorColorsManager.getInstance()
     val current = editorColorManager.globalScheme
     val wasUITheme = oldLaf is UIThemeBasedLookAndFeelInfo
@@ -853,7 +854,7 @@ class LafManagerImpl : LafManager(), PersistentStateComponent<Element>, Disposab
     val laf = if (myCurrentLaf == null) null else lookAndFeelReference
     val lafDefaults = myStoredDefaults.get(laf)
     if (lafDefaults != null) {
-      for (resource in StartupUiUtil.ourPatchableFontResources) {
+      for (resource in StartupUiUtil.patchableFontResources) {
         defaults.put(resource, lafDefaults.get(resource))
       }
     }
@@ -865,7 +866,7 @@ class LafManagerImpl : LafManager(), PersistentStateComponent<Element>, Disposab
     var lafDefaults = myStoredDefaults.get(laf)
     if (lafDefaults == null) {
       lafDefaults = HashMap()
-      for (resource in StartupUiUtil.ourPatchableFontResources) {
+      for (resource in StartupUiUtil.patchableFontResources) {
         lafDefaults.put(resource, defaults.get(resource))
       }
       myStoredDefaults.put(laf, lafDefaults)
@@ -1039,8 +1040,15 @@ class LafManagerImpl : LafManager(), PersistentStateComponent<Element>, Disposab
     private val lafGroups: ActionGroup
       get() {
         val allLaFs =
-          if (ExperimentalUI.isNewUI()) getLafListForTargetUI(TargetUIType.NEW) + getLafListForTargetUI(TargetUIType.CLASSIC)
-          else getLafListForTargetUI(TargetUIType.CLASSIC)
+          if (ExperimentalUI.isNewUI()) {
+            getLafListForTargetUI(TargetUIType.NEW) +
+            getLafListForTargetUI(TargetUIType.CLASSIC) +
+            getLafListForTargetUI(TargetUIType.UNSPECIFIED)
+          }
+          else{
+            getLafListForTargetUI(TargetUIType.CLASSIC) +
+            getLafListForTargetUI(TargetUIType.UNSPECIFIED)
+          }
 
         val lightLaFs = ArrayList<LookAndFeelInfo>()
         val darkLaFs = ArrayList<LookAndFeelInfo>()

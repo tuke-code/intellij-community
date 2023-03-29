@@ -18,7 +18,6 @@ import com.intellij.openapi.util.text.StringUtil
 import com.intellij.openapi.vcs.ProjectLevelVcsManager
 import com.intellij.openapi.wm.impl.ExpandableComboAction
 import com.intellij.openapi.wm.impl.ToolbarComboWidget
-import com.intellij.ui.popup.util.PopupImplUtil
 import git4idea.GitUtil
 import git4idea.GitVcs
 import git4idea.branch.GitBranchIncomingOutgoingManager
@@ -28,6 +27,8 @@ import git4idea.i18n.GitBundle
 import git4idea.repo.GitRepository
 import git4idea.ui.branch.GitBranchPopup
 import git4idea.ui.branch.GitBranchPopupActions
+import git4idea.ui.branch.GitBranchPopupActions.BRANCH_NAME_LENGTH_DELTA
+import git4idea.ui.branch.GitBranchPopupActions.BRANCH_NAME_SUFFIX_LENGTH
 import git4idea.ui.branch.popup.GitBranchesTreePopup
 import icons.DvcsImplIcons
 import javax.swing.Icon
@@ -36,6 +37,8 @@ import javax.swing.JComponent
 private val projectKey = Key.create<Project>("git-widget-project")
 private val repositoryKey = Key.create<GitRepository>("git-widget-repository")
 private val changesKey = Key.create<MyRepoChanges>("git-widget-changes")
+
+private const val GIT_WIDGET_BRANCH_NAME_MAX_LENGTH: Int = 80
 
 internal class GitToolbarWidgetAction : ExpandableComboAction() {
   private val widgetIcon = ExpUiIcons.General.Vcs
@@ -57,9 +60,6 @@ internal class GitToolbarWidgetAction : ExpandableComboAction() {
       JBPopupFactory.getInstance()
         .createActionGroupPopup(null, group, event.dataContext, JBPopupFactory.ActionSelectionAid.SPEEDSEARCH, true, place)
     }
-    val widget = event.getData(PlatformCoreDataKeys.CONTEXT_COMPONENT) as? ToolbarComboWidget
-    PopupImplUtil.setPopupToggleButton(popup, widget)
-
     return popup
   }
 
@@ -136,7 +136,10 @@ internal class GitToolbarWidgetAction : ExpandableComboAction() {
   @NlsSafe
   private fun calcText(project: Project, repository: GitRepository): String {
     return StringUtil.escapeMnemonics(GitBranchUtil.getDisplayableBranchText(repository) { branchName ->
-      GitBranchPopupActions.truncateBranchName(branchName, project)
+      GitBranchPopupActions.truncateBranchName(project, branchName,
+                                               GIT_WIDGET_BRANCH_NAME_MAX_LENGTH,
+                                               BRANCH_NAME_SUFFIX_LENGTH,
+                                               BRANCH_NAME_LENGTH_DELTA)
     }).also { updatePlaceholder(project, it) }
   }
 

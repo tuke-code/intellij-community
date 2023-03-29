@@ -598,20 +598,24 @@ public class PopupFactoryImpl extends JBPopupFactory {
   @Override
   public @NotNull BalloonBuilder createDialogBalloonBuilder(@NotNull JComponent content, @PopupTitle @Nullable String title) {
     final BalloonPopupBuilderImpl builder = new BalloonPopupBuilderImpl(myStorage, content);
+    return fillDialogBalloonBuilder(builder, title);
+  }
+
+  protected @NotNull BalloonBuilder fillDialogBalloonBuilder(BalloonBuilder builder, @PopupTitle @Nullable String title) {
     final Color bg = UIManager.getColor("Panel.background");
     final Color borderOriginal = JBColor.DARK_GRAY;
     final Color border = ColorUtil.toAlpha(borderOriginal, 75);
-    builder
+    return builder
       .setDialogMode(true)
       .setTitle(title)
       .setAnimationCycle(200)
-      .setFillColor(bg).setBorderColor(border).setHideOnClickOutside(false)
+      .setFillColor(bg)
+      .setBorderColor(border)
+      .setHideOnClickOutside(false)
       .setHideOnKeyOutside(false)
       .setHideOnAction(false)
       .setCloseButtonEnabled(true)
       .setShadow(true);
-
-    return builder;
   }
 
   @Override
@@ -640,11 +644,11 @@ public class PopupFactoryImpl extends JBPopupFactory {
     JLabel label = new JLabel();
     final JPanel content = new NonOpaquePanel(new BorderLayout((int)(label.getIconTextGap() * 1.5), (int)(label.getIconTextGap() * 1.5)));
 
-    final NonOpaquePanel textWrapper = new NonOpaquePanel(new GridBagLayout());
+    final NonOpaquePanel textWrapper = new NonOpaquePanel(new BorderLayout());
     JScrollPane scrolledText = ScrollPaneFactory.createScrollPane(text, true);
     scrolledText.setBackground(fillColor);
     scrolledText.getViewport().setBackground(fillColor);
-    textWrapper.add(scrolledText);
+    textWrapper.add(scrolledText, BorderLayout.CENTER);
     content.add(textWrapper, BorderLayout.CENTER);
     if (icon != null) {
       final NonOpaquePanel north = new NonOpaquePanel(new BorderLayout());

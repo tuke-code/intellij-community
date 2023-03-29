@@ -56,11 +56,7 @@ fun main(rawArgs: Array<String>) {
         MethodHandles.lookup().findConstructor(aClass, MethodType.methodType(Void.TYPE)).invoke() as AppStarter
       }
 
-      if (!args.isEmpty()) {
-        initProjectorIfNeeded(args)
-        // must be called after projector init
-        initLuxIfNeeded(args)
-      }
+      initRemoteDevIfNeeded(args)
 
       val busyThread = Thread.currentThread()
       withContext(Dispatchers.Default + StartupAbortedExceptionHandler()) {
@@ -77,38 +73,56 @@ fun main(rawArgs: Array<String>) {
   }
 }
 
-private fun initProjectorIfNeeded(args: List<String>) {
-  if (args.isEmpty() || (AppMode.CWM_HOST_COMMAND != args[0] && AppMode.CWM_HOST_NO_LOBBY_COMMAND != args[0] && AppMode.REMOTE_DEV_HOST_COMMAND != args[0])) {
+private fun initRemoteDevIfNeeded(args: List<String>) {
+  val command = args.firstOrNull()
+  val isRemoteDevEnabled = AppMode.CWM_HOST_COMMAND == command ||
+                           AppMode.CWM_HOST_NO_LOBBY_COMMAND == command ||
+                           AppMode.REMOTE_DEV_HOST_COMMAND == command
+  if (!isRemoteDevEnabled) {
     return
   }
 
+  runActivity("cwm host init") {
+    if (System.getProperty("lux.enabled", "true").toBoolean()) {
+      initLux()
+    }
+    else {
+      initProjector()
+    }
+  }
+}
+
+private fun initProjector() {
   if (!JBR.isProjectorUtilsSupported()) {
     error("JBR version 17.0.5b653.12 or later is required to run a remote-dev server")
   }
 
-  runActivity("cwm host init") {
-    JBR.getProjectorUtils().setLocalGraphicsEnvironmentProvider {
-      val projectorEnvClass = AppStarter::class.java.classLoader.loadClass("org.jetbrains.projector.awt.image.PGraphicsEnvironment")
-      projectorEnvClass.getDeclaredMethod("getInstance").invoke(null) as GraphicsEnvironment
-    }
-
-    val projectorMainClass = AppStarter::class.java.classLoader.loadClass("org.jetbrains.projector.server.ProjectorLauncher\$Starter")
-    MethodHandles.privateLookupIn(projectorMainClass, MethodHandles.lookup()).findStatic(
-      projectorMainClass, "runProjectorServer", MethodType.methodType(Boolean::class.javaPrimitiveType)
-    ).invoke()
+  JBR.getProjectorUtils().setLocalGraphicsEnvironmentProvider {
+    val projectorEnvClass = AppStarter::class.java.classLoader.loadClass("org.jetbrains.projector.awt.image.PGraphicsEnvironment")
+    projectorEnvClass.getDeclaredMethod("getInstance").invoke(null) as GraphicsEnvironment
   }
+
+  val projectorMainClass = AppStarter::class.java.classLoader.loadClass("org.jetbrains.projector.server.ProjectorLauncher\$Starter")
+  MethodHandles.privateLookupIn(projectorMainClass, MethodHandles.lookup()).findStatic(
+    projectorMainClass, "runProjectorServer", MethodType.methodType(Boolean::class.javaPrimitiveType)
+  ).invoke()
 }
 
-private fun initLuxIfNeeded(args: List<String>) {
-  if (args.isEmpty() || (AppMode.CWM_HOST_COMMAND != args[0] && AppMode.CWM_HOST_NO_LOBBY_COMMAND != args[0] && AppMode.REMOTE_DEV_HOST_COMMAND != args[0])) {
-    return
-  }
-  if (!System.getProperty("lux.enabled", "true").toBoolean()) {
-    return
-  }
+private fun initLux() {
   if (!JBR.isGraphicsUtilsSupported()) {
     error("JBR version 17.0.6b796 or later is required to run a remote-dev server with lux")
   }
+
+  if (System.getProperty("lux.fonts.disable.projector.font.manager", "false").toBoolean()) {
+    // disable PFontManager
+    System.setProperty("org.jetbrains.projector.server.enable.font.manager", "false")
+
+    // X11GraphicsEnvironment initializer is necessary for X11FontManager
+    // Do it before Projector sets its own PGraphicsEnvironment
+    GraphicsEnvironment.getLocalGraphicsEnvironment()
+  }
+
+  initProjector()
 
   System.setProperty("awt.nativeDoubleBuffering", false.toString())
   System.setProperty("swing.bufferPerWindow", true.toString())
@@ -143,21 +157,29 @@ fun initClassLoader(addCwmLibs: Boolean) {
                     ?: throw RuntimeException("You must run JVM with -Djava.system.class.loader=com.intellij.util.lang.PathClassLoader")
   val classpath = LinkedHashSet<Path>()
   val preinstalledPluginDir = distDir.resolve("plugins")
+  
   var pluginDir = preinstalledPluginDir
   var marketPlaceBootDir = BootstrapClassLoaderUtil.findMarketplaceBootDir(pluginDir)
   var mpBoot = marketPlaceBootDir.resolve(MARKETPLACE_BOOTSTRAP_JAR)
-  if (Files.notExists(mpBoot)) {
+  var installMarketplace = Files.exists(mpBoot) // enough to check for existence as preinstalled plugin is always compatible
+
+  if (!installMarketplace) {
     pluginDir = Path.of(PathManager.getPluginsPath())
     marketPlaceBootDir = BootstrapClassLoaderUtil.findMarketplaceBootDir(pluginDir)
     mpBoot = marketPlaceBootDir.resolve(MARKETPLACE_BOOTSTRAP_JAR)
+    installMarketplace = BootstrapClassLoaderUtil.isMarketplacePluginCompatible(distDir, pluginDir, mpBoot)
   }
-  val installMarketplace = BootstrapClassLoaderUtil.shouldInstallMarketplace(distDir, mpBoot)
+  
   if (installMarketplace) {
     val marketplaceImpl = marketPlaceBootDir.resolve("marketplace-impl.jar")
     if (Files.exists(marketplaceImpl)) {
       classpath.add(marketplaceImpl)
     }
+    else {
+      installMarketplace = false
+    }
   }
+  
   var updateSystemClassLoader = false
   if (addCwmLibs) {
     // Remote dev requires Projector libraries in system classloader due to AWT internals (see below)

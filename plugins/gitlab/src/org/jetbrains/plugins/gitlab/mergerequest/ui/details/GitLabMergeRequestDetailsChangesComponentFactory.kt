@@ -6,7 +6,7 @@ import com.intellij.collaboration.ui.SimpleHtmlPane
 import com.intellij.collaboration.ui.SingleValueModel
 import com.intellij.collaboration.ui.TransparentScrollPane
 import com.intellij.collaboration.ui.codereview.changes.CodeReviewChangesTreeFactory
-import com.intellij.collaboration.ui.util.bindContent
+import com.intellij.collaboration.ui.util.bindContentIn
 import com.intellij.openapi.actionSystem.ActionGroup
 import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.project.Project
@@ -28,7 +28,7 @@ internal class GitLabMergeRequestDetailsChangesComponentFactory(private val proj
 
   fun create(cs: CoroutineScope, vm: GitLabMergeRequestChangesViewModel): JComponent {
     val wrapper = Wrapper(LoadingLabel())
-    wrapper.bindContent(cs, vm.changesResult) { _, result ->
+    wrapper.bindContentIn(cs, vm.changesResult) { _, result ->
       result.fold(
         onSuccess = { createChangesTree(vm, it) },
         onFailure = { SimpleHtmlPane(it.localizedMessage) }
@@ -61,7 +61,7 @@ internal class GitLabMergeRequestDetailsChangesComponentFactory(private val proj
         }
         vm.updateSelectedChanges(VcsTreeModelData.getListSelectionOrAll(it).map { it as? Change })
 
-        it.installPopupHandler(ActionManager.getInstance().getAction("GitLab.Merge.Requests.Details.Popup") as ActionGroup)
+        it.installPopupHandler(ActionManager.getInstance().getAction("GitLab.Merge.Requests.Changes.Popup") as ActionGroup)
       }
   }
 }

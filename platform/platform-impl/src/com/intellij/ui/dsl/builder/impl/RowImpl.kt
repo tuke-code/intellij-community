@@ -27,7 +27,9 @@ import com.intellij.ui.dsl.UiDslException
 import com.intellij.ui.dsl.builder.*
 import com.intellij.ui.dsl.builder.components.*
 import com.intellij.ui.dsl.gridLayout.UnscaledGaps
+import com.intellij.ui.dsl.gridLayout.UnscaledGapsY
 import com.intellij.ui.dsl.gridLayout.VerticalGaps
+import com.intellij.ui.dsl.gridLayout.unscale
 import com.intellij.ui.layout.ComponentPredicate
 import com.intellij.ui.popup.PopupState
 import com.intellij.util.Function
@@ -436,6 +438,10 @@ internal open class RowImpl(private val dialogPanelConfig: DialogPanelConfig,
   }
 
   override fun customize(customRowGaps: VerticalGaps): Row {
+    return customize(UnscaledGapsY(customRowGaps.top.unscale(), customRowGaps.bottom.unscale()))
+  }
+
+  override fun customize(customRowGaps: UnscaledGapsY): Row {
     internalTopGap = customRowGaps.top
     internalBottomGap = customRowGaps.bottom
     topGap = null
@@ -482,9 +488,6 @@ internal open class RowImpl(private val dialogPanelConfig: DialogPanelConfig,
 }
 
 private class PopupActionGroup(private val actions: Array<AnAction>): ActionGroup(), DumbAware {
-
-  private val popupState = PopupState.forPopup()
-
   init {
     isPopup = true
     templatePresentation.isPerformGroup = actions.isNotEmpty()
@@ -493,13 +496,8 @@ private class PopupActionGroup(private val actions: Array<AnAction>): ActionGrou
   override fun getChildren(e: AnActionEvent?): Array<AnAction> = actions
 
   override fun actionPerformed(e: AnActionEvent) {
-    if (popupState.isRecentlyHidden) {
-      return
-    }
-
     val popup = JBPopupFactory.getInstance().createActionGroupPopup(null, this, e.dataContext,
       JBPopupFactory.ActionSelectionAid.MNEMONICS, true)
-    popupState.prepareToShow(popup)
     PopupUtil.showForActionButtonEvent(popup, e)
   }
 }

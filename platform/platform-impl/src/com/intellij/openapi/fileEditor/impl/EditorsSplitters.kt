@@ -13,9 +13,7 @@ import com.intellij.icons.AllIcons
 import com.intellij.ide.ui.UISettings
 import com.intellij.ide.ui.UISettingsListener
 import com.intellij.openapi.actionSystem.IdeActions
-import com.intellij.openapi.application.ApplicationManager
-import com.intellij.openapi.application.EDT
-import com.intellij.openapi.application.readAction
+import com.intellij.openapi.application.*
 import com.intellij.openapi.client.ClientSessionsManager
 import com.intellij.openapi.components.serviceOrNull
 import com.intellij.openapi.diagnostic.logger
@@ -216,7 +214,7 @@ open class EditorsSplitters internal constructor(
       val gg = IdeBackgroundUtil.withFrameBackground(g, this)
       super.paintComponent(gg)
       @Suppress("UseJBColor")
-      g.color = if (StartupUiUtil.isUnderDarcula()) JBColor.border() else Color(0, 0, 0, 50)
+      g.color = if (StartupUiUtil.isUnderDarcula) JBColor.border() else Color(0, 0, 0, 50)
       g.drawLine(0, 0, width, 0)
     }
   }
@@ -545,7 +543,7 @@ open class EditorsSplitters internal constructor(
       EditorTabPresentationUtil.getEditorTabBackgroundColor(manager.project, file)
     }
 
-    withContext(Dispatchers.EDT) {
+    withContext(Dispatchers.EDT + ModalityState.any().asContextElement()) {
       for (window in windows) {
         val index = window.findFileIndex(file)
         if (index != -1) {
@@ -679,8 +677,8 @@ open class EditorsSplitters internal constructor(
   }
 
   /**
-   * sets the window passed as a current ('focused') window among all splitters. All file openings will be done inside this
-   * current window
+   * Sets the window passed as a current ('focused') window among all splitters.
+   * All file openings will be done inside this current window.
    * @param window a window to be set as current
    * @param requestFocus whether to request focus to the editor, currently selected in this window
    */
@@ -728,7 +726,7 @@ open class EditorsSplitters internal constructor(
   }
 
   @RequiresEdt
-  fun getAllComposites(file: VirtualFile): List<EditorComposite> = windows.mapNotNull { it.getComposite(file) }
+  fun getAllComposites(file: VirtualFile): List<EditorComposite> = getWindowSequence().mapNotNull { it.getComposite(file) }.toList()
 
   private fun findWindows(file: VirtualFile): List<EditorWindow> = windows.filter { it.getComposite(file) != null }
 
@@ -962,13 +960,11 @@ private class UiBuilder(private val splitters: EditorsSplitters) {
         try {
           file.putUserData(OPENED_IN_BULK, true)
 
-          val newProviders = async {
-            runActivity("editor provider computing") {
-              FileEditorProviderManager.getInstance().getProvidersAsync(fileEditorManager.project, file)
-            }
+          val newProviders = async(CoroutineName("editor provider computing")) {
+            FileEditorProviderManager.getInstance().getProvidersAsync(fileEditorManager.project, file)
           }
 
-          val document = readAction {
+          val document = readActionBlocking {
             fileDocumentManager.getDocument(file)
           }
 

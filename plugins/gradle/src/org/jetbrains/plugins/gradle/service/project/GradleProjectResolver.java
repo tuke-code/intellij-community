@@ -44,6 +44,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.plugins.gradle.execution.target.TargetBuildLauncher;
 import org.jetbrains.plugins.gradle.issue.DeprecatedGradleVersionIssue;
+import org.jetbrains.plugins.gradle.issue.UnsupportedGradleVersionIssue;
 import org.jetbrains.plugins.gradle.model.*;
 import org.jetbrains.plugins.gradle.model.data.BuildParticipant;
 import org.jetbrains.plugins.gradle.model.data.BuildScriptClasspathData;
@@ -56,6 +57,7 @@ import org.jetbrains.plugins.gradle.settings.DistributionType;
 import org.jetbrains.plugins.gradle.settings.GradleBuildParticipant;
 import org.jetbrains.plugins.gradle.settings.GradleExecutionSettings;
 import org.jetbrains.plugins.gradle.util.GradleConstants;
+import org.jetbrains.plugins.gradle.util.GradleModuleDataKt;
 
 import java.io.File;
 import java.nio.file.Path;
@@ -130,9 +132,11 @@ public class GradleProjectResolver implements ExternalSystemProjectResolver<Grad
       final String ideProjectPath = settings == null ? null : settings.getIdeProjectPath();
       final String mainModuleFileDirectoryPath = ideProjectPath == null ? projectPath : ideProjectPath;
 
+      ModuleData moduleData = new ModuleData(projectName, GradleConstants.SYSTEM_ID, getDefaultModuleTypeId(),
+                                       projectName, mainModuleFileDirectoryPath, projectPath);
+      GradleModuleDataKt.setGradleIdentityPath(moduleData, ":");
       projectDataNode
-        .createChild(ProjectKeys.MODULE, new ModuleData(projectName, GradleConstants.SYSTEM_ID, getDefaultModuleTypeId(),
-                                                        projectName, mainModuleFileDirectoryPath, projectPath))
+        .createChild(ProjectKeys.MODULE, moduleData)
         .createChild(ProjectKeys.CONTENT_ROOT, new ContentRootData(GradleConstants.SYSTEM_ID, projectPath));
       return projectDataNode;
     }
@@ -213,6 +217,9 @@ public class GradleProjectResolver implements ExternalSystemProjectResolver<Grad
       resolverCtx.setBuildEnvironment(buildEnvironment);
       if (!isCustomSerializationSupported(resolverCtx, gradleVersion, isCompositeBuildsSupported)) {
         useCustomSerialization = false;
+      }
+      if (UnsupportedGradleVersionIssue.isUnsupported(gradleVersion)) {
+        throw new IllegalStateException("Unsupported Gradle version");
       }
     }
     final ProjectImportAction projectImportAction =

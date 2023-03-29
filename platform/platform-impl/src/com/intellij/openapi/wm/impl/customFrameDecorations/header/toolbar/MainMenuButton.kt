@@ -18,9 +18,9 @@ import com.intellij.openapi.keymap.KeymapManagerListener
 import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.ui.popup.JBPopupFactory
 import com.intellij.openapi.util.Disposer
+import com.intellij.openapi.wm.IdeFocusManager
 import com.intellij.ui.popup.PopupFactoryImpl
 import com.intellij.ui.popup.list.ListPopupImpl
-import com.intellij.ui.popup.util.PopupImplUtil
 import com.intellij.util.messages.MessageBusConnection
 import com.intellij.util.ui.JBUI
 import org.jetbrains.annotations.ApiStatus
@@ -142,7 +142,6 @@ internal class MainMenuButton {
         .apply { isShowSubmenuOnHover = true }
         .apply { setMinimumSize(Dimension(JBUI.CurrentTheme.CustomFrameDecorations.menuPopupMinWidth(), 0)) }
         as ListPopupImpl
-      PopupImplUtil.setPopupToggleButton(popup, button)
       popup.showUnderneathOf(button)
 
       if (actionToShow != null) {
@@ -163,7 +162,8 @@ internal class MainMenuButton {
 
     override fun actionPerformed(e: ActionEvent?) {
       if (!getInstance().disableMnemonics) {
-        menuAction.showPopup(DataManager.getInstance().getDataContext(button), actionToShow)
+        val component = IdeFocusManager.getGlobalInstance().focusOwner ?: button
+        menuAction.showPopup(DataManager.getInstance().getDataContext(component), actionToShow)
       }
     }
   }

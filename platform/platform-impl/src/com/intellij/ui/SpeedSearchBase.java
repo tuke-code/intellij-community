@@ -25,6 +25,7 @@ import com.intellij.ui.scale.JBUIScale;
 import com.intellij.ui.speedSearch.SpeedSearch;
 import com.intellij.ui.speedSearch.SpeedSearchSupply;
 import com.intellij.util.ReflectionUtil;
+import com.intellij.util.containers.ContainerUtil;
 import com.intellij.util.text.NameUtilCore;
 import com.intellij.util.ui.JBInsets;
 import com.intellij.util.ui.JBUI;
@@ -43,6 +44,8 @@ import java.awt.*;
 import java.awt.event.*;
 import java.beans.PropertyChangeListener;
 import java.beans.PropertyChangeSupport;
+import java.util.Comparator;
+import java.util.List;
 import java.util.ListIterator;
 import java.util.NoSuchElementException;
 
@@ -90,7 +93,7 @@ public abstract class SpeedSearchBase<Comp extends JComponent> extends SpeedSear
 
   /**
    * @deprecated Please use non-deprecated constructor with combination with "setup listeners" method
-   *   to get the behaviour of this constructor
+   * to get the behaviour of this constructor
    */
   @Deprecated
   public SpeedSearchBase(@NotNull Comp component) {
@@ -163,11 +166,14 @@ public abstract class SpeedSearchBase<Comp extends JComponent> extends SpeedSear
       public void update(@NotNull AnActionEvent e) {
         e.getPresentation().setEnabled(isPopupActive() && !Strings.isEmpty(getEnteredPrefix()));
       }
+
       @Override
       public @NotNull ActionUpdateThread getActionUpdateThread() {
         return ActionUpdateThread.EDT;
       }
     }.registerCustomShortcutSet(CustomShortcutSet.fromString(SystemInfo.isMac ? "meta BACK_SPACE" : "control BACK_SPACE"), myComponent);
+
+    new MySearchAction().registerCustomShortcutSet(CommonShortcuts.getFind(), myComponent);
 
     installSupplyTo(myComponent);
   }
@@ -239,17 +245,17 @@ public abstract class SpeedSearchBase<Comp extends JComponent> extends SpeedSear
   }
 
   /**
-   * @param element Element to select. Don't forget to convert model index to view index if needed (i.e. table.convertRowIndexToView(modelIndex), etc).
+   * @param element      Element to select. Don't forget to convert model index to view index if needed (i.e. table.convertRowIndexToView(modelIndex), etc).
    * @param selectedText search text
    */
   protected abstract void selectElement(Object element, String selectedText);
 
   /**
    * The main method for items traversal.
-   *
+   * <p>
    * Implementations can override it or use the default implementation
    * that uses {@link #getElementAt(int)} and {@link #getElementCount()} methods.
-   *
+   * <p>
    * The old and now deprecated API uses {@link #getAllElements()} and {@link #convertIndexToModel(int)} methods.
    */
   @NotNull
@@ -375,7 +381,7 @@ public abstract class SpeedSearchBase<Comp extends JComponent> extends SpeedSear
   @Nullable
   private Object findFirstElement(String s) {
     final String _s = s.trim();
-    for (ListIterator<?> it = getElementIterator(0); it.hasNext();) {
+    for (ListIterator<?> it = getElementIterator(0); it.hasNext(); ) {
       final Object element = it.next();
       if (isMatchingElement(element, _s)) return element;
     }
@@ -385,7 +391,7 @@ public abstract class SpeedSearchBase<Comp extends JComponent> extends SpeedSear
   @Nullable
   private Object findLastElement(String s) {
     final String _s = s.trim();
-    for (ListIterator<?> it = getElementIterator(getElementCount()); it.hasPrevious();) {
+    for (ListIterator<?> it = getElementIterator(getElementCount()); it.hasPrevious(); ) {
       final Object element = it.previous();
       if (isMatchingElement(element, _s)) return element;
     }
@@ -450,7 +456,7 @@ public abstract class SpeedSearchBase<Comp extends JComponent> extends SpeedSear
 
   @Override
   public void refreshSelection() {
-    if ( mySearchPopup != null ) mySearchPopup.refreshSelection();
+    if (mySearchPopup != null) mySearchPopup.refreshSelection();
   }
 
   @Override
@@ -601,7 +607,7 @@ public abstract class SpeedSearchBase<Comp extends JComponent> extends SpeedSear
     }
     KeymapManager keymapManager = KeymapManager.getInstance();
     if (keymapManager != null) {
-      @NotNull String @NotNull[] actionIds = keymapManager.getActiveKeymap().getActionIds(keyStroke);
+      @NotNull String @NotNull [] actionIds = keymapManager.getActiveKeymap().getActionIds(keyStroke);
       for (String id : actionIds) {
         switch (id) {
           case IdeActions.ACTION_EDITOR_MOVE_CARET_UP -> {
@@ -708,13 +714,13 @@ public abstract class SpeedSearchBase<Comp extends JComponent> extends SpeedSear
         e.consume();
       }
     }
-
   }
 
   /**
    * Creates an additional extension.
    * SpeedSearch calls this method when creating the search text field.
    * If the result of this method is not null, the caller adds it as a serach text field extension.
+   *
    * @return an extension, or null.
    */
   @Nullable
@@ -836,12 +842,14 @@ public abstract class SpeedSearchBase<Comp extends JComponent> extends SpeedSear
     boolean elementCountImplemented = false;
     try {
       elementCountImplemented = ReflectionUtil.getMethodDeclaringClass(getClass(), "getElementCount") != SpeedSearchBase.class;
-      elementIteratorImplemented = ReflectionUtil.getMethodDeclaringClass(getClass(), "getElementIterator", Integer.TYPE) != SpeedSearchBase.class;
+      elementIteratorImplemented =
+        ReflectionUtil.getMethodDeclaringClass(getClass(), "getElementIterator", Integer.TYPE) != SpeedSearchBase.class;
     }
-    catch (Exception ignore) { }
+    catch (Exception ignore) {
+    }
     if (!elementIteratorImplemented && !(elementAtImplemented && elementCountImplemented)) {
       LOG.warn("Please implement getElementAt(int)" +
-               (elementCountImplemented? "" : " and getElementCount()" ) + " in " + getClass().getName());
+               (elementCountImplemented ? "" : " and getElementCount()") + " in " + getClass().getName());
     }
   }
 
@@ -925,6 +933,30 @@ public abstract class SpeedSearchBase<Comp extends JComponent> extends SpeedSear
     @Override
     public void add(Object o) {
       throw new UnsupportedOperationException("Not implemented in: " + getClass().getCanonicalName());
+    }
+  }
+
+  private class MySearchAction extends DumbAwareAction {
+    @Override
+    public void actionPerformed(@NotNull AnActionEvent e) {
+      showPopup();
+    }
+
+    @Override
+    public void update(@NotNull AnActionEvent e) {
+      e.getPresentation().setEnabled(isSpeedSearchEnabled() && !isPopupActive());
+    }
+
+    @Override
+    public @NotNull ActionUpdateThread getActionUpdateThread() {
+      return ActionUpdateThread.EDT;
+    }
+  }
+
+  static class SpeedSearchActionPromoter implements ActionPromoter {
+    @Override
+    public @Nullable List<AnAction> promote(@NotNull List<? extends AnAction> actions, @NotNull DataContext context) {
+      return ContainerUtil.sorted(actions, Comparator.comparing(it -> it instanceof SpeedSearchBase<?>.MySearchAction ? 1 : 0));
     }
   }
 }

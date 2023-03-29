@@ -197,12 +197,11 @@ object CommunityRepositoryModules {
       spec.withModule("intellij.devkit.intelliLang")
       spec.withModule("intellij.devkit.uiDesigner")
       spec.withModule("intellij.devkit.workspaceModel")
-      spec.withModule("intellij.platform.workspaceModel.codegen")
-      spec.withModule("intellij.platform.workspaceModel.codegen.impl")
       spec.withModule("intellij.java.devkit")
       spec.withModule("intellij.groovy.devkit")
       spec.withModule("intellij.kotlin.devkit")
       spec.withModule("intellij.devkit.jps")
+      spec.withProjectLibrary("workspace-model-codegen")
     },
     plugin("intellij.eclipse") { spec ->
       spec.withModule("intellij.eclipse.jps", "eclipse-jps.jar")
@@ -570,7 +569,6 @@ object CommunityRepositoryModules {
       spec.withModuleLibrary("moshi", "intellij.android.core", "")
       //prebuilts/tools/common/m2:eclipse-layout-kernel <= not recognized
       spec.withModuleLibrary("juniversalchardet", "android.sdktools.db-compiler", "")
-      spec.withModuleLibrary("commons-lang", "android.sdktools.db-compiler", "")
       spec.withModuleLibrary("javapoet", "android.sdktools.db-compiler", "")
       spec.withModuleLibrary("auto-common", "android.sdktools.db-compiler", "")
       spec.withModuleLibrary("jetifier-core", "android.sdktools.db-compilerCommon", "")
@@ -582,6 +580,7 @@ object CommunityRepositoryModules {
       spec.withProjectLibrary("android-test-plugin-host-device-info-proto")
       spec.withProjectLibrary("asm-tools")
       spec.withProjectLibrary("baksmali")
+      spec.withProjectLibrary("commons-lang")
       spec.withProjectLibrary("dexlib2")
       spec.withProjectLibrary("emulator-proto")
       //tools/adt/idea/.idea/libraries:ffmpeg <= FIXME

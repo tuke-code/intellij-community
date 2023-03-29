@@ -2,7 +2,6 @@
 package org.jetbrains.plugins.github.pullrequest.ui.details.model.impl
 
 import com.intellij.collaboration.async.combineState
-import com.intellij.collaboration.async.mapState
 import com.intellij.collaboration.ui.codereview.details.ReviewRole
 import com.intellij.collaboration.ui.codereview.details.ReviewState
 import com.intellij.collaboration.util.CollectionDelta
@@ -40,21 +39,20 @@ internal class GHPRReviewFlowViewModelImpl(
   private val currentUser = securityService.currentUser
   private val ghostUser = securityService.ghostUser
 
-  private val _requestedReviewersState: MutableStateFlow<List<GHPullRequestRequestedReviewer>> = MutableStateFlow(metadataModel.reviewers)
-
   private val _isBusy: MutableStateFlow<Boolean> = MutableStateFlow(false)
   override val isBusy: Flow<Boolean> = _isBusy.asStateFlow()
 
   private val mergeabilityState: MutableStateFlow<GHPRMergeabilityState?> = MutableStateFlow(stateModel.mergeabilityState)
 
-  override val requestedReviewersState: StateFlow<List<GHPullRequestRequestedReviewer>> = _requestedReviewersState.asStateFlow()
+  private val _requestedReviewersState: MutableStateFlow<List<GHPullRequestRequestedReviewer>> = MutableStateFlow(metadataModel.reviewers)
+  override val requestedReviewers: Flow<List<GHPullRequestRequestedReviewer>> = _requestedReviewersState.asSharedFlow()
 
   private val pullRequestReviewState: MutableStateFlow<Map<GHPullRequestRequestedReviewer, GHPullRequestReviewState>> = MutableStateFlow(
     metadataModel.reviews.associate { (it.author as? GHUser ?: ghostUser) to it.state } // Collect latest review state by reviewer
   )
 
-  override val reviewerAndReviewState: StateFlow<Map<GHPullRequestRequestedReviewer, ReviewState>> =
-    combineState(scope, pullRequestReviewState, requestedReviewersState) { reviews, requestedReviewers ->
+  override val reviewerReviews: StateFlow<Map<GHPullRequestRequestedReviewer, ReviewState>> =
+    combineState(scope, pullRequestReviewState, _requestedReviewersState) { reviews, requestedReviewers ->
       mutableMapOf<GHPullRequestRequestedReviewer, ReviewState>().apply {
         reviews
           .filter { (reviewer, _) -> reviewer != metadataModel.getAuthor() }
@@ -78,16 +76,16 @@ internal class GHPRReviewFlowViewModelImpl(
     }
   }
 
-  override val roleState: StateFlow<ReviewRole> = reviewerAndReviewState.mapState(scope) {
+  override val role: Flow<ReviewRole> = reviewerReviews.map { reviewerAndReview ->
     when {
       currentUser == metadataModel.getAuthor() -> ReviewRole.AUTHOR
-      reviewerAndReviewState.value.containsKey(currentUser) -> ReviewRole.REVIEWER
+      reviewerAndReview.containsKey(currentUser) -> ReviewRole.REVIEWER
       else -> ReviewRole.GUEST
     }
   }
 
   private val _pendingCommentsState: MutableStateFlow<Int> = MutableStateFlow(0)
-  override val pendingCommentsState: StateFlow<Int> = _pendingCommentsState.asStateFlow()
+  override val pendingComments: Flow<Int> = _pendingCommentsState.asSharedFlow()
 
   override val userCanManageReview: Boolean = securityService.currentUserHasPermissionLevel(GHRepositoryPermissionLevel.TRIAGE) ||
                                               stateModel.viewerDidAuthor
@@ -128,10 +126,10 @@ internal class GHPRReviewFlowViewModelImpl(
   }
 
   override fun requestReview(parentComponent: JComponent) = stateModel.submitTask {
-    val reviewers = (reviewerAndReviewState.value.keys + metadataModel.reviewers).toList()
+    val reviewers = (reviewerReviews.value.keys + metadataModel.reviewers).toList()
     GHUIUtil.showChooserPopup(
       parentComponent,
-      GHUIUtil.SelectionListCellRenderer.PRReviewers(avatarIconsProvider),
+      GHUIUtil.SelectionPresenters.PRReviewers(avatarIconsProvider),
       reviewers,
       metadataModel.loadPotentialReviewers()
     ).thenAccept { selectedReviewers ->
@@ -140,7 +138,7 @@ internal class GHPRReviewFlowViewModelImpl(
   }
 
   override fun reRequestReview() = stateModel.submitTask {
-    val delta = CollectionDelta(metadataModel.reviewers, reviewerAndReviewState.value.keys)
+    val delta = CollectionDelta(metadataModel.reviewers, reviewerReviews.value.keys)
     metadataModel.adjustReviewers(EmptyProgressIndicator(), delta)
   }
 

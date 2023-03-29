@@ -13,6 +13,8 @@ import com.intellij.util.ui.JBScalableIcon
 import org.jetbrains.annotations.ApiStatus.Internal
 import org.jetbrains.annotations.TestOnly
 import java.awt.*
+import java.awt.geom.AffineTransform
+import java.awt.geom.Point2D
 import java.beans.PropertyChangeListener
 import java.beans.PropertyChangeSupport
 import java.util.function.Supplier
@@ -317,8 +319,8 @@ object JBUIScale {
    * @return 'f' scaled by the user scale factor
    */
   @JvmStatic
-  fun scale(f: Float): Float {
-    return f * userScaleFactor.value
+  fun scale(value: Float): Float {
+    return value * userScaleFactor.value
   }
 
   /**
@@ -380,14 +382,6 @@ object JBUIScale {
 
   /**
    * Returns the system scale factor, corresponding to the graphics.
-   * This is a convenience method allowing to avoid casting to `Graphics2D`
-   * on the calling side.
-   */
-  @JvmStatic
-  fun sysScale(g: Graphics?): Float = sysScale(g as? Graphics2D?)
-
-  /**
-   * Returns the system scale factor, corresponding to the graphics.
    * For BufferedImage's graphics, the scale is taken from the graphics itself.
    * In the IDE-managed HiDPI mode defaults to [.sysScale]
    */
@@ -400,11 +394,24 @@ object JBUIScale {
     val gc = g.deviceConfiguration
     if (gc == null || gc.device.type == GraphicsDevice.TYPE_IMAGE_BUFFER || gc.device.type == GraphicsDevice.TYPE_PRINTER) {
       // in this case, gc doesn't provide a valid scale
-      return abs(g.transform.scaleX.toFloat())
+      return abs(getTransformScaleX(g.transform))
     }
     else {
       return gc.defaultTransform.scaleX.toFloat()
     }
+  }
+
+  /**
+   * Get scale for an arbitrary affine transform.
+   * This should not be necessary for [GraphicsConfiguration.getDefaultTransform], as it is expected to be a translation/uniform scale only.
+   *
+   * See javadoc [AffineTransform.getScaleX], it will return an arbitrary number (inc. negative ones)
+   * after [AffineTransform.rotate] or `AffineTransform.scale(-1, 1)` transforms.
+   */
+  private fun getTransformScaleX(transform: AffineTransform): Float {
+    val p = Point2D.Double(1.0, 0.0);
+    transform.deltaTransform(p, p)
+    return p.distance(0.0, 0.0).toFloat()
   }
 
   @JvmStatic
@@ -429,5 +436,5 @@ object JBUIScale {
    */
   @JvmStatic
   val isUsrHiDPI: Boolean
-    get() = isHiDPI(scale(1f).toDouble())
+    get() = isHiDPI(scale(1f))
 }

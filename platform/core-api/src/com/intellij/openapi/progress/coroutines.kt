@@ -1,10 +1,10 @@
-// Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 @file:ApiStatus.Experimental
 
 package com.intellij.openapi.progress
 
 import com.intellij.concurrency.currentThreadContext
-import com.intellij.concurrency.replaceThreadContext
+import com.intellij.concurrency.installThreadContext
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.application.contextModality
@@ -15,7 +15,6 @@ import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.ApiStatus.Internal
 import kotlin.coroutines.ContinuationInterceptor
 import kotlin.coroutines.CoroutineContext
-import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.coroutines.coroutineContext
 
 private val LOG = Logger.getInstance("#com.intellij.openapi.progress")
@@ -114,20 +113,13 @@ fun <T> runBlockingCancellable(action: suspend CoroutineScope.() -> T): T {
 }
 
 private fun <T> runBlockingCancellable(allowOrphan: Boolean, action: suspend CoroutineScope.() -> T): T {
-  val indicator = ProgressManager.getGlobalProgressIndicator()
-  if (indicator != null) {
-    @Suppress("DEPRECATION")
-    return indicatorRunBlockingCancellable(indicator, action)
-  }
   assertBackgroundThreadOrWriteAction()
-  return ensureCurrentJob(allowOrphan) { currentJob ->
-    val context = currentThreadContext() +
-                  currentJob +
-                  CoroutineName("job run blocking")
-    replaceThreadContext(EmptyCoroutineContext).use {
-      @Suppress("RAW_RUN_BLOCKING")
-      runBlocking(context, action)
+  return prepareThreadContext { ctx ->
+    if (!allowOrphan && ctx[Job] == null) {
+      LOG.error(IllegalStateException("There is no ProgressIndicator or Job in this thread, the current job is not cancellable."))
     }
+    @Suppress("RAW_RUN_BLOCKING")
+    runBlocking(ctx, action)
   }
 }
 
@@ -153,15 +145,11 @@ fun <T> runBlockingMaybeCancellable(action: suspend CoroutineScope.() -> T): T {
 @Internal
 fun <T> indicatorRunBlockingCancellable(indicator: ProgressIndicator, action: suspend CoroutineScope.() -> T): T {
   assertBackgroundThreadOrWriteAction()
-  return ensureCurrentJob(indicator) { currentJob ->
-    val context = currentThreadContext() +
-                  currentJob +
-                  CoroutineName("indicator run blocking") +
-                  IndicatorRawProgressReporter(indicator).asContextElement()
-    replaceThreadContext(EmptyCoroutineContext).use {
-      @Suppress("RAW_RUN_BLOCKING")
-      runBlocking(context, action)
-    }
+  return prepareIndicatorThreadContext(indicator) { ctx ->
+    val context = ctx +
+                  CoroutineName("indicator run blocking")
+    @Suppress("RAW_RUN_BLOCKING")
+    runBlocking(context, action)
   }
 }
 
@@ -186,11 +174,25 @@ fun <T> indicatorRunBlockingCancellable(indicator: ProgressIndicator, action: su
  * @see com.intellij.concurrency.currentThreadContext
  */
 suspend fun <T> blockingContext(action: () -> T): T {
-  val currentContext = coroutineContext.minusKey(ContinuationInterceptor.Key)
-  return replaceThreadContext(currentContext).use {
-    // this will catch com.intellij.openapi.progress.JobCanceledException
-    // and throw original java.util.concurrent.CancellationException instead
-    withCurrentJob(currentContext.job, action)
+  val coroutineContext = coroutineContext
+  return blockingContext(coroutineContext, action)
+}
+
+@Internal
+fun <T> blockingContext(currentContext: CoroutineContext, action: () -> T): T {
+  val context = currentContext.minusKey(ContinuationInterceptor)
+  return installThreadContext(context).use {
+    try {
+      action()
+    }
+    catch (e: JobCanceledException) {
+      // This exception is thrown only from `Cancellation.checkCancelled`.
+      // If it's caught, then the job must've been cancelled.
+      if (!context.job.isCancelled) {
+        throw IllegalStateException("JobCanceledException must be thrown by ProgressManager.checkCanceled()", e)
+      }
+      throw CurrentJobCancellationException(e)
+    }
   }
 }
 

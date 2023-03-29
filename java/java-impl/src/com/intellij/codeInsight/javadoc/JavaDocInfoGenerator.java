@@ -650,7 +650,7 @@ public class JavaDocInfoGenerator {
     }
 
     if (docURLs != null) {
-      if (buffer.length() > 0 && elementHasSourceCode()) {
+      if (!buffer.isEmpty() && elementHasSourceCode()) {
         LOG.debug("Documentation for " + myElement + " was generated from source code, it wasn't found at following URLs: ", docURLs);
       }
       else {
@@ -1873,29 +1873,14 @@ public class JavaDocInfoGenerator {
       }
       return;
     }
-    int indent = markup.getCommonIndent(region);
-    markup.visitSnippet(region, new SnippetVisitor() {
+    markup.visitSnippet(region, true, new SnippetVisitor() {
       @Override
       public void visitPlainText(@NotNull PlainText plainText,
                                  @NotNull List<@NotNull LocationMarkupNode> activeNodes) {
         String content = plainText.content();
-        int curIndent = 0;
-        while (curIndent < indent &&
-               curIndent < content.length() &&
-               content.charAt(curIndent) != '\n' &&
-               Character.isWhitespace(content.charAt(curIndent))) {
-          curIndent++;
-        }
-        content = content.substring(curIndent);
         for (LocationMarkupNode node : activeNodes) {
           UnaryOperator<String> replacement;
-          String tagName;
-          if (node instanceof Replace replace) {
-            tagName = "replace";
-            replacement = orig -> replace.replacement();
-          }
-          else if (node instanceof Highlight highlight) {
-            tagName = "highlight";
+          if (node instanceof Highlight highlight) {
             replacement = switch (highlight.type()) {
               case BOLD -> orig -> "<b>" + orig + "</b>";
               case ITALIC -> orig -> "<i>" + orig + "</i>";
@@ -1907,7 +1892,6 @@ public class JavaDocInfoGenerator {
             };
           }
           else if (node instanceof Link link) {
-            tagName = "link";
             replacement = orig -> {
               StringBuilder buffer = new StringBuilder();
               DocumentationManagerUtil.createHyperlink(buffer, link.target(), orig, link.linkType() == LinkType.LINKPLAIN);
@@ -1917,23 +1901,15 @@ public class JavaDocInfoGenerator {
           else {
             throw new AssertionError(node.toString());
           }
-          Selector selector = node.selector();
-          if (selector instanceof Regex regex) {
-            String repl = replacement.apply("$0");
-            try {
-              content = regex.pattern().matcher(content).replaceAll(repl);
-            }
-            catch (IllegalArgumentException | IndexOutOfBoundsException e) {
-              buffer.append(getSpanForUnresolvedItem()).append("[").append(
-                JavaBundle.message("javadoc.snippet.error.malformed.replacement", tagName, repl, e.getMessage())).append("]</span>\n");
-            }
+          int pos = 0;
+          StringBuilder sb = new StringBuilder();
+          for (TextRange range : node.selector().ranges(content)) {
+            sb.append(content, pos, range.getStartOffset());
+            sb.append(replacement.apply(range.substring(content)));
+            pos = range.getEndOffset();
           }
-          else if (selector instanceof Substring substring) {
-            content = content.replace(substring.substring(), replacement.apply(substring.substring()));
-          }
-          else {
-            content = replacement.apply(content);
-          }
+          sb.append(content, pos, content.length());
+          content = sb.toString();
         }
         buffer.append(content);
       }
@@ -2972,7 +2948,7 @@ public class JavaDocInfoGenerator {
     for (; cls != null; cls = cls.getContainingClass()) {
       String name = cls.getName();
       if (name == null) break;
-      if (result.length() > 0) result.insert(0, '.');
+      if (!result.isEmpty()) result.insert(0, '.');
       result.insert(0, name);
     }
     return result.toString();

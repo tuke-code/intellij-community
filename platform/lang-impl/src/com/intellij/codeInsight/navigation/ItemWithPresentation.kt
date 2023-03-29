@@ -2,7 +2,7 @@
 package com.intellij.codeInsight.navigation
 
 import com.intellij.model.Pointer
-import com.intellij.navigation.TargetPresentation
+import com.intellij.platform.backend.presentation.TargetPresentation
 import com.intellij.psi.PsiElement
 import com.intellij.psi.SmartPointerManager
 import java.util.function.Function
@@ -11,6 +11,10 @@ class ItemWithPresentation(val item: Any, var presentation: TargetPresentation) 
 
   override fun dereference(): PsiElement? {
     return if (item is Pointer<*>) item.dereference() as PsiElement? else null
+  }
+
+  override fun toString(): String {
+    return presentation.presentableText
   }
 }
 

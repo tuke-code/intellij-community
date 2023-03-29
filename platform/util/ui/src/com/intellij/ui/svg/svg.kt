@@ -6,14 +6,16 @@ package com.intellij.ui.svg
 import com.intellij.diagnostic.StartUpMeasurer
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.ui.ColorUtil
+import com.intellij.ui.hasher
 import com.intellij.ui.icons.IconLoadMeasurer
+import com.intellij.ui.icons.getResourceData
 import com.intellij.ui.scale.JBUIScale
-import com.intellij.util.ImageLoader
+import com.intellij.ui.scale.isHiDPIEnabledAndApplicable
+import com.intellij.util.JBHiDPIScaledImage
 import com.intellij.util.SVGLoader
 import com.intellij.util.text.CharSequenceReader
 import com.intellij.util.xml.dom.createXmlStreamReader
 import org.jetbrains.annotations.ApiStatus
-import org.jetbrains.xxh3.Xxh3
 import java.awt.Image
 import java.awt.geom.Rectangle2D
 import java.awt.image.BufferedImage
@@ -59,7 +61,7 @@ fun loadSvgFromClassResource(classLoader: ClassLoader?,
                                   scale = scale,
                                   compoundCacheKey = compoundCacheKey,
                                   colorPatcherProvider = colorPatcherProvider) {
-    ImageLoader.getResourceData(path = path, resourceClass = resourceClass, classLoader = classLoader)
+    getResourceData(path = path, resourceClass = resourceClass, classLoader = classLoader)
   }
 }
 
@@ -77,7 +79,8 @@ internal fun loadSvg(path: String?,
   }!!
 }
 
-fun newSvgPatcher(digest: LongArray?, newPalette: Map<String, String>, alphas: Map<String, Int>): SvgAttributePatcher? {
+@ApiStatus.Internal
+fun newSvgPatcher(digest: LongArray?, newPalette: Map<String, String>, alphaProvider: (String) -> Int?): SvgAttributePatcher? {
   if (newPalette.isEmpty()) {
     return null
   }
@@ -112,7 +115,7 @@ fun newSvgPatcher(digest: LongArray?, newPalette: Map<String, String>, alphas: M
       }
       if (newColor != null) {
         attributes.put(attributeName, newColor)
-        alphas.get(newColor)?.let {
+        alphaProvider(newColor)?.let {
           attributes.put("$attributeName-opacity", (it.toFloat() / 255f).toString())
         }
       }
@@ -191,7 +194,7 @@ private inline fun loadAndCacheIfApplicable(path: String?,
                                             colorPatcher: SvgAttributePatcher?,
                                             deprecatedColorPatcher: SVGLoader.SvgElementColorPatcher?,
                                             dataProvider: () -> ByteArray?): BufferedImage? {
-  val colorPatcherDigest = colorPatcher?.digest() ?: deprecatedColorPatcher?.digest()?.let { longArrayOf(Xxh3.hash(it)) }
+  val colorPatcherDigest = colorPatcher?.digest() ?: deprecatedColorPatcher?.digest()?.let { longArrayOf(hasher.hashBytesToLong(it)) }
   val svgCache = svgCache
   if (svgCache == null || !svgCache.isActive() ||
       (colorPatcherDigest == null && (colorPatcher != null || deprecatedColorPatcher != null)) ||
@@ -290,4 +293,26 @@ private fun renderImage(colorPatcher: SvgAttributePatcher?,
     IconLoadMeasurer.svgDecoding.end(decodingStart)
   }
   return bufferedImage
+}
+
+@ApiStatus.Internal
+fun loadWithSizes(sizes: List<Int>, data: ByteArray, scale: Float = JBUIScale.sysScale()): List<Image> {
+  val svgCache = svgCache
+  val document by lazy(LazyThreadSafetyMode.NONE) { createJSvgDocument(data) }
+  val isHiDpiNeeded = isHiDPIEnabledAndApplicable(scale)
+  return sizes.map { size ->
+    val compoundKey = SvgCacheClassifier(scale = scale, size = size)
+    var image = svgCache?.loadFromCache(imageBytes = data, themeKey = 0, compoundKey = compoundKey)
+    if (image == null) {
+      image = renderSvgWithSize(document = document, width = (size * scale), height = (size * scale))
+      svgCache?.storeLoadedImage(precomputedCacheKey = 0, themeKey = 0, imageBytes = data, compoundKey = compoundKey, image = image)
+    }
+
+    if (isHiDpiNeeded) {
+      JBHiDPIScaledImage(image, scale.toDouble())
+    }
+    else {
+      image
+    }
+  }
 }

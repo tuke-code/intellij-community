@@ -3,18 +3,17 @@ package org.jetbrains.plugins.github.pullrequest.ui.details.model
 
 import com.intellij.collaboration.ui.codereview.details.ReviewRole
 import com.intellij.collaboration.ui.codereview.details.ReviewState
+import com.intellij.collaboration.ui.codereview.details.model.CodeReviewFlowViewModel
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.StateFlow
 import org.jetbrains.plugins.github.api.data.pullrequest.GHPullRequestRequestedReviewer
 import javax.swing.JComponent
 
-internal interface GHPRReviewFlowViewModel {
+internal interface GHPRReviewFlowViewModel : CodeReviewFlowViewModel<GHPullRequestRequestedReviewer> {
   val isBusy: Flow<Boolean>
-  val requestedReviewersState: StateFlow<List<GHPullRequestRequestedReviewer>>
-  val reviewerAndReviewState: StateFlow<Map<GHPullRequestRequestedReviewer, ReviewState>>
+  val requestedReviewers: Flow<List<GHPullRequestRequestedReviewer>>
   val reviewState: Flow<ReviewState>
-  val roleState: StateFlow<ReviewRole>
-  val pendingCommentsState: StateFlow<Int>
+  val role: Flow<ReviewRole>
+  val pendingComments: Flow<Int>
 
   val userCanManageReview: Boolean
   val userCanMergeReview: Boolean

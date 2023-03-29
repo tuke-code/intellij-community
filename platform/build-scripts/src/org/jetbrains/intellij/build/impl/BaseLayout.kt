@@ -7,9 +7,8 @@ import com.intellij.util.containers.MultiMap
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet
 import kotlinx.collections.immutable.*
 import org.jetbrains.annotations.TestOnly
-import java.lang.IllegalStateException
+import org.jetbrains.intellij.build.BuildContext
 import java.lang.StackWalker.Option
-import kotlin.collections.LinkedHashSet
 import kotlin.streams.asSequence
 
 const val APP_JAR: String = "app.jar"
@@ -48,6 +47,13 @@ sealed class BaseLayout {
   val excludedModuleLibraries: MultiMap<String, String> = MultiMap.createLinked()
 
   val modulesWithExcludedModuleLibraries: MutableList<String> = mutableListOf()
+
+  internal var patchers: PersistentList<suspend (ModuleOutputPatcher, BuildContext) -> Unit> = persistentListOf()
+    private set
+
+  fun withPatch(patcher: suspend (ModuleOutputPatcher, BuildContext) -> Unit) {
+    patchers = patchers.add(patcher)
+  }
 
   fun hasLibrary(name: String): Boolean = includedProjectLibraries.any { it.libraryName == name }
 
@@ -159,11 +165,12 @@ sealed class BaseLayout {
    * their module libraries are included in the layout automatically.
    * @param relativeOutputPath target path relative to 'lib' directory
    */
-  fun withModuleLibrary(libraryName: String, moduleName: String, relativeOutputPath: String) {
+  fun withModuleLibrary(libraryName: String, moduleName: String, relativeOutputPath: String, extraCopy: Boolean = false) {
     includedModuleLibraries.add(ModuleLibraryData(
       moduleName = moduleName,
       libraryName = libraryName,
       relativeOutputPath = relativeOutputPath,
+      extraCopy = extraCopy
     ))
   }
 
@@ -183,6 +190,7 @@ data class ModuleLibraryData(
   @JvmField val moduleName: String,
   @JvmField val libraryName: String,
   @JvmField val relativeOutputPath: String = "",
+  @JvmField val extraCopy: Boolean = false // set to true to have library both packed to plugin and copied to plugin as additional JAR
 )
 
 class ModuleItem(

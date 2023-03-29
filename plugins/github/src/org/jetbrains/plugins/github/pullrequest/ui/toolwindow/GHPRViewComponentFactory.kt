@@ -49,7 +49,7 @@ import org.jetbrains.plugins.github.pullrequest.ui.changes.GHPRViewedStateDiffSu
 import org.jetbrains.plugins.github.pullrequest.ui.changes.GHPRViewedStateDiffSupportImpl
 import org.jetbrains.plugins.github.pullrequest.ui.changes.showPullRequestProgress
 import org.jetbrains.plugins.github.pullrequest.ui.details.GHPRDetailsComponentFactory
-import org.jetbrains.plugins.github.pullrequest.ui.details.model.GHPRCommitsViewModel
+import org.jetbrains.plugins.github.pullrequest.ui.details.model.GHPRStatusViewModelImpl
 import org.jetbrains.plugins.github.pullrequest.ui.details.model.impl.*
 import org.jetbrains.plugins.github.util.DiffRequestChainProducer
 import javax.swing.JComponent
@@ -144,18 +144,15 @@ internal class GHPRViewComponentFactory(private val actionManager: ActionManager
   private class Controller(
     private val tree: ChangesTree,
     private val changesProviderModel: SingleValueModel<GitParsedChangesBundle>,
-    private val commitsVm: GHPRCommitsViewModel,
-    private val diffBridge: GHPRDiffController
+    private val commitsVm: GHPRCommitsViewModel
   ) : GHPRCommitBrowserComponentController {
     override fun selectCommit(oid: String) {
       val selectedCommit = commitsVm.reviewCommits.value.find { it.abbreviatedOid == oid }
-      diffBridge.activeTree = GHPRDiffController.ActiveTree.COMMITS
       commitsVm.selectCommit(selectedCommit)
       CollaborationToolsUIUtil.focusPanel(tree)
     }
 
     override fun selectChange(oid: String?, filePath: String) {
-      diffBridge.activeTree = GHPRDiffController.ActiveTree.FILES
       commitsVm.selectAllCommits()
 
       if (oid == null) {
@@ -189,7 +186,8 @@ internal class GHPRViewComponentFactory(private val actionManager: ActionManager
       val stateModel = GHPRStateModelImpl(project, dataProvider.stateData, dataProvider.changesData, model, disposable)
 
       val scope = DisposingScope(disposable, SupervisorJob() + Dispatchers.Main.immediate)
-      val reviewDetailsVm = GHPRDetailsViewModelImpl(scope, detailsModel, stateModel)
+      val reviewDetailsVm = GHPRDetailsViewModelImpl(detailsModel, stateModel)
+      val reviewStatusVm = GHPRStatusViewModelImpl(detailsModel, stateModel)
       val reviewFlowVm = GHPRReviewFlowViewModelImpl(scope,
                                                      metadataModel,
                                                      stateModel,
@@ -198,16 +196,15 @@ internal class GHPRViewComponentFactory(private val actionManager: ActionManager
                                                      dataProvider.detailsData,
                                                      dataProvider.reviewData,
                                                      disposable)
-      val commitsVm = GHPRCommitsViewModelImpl(scope, commitsLoadingModel, dataContext.securityService)
+      val commitsVm = GHPRCommitsViewModel(scope, commitsLoadingModel, dataContext.securityService, diffBridge)
 
       GHPRDetailsComponentFactory.create(project,
                                          scope,
-                                         reviewDetailsVm, reviewFlowVm, commitsVm,
+                                         reviewDetailsVm, reviewStatusVm, reviewFlowVm, commitsVm,
                                          dataProvider,
                                          dataContext.repositoryDataService, dataContext.securityService, dataContext.avatarIconsProvider,
                                          branchesModel,
-                                         createCommitFilesBrowserComponent(scope, commitsVm),
-                                         diffBridge)
+                                         createCommitFilesBrowserComponent(scope, commitsVm))
     }.apply {
       isOpaque = true
       background = UIUtil.getListBackground()
@@ -240,7 +237,7 @@ internal class GHPRViewComponentFactory(private val actionManager: ActionManager
         GithubBundle.message("pull.request.does.not.contain.changes"),
         getCustomData
       )
-      val controller = Controller(tree, model, commitsVm, diffBridge)
+      val controller = Controller(tree, model, commitsVm)
       ClientProperty.put(tree, GHPRCommitBrowserComponentController.KEY, controller)
 
       val scrollPane = ScrollPaneFactory.createScrollPane(tree, true)
