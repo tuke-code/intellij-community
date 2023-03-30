@@ -78,6 +78,10 @@ public class CStyleArrayDeclarationInspection extends BaseInspection implements 
         // This was fixed in Java 16 (https://bugs.openjdk.org/browse/JDK-8250629)
         return;
       }
+      if (variable instanceof PsiParameter parameter && parameter.isVarArgs()) {
+        // not compilable, fix is handled by error highlighting
+        return;
+      }
       final PsiTypeElement typeElement = variable.getTypeElement();
       if (typeElement == null || typeElement.isInferredType()) {
         return; // true for enum constants or lambda parameters
@@ -124,13 +128,16 @@ public class CStyleArrayDeclarationInspection extends BaseInspection implements 
       PsiElement start = null;
       PsiElement end = null;
       while (anchor != null) {
-        if (PsiUtil.isJavaToken(anchor, HighlightUtil.BRACKET_TOKENS)) {
+        if (anchor instanceof PsiAnnotation) {
+          if (start == null) start = anchor;
+        }
+        else if (PsiUtil.isJavaToken(anchor, HighlightUtil.BRACKET_TOKENS)) {
           if (start == null) start = anchor;
           end = anchor;
         }
         anchor = anchor.getNextSibling();
       }
-      if (start != null) registerErrorAtRange(start, end, problemElement);
+      if (start != null && end != null) registerErrorAtRange(start, end, problemElement);
     }
   }
 }

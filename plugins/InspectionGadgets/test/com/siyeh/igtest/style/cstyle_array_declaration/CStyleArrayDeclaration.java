@@ -1,5 +1,7 @@
 package com.siyeh.igtest.style;
 
+import java.lang.annotation.*;
+
 public class CStyleArrayDeclaration
 {
     private int[] m_foo;
@@ -36,8 +38,26 @@ public class CStyleArrayDeclaration
         return a;
     }
 
-    record Record(int x<error descr="C-style record component declaration is not allowed">[]</error>) {
+    record Record(int x<error descr="C-style array declaration not allowed in record component">[]</error>) {
     }
 
     int methodWithoutBody()<warning descr="Method 'methodWithoutBody()' has C-style array return type declaration">[][]</warning><EOLError descr="'{' or ';' expected"></EOLError>
+
+
+    void annotation() {
+      String split <warning descr="Local variable 'split' has C-style array type declaration">@Anno []</warning> = null;
+    }
+
+    @Target(ElementType.TYPE_USE)
+    public @interface Anno {}
+
+    public Integer @A(1) /*1*/[] @A(2) /*2*/[] test5() <warning descr="Method 'test5()' has C-style array return type declaration">@A(3) /*3*/[] @A(4) /*4*/[]</warning>  {
+      return null;
+    }
+    String @A(1) /*1*/ [] @A(2) /*2*/[] string <warning descr="Field 'string' has C-style array type declaration">@A(3) /*3*/[] @A(4) /*4*/[]</warning>;
+
+    @Target(ElementType.TYPE_USE)
+    @interface A {
+      int value();
+    }
 }

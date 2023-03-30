@@ -1282,7 +1282,9 @@
       <module fileurl="file://$PROJECT_DIR$/plugins/kotlin/tests-from-compiler/kotlin.testsFromCompiler.iml" filepath="$PROJECT_DIR$/plugins/kotlin/tests-from-compiler/kotlin.testsFromCompiler.iml" />
       <module fileurl="file://$PROJECT_DIR$/plugins/kotlin/uast/uast-kotlin/kotlin.uast.uast-kotlin.iml" filepath="$PROJECT_DIR$/plugins/kotlin/uast/uast-kotlin/kotlin.uast.uast-kotlin.iml" />
       <module fileurl="file://$PROJECT_DIR$/plugins/kotlin/uast/uast-kotlin-base/kotlin.uast.uast-kotlin-base.iml" filepath="$PROJECT_DIR$/plugins/kotlin/uast/uast-kotlin-base/kotlin.uast.uast-kotlin-base.iml" />
+      <module fileurl="file://$PROJECT_DIR$/plugins/kotlin/uast/uast-kotlin-base/tests/kotlin.uast.uast-kotlin-base.tests.iml" filepath="$PROJECT_DIR$/plugins/kotlin/uast/uast-kotlin-base/tests/kotlin.uast.uast-kotlin-base.tests.iml" />
       <module fileurl="file://$PROJECT_DIR$/plugins/kotlin/uast/uast-kotlin-fir/kotlin.uast.uast-kotlin-fir.iml" filepath="$PROJECT_DIR$/plugins/kotlin/uast/uast-kotlin-fir/kotlin.uast.uast-kotlin-fir.iml" />
+      <module fileurl="file://$PROJECT_DIR$/plugins/kotlin/uast/uast-kotlin-fir/tests/kotlin.uast.uast-kotlin-fir.tests.iml" filepath="$PROJECT_DIR$/plugins/kotlin/uast/uast-kotlin-fir/tests/kotlin.uast.uast-kotlin-fir.tests.iml" />
       <module fileurl="file://$PROJECT_DIR$/plugins/kotlin/uast/uast-kotlin-idea/kotlin.uast.uast-kotlin-idea.iml" filepath="$PROJECT_DIR$/plugins/kotlin/uast/uast-kotlin-idea/kotlin.uast.uast-kotlin-idea.iml" />
       <module fileurl="file://$PROJECT_DIR$/plugins/kotlin/uast/uast-kotlin-idea-base/kotlin.uast.uast-kotlin-idea-base.iml" filepath="$PROJECT_DIR$/plugins/kotlin/uast/uast-kotlin-idea-base/kotlin.uast.uast-kotlin-idea-base.iml" />
       <module fileurl="file://$PROJECT_DIR$/plugins/kotlin/uast/uast-kotlin-idea-fir/kotlin.uast.uast-kotlin-idea-fir.iml" filepath="$PROJECT_DIR$/plugins/kotlin/uast/uast-kotlin-idea-fir/kotlin.uast.uast-kotlin-idea-fir.iml" />
