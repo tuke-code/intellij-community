@@ -8,11 +8,14 @@ import com.intellij.openapi.components.service
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.registry.Registry
 import com.intellij.ui.components.JBList
+import org.jetbrains.annotations.ApiStatus
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 import javax.swing.ListCellRenderer
 
-internal class SearchEverywhereMlServiceImpl : SearchEverywhereMlService() {
+
+@ApiStatus.Internal
+class SearchEverywhereMlServiceImpl : SearchEverywhereMlService() {
   companion object {
     internal const val RECORDER_CODE = "MLSE"
 
@@ -34,7 +37,7 @@ internal class SearchEverywhereMlServiceImpl : SearchEverywhereMlService() {
     return experiment.getExperimentForTab(tab) == SearchEverywhereMlExperiment.ExperimentType.USE_EXPERIMENTAL_MODEL
   }
 
-  fun getCurrentSession(): SearchEverywhereMLSearchSession? {
+  internal fun getCurrentSession(): SearchEverywhereMLSearchSession? {
     if (isEnabled()) {
       return activeSession.get()
     }
@@ -58,6 +61,13 @@ internal class SearchEverywhereMlServiceImpl : SearchEverywhereMlService() {
 
     val session = getCurrentSession() ?: return foundElementInfoWithoutMl
     val state = session.getCurrentSearchState() ?: return foundElementInfoWithoutMl
+
+    val tab = SearchEverywhereTabWithMl.findById(state.tabId)
+    tab?.let {
+      if (experiment.getExperimentForTab(tab) == SearchEverywhereMlExperiment.ExperimentType.NO_ML_FEATURES)
+        return foundElementInfoWithoutMl
+    }
+
 
     val elementId = session.itemIdProvider.getId(element)
     val mlElementInfo = state.getElementFeatures(elementId, element, contributor, priority, session.mixedListInfo)
@@ -98,6 +108,7 @@ internal class SearchEverywhereMlServiceImpl : SearchEverywhereMlService() {
     if (settings.isSortingByMlEnabledByDefault(tab)) {
       return settings.isSortingByMlEnabled(tab)
              && experiment.getExperimentForTab(tab) != SearchEverywhereMlExperiment.ExperimentType.NO_ML
+             && experiment.getExperimentForTab(tab) != SearchEverywhereMlExperiment.ExperimentType.NO_ML_FEATURES
     }
     else {
       return settings.isSortingByMlEnabled(tab)

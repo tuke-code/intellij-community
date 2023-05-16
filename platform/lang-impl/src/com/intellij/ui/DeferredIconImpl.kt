@@ -19,10 +19,12 @@ import com.intellij.util.ui.EmptyIcon
 import com.intellij.util.ui.JBScalableIcon
 import com.intellij.util.ui.tree.TreeUtil
 import kotlinx.coroutines.*
+import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.VisibleForTesting
 import java.awt.Component
 import java.awt.Graphics
 import java.util.*
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 import javax.swing.Icon
 import javax.swing.JTree
@@ -32,6 +34,8 @@ private val repaintScheduler = DeferredIconRepaintScheduler()
 class DeferredIconImpl<T> : JBScalableIcon, DeferredIcon, RetrievableIcon, IconWithToolTip, CopyableIcon {
   companion object {
     internal val EMPTY_ICON: Icon by lazy { EmptyIcon.create(16).withIconPreScaled(false) }
+
+    private val nextDeferredIconId = AtomicLong(1)
 
     fun <T> withoutReadAction(baseIcon: Icon?, param: T, evaluator: (T) -> Icon?): DeferredIcon {
       return DeferredIconImpl(baseIcon = baseIcon, param = param, needReadAction = false, evaluator = evaluator, listener = null)
@@ -52,13 +56,16 @@ class DeferredIconImpl<T> : JBScalableIcon, DeferredIcon, RetrievableIcon, IconW
   private var scaledDelegateIcon: Icon
   private var cachedScaledIcon: DeferredIconImpl<T>?
   private var evaluator: ((T) -> Icon?)?
+  private var asyncEvaluator: (suspend (T) -> Icon)? = null
   private var scheduledRepaints: Set<RepaintRequest>? = null
 
-  @Volatile
-  private var isScheduled = false
+  private val isScheduled = AtomicBoolean(false)
 
   @JvmField
   val param: T
+
+  @ApiStatus.Internal
+  val uniqueId: Long = nextDeferredIconId.getAndIncrement()
 
   val isNeedReadAction: Boolean
 
@@ -66,8 +73,6 @@ class DeferredIconImpl<T> : JBScalableIcon, DeferredIcon, RetrievableIcon, IconW
   var isDone: Boolean = false
     private set
 
-  private var lastCalcTime: Long = 0
-  private var lastTimeSpent: Long = 0
   private var modificationCount = AtomicLong(0)
   private val evalListener: ((DeferredIconImpl<T>, Icon) -> Unit)?
 
@@ -76,12 +81,11 @@ class DeferredIconImpl<T> : JBScalableIcon, DeferredIcon, RetrievableIcon, IconW
     scaledDelegateIcon = icon.delegateIcon
     cachedScaledIcon = null
     evaluator = icon.evaluator
-    isScheduled = icon.isScheduled
+    asyncEvaluator = icon.asyncEvaluator
+    isScheduled.set(icon.isScheduled.get())
     param = icon.param
     isNeedReadAction = icon.isNeedReadAction
     isDone = icon.isDone
-    lastCalcTime = icon.lastCalcTime
-    lastTimeSpent = icon.lastTimeSpent
     evalListener = icon.evalListener
     modificationCount = icon.modificationCount
   }
@@ -107,6 +111,23 @@ class DeferredIconImpl<T> : JBScalableIcon, DeferredIcon, RetrievableIcon, IconW
          needReadAction = needReadAction,
          evaluator = { evaluator.`fun`(it) },
          listener = null)
+
+
+  @ApiStatus.Internal
+  constructor(baseIcon: Icon?,
+              param: T,
+              asyncEvaluator: suspend (T) -> Icon,
+              listener: ((DeferredIconImpl<T>, Icon) -> Unit)?) {
+    this.param = param
+    delegateIcon = baseIcon ?: EMPTY_ICON
+    scaledDelegateIcon = delegateIcon
+    cachedScaledIcon = null
+    this.evaluator = null
+    this.asyncEvaluator = asyncEvaluator
+    isNeedReadAction = false
+    evalListener = listener
+    checkDelegationDepth()
+  }
 
   override fun getModificationCount(): Long = modificationCount.get()
 
@@ -184,10 +205,16 @@ class DeferredIconImpl<T> : JBScalableIcon, DeferredIcon, RetrievableIcon, IconW
       }
     }
 
-    if (isScheduled) {
+    if (isScheduled.get()) {
       return null
     }
-    isScheduled = true
+    return scheduleCalculationIfNeeded()
+  }
+
+  private fun scheduleCalculationIfNeeded(): Job? {
+    if (isScheduled.getAndSet(true)) {
+      return null
+    }
 
     @Suppress("OPT_IN_USAGE")
     val coroutineScope = serviceOrNull<IconCalculatingService>()?.coroutineScope ?: GlobalScope
@@ -195,10 +222,10 @@ class DeferredIconImpl<T> : JBScalableIcon, DeferredIcon, RetrievableIcon, IconW
       val oldWidth = scaledDelegateIcon.iconWidth
       val result = IconDeferrerImpl.evaluateDeferred {
         if (isNeedReadAction) {
-          runReadAction { evaluate() }
+          readAction { evaluate() }
         }
         else {
-          evaluate()
+          asyncEvaluator?.let { adjustResultWithScale(it(param)) } ?: evaluate()
         }
       }
 
@@ -206,19 +233,24 @@ class DeferredIconImpl<T> : JBScalableIcon, DeferredIcon, RetrievableIcon, IconW
       modificationCount.incrementAndGet()
       checkDelegationDepth()
       processRepaints(oldWidth = oldWidth, result = result)
+      setDone(result)
     }
+  }
+
+  @ApiStatus.Internal
+  fun triggerEvaluation() {
+    scheduleCalculationIfNeeded()
   }
 
   private suspend fun processRepaints(oldWidth: Int, result: Icon) {
     val shouldRevalidate = Registry.`is`("ide.tree.deferred.icon.invalidates.cache", true) && scaledDelegateIcon.iconWidth != oldWidth
     withContext(Dispatchers.EDT + ModalityState.any().asContextElement()) {
       val repaints = scheduledRepaints
-      setDone(result)
-      if (equalIcons(result, delegateIcon)) {
+      if (equalIcons(result, delegateIcon) || repaints == null) {
         return@withContext
       }
 
-      for (repaintRequest in repaints!!) {
+      for (repaintRequest in repaints) {
         val actualTarget = repaintRequest.getActualTarget() ?: continue
         // revalidate will not work: JTree caches size of nodes
         if (shouldRevalidate && actualTarget is JTree) {
@@ -231,11 +263,15 @@ class DeferredIconImpl<T> : JBScalableIcon, DeferredIcon, RetrievableIcon, IconW
     }
   }
 
-  private fun setDone(result: Icon) {
-    evalListener?.invoke(this, result)
-    isDone = true
-    evaluator = null
-    scheduledRepaints = null
+  private suspend fun setDone(result: Icon) {
+    withContext(Dispatchers.EDT + ModalityState.any().asContextElement()) {
+      evalListener?.invoke(this@DeferredIconImpl, result)
+      isDone = true
+      evaluator = null
+      asyncEvaluator = null
+      scheduledRepaints = null
+      ApplicationManager.getApplication().messageBus.syncPublisher(DeferredIconListener.TOPIC).evaluated(this@DeferredIconImpl, result)
+    }
   }
 
   override fun retrieveIcon(): Icon {
@@ -257,8 +293,10 @@ class DeferredIconImpl<T> : JBScalableIcon, DeferredIcon, RetrievableIcon, IconW
     if (app != null && app.isUnitTestMode) {
       checkDoesntReferenceThis(result)
     }
-    return if (scale != 1f && result is ScalableIcon) result.scale(scale) else result
+    return adjustResultWithScale(result)
   }
+
+  private fun adjustResultWithScale(result: Icon) = if (scale != 1f && result is ScalableIcon) result.scale(scale) else result
 
   private fun checkDoesntReferenceThis(icon: Icon?) {
     check(icon !== this) { "Loop in icons delegation" }

@@ -18,9 +18,7 @@ import org.jetbrains.idea.maven.server.MavenServerExecutionResult;
 import org.jetbrains.idea.maven.server.MavenServerManager;
 import org.jetbrains.idea.maven.server.ProfileApplicationResult;
 import org.jetbrains.idea.maven.utils.MavenJDOMUtil;
-import org.jetbrains.idea.maven.utils.MavenLog;
-import org.jetbrains.idea.maven.utils.MavenProcessCanceledException;
-import org.jetbrains.idea.maven.utils.MavenUtil;
+import org.jetbrains.idea.maven.utils.*;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -515,15 +513,29 @@ public final class MavenProjectReader {
     }
   }
 
-  public Collection<MavenProjectReaderResult> resolveProject(final MavenGeneralSettings generalSettings,
+  // used in third-party plugins
+  public Collection<MavenProjectReaderResult> resolveProject(MavenGeneralSettings generalSettings,
                                                              MavenEmbedderWrapper embedder,
                                                              Collection<VirtualFile> files,
-                                                             final MavenExplicitProfiles explicitProfiles,
-                                                             final MavenProjectReaderProjectLocator locator)
+                                                             MavenExplicitProfiles explicitProfiles,
+                                                             MavenProjectReaderProjectLocator locator)
+    throws MavenProcessCanceledException {
+    return resolveProject(generalSettings, embedder, files, explicitProfiles, locator, null, null, null, false);
+  }
+
+  public Collection<MavenProjectReaderResult> resolveProject(MavenGeneralSettings generalSettings,
+                                                             MavenEmbedderWrapper embedder,
+                                                             Collection<VirtualFile> files,
+                                                             MavenExplicitProfiles explicitProfiles,
+                                                             MavenProjectReaderProjectLocator locator,
+                                                             @Nullable MavenProgressIndicator process,
+                                                             @Nullable MavenConsole console,
+                                                             @Nullable MavenWorkspaceMap workspaceMap,
+                                                             boolean updateSnapshots)
     throws MavenProcessCanceledException {
     try {
-      Collection<MavenServerExecutionResult> executionResults = embedder
-        .resolveProject(files, explicitProfiles.getEnabledProfiles(), explicitProfiles.getDisabledProfiles());
+      Collection<MavenServerExecutionResult> executionResults =
+        embedder.resolveProject(files, explicitProfiles, process, console, workspaceMap, updateSnapshots);
       Map<String, VirtualFile> filesMap = CollectionFactory.createFilePathMap();
       filesMap.putAll(files.stream().collect(toMap(VirtualFile::getPath, Function.identity())));
 
@@ -586,32 +598,6 @@ public final class MavenProjectReader {
       }
     }
     return null;
-  }
-
-  @Nullable
-  public static MavenProjectReaderResult generateSources(MavenEmbedderWrapper embedder,
-                                                         MavenImportingSettings importingSettings,
-                                                         VirtualFile file,
-                                                         MavenExplicitProfiles profiles,
-                                                         MavenConsole console) throws MavenProcessCanceledException {
-    try {
-      List<String> goals = Collections.singletonList(importingSettings.getUpdateFoldersOnImportPhase());
-      MavenServerExecutionResult result = embedder.execute(file, profiles.getEnabledProfiles(), profiles.getDisabledProfiles(), goals);
-      MavenServerExecutionResult.ProjectData projectData = result.projectData;
-      if (projectData == null) return null;
-
-      return new MavenProjectReaderResult(projectData.mavenModel,
-                                          projectData.mavenModelMap,
-                                          new MavenExplicitProfiles(projectData.activatedProfiles, profiles.getDisabledProfiles()),
-                                          projectData.nativeMavenProject,
-                                          result.problems,
-                                          result.unresolvedArtifacts);
-    }
-    catch (Throwable e) {
-      console.printException(e);
-      MavenLog.LOG.warn(e);
-      return null;
-    }
   }
 
   private static Element readXml(final VirtualFile file,

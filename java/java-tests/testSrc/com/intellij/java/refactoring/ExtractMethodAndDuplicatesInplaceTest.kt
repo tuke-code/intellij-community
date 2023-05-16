@@ -488,6 +488,47 @@ class ExtractMethodAndDuplicatesInplaceTest: LightJavaCodeInsightTestCase() {
     }
   }
 
+  fun testFoldParametersInDuplicates(){
+    doTest()
+  }
+
+  fun testTypeParametersInNonStaticTarget(){
+    JavaRefactoringSettings.getInstance().EXTRACT_STATIC_METHOD = true
+    shouldSelectTargetClass("Inner in Test")
+    doTest()
+  }
+
+  fun testNonStaticExtractFromStaticInner(){
+    shouldSelectTargetClass("Inner in Test")
+    JavaRefactoringSettings.getInstance().EXTRACT_STATIC_METHOD = false
+    doTest()
+  }
+
+  fun testPassThisAsParameter(){
+    JavaRefactoringSettings.getInstance().EXTRACT_STATIC_METHOD_AND_PASS_FIELDS = true
+    doTest()
+  }
+
+  fun testCheckNameExtractedFromLambda(){
+    doTest {
+      nextTemplateVariable()
+    }
+  }
+
+  fun testChangeSignatureIsIgnored(){
+    DuplicatesMethodExtractor.changeSignatureDefault = true
+    doTest()
+  }
+
+  fun testKeepVarKeyword(){
+    doTest()
+  }
+
+  fun testDeclareVarType(){
+    JavaRefactoringSettings.getInstance().INTRODUCE_LOCAL_CREATE_VAR_TYPE = true
+    doTest()
+  }
+
   fun testRefactoringListener(){
     templateTest {
       configureByFile("$BASE_PATH/${getTestName(false)}.java")
@@ -534,11 +575,13 @@ class ExtractMethodAndDuplicatesInplaceTest: LightJavaCodeInsightTestCase() {
     val settings = JavaRefactoringSettings.getInstance()
     val defaultStatic = settings.EXTRACT_STATIC_METHOD
     val defaultPassFields = settings.EXTRACT_STATIC_METHOD_AND_PASS_FIELDS
+    val defaultDeclareVar = settings.INTRODUCE_LOCAL_CREATE_VAR_TYPE
     val defaultChangeSignature = DuplicatesMethodExtractor.changeSignatureDefault
     val defaultReplaceDuplicates = DuplicatesMethodExtractor.replaceDuplicatesDefault
     Disposer.register(testRootDisposable) {
       settings.EXTRACT_STATIC_METHOD = defaultStatic
       settings.EXTRACT_STATIC_METHOD_AND_PASS_FIELDS = defaultPassFields
+      settings.INTRODUCE_LOCAL_CREATE_VAR_TYPE = defaultDeclareVar
       DuplicatesMethodExtractor.changeSignatureDefault = defaultChangeSignature
       DuplicatesMethodExtractor.replaceDuplicatesDefault = defaultReplaceDuplicates
     }

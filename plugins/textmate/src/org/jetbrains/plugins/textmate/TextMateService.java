@@ -2,10 +2,8 @@ package org.jetbrains.plugins.textmate;
 
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.diagnostic.Logger;
-import com.intellij.openapi.vfs.VirtualFile;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.jetbrains.plugins.textmate.bundles.Bundle;
 import org.jetbrains.plugins.textmate.bundles.TextMateBundleReader;
 import org.jetbrains.plugins.textmate.configuration.TextMateBuiltinBundlesSettings;
 import org.jetbrains.plugins.textmate.configuration.TextMateUserBundlesSettings;
@@ -15,6 +13,7 @@ import org.jetbrains.plugins.textmate.language.preferences.ShellVariablesRegistr
 import org.jetbrains.plugins.textmate.language.preferences.SnippetsRegistry;
 import org.jetbrains.plugins.textmate.language.syntax.highlighting.TextMateTextAttributesAdapter;
 
+import java.nio.file.Path;
 import java.util.Map;
 
 public abstract class TextMateService {
@@ -27,22 +26,10 @@ public abstract class TextMateService {
   /**
    * Create bundle object from given directory.
    *
-   * @deprecated use {@link #readBundle(VirtualFile)} instead
-   * @return bundle object or {@code null} if directory doesn't exist or bundle type can't be defined
-   */
-  @Deprecated(forRemoval = true)
-  @Nullable
-  public Bundle createBundle(@NotNull VirtualFile directory) {
-    return null;
-  }
-
-  /**
-   * Create bundle object from given directory.
-   *
    * @return bundle object or {@code null} if directory doesn't exist or bundle type can't be defined
    */
   @Nullable
-  public TextMateBundleReader readBundle(@Nullable VirtualFile directory) {
+  public TextMateBundleReader readBundle(@Nullable Path directory) {
     return null;
   }
 

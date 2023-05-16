@@ -1,4 +1,4 @@
-// Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.ui;
 
 import com.intellij.featureStatistics.FeatureUsageTracker;
@@ -19,6 +19,7 @@ import com.intellij.openapi.util.text.Strings;
 import com.intellij.openapi.wm.ToolWindow;
 import com.intellij.openapi.wm.ToolWindowManager;
 import com.intellij.openapi.wm.ex.ToolWindowManagerListener;
+import com.intellij.ui.awt.RelativeRectangle;
 import com.intellij.ui.components.fields.ExtendableTextComponent;
 import com.intellij.ui.components.fields.ExtendableTextField;
 import com.intellij.ui.scale.JBUIScale;
@@ -154,17 +155,17 @@ public abstract class SpeedSearchBase<Comp extends JComponent> extends SpeedSear
     new DumbAwareAction() {
       @Override
       public void actionPerformed(@NotNull AnActionEvent e) {
-        final String prefix = getEnteredPrefix();
-        assert prefix != null;
-        final String[] strings = NameUtilCore.splitNameIntoWords(prefix);
-        final String last = strings[strings.length - 1];
-        final int i = prefix.lastIndexOf(last);
+        String prefix = getEnteredPrefix();
+        String[] strings = NameUtilCore.splitNameIntoWords(prefix);
+        if (strings.length == 0) return; // "__" has no words
+        String last = strings[strings.length - 1];
+        int i = prefix.lastIndexOf(last);
         mySearchPopup.mySearchField.setText(prefix.substring(0, i).trim());
       }
 
       @Override
       public void update(@NotNull AnActionEvent e) {
-        e.getPresentation().setEnabled(isPopupActive() && !Strings.isEmpty(getEnteredPrefix()));
+        e.getPresentation().setEnabled(isPopupActive() && Strings.isNotEmpty(getEnteredPrefix()));
       }
 
       @Override
@@ -812,7 +813,22 @@ public abstract class SpeedSearchBase<Comp extends JComponent> extends SpeedSear
     }
     int y = r.y + componentP.y - lPaneP.y - prefSize.height;
     y = Math.max(y, windowP.y - lPaneP.y);
-    mySearchPopup.setLocation(componentP.x - lPaneP.x + r.x, y);
+    Point location = new Point(componentP.x - lPaneP.x + r.x, y);
+
+    if (Registry.is("ide.speed.search.allow.custom.location")) {
+      SpeedSearchLocator locator = DataManager.getInstance().getDataContext(myComponent).getData(PlatformDataKeys.SPEED_SEARCH_LOCATOR);
+      if (locator != null) {
+        RelativeRectangle relativeRectangle = locator.getSizeAndLocation(myComponent);
+        if (relativeRectangle != null) {
+          Rectangle rect = relativeRectangle.getRectangleOn(myPopupLayeredPane);
+          location = rect.getLocation();
+          prefSize = rect.getSize();
+          mySearchPopup.setPreferredSize(prefSize);
+        }
+      }
+    }
+
+    mySearchPopup.setLocation(location);
     mySearchPopup.setSize(prefSize);
     mySearchPopup.setVisible(true);
     mySearchPopup.validate();

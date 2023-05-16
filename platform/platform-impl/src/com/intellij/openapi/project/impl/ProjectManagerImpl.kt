@@ -9,8 +9,6 @@ import com.intellij.conversion.CannotConvertException
 import com.intellij.conversion.ConversionResult
 import com.intellij.conversion.ConversionService
 import com.intellij.diagnostic.*
-import com.intellij.diagnostic.telemetry.TraceManager
-import com.intellij.diagnostic.telemetry.useWithScope2
 import com.intellij.featureStatistics.fusCollectors.LifecycleUsageTriggerCollector
 import com.intellij.ide.*
 import com.intellij.ide.impl.*
@@ -31,6 +29,7 @@ import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.*
 import com.intellij.openapi.application.ex.ApplicationManagerEx
 import com.intellij.openapi.application.impl.LaterInvocator
+import com.intellij.openapi.components.serviceAsync
 import com.intellij.openapi.components.serviceIfCreated
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.extensions.ExtensionPointName
@@ -38,6 +37,8 @@ import com.intellij.openapi.extensions.PluginDescriptor
 import com.intellij.openapi.extensions.impl.ExtensionPointImpl
 import com.intellij.openapi.extensions.impl.ExtensionsAreaImpl
 import com.intellij.openapi.fileEditor.FileDocumentManager
+import com.intellij.openapi.fileEditor.FileEditorManager
+import com.intellij.openapi.fileEditor.impl.FileEditorManagerImpl
 import com.intellij.openapi.module.Module
 import com.intellij.openapi.module.ModuleManager
 import com.intellij.openapi.progress.ModalTaskOwner
@@ -47,7 +48,7 @@ import com.intellij.openapi.progress.runBlockingModalWithRawProgressReporter
 import com.intellij.openapi.project.*
 import com.intellij.openapi.project.ex.ProjectEx
 import com.intellij.openapi.project.ex.ProjectManagerEx
-import com.intellij.openapi.project.impl.ProjectImpl.Companion.preloadServicesAndCreateComponents
+import com.intellij.openapi.project.impl.ProjectImpl.Companion.preloadServices
 import com.intellij.openapi.startup.StartupManager
 import com.intellij.openapi.ui.MessageDialogBuilder
 import com.intellij.openapi.ui.Messages
@@ -63,6 +64,9 @@ import com.intellij.openapi.wm.impl.welcomeScreen.WelcomeFrame
 import com.intellij.platform.PlatformProjectOpenProcessor
 import com.intellij.platform.PlatformProjectOpenProcessor.Companion.isLoadedFromCacheButHasNoModules
 import com.intellij.platform.attachToProjectAsync
+import com.intellij.platform.diagnostic.telemetry.TelemetryTracer
+import com.intellij.platform.diagnostic.telemetry.impl.useWithScope2
+import com.intellij.platform.jps.model.diagnostic.JpsMetrics
 import com.intellij.projectImport.ProjectAttachProcessor
 import com.intellij.serviceContainer.ComponentManagerImpl
 import com.intellij.ui.IdeUICustomization
@@ -71,6 +75,7 @@ import com.intellij.util.PathUtilRt
 import com.intellij.util.concurrency.annotations.RequiresEdt
 import com.intellij.util.containers.ContainerUtil
 import com.intellij.util.io.delete
+import com.intellij.workspaceModel.ide.impl.jpsMetrics
 import io.opentelemetry.api.common.AttributeKey
 import kotlinx.coroutines.*
 import org.jetbrains.annotations.ApiStatus.Internal
@@ -92,7 +97,6 @@ open class ProjectManagerImpl : ProjectManagerEx(), Disposable {
     @TestOnly
     @JvmStatic
     fun isLight(project: Project): Boolean = project is ProjectEx && project.isLight
-
 
     internal suspend fun dispatchEarlyNotifications() {
       val notificationManager = NotificationsManager.getNotificationsManager() as NotificationsManagerImpl
@@ -189,7 +193,7 @@ open class ProjectManagerImpl : ProjectManagerEx(), Disposable {
   override fun loadProject(path: Path): Project {
     ApplicationManager.getApplication().assertIsNonDispatchThread()
 
-    val project = ProjectImpl(filePath = path, projectName = null)
+    val project = ProjectImpl(filePath = path, projectName = null, parent = ApplicationManager.getApplication() as ComponentManagerImpl)
     val modalityState = CoreProgressManager.getCurrentThreadProgressModality()
     @Suppress("RAW_RUN_BLOCKING")
     runBlocking(modalityState.asContextElement()) {
@@ -267,7 +271,7 @@ open class ProjectManagerImpl : ProjectManagerEx(), Disposable {
   override fun findOpenProjectByHash(locationHash: String?): Project? = openProjectByHash.get(locationHash)
 
   override fun reloadProject(project: Project) {
-    StoreReloadManager.getInstance().reloadProject(project)
+    StoreReloadManager.getInstance(project).reloadProject()
   }
 
   override fun closeProject(project: Project): Boolean {
@@ -524,6 +528,8 @@ open class ProjectManagerImpl : ProjectManagerEx(), Disposable {
   }
 
   final override suspend fun openProjectAsync(projectStoreBaseDir: Path, options: OpenProjectTask): Project? {
+    jpsMetrics.startNewSpan("project.opening", JpsMetrics.jpsSyncSpanName)
+
     if (LOG.isDebugEnabled && !ApplicationManager.getApplication().isUnitTestMode) {
       LOG.debug("open project: $options", Exception())
     }
@@ -634,7 +640,7 @@ open class ProjectManagerImpl : ProjectManagerEx(), Disposable {
           throw CancellationException("project is already opened")
         }
 
-        // Project is loaded and is initialized, project services and components can be accessed.
+        // The project is loaded and is initialized, project services and components can be accessed.
         // But start-up and post start-up activities are not yet executed.
         if (!initFrameEarly) {
           rawProjectDeferred?.complete(project)
@@ -720,6 +726,8 @@ open class ProjectManagerImpl : ProjectManagerEx(), Disposable {
     LifecycleUsageTriggerCollector.onProjectOpened(project)
 
     options.callback?.projectOpened(project, module ?: ModuleManager.getInstance(project).modules[0])
+
+    jpsMetrics.endSpan("project.opening")
     return project
   }
 
@@ -801,7 +809,9 @@ open class ProjectManagerImpl : ProjectManagerEx(), Disposable {
 
   protected open fun instantiateProject(projectStoreBaseDir: Path, options: OpenProjectTask): ProjectImpl {
     val activity = StartUpMeasurer.startActivity("project instantiation")
-    val project = ProjectImpl(filePath = projectStoreBaseDir, projectName = options.projectName)
+    val project = ProjectImpl(filePath = projectStoreBaseDir,
+                              projectName = options.projectName,
+                              parent = ApplicationManager.getApplication() as ComponentManagerImpl)
     activity.end()
     options.beforeInit?.invoke(project)
     return project
@@ -915,7 +925,7 @@ open class ProjectManagerImpl : ProjectManagerEx(), Disposable {
   }
 }
 
-private val tracer by lazy { TraceManager.getTracer("projectManager") }
+private val tracer by lazy { TelemetryTracer.getInstance().getTracer(ProjectManagerScope) }
 
 @NlsSafe
 private fun message(e: Throwable): String {
@@ -1101,7 +1111,7 @@ private fun toCanonicalName(filePath: String): Path {
   catch (ignore: InvalidPathException) {
   }
   catch (e: IOException) {
-    // OK. File does not yet exist, so its canonical path will be equal to its original path.
+    // the file does not yet exist, so its canonical path will be equal to its original path
   }
   return file
 }
@@ -1182,7 +1192,21 @@ private suspend fun initProject(file: Path,
 
       rawProjectDeferred?.complete(project)
 
-      preloadServicesAndCreateComponents(project, preloadServices)
+      val beforeComponentCreation: Job? = if (rawProjectDeferred == null) {
+        null
+      }
+      else {
+        (project.serviceAsync<FileEditorManager>().await() as? FileEditorManagerImpl)?.initJob
+      }
+
+      if (preloadServices) {
+        preloadServices(project)
+      }
+
+      launch {
+        beforeComponentCreation?.join()
+        project.createComponentsNonBlocking()
+      }
 
       if (!isTrusted.await()) {
         throw CancellationException("not trusted")
@@ -1322,7 +1346,7 @@ private suspend fun checkTrustedState(projectStoreBaseDir: Path): Boolean {
     // this project is in recent projects => it was opened on this computer before
     // => most probably we already asked about its trusted state before
     // the only exception is: the project stayed in the UNKNOWN state in the previous version because it didn't utilize any dangerous features
-    // in this case we will ask since no UNKNOWN state is allowed, but on a later stage, when we'll be able to look into the project-wide storage
+    // in this case, we will ask since no UNKNOWN state is allowed, but on a later stage, when we'll be able to look into the project-wide storage
     return true
   }
 

@@ -35,15 +35,6 @@ public final class Cancellation {
     }
   }
 
-  public static @Nullable Throwable getCause(@NotNull CancellationException ce) {
-    if (ce instanceof CurrentJobCancellationException) {
-      return ((CurrentJobCancellationException)ce).getOriginalCancellationException().getCause();
-    }
-    else {
-      return ce.getCause();
-    }
-  }
-
   /**
    * {@code true} if running in non-cancelable section started with {@link #computeInNonCancelableSection)} in this thread,
    * otherwise {@code false}

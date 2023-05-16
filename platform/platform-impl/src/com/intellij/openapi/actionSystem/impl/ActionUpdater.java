@@ -2,6 +2,7 @@
 package com.intellij.openapi.actionSystem.impl;
 
 import com.intellij.codeWithMe.ClientId;
+import com.intellij.concurrency.ConcurrentCollectionFactory;
 import com.intellij.concurrency.SensitiveProgressWrapper;
 import com.intellij.diagnostic.PluginException;
 import com.intellij.diagnostic.ThreadDumpService;
@@ -58,8 +59,8 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
-import static com.intellij.diagnostic.telemetry.TraceKt.computeWithSpan;
-import static com.intellij.diagnostic.telemetry.TraceKt.runWithSpan;
+import static com.intellij.platform.diagnostic.telemetry.impl.TraceKt.computeWithSpan;
+import static com.intellij.platform.diagnostic.telemetry.impl.TraceKt.runWithSpan;
 
 final class ActionUpdater {
   private static final Logger LOG = Logger.getInstance(ActionUpdater.class);
@@ -72,8 +73,8 @@ final class ActionUpdater {
   private static final Executor ourCommonExecutor = AppExecutorUtil.createBoundedApplicationPoolExecutor("Action Updater (Common)", 2);
   private static final Executor ourFastTrackExecutor = AppExecutorUtil.createBoundedApplicationPoolExecutor("Action Updater (Fast)", 1);
 
-  private static final Set<CancellablePromise<?>> ourPromises = ContainerUtil.newConcurrentSet();
-  private static final Set<CancellablePromise<?>> ourToolbarPromises = ContainerUtil.newConcurrentSet();
+  private static final Set<CancellablePromise<?>> ourPromises = ConcurrentCollectionFactory.createConcurrentSet();
+  private static final Set<CancellablePromise<?>> ourToolbarPromises = ConcurrentCollectionFactory.createConcurrentSet();
   private static FList<String> ourInEDTActionOperationStack = FList.emptyList();
   private static boolean ourNoRulesInEDTSection;
 
@@ -622,10 +623,12 @@ final class ActionUpdater {
 
   static @NotNull List<AnAction> removeUnnecessarySeparators(@NotNull List<? extends AnAction> visible) {
     List<AnAction> result = new ArrayList<>();
-    for (AnAction child : visible) {
+    for (int i = 0; i < visible.size(); i++) {
+      AnAction child = visible.get(i);
       if (child instanceof Separator &&
-          (result.isEmpty() || ContainerUtil.getLastItem(result) instanceof Separator) &&
-          StringUtil.isEmpty(((Separator)child).getText())) {
+          (i == visible.size() - 1 ||
+           visible.get(i + 1) instanceof Separator ||
+           result.isEmpty() && StringUtil.isEmpty(((Separator)child).getText()))) {
         continue;
       }
       result.add(child);

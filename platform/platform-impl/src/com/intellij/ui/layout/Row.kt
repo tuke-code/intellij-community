@@ -91,7 +91,7 @@ interface RowBuilder : BaseBuilder {
   fun hideableRow(@NlsContexts.Separator title: String, incrementsIndent: Boolean = true, init: Row.() -> Unit): Row
 
   @ApiStatus.ScheduledForRemoval
-  @Deprecated("Use Kotlin UI DSL Version 2")
+  @Deprecated("Use Kotlin UI DSL Version 2", level = DeprecationLevel.HIDDEN)
   fun hideableRow(@NlsContexts.Separator title: String, init: Row.() -> Unit): Row {
     return hideableRow(title = title, true, init)
   }
@@ -169,15 +169,11 @@ abstract class Row : Cell(), RowBuilder {
   @Deprecated("Use Kotlin UI DSL Version 2")
   abstract var subRowIndent: Int
 
-  @get:Deprecated("Use Kotlin UI DSL Version 2")
-  @get:ApiStatus.ScheduledForRemoval
-  protected abstract val builder: LayoutBuilderImpl
-
   /**
    * Specifies the right alignment for the component if the cell is larger than the component plus its gaps.
    */
   @ApiStatus.ScheduledForRemoval
-  @Deprecated("Use Kotlin UI DSL Version 2")
+  @Deprecated("Use Kotlin UI DSL Version 2", level = DeprecationLevel.HIDDEN)
   inline fun right(init: Row.() -> Unit) {
     alignRight()
     init()

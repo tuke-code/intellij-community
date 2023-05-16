@@ -3,15 +3,15 @@ package org.jetbrains.kotlin.idea.debugger.evaluate
 
 import org.jetbrains.kotlin.descriptors.ClassConstructorDescriptor
 import org.jetbrains.kotlin.descriptors.DescriptorVisibilities
+import org.jetbrains.kotlin.descriptors.MemberDescriptor
 import org.jetbrains.kotlin.descriptors.ReceiverParameterDescriptor
 import org.jetbrains.kotlin.idea.codeInsight.DescriptorToSourceUtilsIde
 import org.jetbrains.kotlin.idea.core.util.analyzeInlinedFunctions
+import org.jetbrains.kotlin.idea.util.expectedDeclarationIfAny
 import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.resolve.BindingContext
 import org.jetbrains.kotlin.resolve.DescriptorToSourceUtils
-import org.jetbrains.kotlin.resolve.scopes.receivers.ContextClassReceiver
-import org.jetbrains.kotlin.resolve.scopes.receivers.ReceiverValue
-import org.jetbrains.kotlin.resolve.scopes.receivers.ThisClassReceiver
+import org.jetbrains.kotlin.resolve.scopes.receivers.*
 
 /**
  * This traversal collects the files containing the sources of
@@ -51,10 +51,11 @@ private fun analyzeCalls(
 
             val descriptor = resolvedCall.resultingDescriptor
 
-            fun processContextClassReceiver(receiver: ReceiverValue?) {
-                if (receiver is ContextClassReceiver) {
+            fun processClassReceiver(receiver: ReceiverValue?) {
+                if (receiver is ContextClassReceiver || receiver is ImplicitClassReceiver && receiver.classDescriptor.visibility == DescriptorVisibilities.LOCAL) {
+                    val declarationDescriptor = (receiver as? ImplicitReceiver)?.declarationDescriptor ?: return
                     val declaration = DescriptorToSourceUtilsIde.getAnyDeclaration(
-                        project, receiver.declarationDescriptor
+                        project, declarationDescriptor
                     ) ?: return
                     files.add(declaration.containingFile as KtFile)
                 }
@@ -82,12 +83,18 @@ private fun analyzeCalls(
             //   8: return
 
             with(resolvedCall) {
-                processContextClassReceiver(dispatchReceiver)
-                contextReceivers.forEach(::processContextClassReceiver)
+                processClassReceiver(dispatchReceiver)
+                contextReceivers.forEach(::processClassReceiver)
             }
 
             if (descriptor is ReceiverParameterDescriptor) {
-                processContextClassReceiver(descriptor.value)
+                processClassReceiver(descriptor.value)
+            }
+
+            if ((descriptor as? MemberDescriptor)?.isActual == true) {
+                val actualDeclaration = DescriptorToSourceUtilsIde.getAnyDeclaration(project, descriptor)
+                val expectedDeclaration = (actualDeclaration as? KtDeclaration)?.expectedDeclarationIfAny()
+                listOfNotNull(actualDeclaration, expectedDeclaration).forEach { files.add(it.containingFile as KtFile) }
             }
 
             if (descriptor.visibility == DescriptorVisibilities.LOCAL) {

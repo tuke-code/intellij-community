@@ -1,7 +1,8 @@
-// Copyright 2000-2021 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
+// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.codeInsight.navigation;
 
 import com.intellij.codeInsight.CodeInsightBundle;
+import com.intellij.codeInsight.navigation.impl.PsiTargetPresentationRenderer;
 import com.intellij.ide.util.DefaultPsiElementCellRenderer;
 import com.intellij.ide.util.EditSourceUtil;
 import com.intellij.ide.util.PsiElementListCellRenderer;
@@ -47,7 +48,9 @@ import com.intellij.ui.popup.list.ListPopupImpl;
 import com.intellij.ui.popup.list.PopupListElementRenderer;
 import com.intellij.util.Processor;
 import com.intellij.util.TextWithIcon;
+import com.intellij.util.ui.EDT;
 import com.intellij.util.ui.JBUI;
+import org.jetbrains.annotations.ApiStatus.Internal;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -56,6 +59,7 @@ import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.util.List;
 import java.util.*;
+import java.util.function.Supplier;
 
 public final class NavigationUtil {
   private static final ExtensionPointName<GotoRelatedProvider> GO_TO_EP_NAME = new ExtensionPointName<>("com.intellij.gotoRelatedProvider");
@@ -67,6 +71,19 @@ public final class NavigationUtil {
     return new PsiTargetNavigator<>(elements).createPopup(elements[0].getProject(), title);
   }
 
+  public static @NotNull JBPopup getPsiElementPopup(@NotNull Supplier<Collection<PsiElement>> elements,
+                                                    @NotNull PsiTargetPresentationRenderer<PsiElement> renderer,
+                                                    @PopupTitle String title,
+                                                    @NotNull Project project) {
+    return new PsiTargetNavigator<>(elements)
+      .presentationProvider(renderer)
+      .createPopup(project, title);
+  }
+
+  /**
+   * @deprecated Use {@link #getPsiElementPopup(Supplier, PsiTargetPresentationRenderer, String, Project)}
+   */
+  @Deprecated
   public static @NotNull JBPopup getPsiElementPopup(PsiElement @NotNull [] elements,
                                                     @NotNull PsiElementListCellRenderer<? super PsiElement> renderer,
                                                     @PopupTitle String title) {
@@ -138,14 +155,7 @@ public final class NavigationUtil {
   }
 
   public static boolean openFileWithPsiElement(PsiElement element, boolean searchForOpen, boolean requestFocus) {
-    boolean openAsNative = false;
-    if (element instanceof PsiFile) {
-      VirtualFile virtualFile = ((PsiFile)element).getVirtualFile();
-      if (virtualFile != null) {
-        FileType type = virtualFile.getFileType();
-        openAsNative = type instanceof INativeFileType || type instanceof UnknownFileType;
-      }
-    }
+    boolean openAsNative = shouldOpenAsNative(element);
 
     if (searchForOpen) {
       element.putUserData(FileEditorManager.USE_CURRENT_WINDOW, null);
@@ -175,6 +185,23 @@ public final class NavigationUtil {
     return false;
   }
 
+  private static boolean shouldOpenAsNative(PsiElement element) {
+    if (!(element instanceof PsiFile file)) {
+      return false;
+    }
+    VirtualFile virtualFile = file.getVirtualFile();
+    if (virtualFile == null) {
+      return false;
+    }
+    return shouldOpenAsNative(virtualFile);
+  }
+
+  @Internal
+  public static boolean shouldOpenAsNative(@NotNull VirtualFile virtualFile) {
+    FileType type = virtualFile.getFileType();
+    return type instanceof INativeFileType || type instanceof UnknownFileType;
+  }
+
   private static boolean activatePsiElementIfOpen(@NotNull PsiElement element, boolean searchForOpen, boolean requestFocus) {
     if (!element.isValid()) {
       return false;
@@ -191,17 +218,31 @@ public final class NavigationUtil {
       return false;
     }
 
-    if (!EditorHistoryManager.getInstance(element.getProject()).hasBeenOpen(vFile)) {
+    Project project = element.getProject();
+
+    return activateFileIfOpen(project, vFile, element.getTextRange(), searchForOpen, requestFocus);
+  }
+
+  @Internal
+  public static boolean activateFileIfOpen(
+    @NotNull Project project,
+    @NotNull VirtualFile vFile,
+    @Nullable TextRange range,
+    boolean searchForOpen,
+    boolean requestFocus
+  ) {
+    EDT.assertIsEdt();
+    if (!EditorHistoryManager.getInstance(project).hasBeenOpen(vFile)) {
       return false;
     }
 
-    FileEditorManagerEx fileEditorManager = FileEditorManagerEx.getInstanceEx(element.getProject());
+    FileEditorManagerEx fileEditorManager = FileEditorManagerEx.getInstanceEx(project);
     boolean wasAlreadyOpen = fileEditorManager.isFileOpen(vFile);
+    FileEditorOpenOptions openOptions = new FileEditorOpenOptions().withRequestFocus(requestFocus).withReuseOpen(searchForOpen);
     if (!wasAlreadyOpen) {
-      fileEditorManager.openFile(vFile, null, new FileEditorOpenOptions().withRequestFocus().withReuseOpen(searchForOpen));
+      fileEditorManager.openFile(vFile, null, openOptions);
     }
 
-    TextRange range = element.getTextRange();
     if (range == null) {
       return false;
     }
@@ -213,7 +254,7 @@ public final class NavigationUtil {
         if (range.containsOffset(offset)) {
           if (wasAlreadyOpen) {
             // select the file
-            fileEditorManager.openFile(vFile, requestFocus, searchForOpen);
+            fileEditorManager.openFile(vFile, null, openOptions);
           }
           return true;
         }

@@ -399,6 +399,7 @@ public class AllIcons {
     /** 16x16 */ public static final @NotNull Icon Htaccess = load("fileTypes/htaccess.svg", -2088610418, 0);
     /** 16x16 */ public static final @NotNull Icon Html = load("fileTypes/html.svg", -1577865559, 0);
     /** 16x16 */ public static final @NotNull Icon Idl = load("fileTypes/idl.svg", -219435872, 0);
+    /** 16x16 */ public static final @NotNull Icon Image = load("fileTypes/image.svg", -1773595662, 0);
     /** 16x16 */ public static final @NotNull Icon Java = load("fileTypes/java.svg", 1910963991, 0);
     /** 16x16 */ public static final @NotNull Icon JavaClass = load("fileTypes/javaClass.svg", 1466981955, 0);
     /** 16x16 */ public static final @NotNull Icon JavaOutsideSource = load("fileTypes/javaOutsideSource.svg", -223692720, 0);
@@ -602,7 +603,7 @@ public class AllIcons {
     /** 16x16 */ public static final @NotNull Icon ConfigFile = load("ide/configFile.svg", 1287498598, 2);
     /** 20x20 */ public static final @NotNull Icon Dislike = load("ide/dislike.svg", 1254925866, 2);
     /** 20x20 */ public static final @NotNull Icon DislikeDimmed = load("ide/dislikeDimmed.svg", 515359443, 2);
-    /** 20x20 */ public static final @NotNull Icon DislikeSelected = load("ide/dislikeSelected.svg", 997726336, 2);
+    /** 20x20 */ public static final @NotNull Icon DislikeSelected = load("ide/dislikeSelected.svg", 287201342, 2);
     /** 6x6 */ public static final @NotNull Icon ErrorPoint = load("ide/errorPoint.svg", 1012076789, 2);
     /** 14x14 */ public static final @NotNull Icon External_link_arrow = load("ide/external_link_arrow.svg", 1070887805, 0);
     /** 16x16 */ public static final @NotNull Icon FatalErrorRead = load("ide/fatalError-read.svg", 567622805, 2);
@@ -619,7 +620,7 @@ public class AllIcons {
     /** 16x16 */ public static final @NotNull Icon IncomingChangesOn = load("ide/incomingChangesOn.svg", 1661917715, 2);
     /** 20x20 */ public static final @NotNull Icon Like = load("ide/like.svg", -2074345401, 2);
     /** 20x20 */ public static final @NotNull Icon LikeDimmed = load("ide/likeDimmed.svg", -1358929505, 2);
-    /** 20x20 */ public static final @NotNull Icon LikeSelected = load("ide/likeSelected.svg", -1874016551, 2);
+    /** 20x20 */ public static final @NotNull Icon LikeSelected = load("ide/likeSelected.svg", 1510945465, 2);
     /** 12x12 */ public static final @NotNull Icon Link = load("ide/link.svg", 2028749339, 2);
     /** 16x16 */ public static final @NotNull Icon LocalScope = load("ide/localScope.svg", -569945429, 0);
     /** 16x16 */ public static final @NotNull Icon LocalScopeAction = load("ide/localScopeAction.svg", 336925654, 2);
@@ -696,7 +697,7 @@ public class AllIcons {
   /** 100x100 */ public static final @NotNull Icon Idea_logo_welcome = load("idea_logo_welcome.png", 0, 0);
 
   public static final class Javaee {
-    /** 16x16 */ public static final @NotNull Icon Home = load("javaee/home.svg", -1762129996, 1);
+    /** 16x16 */ public static final @NotNull Icon Home = load("javaee/home.svg", -1762129996, 0);
     /** 16x16 */ public static final @NotNull Icon PersistenceEntity = load("javaee/persistenceEntity.svg", -1501668648, 0);
     /** 16x16 */ public static final @NotNull Icon UpdateRunningApplication = load("javaee/updateRunningApplication.svg", -36399267, 2);
     /** 16x16 */ public static final @NotNull Icon WebModuleGroup = load("javaee/webModuleGroup.svg", 125213459, 0);
@@ -987,7 +988,6 @@ public class AllIcons {
     /** 9x9 */ public static final @NotNull Icon CollapseNode = load("profiler/collapseNode.svg", 1755856612, 2);
     /** 9x9 */ public static final @NotNull Icon ExpandNode = load("profiler/expandNode.svg", -852064630, 2);
     /** 12x12 */ public static final @NotNull Icon Rec = load("profiler/rec.svg", 321721744, 2);
-    /** 12x12 */ public static final @NotNull Icon RecInactive = load("profiler/recInactive.svg", -901521234, 2);
   }
 
   public static final class Providers {
@@ -1165,6 +1165,7 @@ public class AllIcons {
     /** 13x13 */ public static final @NotNull Icon ToolWindowFind = load("toolwindows/toolWindowFind.svg", 1019701727, 2);
     /** 13x13 */ public static final @NotNull Icon ToolWindowHierarchy = load("toolwindows/toolWindowHierarchy.svg", -734449411, 2);
     /** 13x13 */ public static final @NotNull Icon ToolWindowInspection = load("toolwindows/toolWindowInspection.svg", -1567931501, 2);
+    /** 13x13 */ public static final @NotNull Icon ToolWindowInternal = load("toolwindows/toolWindowInternal.svg", 1722876469, 2);
     /** 13x13 */ public static final @NotNull Icon ToolWindowJsonPath = load("toolwindows/toolWindowJsonPath.svg", 122593557, 2);
     /** 13x13 */ public static final @NotNull Icon ToolWindowMessages = load("toolwindows/toolWindowMessages.svg", 320544649, 2);
     /** 13x13 */ public static final @NotNull Icon ToolWindowModuleDependencies = load("toolwindows/toolWindowModuleDependencies.svg", 306164943, 2);

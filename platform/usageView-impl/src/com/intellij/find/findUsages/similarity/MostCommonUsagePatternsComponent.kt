@@ -173,8 +173,11 @@ class MostCommonUsagePatternsComponent(
           updateToolbar(selectedUsages.size)
           for (i in snippets.size until previewComponents.size) {
             val component = previewComponents[i]
-            remove(component)
+            myMainPanel.remove(component)
             Disposer.dispose(component)
+          }
+          if (snippets.size < previewComponents.size) {
+            previewComponents.subList(snippets.size, previewComponents.size).clear()
           }
           for ((index, loadedSnippet) in snippets.withIndex()) {
             val previewComponent: UsagePreviewComponent?
@@ -276,10 +279,12 @@ class MostCommonUsagePatternsComponent(
       _loadedSnippets.value = queue.receiveBatch(initialBatchSize)
       _loadSnippetRequests.debounce(10.milliseconds).collect {
         val newBatch = queue.receiveBatch(CLUSTER_LIMIT)
-        _loadedSnippets.update {
-          it + newBatch
+        if (newBatch.isNotEmpty()) {
+          _loadedSnippets.update {
+            it + newBatch
+          }
+          logMoreSnippetsLoadedInClustersPreview(project, usageView, _loadedSnippets.value.size)
         }
-        logMoreSnippetsLoadedInClustersPreview(project, usageView, _loadedSnippets.value.size)
       }
     }
   }

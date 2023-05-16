@@ -3,11 +3,12 @@ package org.jetbrains.idea.devkit.inspections
 
 import com.intellij.codeInspection.InspectionManager
 import com.intellij.codeInspection.ProblemDescriptor
+import com.intellij.codeInspection.registerUProblem
 import com.intellij.codeInspection.util.InspectionMessage
 import com.intellij.openapi.components.Service
-import com.intellij.openapi.components.ServiceDescriptor
 import com.intellij.psi.PsiClass
 import com.intellij.psi.util.InheritanceUtil
+import com.intellij.psi.xml.XmlTag
 import com.intellij.util.xml.DomManager
 import org.jetbrains.idea.devkit.DevKitBundle
 import org.jetbrains.idea.devkit.dom.Extension
@@ -16,6 +17,8 @@ import org.jetbrains.idea.devkit.util.locateExtensionsByPsiClass
 import org.jetbrains.uast.UClass
 
 class ExtensionRegisteredAsServiceOrComponentInspection : DevKitUastInspectionBase(UClass::class.java) {
+
+  private val serviceAttributeNames = setOf("service")
 
   override fun checkClass(uClass: UClass, manager: InspectionManager, isOnTheFly: Boolean): Array<ProblemDescriptor?>? {
     val psiClass = uClass.javaPsi
@@ -34,9 +37,9 @@ class ExtensionRegisteredAsServiceOrComponentInspection : DevKitUastInspectionBa
       val tag = candidate.pointer.element ?: continue
       val element = domManager.getDomElement(tag) ?: continue
       if (element is Extension) {
-        if (hasServiceBeanFqn(element)) {
+        if (ExtensionUtil.hasServiceBeanFqn(element)) {
           isService = true
-        } else {
+        } else if (!isValueOfServiceAttribute(tag, psiClass.qualifiedName)) {
           isExtension = true
         }
       }
@@ -57,8 +60,12 @@ class ExtensionRegisteredAsServiceOrComponentInspection : DevKitUastInspectionBa
     return ProblemDescriptor.EMPTY_ARRAY
   }
 
-  private fun hasServiceBeanFqn(extension: Extension): Boolean {
-    return extension.extensionPoint?.beanClass?.stringValue == ServiceDescriptor::class.java.canonicalName
+  /**
+   * Finds all attribute names with a given value and checks they all are among [serviceAttributeNames].
+   */
+  private fun isValueOfServiceAttribute(tag: XmlTag, value: String?): Boolean {
+    val attributeNames = tag.attributes.filter { it.value == value }.map { it.name }.toSet()
+    return serviceAttributeNames.containsAll(attributeNames)
   }
 
   private fun isLightService(uClass: UClass): Boolean {
@@ -79,9 +86,8 @@ class ExtensionRegisteredAsServiceOrComponentInspection : DevKitUastInspectionBa
                               @InspectionMessage message: String,
                               manager: InspectionManager,
                               isOnTheFly: Boolean): Array<ProblemDescriptor?> {
-    val classPsiAnchor = uClass.uastAnchor?.sourcePsi!!
     val holder = createProblemsHolder(uClass, manager, isOnTheFly)
-    holder.registerProblem(classPsiAnchor, message)
+    holder.registerUProblem(uClass, message)
     return holder.resultsArray
   }
 }

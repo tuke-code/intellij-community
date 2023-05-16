@@ -1,4 +1,4 @@
-// Copyright 2000-2021 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
+// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 
 package com.intellij.ide.projectView.impl.nodes;
 
@@ -6,10 +6,7 @@ import com.intellij.codeInsight.navigation.NavigationUtil;
 import com.intellij.ide.bookmark.Bookmark;
 import com.intellij.ide.bookmark.BookmarkType;
 import com.intellij.ide.bookmark.BookmarksManager;
-import com.intellij.ide.projectView.PresentationData;
-import com.intellij.ide.projectView.ProjectViewNode;
-import com.intellij.ide.projectView.ProjectViewSettings;
-import com.intellij.ide.projectView.ViewSettings;
+import com.intellij.ide.projectView.*;
 import com.intellij.ide.projectView.impl.CompoundProjectViewNodeDecorator;
 import com.intellij.ide.projectView.impl.ProjectViewInplaceCommentProducerImplKt;
 import com.intellij.ide.tags.TagManager;
@@ -30,6 +27,7 @@ import com.intellij.openapi.vcs.FileStatus;
 import com.intellij.openapi.vcs.FileStatusManager;
 import com.intellij.openapi.vfs.VFileProperty;
 import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.platform.backend.navigation.NavigationRequest;
 import com.intellij.pom.StatePreservingNavigatable;
 import com.intellij.psi.PsiDirectory;
 import com.intellij.psi.PsiElement;
@@ -40,6 +38,8 @@ import com.intellij.ui.LayeredIcon;
 import com.intellij.util.AstLoadingFilter;
 import com.intellij.util.IconUtil;
 import com.intellij.util.PlatformIcons;
+import com.intellij.util.concurrency.annotations.RequiresBackgroundThread;
+import com.intellij.util.concurrency.annotations.RequiresReadLock;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -49,6 +49,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Objects;
 
+import static com.intellij.ide.projectView.impl.ProjectViewUtilKt.getFileAttributes;
 import static com.intellij.ide.util.treeView.NodeRenderer.getSimpleTextAttributes;
 
 /**
@@ -58,6 +59,7 @@ import static com.intellij.ide.util.treeView.NodeRenderer.getSimpleTextAttribute
  */
 public abstract class AbstractPsiBasedNode<Value> extends ProjectViewNode<Value> implements ValidateableNode, StatePreservingNavigatable {
   private static final Logger LOG = Logger.getInstance(AbstractPsiBasedNode.class.getName());
+  private volatile long timestamp;
 
   protected AbstractPsiBasedNode(final Project project,
                                  @NotNull Value value,
@@ -140,6 +142,11 @@ public abstract class AbstractPsiBasedNode<Value> extends ProjectViewNode<Value>
   }
 
   @Override
+  public @Nullable Comparable<?> getTimeSortKey() {
+    return timestamp == 0 ? null : timestamp;
+  }
+
+  @Override
   protected void appendInplaceComments(@NotNull InplaceCommentAppender appender) {
     if (UISettings.getInstance().getShowInplaceComments()) {
       ProjectViewInplaceCommentProducerImplKt.appendInplaceComments(this, appender);
@@ -204,7 +211,21 @@ public abstract class AbstractPsiBasedNode<Value> extends ProjectViewNode<Value>
       updateImpl(data);
       data.setIcon(patchIcon(myProject, data.getIcon(true), getVirtualFile()));
       CompoundProjectViewNodeDecorator.get(myProject).decorate(this, data);
+      updateTimestamp();
     });
+  }
+
+  private void updateTimestamp() {
+    if (
+      getSettings() instanceof ProjectViewSettings projectViewSettings &&
+      projectViewSettings.getSortKey() != NodeSortKey.BY_TIME_DESCENDING &&
+      projectViewSettings.getSortKey() != NodeSortKey.BY_TIME_ASCENDING
+    ) {
+      timestamp = 0; // skip for performance reasons
+      return;
+    }
+    var attributes = getFileAttributes(getVirtualFile());
+    timestamp = attributes == null ? 0 : attributes.lastModifiedTime().toMillis();
   }
 
   @Iconable.IconFlags
@@ -268,6 +289,17 @@ public abstract class AbstractPsiBasedNode<Value> extends ProjectViewNode<Value>
   public NavigationItem getNavigationItem() {
     final PsiElement psiElement = extractPsiFromValue();
     return psiElement instanceof NavigationItem ? (NavigationItem) psiElement : null;
+  }
+
+  @RequiresReadLock
+  @RequiresBackgroundThread
+  @Override
+  public @Nullable NavigationRequest navigationRequest() {
+    PsiElement element = extractPsiFromValue();
+    if (element == null) {
+      return null;
+    }
+    return ((NavigationItem)element).navigationRequest();
   }
 
   @Override

@@ -57,14 +57,14 @@ internal class CellImpl<T : JComponent>(
 
   val onChangeManager = OnChangeManager(component)
 
-  @Deprecated("Use align method instead", level = DeprecationLevel.HIDDEN)
+  @Deprecated("Use align(AlignX.LEFT/CENTER/RIGHT/FILL) method instead", level = DeprecationLevel.HIDDEN)
   @ApiStatus.ScheduledForRemoval
   override fun horizontalAlign(horizontalAlign: HorizontalAlign): CellImpl<T> {
     super.horizontalAlign(horizontalAlign)
     return this
   }
 
-  @Deprecated("Use align method instead", level = DeprecationLevel.HIDDEN)
+  @Deprecated("Use align(AlignY.TOP/CENTER/BOTTOM/FILL) method instead", level = DeprecationLevel.HIDDEN)
   @ApiStatus.ScheduledForRemoval
   override fun verticalAlign(verticalAlign: VerticalAlign): CellImpl<T> {
     super.verticalAlign(verticalAlign)
@@ -153,7 +153,9 @@ internal class CellImpl<T : JComponent>(
   }
 
   override fun comment(@NlsContexts.DetailedDescription comment: String?, maxLineLength: Int, action: HyperlinkEventAction): CellImpl<T> {
-    this.comment = if (comment == null) null else createComment(comment, maxLineLength, action)
+    this.comment = if (comment == null) null else createComment(comment, maxLineLength, action).apply {
+      registerCreationStacktrace(this)
+    }
     return this
   }
 
@@ -165,6 +167,7 @@ internal class CellImpl<T : JComponent>(
     this.label = label
     labelPosition = position
     label.putClientProperty(DslComponentPropertyInternal.CELL_LABEL, true)
+    registerCreationStacktrace(label)
     return this
   }
 
@@ -353,6 +356,7 @@ internal class CellImpl<T : JComponent>(
   }
 
   @Deprecated("Use customize(UnscaledGaps) instead")
+  @ApiStatus.ScheduledForRemoval
   override fun customize(customGaps: Gaps): CellImpl<T> {
     return customize(customGaps.toUnscaled())
   }

@@ -8,6 +8,7 @@ import com.intellij.concurrency.resetThreadContext
 import com.intellij.openapi.application.asContextElement
 import com.intellij.util.ConcurrencyUtil
 import com.intellij.util.concurrency.BlockingJob
+import com.intellij.util.concurrency.annotations.RequiresBlockingContext
 import kotlinx.coroutines.*
 import org.jetbrains.annotations.ApiStatus.Internal
 import kotlin.coroutines.CoroutineContext
@@ -52,6 +53,13 @@ private fun prepareCurrentThreadContext(): CoroutineContext {
   return currentThreadContext().minusKey(BlockingJob)
 }
 
+@Internal
+@RequiresBlockingContext
+fun isInCancellableContext(): Boolean {
+  return (ProgressManager.getGlobalProgressIndicator() != null || Cancellation.currentJob() != null) &&
+         !Cancellation.isInNonCancelableSection()
+}
+
 /**
  * Ensures that the current thread has an [associated job][Cancellation.currentJob].
  *
@@ -69,6 +77,7 @@ private fun prepareCurrentThreadContext(): CoroutineContext {
  * @throws CancellationException if there was a current job it was cancelled
  */
 @Internal
+@RequiresBlockingContext
 fun <T> prepareThreadContext(action: (CoroutineContext) -> T): T {
   val indicator = ProgressManager.getGlobalProgressIndicator()
   if (indicator != null) {
@@ -100,14 +109,6 @@ internal fun <T> prepareIndicatorThreadContext(indicator: ProgressIndicator, act
       }
     }
   }
-  catch (ce: IndicatorCancellationException) {
-    currentJob.cancel(ce)
-    throw ProcessCanceledException(ce)
-  }
-  catch (ce: CurrentJobCancellationException) {
-    currentJob.cancel(ce)
-    throw ProcessCanceledException(ce)
-  }
   catch (t: Throwable) {
     currentJob.completeExceptionally(t)
     throw t
@@ -129,41 +130,5 @@ private fun cancelWithIndicator(job: Job, indicator: ProgressIndicator): Job {
     catch (pce: ProcessCanceledException) {
       job.cancel(IndicatorCancellationException(pce))
     }
-  }
-}
-
-/**
- * Associates the calling thread with a [job], invokes [action], and completes the job.
- * @return action result
- */
-@Internal
-fun <X> executeActionAndCompleteJob(
-  job: CompletableJob,
-  action: () -> X,
-): X {
-  try {
-    val result: X = action()
-    job.complete()
-    return result
-  }
-  catch (ce: CancellationException) {
-    job.cancel(ce)
-    throw ce
-  }
-  catch (e: Throwable) {
-    // `job.completeExceptionally(e)` will fail parent Job,
-    // which is not desired when this Job is a read action Job.
-    //
-    // ReadAction.computeCancellable {
-    //   throw X
-    // }
-    // X will be re-thrown, but the caller is not expected to become cancelled
-    // since it might catch X and act accordingly.
-    //
-    // Ideally, completeExceptionally should be used because it's more correct semantically,
-    // but read job must not fail its parent regardless of whether the parent is supervisor:
-    // https://github.com/Kotlin/kotlinx.coroutines/issues/3409
-    job.cancel(CancellationException(null, e))
-    throw e
   }
 }

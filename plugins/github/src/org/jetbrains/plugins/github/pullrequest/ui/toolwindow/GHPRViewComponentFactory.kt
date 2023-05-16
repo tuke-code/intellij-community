@@ -16,6 +16,7 @@ import com.intellij.openapi.vcs.FilePath
 import com.intellij.openapi.vcs.changes.Change
 import com.intellij.openapi.vcs.changes.ChangesUtil
 import com.intellij.openapi.vcs.changes.EditorTabDiffPreviewManager.Companion.EDITOR_TAB_DIFF_PREVIEW
+import com.intellij.openapi.vcs.changes.ui.AsyncChangesTree
 import com.intellij.openapi.vcs.changes.ui.ChangesTree
 import com.intellij.openapi.vcs.changes.ui.VcsTreeModelData
 import com.intellij.ui.ClientProperty
@@ -26,7 +27,7 @@ import com.intellij.util.containers.TreeTraversal
 import com.intellij.util.ui.UIUtil
 import com.intellij.util.ui.tree.TreeUtil
 import com.intellij.vcsUtil.VcsUtil
-import git4idea.changes.GitParsedChangesBundle
+import git4idea.changes.GitBranchComparisonResult
 import git4idea.changes.findCumulativeChange
 import git4idea.repo.GitRepository
 import kotlinx.coroutines.*
@@ -66,7 +67,7 @@ internal class GHPRViewComponentFactory(private val actionManager: ActionManager
 
   private val detailsLoadingModel = GHCompletableFutureLoadingModel<GHPullRequest>(disposable)
   private val commitsLoadingModel = GHCompletableFutureLoadingModel<List<GHCommit>>(disposable)
-  private val changesLoadingModel = GHCompletableFutureLoadingModel<GitParsedChangesBundle>(disposable)
+  private val changesLoadingModel = GHCompletableFutureLoadingModel<GitBranchComparisonResult>(disposable)
   private val viewedStateLoadingModel = GHCompletableFutureLoadingModel<Map<String, GHPullRequestFileViewedState>>(disposable)
 
   init {
@@ -98,7 +99,8 @@ internal class GHPRViewComponentFactory(private val actionManager: ActionManager
 
   private val diffRequestProducer: GHPRDiffRequestChainProducer =
     object : GHPRDiffRequestChainProducer(project,
-                                          dataProvider, dataContext.avatarIconsProvider,
+                                          dataProvider,
+                                          dataContext.htmlImageLoader, dataContext.avatarIconsProvider,
                                           dataContext.repositoryDataService,
                                           dataContext.securityService.ghostUser,
                                           dataContext.securityService.currentUser) {
@@ -142,8 +144,8 @@ internal class GHPRViewComponentFactory(private val actionManager: ActionManager
     }
 
   private class Controller(
-    private val tree: ChangesTree,
-    private val changesProviderModel: SingleValueModel<GitParsedChangesBundle>,
+    private val tree: AsyncChangesTree,
+    private val changesProviderModel: SingleValueModel<GitBranchComparisonResult>,
     private val commitsVm: GHPRCommitsViewModel
   ) : GHPRCommitBrowserComponentController {
     override fun selectCommit(oid: String) {
@@ -155,16 +157,18 @@ internal class GHPRViewComponentFactory(private val actionManager: ActionManager
     override fun selectChange(oid: String?, filePath: String) {
       commitsVm.selectAllCommits()
 
-      if (oid == null) {
-        tree.selectFile(VcsUtil.getFilePath(filePath, false))
-      }
-      else {
-        val change = changesProviderModel.value.patchesByChange.findCumulativeChange(oid, filePath)
-        if (change == null) {
+      tree.invokeAfterRefresh {
+        if (oid == null) {
           tree.selectFile(VcsUtil.getFilePath(filePath, false))
         }
         else {
-          tree.selectChange(change)
+          val change = changesProviderModel.value.findCumulativeChange(oid, filePath)
+          if (change == null) {
+            tree.selectFile(VcsUtil.getFilePath(filePath, false))
+          }
+          else {
+            tree.selectChange(change)
+          }
         }
       }
       CollaborationToolsUIUtil.focusPanel(tree)
@@ -187,7 +191,7 @@ internal class GHPRViewComponentFactory(private val actionManager: ActionManager
 
       val scope = DisposingScope(disposable, SupervisorJob() + Dispatchers.Main.immediate)
       val reviewDetailsVm = GHPRDetailsViewModelImpl(detailsModel, stateModel)
-      val reviewStatusVm = GHPRStatusViewModelImpl(detailsModel, stateModel)
+      val reviewStatusVm = GHPRStatusViewModelImpl(stateModel)
       val reviewFlowVm = GHPRReviewFlowViewModelImpl(scope,
                                                      metadataModel,
                                                      stateModel,
@@ -248,7 +252,7 @@ internal class GHPRViewComponentFactory(private val actionManager: ActionManager
 
   private fun createCommitChangesModel(
     scope: CoroutineScope,
-    changesProviderModel: SingleValueModel<GitParsedChangesBundle>,
+    changesProviderModel: SingleValueModel<GitBranchComparisonResult>,
     commitsAndFilesVm: GHPRCommitsViewModel
   ): SingleValueModel<Collection<Change>> {
     val changesState = MutableStateFlow(changesProviderModel.value)
@@ -277,7 +281,7 @@ internal class GHPRViewComponentFactory(private val actionManager: ActionManager
     model: SingleValueModel<Collection<Change>>,
     emptyTextText: @Nls String,
     getCustomData: ChangesTree.(String) -> Any? = { null }
-  ): ChangesTree {
+  ): AsyncChangesTree {
     val tree = CodeReviewChangesTreeFactory(project, model).create(emptyTextText)
 
     val diffPreviewController = createAndSetupDiffPreview(tree, diffRequestProducer.changeProducerFactory, dataProvider,

@@ -71,7 +71,7 @@ public final class MavenProjectsTree {
 
   private final List<MavenProject> myRootProjects = new ArrayList<>();
 
-  private final Map<MavenProject, MavenProjectTimestamp> myTimestamps = new HashMap<>();
+  private final Map<VirtualFile, MavenProjectTimestamp> myTimestamps = new HashMap<>();
   private final MavenWorkspaceMap myWorkspaceMap = new MavenWorkspaceMap();
   private final Map<MavenId, MavenProject> myMavenIdToProjectMapping = new HashMap<>();
   private final Map<VirtualFile, MavenProject> myVirtualFileToProjectMapping = new HashMap<>();
@@ -103,8 +103,7 @@ public final class MavenProjectsTree {
     return myProjectLocator;
   }
 
-  @Nullable
-  public static MavenProjectsTree read(Project project, Path file) throws IOException {
+  public static @Nullable MavenProjectsTree read(Project project, Path file) throws IOException {
     MavenProjectsTree result = new MavenProjectsTree(project);
 
     try (DataInputStream in = new DataInputStream(new BufferedInputStream(PathKt.inputStream(file)))) {
@@ -154,12 +153,14 @@ public final class MavenProjectsTree {
       List<MavenProject> modules = readProjectsRecursively(in, tree);
       if (project != null) {
         result.add(project);
-        tree.myTimestamps.put(project, timestamp);
+        tree.myTimestamps.put(project.getFile(), timestamp);
         tree.myVirtualFileToProjectMapping.put(project.getFile(), project);
         tree.fillIDMaps(project);
-        tree.myAggregatorToModuleMapping.put(project, modules);
-        for (MavenProject eachModule : modules) {
-          tree.myModuleToAggregatorMapping.put(eachModule, project);
+        if (!modules.isEmpty()) {
+          tree.myAggregatorToModuleMapping.put(project, modules);
+          for (MavenProject eachModule : modules) {
+            tree.myModuleToAggregatorMapping.put(eachModule, project);
+          }
         }
       }
     }
@@ -182,17 +183,17 @@ public final class MavenProjectsTree {
     }
   }
 
-  private void writeProjectsRecursively(DataOutputStream out, List<MavenProject> list) throws IOException {
-    out.writeInt(list.size());
-    for (MavenProject each : list) {
-      each.write(out);
-      myTimestamps.get(each).write(out);
-      writeProjectsRecursively(out, getModules(each));
+  private void writeProjectsRecursively(DataOutputStream out, List<MavenProject> mavenProjects) throws IOException {
+    out.writeInt(mavenProjects.size());
+    for (var mavenProject : mavenProjects) {
+      mavenProject.write(out);
+      var timestamp = myTimestamps.getOrDefault(mavenProject.getFile(), MavenProjectTimestamp.NULL);
+      timestamp.write(out);
+      writeProjectsRecursively(out, getModules(mavenProject));
     }
   }
 
-  @NotNull
-  public List<String> getManagedFilesPaths() {
+  public @NotNull List<String> getManagedFilesPaths() {
     synchronized (myStateLock) {
       return new ArrayList<>(myManagedFilesPaths);
     }
@@ -336,10 +337,14 @@ public final class MavenProjectsTree {
     return result;
   }
 
-  public boolean isIgnored(MavenProject project) {
+  public boolean isIgnored(@NotNull MavenProject project) {
     String path = project.getPath();
+    return isIgnored(path);
+  }
+
+  private boolean isIgnored(String projectPath) {
     synchronized (myStateLock) {
-      return myIgnoredFilesPaths.contains(path) || matchesIgnoredFilesPatterns(path);
+      return myIgnoredFilesPaths.contains(projectPath) || matchesIgnoredFilesPatterns(projectPath);
     }
   }
 
@@ -525,6 +530,10 @@ public final class MavenProjectsTree {
     }
 
     private boolean startUpdate(VirtualFile mavenProjectFile, boolean forceRead) {
+      String projectPath = mavenProjectFile.getPath();
+
+      if (tree.isIgnored(projectPath)) return false;
+
       Ref<Boolean> previousUpdateRef = new Ref<>();
       updated.compute(mavenProjectFile, (file, value) -> {
         previousUpdateRef.set(value);
@@ -537,14 +546,14 @@ public final class MavenProjectsTree {
         MavenLog.LOG.debug("Has already been updated (%s): %s; forceRead: %s".formatted(previousUpdate, mavenProjectFile, forceRead));
         return false;
       }
-      process.setText(MavenProjectBundle.message("maven.reading.pom", mavenProjectFile.getPath()));
+      process.setText(MavenProjectBundle.message("maven.reading.pom", projectPath));
       process.setText2("");
       return true;
     }
 
     private boolean readPomIfNeeded(MavenProject mavenProject, boolean forceRead) {
       var timestamp = tree.calculateTimestamp(mavenProject, explicitProfiles, generalSettings);
-      boolean timeStampChanged = !timestamp.equals(tree.myTimestamps.get(mavenProject));
+      boolean timeStampChanged = !timestamp.equals(tree.myTimestamps.get(mavenProject.getFile()));
       boolean readPom = forceRead || timeStampChanged;
 
       if (readPom) {
@@ -558,12 +567,12 @@ public final class MavenProjectsTree {
         });
 
         if (Comparing.equal(oldParentId, mavenProject.getParentId())) {
-          tree.myTimestamps.put(mavenProject, timestamp);
+          tree.myTimestamps.put(mavenProject.getFile(), timestamp);
         }
         else {
           // ensure timestamp reflects actual parent's timestamp
           var newTimestamp = tree.calculateTimestamp(mavenProject, explicitProfiles, generalSettings);
-          tree.myTimestamps.put(mavenProject, newTimestamp);
+          tree.myTimestamps.put(mavenProject.getFile(), newTimestamp);
         }
 
         var forcedChanges = forceRead ? MavenProjectChanges.ALL : MavenProjectChanges.NONE;
@@ -689,9 +698,9 @@ public final class MavenProjectsTree {
     }
   }
 
-  private MavenProjectTimestamp calculateTimestamp(final MavenProject mavenProject,
-                                                   final MavenExplicitProfiles explicitProfiles,
-                                                   final MavenGeneralSettings generalSettings) {
+  private MavenProjectTimestamp calculateTimestamp(MavenProject mavenProject,
+                                                   MavenExplicitProfiles explicitProfiles,
+                                                   MavenGeneralSettings generalSettings) {
     return ReadAction.compute(() -> {
       long pomTimestamp = getFileTimestamp(mavenProject.getFile());
       MavenProject parent = findParent(mavenProject);
@@ -815,7 +824,7 @@ public final class MavenProjectsTree {
       else {
         myRootProjects.remove(project);
       }
-      myTimestamps.remove(project);
+      myTimestamps.remove(project.getFile());
       myVirtualFileToProjectMapping.remove(project.getFile());
       clearIDMaps(project.getMavenId());
       myAggregatorToModuleMapping.remove(project);
@@ -913,8 +922,7 @@ public final class MavenProjectsTree {
     }
   }
 
-  @NotNull
-  public static Collection<String> getFilterExclusions(MavenProject mavenProject) {
+  public static @NotNull Collection<String> getFilterExclusions(MavenProject mavenProject) {
     Element config = mavenProject.getPluginConfiguration("org.apache.maven.plugins", "maven-resources-plugin");
     if (config == null) {
       return Collections.emptySet();
@@ -988,12 +996,10 @@ public final class MavenProjectsTree {
 
           @Override
           public void flush() {
-
           }
 
           @Override
           public void close() {
-
           }
         };
 
@@ -1039,24 +1045,20 @@ public final class MavenProjectsTree {
     return withReadLock(() -> new ArrayList<>(myVirtualFileToProjectMapping.keySet()));
   }
 
-  @NotNull
-  private MavenProject findOrCreateProject(VirtualFile f) {
+  private @NotNull MavenProject findOrCreateProject(VirtualFile f) {
     var mavenProject = findProject(f);
     return null == mavenProject ? new MavenProject(f) : mavenProject;
   }
 
-  @Nullable
-  public MavenProject findProject(VirtualFile f) {
+  public @Nullable MavenProject findProject(VirtualFile f) {
     return withReadLock(() -> myVirtualFileToProjectMapping.get(f));
   }
 
-  @Nullable
-  public MavenProject findProject(MavenId id) {
+  public @Nullable MavenProject findProject(MavenId id) {
     return withReadLock(() -> myMavenIdToProjectMapping.get(id));
   }
 
-  @Nullable
-  public MavenProject findProject(MavenArtifact artifact) {
+  public @Nullable MavenProject findProject(MavenArtifact artifact) {
     return findProject(artifact.getMavenId());
   }
 
@@ -1076,7 +1078,21 @@ public final class MavenProjectsTree {
   }
 
   @NotNull
-  public MavenProject findRootProject(@NotNull MavenProject project) {
+  public Collection<MavenProject> collectAggregators(@NotNull Collection<MavenProject> mavenProjects) {
+    var mavenProjectsToSkip = new HashSet<MavenProject>();
+    for (var mavenProject : mavenProjects) {
+      var aggregator = mavenProject;
+      while ((aggregator = findAggregator(aggregator)) != null) {
+        if (mavenProjects.contains(aggregator)) {
+          mavenProjectsToSkip.add(mavenProject);
+          break;
+        }
+      }
+    }
+    return mavenProjects.stream().filter(mavenProject -> !mavenProjectsToSkip.contains(mavenProject)).toList();
+  }
+
+  public @NotNull MavenProject findRootProject(@NotNull MavenProject project) {
     return withReadLock(() -> {
       MavenProject rootProject = project;
       while (true) {
@@ -1087,10 +1103,6 @@ public final class MavenProjectsTree {
         rootProject = aggregator;
       }
     });
-  }
-
-  public boolean isRootProject(@NotNull MavenProject project) {
-    return withReadLock(() -> myModuleToAggregatorMapping.get(project) == null);
   }
 
   public List<MavenProject> getModules(MavenProject aggregator) {
@@ -1120,6 +1132,9 @@ public final class MavenProjectsTree {
       List<MavenProject> modules = myAggregatorToModuleMapping.get(aggregator);
       if (modules == null) return;
       modules.remove(module);
+      if (modules.isEmpty()) {
+        myAggregatorToModuleMapping.remove(aggregator);
+      }
       myModuleToAggregatorMapping.remove(module);
     });
   }
@@ -1291,8 +1306,7 @@ public final class MavenProjectsTree {
       fireProjectsUpdated(updated, mavenProjects);
     }
 
-    @NotNull
-    private List<Pair<MavenProject, MavenProjectChanges>> mapToListWithPairs() {
+    private @NotNull List<Pair<MavenProject, MavenProjectChanges>> mapToListWithPairs() {
       ArrayList<Pair<MavenProject, MavenProjectChanges>> result = new ArrayList<>(updatedProjectsWithChanges.size());
       for (Map.Entry<MavenProject, MavenProjectChanges> entry : updatedProjectsWithChanges.entrySet()) {
         entry.getKey().getProblems(); // need for fill problem cache
@@ -1343,6 +1357,8 @@ public final class MavenProjectsTree {
     private final long myExplicitProfilesHashCode;
     private final long myJvmConfigTimestamp;
     private final long myMavenConfigTimestamp;
+
+    private static MavenProjectTimestamp NULL = new MavenProjectTimestamp(0, 0, 0, 0, 0, 0, 0, 0);
 
     private MavenProjectTimestamp(long pomTimestamp,
                                   long parentLastReadStamp,

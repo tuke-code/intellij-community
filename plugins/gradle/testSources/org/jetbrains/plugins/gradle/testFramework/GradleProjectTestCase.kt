@@ -33,9 +33,6 @@ abstract class GradleProjectTestCase : GradleProjectBaseTestCase() {
   fun testJavaProject(gradleVersion: GradleVersion, test: () -> Unit) =
     test(gradleVersion, JAVA_PROJECT, test)
 
-  fun testKotlinProject(gradleVersion: GradleVersion, test: () -> Unit) =
-    test(gradleVersion, KOTLIN_PROJECT, test)
-
   fun testGroovyProject(gradleVersion: GradleVersion, test: () -> Unit) =
     test(gradleVersion, GROOVY_PROJECT, test)
 
@@ -58,25 +55,28 @@ abstract class GradleProjectTestCase : GradleProjectBaseTestCase() {
     }
   }
 
-  fun writeText(relativePath: String, text: String) {
+  fun writeText(relativePath: String, text: String): VirtualFile {
     val file = findOrCreateFile(relativePath)
     runWriteActionAndWait {
       file.writeText(text)
     }
+    return file
   }
 
-  fun appendText(relativePath: String, text: String) {
+  fun appendText(relativePath: String, text: String): VirtualFile {
     val file = getFile(relativePath)
     runWriteActionAndWait {
       file.writeText(file.readText() + "\n" + text)
     }
+    return file
   }
 
-  fun prependText(relativePath: String, text: String) {
+  fun prependText(relativePath: String, text: String): VirtualFile {
     val file = getFile(relativePath)
     runWriteActionAndWait {
       file.writeText(text + "\n" + file.readText())
     }
+    return file
   }
 
   companion object {
@@ -97,19 +97,6 @@ abstract class GradleProjectTestCase : GradleProjectBaseTestCase() {
       }
       withDirectory("src/main/java")
       withDirectory("src/test/java")
-    }
-
-
-    private val KOTLIN_PROJECT = GradleTestFixtureBuilder.create("kotlin-plugin-project") { gradleVersion ->
-      withSettingsFile {
-        setProjectName("kotlin-plugin-project")
-      }
-      withBuildFile(gradleVersion) {
-        withKotlinJvmPlugin()
-        withJUnit()
-      }
-      withDirectory("src/main/kotlin")
-      withDirectory("src/test/kotlin")
     }
 
     private val GROOVY_PROJECT = GradleTestFixtureBuilder.create("groovy-plugin-project") { gradleVersion ->

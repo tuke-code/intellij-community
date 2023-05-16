@@ -345,6 +345,16 @@ public abstract class IdeCompiledLightClassesByFqNameTestGenerated extends Abstr
             runTest(compilerTestData("compiler/testData/asJava/lightClasses/lightClassByFqName/InlineReified.kt"));
         }
 
+        @TestMetadata("InvalidJavaIdentifierAsAnnotationArgument.kt")
+        public void testInvalidJavaIdentifierAsAnnotationArgument() throws Exception {
+            runTest(compilerTestData("compiler/testData/asJava/lightClasses/lightClassByFqName/InvalidJavaIdentifierAsAnnotationArgument.kt"));
+        }
+
+        @TestMetadata("InvalidJavaIdentifierAsPropertyInitializer.kt")
+        public void testInvalidJavaIdentifierAsPropertyInitializer() throws Exception {
+            runTest(compilerTestData("compiler/testData/asJava/lightClasses/lightClassByFqName/InvalidJavaIdentifierAsPropertyInitializer.kt"));
+        }
+
         @TestMetadata("JavaBetween.kt")
         public void testJavaBetween() throws Exception {
             runTest(compilerTestData("compiler/testData/asJava/lightClasses/lightClassByFqName/JavaBetween.kt"));
@@ -428,6 +438,25 @@ public abstract class IdeCompiledLightClassesByFqNameTestGenerated extends Abstr
         @TestMetadata("VarArgs.kt")
         public void testVarArgs() throws Exception {
             runTest(compilerTestData("compiler/testData/asJava/lightClasses/lightClassByFqName/VarArgs.kt"));
+        }
+    }
+
+    @RunWith(JUnit3RunnerWithInners.class)
+    @TestMetadata("../../../../out/kotlinc-testdata-2/compiler/testData/asJava/lightClasses/lightClassByFqName/withTestCompilerPluginEnabled")
+    public static class WithTestCompilerPluginEnabled extends AbstractIdeCompiledLightClassesByFqNameTest {
+        private void runTest(String testDataFilePath) throws Exception {
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+        }
+
+        @Override
+        protected void setUp() {
+            compilerTestData("compiler/testData/asJava/lightClasses/lightClassByFqName/withTestCompilerPluginEnabled");
+            super.setUp();
+        }
+
+        @TestMetadata("allOpen.kt")
+        public void testAllOpen() throws Exception {
+            runTest(compilerTestData("compiler/testData/asJava/lightClasses/lightClassByFqName/withTestCompilerPluginEnabled/allOpen.kt"));
         }
     }
 }

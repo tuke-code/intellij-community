@@ -19,9 +19,12 @@ import org.jetbrains.kotlin.analysis.api.components.KtDiagnosticCheckerFilter
 import org.jetbrains.kotlin.analysis.api.diagnostics.KtDiagnostic
 import org.jetbrains.kotlin.analysis.api.diagnostics.KtDiagnosticWithPsi
 import org.jetbrains.kotlin.analysis.api.diagnostics.getDefaultMessageWithFactoryName
+import org.jetbrains.kotlin.analysis.api.fir.diagnostics.KtFirDiagnostic
 import org.jetbrains.kotlin.diagnostics.Severity
+import org.jetbrains.kotlin.idea.inspections.suppress.CompilerWarningIntentionAction
 import org.jetbrains.kotlin.idea.codeinsight.api.applicators.fixes.KotlinQuickFixService
 import org.jetbrains.kotlin.idea.inspections.suppress.KotlinSuppressableWarningProblemGroup
+import org.jetbrains.kotlin.idea.statistics.compilationError.KotlinCompilationErrorFrequencyStatsCollector
 import org.jetbrains.kotlin.psi.KtFile
 
 class KotlinDiagnosticHighlightVisitor : HighlightVisitor {
@@ -49,17 +52,24 @@ class KotlinDiagnosticHighlightVisitor : HighlightVisitor {
 
     private fun analyze(file: KtFile, holder: HighlightInfoHolder) {
         analyze(file) {
-            file.collectDiagnosticsForFile(KtDiagnosticCheckerFilter.ONLY_COMMON_CHECKERS).forEach { diagnostic ->
+            val diagnostics = file.collectDiagnosticsForFile(KtDiagnosticCheckerFilter.ONLY_COMMON_CHECKERS)
+            for (diagnostic in diagnostics) {
                 addDiagnostic(diagnostic, holder)
             }
+            KotlinCompilationErrorFrequencyStatsCollector.recordCompilationErrorsHappened(
+                diagnostics.asSequence().filter { it.severity == Severity.ERROR }.mapNotNull(KtDiagnosticWithPsi<*>::factoryName),
+                file
+            )
         }
     }
 
     context(KtAnalysisSession)
     private fun addDiagnostic(diagnostic: KtDiagnosticWithPsi<*>, holder: HighlightInfoHolder) {
-        val fixes = KotlinQuickFixService.getInstance().getQuickFixesFor(diagnostic)
+        val isWarning = diagnostic.severity == Severity.WARNING
         val factoryName = diagnostic.factoryName
-        val problemGroup = if (diagnostic.severity == Severity.WARNING && factoryName != null) {
+        val fixes = KotlinQuickFixService.getInstance().getQuickFixesFor(diagnostic).takeIf { it.isNotEmpty() }
+            ?: if (isWarning && factoryName != null) listOf(CompilerWarningIntentionAction(factoryName)) else emptyList()
+        val problemGroup = if (isWarning && factoryName != null) {
             KotlinSuppressableWarningProblemGroup(factoryName)
         } else null
         diagnostic.textRanges.forEach { range ->
@@ -94,14 +104,35 @@ class KotlinDiagnosticHighlightVisitor : HighlightVisitor {
         return application.isInternal || application.isUnitTestMode
     }
 
+
+    context(KtAnalysisSession)
     private fun KtDiagnosticWithPsi<*>.getHighlightInfoType(): HighlightInfoType {
-        return when (severity) {
-            Severity.INFO -> HighlightInfoType.INFORMATION
-            Severity.ERROR -> HighlightInfoType.ERROR
-            Severity.WARNING -> HighlightInfoType.WARNING
+       return when {
+            isUnresolvedDiagnostic() -> HighlightInfoType.WRONG_REF
+            isDeprecatedDiagnostic() -> HighlightInfoType.DEPRECATED
+            else ->  when (severity) {
+                Severity.INFO -> HighlightInfoType.INFORMATION
+                Severity.ERROR -> HighlightInfoType.ERROR
+                Severity.WARNING -> HighlightInfoType.WARNING
+            }
         }
     }
 
+    context(KtAnalysisSession)
+    private fun KtDiagnosticWithPsi<*>.isUnresolvedDiagnostic() = when (this) {
+        is KtFirDiagnostic.UnresolvedReference -> true
+        is KtFirDiagnostic.UnresolvedLabel -> true
+        is KtFirDiagnostic.UnresolvedReferenceWrongReceiver -> true
+        is KtFirDiagnostic.UnresolvedImport -> true
+        is KtFirDiagnostic.MissingStdlibClass -> true
+        else -> false
+    }
+
+    context(KtAnalysisSession)
+    private fun KtDiagnosticWithPsi<*>.isDeprecatedDiagnostic() = when (this) {
+        is KtFirDiagnostic.Deprecation -> true
+        else -> false
+    }
 
     override fun visit(element: PsiElement) {
         // After-analysis highlighting visitors are implemented as a separate highlighting pass, see [KotlinSemanticHighlightingPass],

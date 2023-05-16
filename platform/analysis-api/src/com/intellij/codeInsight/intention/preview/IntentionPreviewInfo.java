@@ -79,6 +79,36 @@ public interface IntentionPreviewInfo {
   };
 
   /**
+   * Diff preview applied to the current file when new text is not actually written.
+   * Could be used as an alternative to {@link #DIFF} when we can generate the target text
+   * without actual PSI changes.
+   */
+  class Diff implements IntentionPreviewInfo {
+    private final @NotNull String myOrigText;
+    private final @NotNull String myModifiedText;
+
+    /**
+     * @param origText old text of the current file
+     * @param modifiedText new text for the current file
+     */
+    public Diff(@NotNull String origText, @NotNull String modifiedText) {
+      myOrigText = origText;
+      myModifiedText = modifiedText;
+    }
+
+    /**
+     * @return new text for the current file
+     */
+    public @NotNull String modifiedText() {
+      return myModifiedText;
+    }
+
+    public @NotNull String originalText() {
+      return myOrigText;
+    }
+  }
+  
+  /**
    * Diff preview where original text and new text are explicitly displayed.
    * Could be used to generate custom diff previews (e.g. when changes are to be applied to another file).
    * <p>
@@ -309,8 +339,17 @@ public interface IntentionPreviewInfo {
    */
   static @NotNull IntentionPreviewInfo navigate(@NotNull NavigatablePsiElement target) {
     PsiFile file = target.getContainingFile();
-    Icon icon = file.getIcon(0);
     int offset = target.getTextOffset();
+    return navigate(file, offset);
+  }
+
+  /**
+   * @param file file to navigate to
+   * @param offset offset within file to navigate to
+   * @return a presentation describing that the action will navigate to the specified target element
+   */
+  static @NotNull Html navigate(@NotNull PsiFile file, int offset) {
+    Icon icon = file.getIcon(0);
     Document document = file.getViewProvider().getDocument();
     HtmlBuilder builder = new HtmlBuilder();
     builder.append(HtmlChunk.htmlEntity("&rarr;")).append(" ");

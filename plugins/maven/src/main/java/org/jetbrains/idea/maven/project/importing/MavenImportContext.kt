@@ -6,11 +6,9 @@ import com.intellij.openapi.module.Module
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
 import org.jetbrains.concurrency.Promise
-import org.jetbrains.idea.maven.model.MavenArtifact
 import org.jetbrains.idea.maven.model.MavenExplicitProfiles
 import org.jetbrains.idea.maven.model.MavenProjectProblem
 import org.jetbrains.idea.maven.project.*
-import org.jetbrains.idea.maven.server.NativeMavenProjectHolder
 import org.jetbrains.idea.maven.utils.MavenProgressIndicator
 
 
@@ -58,9 +56,8 @@ class MavenReadContext internal constructor(project: Project,
 }
 
 class MavenResolvedContext internal constructor(project: Project,
-                                                val unresolvedArtifacts: Collection<MavenArtifact>,
                                                 val projectsToImport: List<MavenProject>,
-                                                val nativeProjectHolder: List<Pair<MavenProject, NativeMavenProjectHolder>>,
+                                                val projectsWithUnresolvedPlugins: Collection<MavenProjectWithHolder>,
                                                 val readContext: MavenReadContext) : MavenImportContext(project) {
   val initialContext = readContext.initialContext
   override val indicator = readContext.indicator

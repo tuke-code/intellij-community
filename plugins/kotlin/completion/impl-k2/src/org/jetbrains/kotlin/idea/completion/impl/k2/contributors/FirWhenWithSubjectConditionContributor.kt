@@ -91,7 +91,8 @@ internal class FirWhenWithSubjectConditionContributor(
     ) {
         val availableFromScope = mutableSetOf<KtClassifierSymbol>()
         getAvailableClassifiersCurrentScope(originalKtFile, whenCondition, scopeNameFilter, visibilityChecker)
-            .forEach { classifier ->
+            .forEach { classifierWithScopeKind ->
+                val classifier = classifierWithScopeKind.symbol
                 if (classifier !is KtNamedSymbol) return@forEach
                 availableFromScope += classifier
 
@@ -247,7 +248,6 @@ internal class FirWhenWithSubjectConditionContributor(
             .withInsertHandler(WhenConditionInsertionHandler)
             .withTailText(createStarTypeArgumentsList(typeArgumentsCount), /*grayed*/true)
             .letIf(isSingleCondition) { it.appendTailText(" -> ",  /*grayed*/true) }
-            .also { it.availableWithoutImport = availableWithoutImport }
             .let(sink::addElement)
     }
 }

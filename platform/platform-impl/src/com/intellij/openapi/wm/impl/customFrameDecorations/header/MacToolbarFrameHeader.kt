@@ -1,25 +1,29 @@
 // Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.openapi.wm.impl.customFrameDecorations.header
 
-import com.intellij.ide.actions.ToggleDistractionFreeModeAction
+import com.intellij.ide.ProjectWindowCustomizerService
+import com.intellij.ide.ui.LafManagerListener
 import com.intellij.ide.ui.UISettings
 import com.intellij.ide.ui.UISettingsListener
 import com.intellij.ide.ui.customization.CustomActionsSchema
 import com.intellij.openapi.actionSystem.ActionGroup
-import com.intellij.openapi.util.registry.Registry
-import com.intellij.openapi.util.registry.RegistryValue
-import com.intellij.openapi.util.registry.RegistryValueListener
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.wm.impl.IdeMenuBar
+import com.intellij.openapi.wm.impl.IdeRootPane
 import com.intellij.openapi.wm.impl.ToolbarHolder
 import com.intellij.openapi.wm.impl.customFrameDecorations.CustomFrameTitleButtons
 import com.intellij.openapi.wm.impl.customFrameDecorations.header.titleLabel.SimpleCustomDecorationPath
 import com.intellij.openapi.wm.impl.headertoolbar.MainToolbar
 import com.intellij.ui.awt.RelativeRectangle
+import com.intellij.ui.mac.MacFullScreenControlsManager
 import com.intellij.ui.mac.MacMainFrameDecorator
 import com.intellij.util.ui.JBUI
 import com.jetbrains.CustomWindowDecoration
 import com.jetbrains.JBR
-import java.awt.*
+import java.awt.CardLayout
+import java.awt.Component
+import java.awt.Graphics
+import java.awt.Rectangle
 import java.awt.event.ComponentAdapter
 import java.awt.event.ComponentEvent
 import java.beans.PropertyChangeListener
@@ -36,9 +40,12 @@ internal class MacToolbarFrameHeader(private val frame: JFrame,
   private val ideMenu: IdeMenuBar = IdeMenuBar()
   private var toolbar: MainToolbar? = null
   private val headerTitle = SimpleCustomDecorationPath(frame)
+  private val isCompact: Boolean get() = (root as? IdeRootPane)?.isCompactHeader == true
 
   private val TOOLBAR_CARD = "TOOLBAR_CARD"
   private val PATH_CARD = "PATH_CARD"
+
+  private val customizer get() = ProjectWindowCustomizerService.getInstance()
 
   init {
     layout = AdjustableSizeCardLayout()
@@ -49,15 +56,20 @@ internal class MacToolbarFrameHeader(private val frame: JFrame,
     toolbar = createToolBar()
     updateVisibleCard()
 
-    val rKey = Registry.get("apple.awt.newFullScreeControls")
-    System.setProperty(rKey.key, java.lang.Boolean.toString(rKey.asBoolean()))
-    rKey.addListener(
-      object : RegistryValueListener {
-        override fun afterValueChanged(value: RegistryValue) {
-          System.setProperty(rKey.key, java.lang.Boolean.toString(rKey.asBoolean()))
-          updateBorders()
-        }
-      }, this)
+    MacFullScreenControlsManager.configureEnable(this) {
+      updateBorders()
+    }
+
+    ApplicationManager.getApplication().messageBus.connect(this).subscribe(LafManagerListener.TOPIC, LafManagerListener {
+      if (root.getClientProperty(MacMainFrameDecorator.FULL_SCREEN) != null) {
+        MacFullScreenControlsManager.updateColors(frame)
+      }
+    })
+
+    customizer.addListener(this, true) {
+      isOpaque = !it
+      revalidate()
+    }
   }
 
   private fun createToolBar(): MainToolbar {
@@ -72,6 +84,11 @@ internal class MacToolbarFrameHeader(private val frame: JFrame,
     })
     add(toolbar, TOOLBAR_CARD)
     return toolbar
+  }
+
+  override fun paint(g: Graphics?) {
+    ProjectWindowCustomizerService.getInstance().paint(frame, this, g)
+    super.paint(g)
   }
 
   private fun addHeaderTitle() {
@@ -107,7 +124,7 @@ internal class MacToolbarFrameHeader(private val frame: JFrame,
   }
 
   private fun updateVisibleCard() {
-    val cardToShow = if (ToggleDistractionFreeModeAction.shouldMinimizeCustomHeader()) PATH_CARD else TOOLBAR_CARD
+    val cardToShow = if (isCompact) PATH_CARD else TOOLBAR_CARD
     (getLayout() as? CardLayout)?.show(this, cardToShow)
 
     revalidate()
@@ -152,7 +169,7 @@ internal class MacToolbarFrameHeader(private val frame: JFrame,
 
   private fun updateBorders() {
     val isFullscreen = root.getClientProperty(MacMainFrameDecorator.FULL_SCREEN) != null
-    if (isFullscreen && !Registry.`is`("apple.awt.newFullScreeControls")) {
+    if (isFullscreen && !MacFullScreenControlsManager.enabled()) {
       border = JBUI.Borders.empty()
       headerTitle.updateBorders(0)
     }

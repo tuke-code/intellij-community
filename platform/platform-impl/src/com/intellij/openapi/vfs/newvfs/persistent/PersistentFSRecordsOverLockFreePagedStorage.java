@@ -20,10 +20,11 @@ import static com.intellij.openapi.vfs.newvfs.persistent.PersistentFSHeaders.*;
 public class PersistentFSRecordsOverLockFreePagedStorage implements PersistentFSRecordsStorage, IPersistentFSRecordsStorage {
 
 
-
-  /* ================ RECORD FIELDS LAYOUT (in ints = 4 bytes) ======================================== */
+  /* ================ FILE HEADER FIELDS LAYOUT ======================================================= */
 
   public static final int HEADER_SIZE = PersistentFSHeaders.HEADER_SIZE;
+
+  /* ================ RECORD FIELDS LAYOUT  =========================================================== */
 
   private static final int PARENT_REF_OFFSET = 0;
   private static final int PARENT_REF_SIZE = Integer.BYTES;
@@ -44,7 +45,6 @@ public class PersistentFSRecordsOverLockFreePagedStorage implements PersistentFS
   private static final int LENGTH_SIZE = Long.BYTES;
 
   public static final int RECORD_SIZE_IN_BYTES = LENGTH_OFFSET + LENGTH_SIZE;
-
 
   /* ================ RECORD FIELDS LAYOUT end             ======================================== */
 
@@ -610,6 +610,8 @@ public class PersistentFSRecordsOverLockFreePagedStorage implements PersistentFS
         getNameId(recordId),
         getFlags(recordId),
         getParent(recordId),
+        getAttributeRecordId(recordId),
+        getContentRecordId(recordId),
         /* corrupted = */ false
       );
     }
@@ -677,9 +679,17 @@ public class PersistentFSRecordsOverLockFreePagedStorage implements PersistentFS
 
   @Override
   public void close() throws IOException {
-    force();
-    try {
+    if (!storage.isClosed()) {
+      force();
       storage.close();
+    }
+  }
+
+  @Override
+  public void closeAndRemoveAllFiles() throws IOException {
+    close();
+    try {
+      storage.closeAndRemoveAllFiles();
     }
     catch (InterruptedException e) {
       throw new IOException(e);

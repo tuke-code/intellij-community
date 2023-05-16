@@ -30,6 +30,7 @@ import com.intellij.openapi.wm.ex.StatusBarEx
 import com.intellij.serviceContainer.NonInjectable
 import com.intellij.util.ConcurrencyUtil
 import com.intellij.util.SystemProperties
+import com.intellij.util.application
 import com.intellij.util.indexing.IndexingBundle
 import com.intellij.util.ui.DeprecationStripePanel
 import com.intellij.util.ui.UIUtil
@@ -120,7 +121,7 @@ open class DumbServiceImpl @NonInjectable @VisibleForTesting constructor(private
       myProject.service<DumbServiceScanningListener>().subscribe()
     }
     if (Registry.`is`("vfs.refresh.should.pause.dumb.queue", true)) {
-      DumbServiceVfsBatchListener(myProject, myGuiDumbTaskRunner.guiSuspender)
+      DumbServiceVfsBatchListener(myProject, myGuiDumbTaskRunner.guiSuspender())
     }
     myBalloon = DumbServiceBalloon(myProject, this)
     myAlternativeResolveTracker = DumbServiceAlternativeResolveTracker()
@@ -161,7 +162,7 @@ open class DumbServiceImpl @NonInjectable @VisibleForTesting constructor(private
   }
 
   override suspend fun suspendIndexingAndRun(activityName: @NlsContexts.ProgressText String, activity: suspend () -> Unit) {
-    myGuiDumbTaskRunner.guiSuspender.suspendAndRun(activityName, activity)
+    myGuiDumbTaskRunner.guiSuspender().suspendAndRun(activityName, activity)
   }
 
   override var isDumb: Boolean
@@ -246,6 +247,9 @@ open class DumbServiceImpl @NonInjectable @VisibleForTesting constructor(private
   }
 
   private fun enterDumbModeIfSmart(modality: ModalityState, trace: Throwable) {
+    application.assertWriteIntentLockAcquired()
+    if (myState.get() == State.DUMB) return // don't event start unneeded write action
+
     val entered = WriteAction.compute<Boolean, RuntimeException> {
       if (!myState.compareAndSet(State.SMART, State.DUMB)) {
         return@compute false
@@ -262,6 +266,9 @@ open class DumbServiceImpl @NonInjectable @VisibleForTesting constructor(private
   }
 
   private fun enterSmartModeIfDumb() {
+    application.assertWriteIntentLockAcquired()
+    if (myState.get() == State.SMART) return // don't event start unneeded write action
+
     val entered = WriteAction.compute<Boolean, RuntimeException> {
       if (!myState.compareAndSet(State.DUMB, State.SMART)) {
         return@compute false
@@ -305,7 +312,7 @@ open class DumbServiceImpl @NonInjectable @VisibleForTesting constructor(private
       // isRunning will be false eventually, because we are on EDT, and no new task can be queued outside the EDT
       // (we only wait for currently running task to terminate).
       myGuiDumbTaskRunner.cancelAllTasks()
-      while (myGuiDumbTaskRunner.isRunning().value && !myProject.isDisposed) {
+      while (myGuiDumbTaskRunner.isRunning.value && !myProject.isDisposed) {
         PingProgress.interactWithEdtProgress()
         LockSupport.parkNanos(50000000)
       }
@@ -422,9 +429,11 @@ open class DumbServiceImpl @NonInjectable @VisibleForTesting constructor(private
   }
 
   private fun processQueueUnderModalProgress(): Boolean {
+    val startTrace = Throwable()
     NoAccessDuringPsiEvents.checkCallContext("modal indexing")
     return myGuiDumbTaskRunner.tryStartProcessInThisThread { processTask: AutoclosableProgressive ->
       try {
+        LOG.infoWithDebug("Processing dumb queue under modal progress (start)", startTrace)
         (ApplicationManager.getApplication() as ApplicationImpl).executeSuspendingWriteAction(myProject, IndexingBundle.message(
           "progress.indexing.title")) {
           processTask.use {
@@ -437,6 +446,7 @@ open class DumbServiceImpl @NonInjectable @VisibleForTesting constructor(private
         if (myTaskQueue.isEmpty) {
           enterSmartModeIfDumb()
         }
+        LOG.infoWithDebug("Processing dumb queue under modal progress (end)", startTrace)
       }
     }
   }
@@ -490,10 +500,13 @@ open class DumbServiceImpl @NonInjectable @VisibleForTesting constructor(private
     val isSynchronousTaskExecution: Boolean
       get() {
         val application = ApplicationManager.getApplication()
-        return (application.isUnitTestMode || application.isHeadlessEnvironment) &&
+        return (application.isUnitTestMode || isSynchronousHeadlessApplication) &&
                !java.lang.Boolean.parseBoolean(System.getProperty(IDEA_FORCE_DUMB_QUEUE_TASKS, "false"))
       }
 
     const val IDEA_FORCE_DUMB_QUEUE_TASKS = "idea.force.dumb.queue.tasks"
+
+    private val isSynchronousHeadlessApplication: Boolean
+      get() = application.isHeadlessEnvironment && !java.lang.Boolean.getBoolean("ide.async.headless.mode")
   }
 }

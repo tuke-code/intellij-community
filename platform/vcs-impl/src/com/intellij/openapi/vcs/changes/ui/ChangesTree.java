@@ -62,6 +62,9 @@ import static com.intellij.openapi.vcs.changes.ui.VcsTreeModelData.*;
 import static com.intellij.ui.tree.TreePathUtil.toTreePathArray;
 import static com.intellij.util.ui.ThreeStateCheckBox.State;
 
+/**
+ * Consider implementing {@link AsyncChangesTree} instead.
+ */
 public abstract class ChangesTree extends Tree implements DataProvider {
   @ApiStatus.Internal @NonNls public static final String LOG_COMMIT_SESSION_EVENTS = "LogCommitSessionEvents";
 
@@ -119,7 +122,7 @@ public abstract class ChangesTree extends Tree implements DataProvider {
     setShowsRootHandles(true);
     setOpaque(false);
     if (withSpeedSearch) {
-      TreeSpeedSearch.installOn(this, false, ChangesBrowserNode.TO_TEXT_CONVERTER.asFunction());
+      TreeSpeedSearch.installOn(this, false, ChangesBrowserNode.TO_TEXT_CONVERTER);
     }
 
     final ChangesBrowserNodeRenderer nodeRenderer = new ChangesBrowserNodeRenderer(myProject, this::isShowFlatten, highlightProblems);
@@ -624,18 +627,6 @@ public abstract class ChangesTree extends Tree implements DataProvider {
 
   public void setTreeExpander(@NotNull TreeExpander expander) {
     myTreeExpander = expander;
-  }
-
-  /**
-   * @deprecated See {@link ChangesTree#GROUP_BY_ACTION_GROUP}, {@link TreeActionsToolbarPanel}
-   */
-  @Deprecated(forRemoval = true)
-  public AnAction[] getTreeActions() {
-    return new AnAction[]{
-      ActionManager.getInstance().getAction(GROUP_BY_ACTION_GROUP),
-      createExpandAllAction(false),
-      createCollapseAllAction(false)
-    };
   }
 
   @NotNull

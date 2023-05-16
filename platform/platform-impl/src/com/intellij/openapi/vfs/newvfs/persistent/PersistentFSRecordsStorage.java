@@ -123,8 +123,11 @@ public interface PersistentFSRecordsStorage {
 
   void close() throws IOException;
 
+  /** Close the storage and remove all its data files */
+  void closeAndRemoveAllFiles() throws IOException;
+
   @FunctionalInterface
   interface FsRecordProcessor {
-    void process(int fileId, int nameId, int flags, int parentId, boolean corrupted);
+    void process(int fileId, int nameId, int flags, int parentId, int attributeRecordId, int contentId, boolean corrupted);
   }
 }

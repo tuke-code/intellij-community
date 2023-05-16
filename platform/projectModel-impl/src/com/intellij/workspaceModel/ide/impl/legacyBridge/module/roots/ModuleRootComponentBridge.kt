@@ -42,7 +42,7 @@ class ModuleRootComponentBridge(
         rootModel = this,
         updater = null
       )
-    }, "Root Model Bridge (${currentModule.name})").also { Disposer.register(this, it) }
+    }, "Root Model Bridge (${currentModule.name})", currentModule.project).also { Disposer.register(this, it) }
 
   internal val moduleLibraryTable: ModuleLibraryTableBridgeImpl = ModuleLibraryTableBridgeImpl(moduleBridge)
 
@@ -116,6 +116,11 @@ class ModuleRootComponentBridge(
     moduleBridge,
     accessor,
     cacheStorageResult)
+
+  @ApiStatus.Internal
+  fun getModifiableModelWithoutCaching(): ModifiableRootModel {
+    return getModifiableModel(MutableEntityStorage.from(moduleBridge.entityStorage.current), RootConfigurationAccessor.DEFAULT_INSTANCE)
+  }
 
   fun getModifiableModel(diff: MutableEntityStorage, accessor: RootConfigurationAccessor): ModifiableRootModel {
     return ModifiableRootModelBridgeImpl(diff, moduleBridge, accessor, false)

@@ -12,9 +12,6 @@ import org.jetbrains.plugins.gradle.execution.test.runner.GradleConsolePropertie
 import org.jetbrains.plugins.gradle.execution.test.runner.GradleSMTestProxy;
 import org.jetbrains.plugins.gradle.execution.test.runner.GradleTestsExecutionConsole;
 
-import java.nio.charset.StandardCharsets;
-import java.util.Base64;
-
 /**
  * @author Vladislav.Soroka
  */
@@ -66,10 +63,6 @@ public abstract class AbstractTestEventProcessor implements TestEventProcessor {
     getExecutionConsole().getTestsMap().put(proxyId, testProxy);
   }
 
-  protected String decode(String s) {
-    return new String(Base64.getDecoder().decode(s), StandardCharsets.UTF_8);
-  }
-
   protected boolean showInternalTestNodes() {
     return GradleConsoleProperties.SHOW_INTERNAL_TEST_NODES.value(getProperties());
   }
@@ -87,9 +80,10 @@ public abstract class AbstractTestEventProcessor implements TestEventProcessor {
     var eventConverter = new GradleTestEventConverter(project, parentTestProxy, isSuite, suiteName, className, methodName, displayName);
     var aClassName = eventConverter.getConvertedClassName();
     var aMethodName = eventConverter.getConvertedMethodName();
+    var aParamName = eventConverter.getConvertedParameterName();
     var aDisplayName = eventConverter.getConvertedDisplayName();
     var locationProtocol = isSuite ? JavaTestLocator.SUITE_PROTOCOL : JavaTestLocator.TEST_PROTOCOL;
-    var locationUrl = JavaTestLocator.createLocationUrl(locationProtocol, aClassName, aMethodName);
+    var locationUrl = JavaTestLocator.createLocationUrl(locationProtocol, aClassName, aMethodName, aParamName);
     var testProxy = new GradleSMTestProxy(aDisplayName, isSuite, locationUrl);
     testProxy.setLocator(getExecutionConsole().getUrlProvider());
     testProxy.setParentId(parentTestId);

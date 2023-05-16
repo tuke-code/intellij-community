@@ -78,7 +78,7 @@ private const val DEBUG: String = ToolWindowId.DEBUG
 
 private val recentLimit: Int get() = AdvancedSettings.getInt("max.recent.run.configurations")
 
-internal fun createRunConfigurationsActionGroup(project: Project): ActionGroup {
+internal fun createRunConfigurationsActionGroup(project: Project, e: AnActionEvent): ActionGroup {
   val actions = DefaultActionGroup()
   val registry = ExecutorRegistry.getInstance()
   val runExecutor = registry.getExecutorById(RUN) ?: error("No '${RUN}' executor found")
@@ -96,13 +96,20 @@ internal fun createRunConfigurationsActionGroup(project: Project): ActionGroup {
   }
 
   val createActionFn: (RunnerAndConfigurationSettings) -> AnAction = { configuration ->
-    createRunConfigurationWithInlines(runExecutor, debugExecutor, configuration, project) { shouldBeShown(configuration, it) }
+    createRunConfigurationWithInlines(runExecutor, debugExecutor, configuration, project, e) { shouldBeShown(configuration, it) }
   }
   val createFolderFn: (String) -> DefaultActionGroup = { folderName ->
     HideableDefaultActionGroup(folderName) { shouldBeShown(null, it) }
   }
+  val filteringSubActions: (RunnerAndConfigurationSettings, String) -> AnAction = { configuration, folderName ->
+    createRunConfigurationWithInlines(runExecutor, debugExecutor, configuration, project, e) { holdingFilter ->
+      holdingFilter && !recents.contains(configuration)
+    }.also {
+      it.templatePresentation.putClientProperty(Presentation.PROP_VALUE, folderName)
+    }
+  }
   val allConfigurations = DefaultActionGroup()
-  val allConfigurationsNumber = RunConfigurationsComboBoxAction.addRunConfigurations(allConfigurations, project, createActionFn, createFolderFn)
+  val allConfigurationsNumber = RunConfigurationsComboBoxAction.addRunConfigurations(allConfigurations, project, createActionFn, createFolderFn, filteringSubActions)
 
   if (shouldShowRecent && allConfigurationsNumber < recentLimit) {
     shouldShowRecent = false
@@ -111,7 +118,7 @@ internal fun createRunConfigurationsActionGroup(project: Project): ActionGroup {
   if (shouldShowRecent) {
     actions.add(Separator.create(ExecutionBundle.message("run.toolbar.widget.dropdown.recent.separator.text")))
     for (conf in recents) {
-      val actionGroupWithInlineActions = createRunConfigurationWithInlines(runExecutor, debugExecutor, conf, project)
+      val actionGroupWithInlineActions = createRunConfigurationWithInlines(runExecutor, debugExecutor, conf, project, e)
       actions.add(actionGroupWithInlineActions)
     }
     actions.add(Separator.create())
@@ -194,6 +201,7 @@ private fun createRunConfigurationWithInlines(runExecutor: Executor,
                                               debugExecutor: Executor,
                                               conf: RunnerAndConfigurationSettings,
                                               project: Project,
+                                              e: AnActionEvent,
                                               shouldBeShown: (Boolean) -> Boolean = { true }
 ): SelectRunConfigurationWithInlineActions {
   val activeExecutor = getActiveExecutor(project, conf)
@@ -215,7 +223,7 @@ private fun createRunConfigurationWithInlines(runExecutor: Executor,
     val extraAction = ExecutorRegistryImpl.RunSpecifiedConfigExecutorAction(extraExecutor, conf, false)
     result.addAction(extraAction, Constraints.FIRST)
   }
-  addAdditionalActionsToRunConfigurationOptions(project, conf, result, false)
+  addAdditionalActionsToRunConfigurationOptions(project, e, conf, result, false)
   return result
 }
 
@@ -302,8 +310,9 @@ class StopWithDropDownAction : AnAction(), CustomComponentAction, DumbAware {
       e.presentation.isEnabledAndVisible = false
       return
     }
-    val manger = ExecutionManagerImpl.getInstance(e.project ?: return)
-    val running = manger.getRunningDescriptors { true }
+    val project = e.project ?: return
+    val manager = ExecutionManagerImpl.getInstance(project)
+    val running = getStoppableDescriptors(project).map { it.first }
     val activeProcesses = running.size
     e.presentation.putClientProperty(ACTIVE_PROCESSES, activeProcesses)
     e.presentation.isEnabled = activeProcesses > 0
@@ -312,7 +321,7 @@ class StopWithDropDownAction : AnAction(), CustomComponentAction, DumbAware {
     e.presentation.icon = toStrokeIcon(AllIcons.Actions.Suspend, JBUI.CurrentTheme.RunWidget.FOREGROUND)
     if (activeProcesses == 1) {
       val first = running.first()
-      getConfigurations(manger, first)
+      getConfigurations(manager, first)
         ?.shortenName()
         ?.let {
           e.presentation.putClientProperty(SINGLE_RUNNING_NAME, it)
@@ -359,8 +368,8 @@ class StopWithDropDownAction : AnAction(), CustomComponentAction, DumbAware {
 }
 
 private fun stopAll(e: AnActionEvent) {
-  ExecutionManagerImpl.getInstance(e.project ?: return)
-    .getRunningDescriptors { true }
+  val project = e.project ?: return
+  getStoppableDescriptors(project).map { it.first }
     .forEach { descr ->
       ExecutionManagerImpl.stopProcess(descr)
     }
@@ -368,17 +377,16 @@ private fun stopAll(e: AnActionEvent) {
 
 fun createStopPopup(context: DataContext, project: Project): JBPopup {
   val group = DefaultActionGroup()
-  val manager = ExecutionManagerImpl.getInstance(project)
-  val running = manager.getRunningDescriptors { true }.asReversed()
-  running.forEach { descr ->
-    val name = getConfigurations(manager, descr)?.shortenName() ?: descr.displayName
+  val descriptorsByEnv = getStoppableDescriptors(project)
+  descriptorsByEnv.forEach { (descr, settings) ->
+    val name = settings?.shortenName() ?: descr.displayName
     group.add(DumbAwareAction.create(ExecutionBundle.message("stop.item.new.ui.popup", name)) {
       ExecutionManagerImpl.stopProcess(descr)
     })
   }
   group.addSeparator()
   val textColor = ColorUtil.toHex(JBUI.CurrentTheme.StatusBar.Widget.FOREGROUND)
-  val message = ExecutionBundle.message("stop.all.new.ui.popup", """<a style="color:#$textColor;">${running.size}</a>""")
+  val message = ExecutionBundle.message("stop.all.new.ui.popup", """<a style="color:#$textColor;">${descriptorsByEnv.size}</a>""")
   group.add(DumbAwareAction.create("""<html>$message</html>""") {
     stopAll(it)
   }.also {

@@ -36,10 +36,8 @@ import org.jetbrains.annotations.Nls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.plugins.gradle.service.GradleFileModificationTracker;
-import org.jetbrains.plugins.gradle.service.GradleInstallationManager;
 import org.jetbrains.plugins.gradle.service.execution.GradleExecutionHelper;
 import org.jetbrains.plugins.gradle.service.execution.GradleInitScriptUtil;
-import org.jetbrains.plugins.gradle.service.execution.GradleRunConfiguration;
 import org.jetbrains.plugins.gradle.service.project.GradleProjectResolver;
 import org.jetbrains.plugins.gradle.service.project.GradleProjectResolverExtension;
 import org.jetbrains.plugins.gradle.service.project.GradleProjectResolverUtil;
@@ -49,7 +47,6 @@ import org.jetbrains.plugins.gradle.settings.GradleExecutionSettings;
 import org.jetbrains.plugins.gradle.settings.GradleSettings;
 import org.jetbrains.plugins.gradle.util.GradleConstants;
 
-import java.io.File;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
@@ -59,6 +56,7 @@ import static com.intellij.openapi.externalSystem.rt.execution.ForkedDebuggerHel
 import static com.intellij.openapi.externalSystem.service.execution.ExternalSystemRunnableState.*;
 import static com.intellij.openapi.util.text.StringUtil.notNullize;
 import static com.intellij.util.containers.ContainerUtil.addAllNotNull;
+import static org.jetbrains.plugins.gradle.frameworkSupport.buildscript.GradleBuildScriptBuilderUtil.isGradleAtLeast;
 import static org.jetbrains.plugins.gradle.util.GradleUtil.determineRootProject;
 
 public class GradleTaskManager implements ExternalSystemTaskManager<GradleExecutionSettings> {
@@ -166,15 +164,10 @@ public class GradleTaskManager implements ExternalSystemTaskManager<GradleExecut
   }
 
   private static boolean isApplicableTestLauncher(@NotNull GradleExecutionSettings settings) {
-    var isEnabledTestLauncher = Registry.is("gradle.testLauncherAPI.enabled")
-                                || ApplicationManager.getApplication().isUnitTestMode();
-    return isEnabledTestLauncher
-           && Boolean.TRUE.equals(settings.getUserData(GradleConstants.RUN_TASK_AS_TEST))
-           && Optional.ofNullable(settings.getGradleHome())
-             .map(GradleInstallationManager::getGradleVersion)
-             .map(GradleInstallationManager::getGradleVersionSafe)
-             .map(v -> GradleVersion.version("7.6").compareTo(v) <= 0)
-             .orElse(false);
+    var isEnabledTestLauncher = Registry.is("gradle.testLauncherAPI.enabled");
+    var gradleVersion = settings.getGradleVersion();
+    var isSupportedTestLauncher = gradleVersion != null && isGradleAtLeast(gradleVersion, "7.6");
+    return isEnabledTestLauncher && settings.isRunAsTest() && isSupportedTestLauncher;
   }
 
   private static void prepareTaskState(@NotNull ExternalSystemTaskId id,
@@ -201,18 +194,6 @@ public class GradleTaskManager implements ExternalSystemTaskManager<GradleExecut
       throw new RuntimeException(e);
     }
     listener.onEnvironmentPrepared(id);
-  }
-
-  protected static boolean isGradleScriptDebug(@Nullable GradleExecutionSettings settings) {
-    return Optional.ofNullable(settings)
-      .map(s -> s.getUserData(GradleRunConfiguration.DEBUG_FLAG_KEY))
-      .orElse(false);
-  }
-
-  protected static boolean isDebugAllTasks(@Nullable GradleExecutionSettings settings) {
-    return Optional.ofNullable(settings)
-      .map(s -> s.getUserData(GradleRunConfiguration.DEBUG_ALL_KEY))
-      .orElse(false);
   }
 
   @Override
@@ -255,14 +236,13 @@ public class GradleTaskManager implements ExternalSystemTaskManager<GradleExecut
       Map<String, String> enhancementParameters = new HashMap<>();
       enhancementParameters.put(GradleProjectResolverExtension.JVM_PARAMETERS_SETUP_KEY, jvmParametersSetup);
 
-      String isTestExecution = String.valueOf(Boolean.TRUE == effectiveSettings.getUserData(GradleConstants.RUN_TASK_AS_TEST));
-      enhancementParameters.put(GradleProjectResolverExtension.TEST_EXECUTION_EXPECTED_KEY, isTestExecution);
+      Boolean isTestExecution = effectiveSettings.isRunAsTest();
+      enhancementParameters.put(GradleProjectResolverExtension.TEST_EXECUTION_EXPECTED_KEY, String.valueOf(isTestExecution));
 
       Integer debugDispatchPort = effectiveSettings.getUserData(DEBUGGER_DISPATCH_PORT_KEY);
-
       if (debugDispatchPort != null) {
         enhancementParameters.put(GradleProjectResolverExtension.DEBUG_DISPATCH_PORT_KEY, String.valueOf(debugDispatchPort));
-        String debugOptions = effectiveSettings.getUserData(GradleRunConfiguration.DEBUGGER_PARAMETERS_KEY);
+        String debugOptions = effectiveSettings.getUserData(DEBUGGER_PARAMETERS_KEY);
         enhancementParameters.put(GradleProjectResolverExtension.DEBUG_OPTIONS_KEY, debugOptions);
       }
       String debugDispatchAddr = effectiveSettings.getUserData(DEBUGGER_DISPATCH_ADDR_KEY);
@@ -317,26 +297,27 @@ public class GradleTaskManager implements ExternalSystemTaskManager<GradleExecut
   private static void writeAndAppendScript(@NotNull GradleExecutionSettings effectiveSettings,
                                            @NotNull String initScript,
                                            @NotNull String initScriptPrefix) {
-    String initScriptPrefixName = FileUtil.sanitizeFileName(initScriptPrefix);
-    File tempFile = GradleInitScriptUtil.createInitScript(initScriptPrefixName, initScript);
-    effectiveSettings.withArguments(GradleConstants.INIT_SCRIPT_CMD_OPTION, tempFile.getAbsolutePath());
+    var initScriptPrefixName = FileUtil.sanitizeFileName(initScriptPrefix);
+    var initScriptPath = GradleInitScriptUtil.createInitScript(initScriptPrefixName, initScript);
+    effectiveSettings.withArguments(GradleConstants.INIT_SCRIPT_CMD_OPTION, initScriptPath.toString());
   }
 
   public static void setupGradleScriptDebugging(@NotNull GradleExecutionSettings effectiveSettings) {
     Integer gradleScriptDebugPort = effectiveSettings.getUserData(BUILD_PROCESS_DEBUGGER_PORT_KEY);
-    if (isGradleScriptDebug(effectiveSettings) && gradleScriptDebugPort != null && gradleScriptDebugPort > 0) {
+    if (effectiveSettings.isDebugServerProcess() && gradleScriptDebugPort != null && gradleScriptDebugPort > 0) {
       String debugAddress;
       String dispatchAddr = effectiveSettings.getUserData(DEBUGGER_DISPATCH_ADDR_KEY);
       if (dispatchAddr != null) {
         debugAddress = dispatchAddr + ":" + gradleScriptDebugPort;
-      } else {
+      }
+      else {
         boolean isJdk9orLater = ExternalSystemJdkUtil.isJdk9orLater(effectiveSettings.getJavaHome());
         debugAddress = (isJdk9orLater ? "127.0.0.1:" : "") + gradleScriptDebugPort;
       }
       String jvmOpt = ForkedDebuggerHelper.JVM_DEBUG_SETUP_PREFIX + debugAddress;
       effectiveSettings.withVmOption(jvmOpt);
     }
-    if (isDebugAllTasks(effectiveSettings)) {
+    if (effectiveSettings.isDebugAllEnabled()) {
       effectiveSettings.withVmOption("-Didea.gradle.debug.all=true");
     }
   }

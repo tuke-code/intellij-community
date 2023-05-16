@@ -27,6 +27,8 @@ import com.intellij.openapi.diagnostic.ErrorReportSubmitter
 import com.intellij.openapi.diagnostic.IdeaLoggingEvent
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.diagnostic.SubmittedReportInfo
+import com.intellij.openapi.editor.colors.EditorColorsManager
+import com.intellij.openapi.editor.colors.EditorFontType
 import com.intellij.openapi.extensions.PluginId
 import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.project.Project
@@ -43,7 +45,6 @@ import com.intellij.openapi.wm.IdeFrame
 import com.intellij.openapi.wm.WindowManager
 import com.intellij.ui.*
 import com.intellij.ui.components.*
-import com.intellij.ui.scale.JBUIScale.scale
 import com.intellij.util.ExceptionUtil
 import com.intellij.util.Function
 import com.intellij.util.io.HttpRequests
@@ -226,6 +227,10 @@ open class IdeErrorsDialog internal constructor(private val myMessagePool: Messa
     }
     myAttachmentList.selectionMode = ListSelectionModel.MULTIPLE_INTERVAL_SELECTION
     myAttachmentArea = JTextArea()
+    val attachmentFont = EditorColorsManager.getInstance()?.globalScheme?.getFont(EditorFontType.PLAIN)
+    if (attachmentFont != null) {
+      myAttachmentArea.font = attachmentFont
+    }
     myAttachmentArea.margin = JBUI.insets(2)
     myAttachmentArea.document.addDocumentListener(object : DocumentAdapter() {
       override fun textChanged(e: DocumentEvent) {
@@ -269,9 +274,10 @@ open class IdeErrorsDialog internal constructor(private val myMessagePool: Messa
     val commentPanel = JPanel(BorderLayout())
     commentPanel.border = JBUI.Borders.emptyTop(5)
     commentPanel.add(scrollPane(myCommentArea, 0, 0), BorderLayout.CENTER)
-    val attachmentsPanel = JSplitPane(JSplitPane.HORIZONTAL_SPLIT,
-                                      scrollPane(myAttachmentList, 150, 350),
-                                      scrollPane(myAttachmentArea, 500, 350))
+    val attachmentsPanel = JBSplitter(false, 0.3f).apply {
+      firstComponent = scrollPane(myAttachmentList, 150, 350)
+      secondComponent = scrollPane(myAttachmentArea, 500, 350)
+    }
     attachmentsPanel.border = JBUI.Borders.emptyTop(5)
     val accountRow = JPanel(GridBagLayout())
     accountRow.border = JBUI.Borders.empty(6, 0)

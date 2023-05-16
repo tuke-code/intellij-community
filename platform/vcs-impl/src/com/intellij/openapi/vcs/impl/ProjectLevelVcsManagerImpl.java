@@ -1,8 +1,10 @@
 // Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.openapi.vcs.impl;
 
+import com.intellij.concurrency.ConcurrentCollectionFactory;
 import com.intellij.execution.ui.ConsoleViewContentType;
 import com.intellij.ide.trustedProjects.TrustedProjectsListener;
+import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.components.PersistentStateComponent;
@@ -42,10 +44,10 @@ import com.intellij.ui.content.ContentManager;
 import com.intellij.util.ContentUtilEx;
 import com.intellij.util.Processor;
 import com.intellij.util.concurrency.annotations.RequiresEdt;
-import com.intellij.util.containers.ContainerUtil;
 import com.intellij.util.text.DateFormatUtil;
 import com.intellij.vcs.ViewUpdateInfoNotification;
 import com.intellij.vcs.console.VcsConsoleTabService;
+import kotlin.Pair;
 import org.jdom.Attribute;
 import org.jdom.DataConversionException;
 import org.jdom.Element;
@@ -55,7 +57,7 @@ import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
 @State(name = "ProjectLevelVcsManager", storages = @Storage(StoragePathMacros.WORKSPACE_FILE))
-public final class ProjectLevelVcsManagerImpl extends ProjectLevelVcsManagerEx implements PersistentStateComponent<Element> {
+public final class ProjectLevelVcsManagerImpl extends ProjectLevelVcsManagerEx implements PersistentStateComponent<Element>, Disposable {
   private static final Logger LOG = Logger.getInstance(ProjectLevelVcsManagerImpl.class);
   @NonNls private static final String SETTINGS_EDITED_MANUALLY = "settingsEditedManually";
 
@@ -76,7 +78,7 @@ public final class ProjectLevelVcsManagerImpl extends ProjectLevelVcsManagerEx i
 
   private final @NotNull AtomicInteger myBackgroundOperationCounter = new AtomicInteger();
 
-  private final Set<ActionKey> myBackgroundRunningTasks = ContainerUtil.newConcurrentSet();
+  private final Set<ActionKey> myBackgroundRunningTasks = ConcurrentCollectionFactory.createConcurrentSet();
 
   private final FileIndexFacade myExcludedIndex;
 
@@ -87,7 +89,11 @@ public final class ProjectLevelVcsManagerImpl extends ProjectLevelVcsManagerEx i
     myOptionsAndConfirmations = new OptionsAndConfirmations();
 
     myMappings = new NewMappings(myProject, this);
-    Disposer.register(myProject, myMappings);
+  }
+
+  @Override
+  public void dispose() {
+    Disposer.dispose(myMappings);
   }
 
   public static ProjectLevelVcsManagerImpl getInstanceImpl(@NotNull Project project) {
@@ -385,16 +391,22 @@ public final class ProjectLevelVcsManagerImpl extends ProjectLevelVcsManagerEx i
     VcsRootIterator.iterateVcsRoot(myProject, root, iterator, directoryFilter);
   }
 
+  /**
+   * @see #writeDirectoryMappings(Element)
+   */
   @Override
   public @NotNull Element getState() {
     Element element = new Element("state");
     ProjectLevelVcsManagerSerialization.writeExternalUtil(element, myOptionsAndConfirmations);
-    if (myHaveLegacyVcsConfiguration) {
+    if (myHaveLegacyVcsConfiguration && !myProject.isDefault()) {
       element.setAttribute(SETTINGS_EDITED_MANUALLY, "true");
     }
     return element;
   }
 
+  /**
+   * @see #readDirectoryMappings(Element)
+   */
   @Override
   public void loadState(@NotNull Element state) {
     ProjectLevelVcsManagerSerialization.readExternalUtil(state, myOptionsAndConfirmations);

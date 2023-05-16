@@ -2,7 +2,6 @@
 package com.intellij.codeInsight.daemon.impl;
 
 import com.intellij.ProjectTopics;
-import com.intellij.codeHighlighting.Pass;
 import com.intellij.codeInsight.daemon.DaemonCodeAnalyzer;
 import com.intellij.codeInsight.daemon.LineMarkerInfo;
 import com.intellij.codeInsight.daemon.LineMarkerProviders;
@@ -10,6 +9,7 @@ import com.intellij.codeInsight.daemon.impl.analysis.FileHighlightingSettingList
 import com.intellij.codeInsight.intention.IntentionAction;
 import com.intellij.codeInsight.intention.IntentionActionDelegate;
 import com.intellij.codeInspection.InspectionProfile;
+import com.intellij.codeInspection.LocalQuickFix;
 import com.intellij.codeInspection.ex.QuickFixWrapper;
 import com.intellij.diagnostic.PluginException;
 import com.intellij.facet.Facet;
@@ -129,7 +129,7 @@ public final class DaemonListeners implements Disposable {
     EditorFactory editorFactory = EditorFactory.getInstance();
     EditorEventMulticasterEx eventMulticaster = (EditorEventMulticasterEx)editorFactory.getEventMulticaster();
     eventMulticaster.addDocumentListener(new DocumentListener() {
-      // clearing highlighters before changing document because change can damage editor highlighters drastically, so we'll clear more than necessary
+      // clearing highlighters before changing the document because change can damage editor highlighters drastically, so we'll clear more than necessary
       @Override
       public void beforeDocumentChange(@NotNull DocumentEvent e) {
         Document document = e.getDocument();
@@ -306,17 +306,8 @@ public final class DaemonListeners implements Disposable {
         if (document == null) {
           return;
         }
-
-        // highlight markers no more
-        //todo clear all highlights regardless the pass id
-
-        // Here color scheme required for TextEditorFields, as far as I understand this
-        // code related to standard file editors, which always use Global color scheme,
-        // thus we can pass null here.
-        UpdateHighlightersUtil.setHighlightersToEditor(myProject, document, 0, document.getTextLength(),
-                                                       Collections.emptyList(),
-                                                       null,
-                                                       Pass.UPDATE_ALL);
+        // when the file becomes un-highlighteable, clear all highlighters from previous HighlightPasses
+        removeAllHighlightersFromHighlightPasses(document, project);
       }
     });
     connection.subscribe(FileTypeManager.TOPIC, new FileTypeListener() {
@@ -412,6 +403,17 @@ public final class DaemonListeners implements Disposable {
         }
       }));
     HeavyProcessLatch.INSTANCE.addListener(this, __ -> stopDaemon(true, "re-scheduled to execute after heavy processing finished"));
+  }
+
+  private void removeAllHighlightersFromHighlightPasses(@NotNull Document document, @NotNull Project project) {
+    MarkupModel model = DocumentMarkupModel.forDocument(document, project, false);
+    if (model == null) return;
+    for (RangeHighlighter highlighter : model.getAllHighlighters()) {
+      Object tooltip = highlighter.getErrorStripeTooltip();
+      if (tooltip instanceof HighlightInfo) {
+        highlighter.dispose();
+      }
+    }
   }
 
   void repaintTrafficLightIconForAllEditors() {
@@ -737,9 +739,11 @@ public final class DaemonListeners implements Disposable {
       IntentionAction quickFixFromPlugin =
         ((HighlightInfo)errorStripeTooltip).findRegisteredQuickFix((descriptor, range) -> {
           IntentionAction intentionAction = IntentionActionDelegate.unwrap(descriptor.getAction());
-          if (intentionAction.getClass().getClassLoader() == pluginClassLoader ||
-              intentionAction instanceof QuickFixWrapper && ((QuickFixWrapper)intentionAction).getFix().getClass().getClassLoader() ==
-                                                            pluginClassLoader) {
+          if (intentionAction.getClass().getClassLoader() == pluginClassLoader) {
+            return intentionAction;
+          }
+          LocalQuickFix fix = QuickFixWrapper.unwrap(intentionAction);
+          if (fix != null && fix.getClass().getClassLoader() == pluginClassLoader) {
             return intentionAction;
           }
           return null;

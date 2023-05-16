@@ -7,20 +7,16 @@ import com.intellij.ide.BrowserUtil;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.editor.colors.EditorColorsManager;
-import com.intellij.openapi.fileChooser.FileChooser;
-import com.intellij.openapi.fileChooser.FileChooserDescriptor;
-import com.intellij.openapi.project.ProjectManager;
 import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.util.io.FileUtil;
 import com.intellij.openapi.util.registry.Registry;
-import com.intellij.openapi.vfs.VfsUtil;
 import com.intellij.ui.JBColor;
 import com.intellij.ui.scale.JBUIScale;
 import com.intellij.ui.scale.ScaleContext;
+import com.intellij.ui.scale.ScaleContextCache;
 import com.intellij.util.IconUtil;
 import com.intellij.util.LazyInitializer;
 import com.intellij.util.ObjectUtils;
-import com.intellij.util.containers.ContainerUtil;
 import com.intellij.util.net.ssl.CertificateListener;
 import com.intellij.util.net.ssl.CertificateManager;
 import com.intellij.util.ui.UIUtil;
@@ -44,12 +40,10 @@ import java.beans.PropertyChangeListener;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Path;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.util.Base64;
 import java.util.Objects;
-import java.util.Vector;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -113,20 +107,19 @@ public abstract class JBCefBrowserBase implements JBCefDisposable {
     return "";
   });
 
-  private static final LazyInitializer.LazyValue<ScaleContext.@NotNull Cache<String>> BASE64_ERROR_PAGE_ICON = LazyInitializer.create(
-    () -> {
-      return new ScaleContext.Cache<>((ctx) -> {
-        try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
-          BufferedImage image = IconUtil.toBufferedImage(IconUtil.scale(ERROR_PAGE_ICON, ctx), false);
-          ImageIO.write(image, "png", out);
-          return Base64.getEncoder().encodeToString(out.toByteArray());
-        }
-        catch (IOException ex) {
-          Logger.getInstance(JBCefBrowserBase.class).error("couldn't write an error image", ex);
-        }
-        return "";
-      });
+  private static final LazyInitializer.LazyValue<ScaleContextCache<String>> BASE64_ERROR_PAGE_ICON = LazyInitializer.create(() -> {
+    return new ScaleContextCache<>((scaleContext) -> {
+      try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+        BufferedImage image = IconUtil.toBufferedImage(IconUtil.scale(ERROR_PAGE_ICON, scaleContext), false);
+        ImageIO.write(image, "png", out);
+        return Base64.getEncoder().encodeToString(out.toByteArray());
+      }
+      catch (IOException ex) {
+        Logger.getInstance(JBCefBrowserBase.class).error("couldn't write an error image", ex);
+      }
+      return "";
     });
+  });
 
   /**
    * According to
@@ -199,6 +192,7 @@ public abstract class JBCefBrowserBase implements JBCefDisposable {
         public void onLoadEnd(CefBrowser browser, CefFrame frame, int httpStatusCode) {
           setPageBackgroundColor();
         }
+
         @Override
         public void onLoadError(CefBrowser browser, CefFrame frame, ErrorCode errorCode, String errorText, String failedUrl) {
           // do not show error page if another URL has already been requested to load
@@ -217,11 +211,11 @@ public abstract class JBCefBrowserBase implements JBCefDisposable {
                                       CefFrame frame,
                                       CefRequest request,
                                       boolean user_gesture,
-                                      boolean is_redirect)
-        {
+                                      boolean is_redirect) {
           setLastRequestedUrl(ObjectUtils.notNull(request.getURL(), ""));
           return super.onBeforeBrowse(browser, frame, request, user_gesture, is_redirect);
         }
+
         @Override
         public boolean getAuthCredentials(CefBrowser browser,
                                           String origin_url,
@@ -229,8 +223,7 @@ public abstract class JBCefBrowserBase implements JBCefDisposable {
                                           String host,
                                           int port,
                                           String realm,
-                                          String scheme, CefAuthCallback callback)
-        {
+                                          String scheme, CefAuthCallback callback) {
           if (isProxy && !isProperty(Properties.NO_DEFAULT_AUTH_CREDENTIALS)) {
             Credentials credentials = JBCefProxyAuthenticator.getCredentials(JBCefBrowserBase.this, host, port);
             if (credentials != null) {
@@ -284,41 +277,6 @@ public abstract class JBCefBrowserBase implements JBCefDisposable {
     };
 
     CertificateManager.getInstance().getCustomTrustManager().addListener(myCertificateListener);
-
-    // Vladimir.Kharitonov@jetbrains.com
-    // This CefDialogHandler is a temporary workaround for JBR-5420 JCEF: IDEA crashes on opening file chooser dialog
-    // Calling a native choose file dialog via cef leads to a crash.
-    // This handler is fallback to call the dialog via IDEA in case user handler is not defined(most likely).
-
-    // There is a limitation. acceptFilters have quite advance format. Like providing MIME types (e.g. "text/*" or "image/*") or specifying
-    // combined description and file extension delimited using "|" and ";" (e.g. "Image Types|.png;.gif;.jpg"). It's not supported.
-    // So, no filters.
-
-    // To be removed after JBR is updated.
-    myCefClient.getCefClient().addDialogHandler(new CefDialogHandler() {
-      @Override
-      public boolean onFileDialog(CefBrowser browser,
-                                  FileDialogMode mode,
-                                  String title,
-                                  String defaultFilePath,
-                                  Vector<String> acceptFilters,
-                                  CefFileDialogCallback callback) {
-        FileChooserDescriptor descriptor =
-          new FileChooserDescriptor(true, true, false, false, false, mode == FileDialogMode.FILE_DIALOG_OPEN_MULTIPLE)
-            .withTitle(title);
-
-        ApplicationManager.getApplication().invokeLater(() -> {
-          FileChooser.chooseFiles(descriptor, ProjectManager.getInstance().getDefaultProject(),
-                                  VfsUtil.findFile(Path.of(defaultFilePath), true),
-                                  result -> {
-                                    //noinspection UseOfObsoleteCollectionType
-                                    callback.Continue(new Vector<>(
-                                      ContainerUtil.map(result, f -> f.getPath())));
-                                  });
-        });
-        return true;
-      }
-    });
   }
 
   private @NotNull CefBrowserOsrWithHandler createOsrBrowser(@NotNull JBCefOSRHandlerFactory factory,
@@ -328,8 +286,7 @@ public abstract class JBCefBrowserBase implements JBCefDisposable {
                                                              // not-null parentBrowser creates a DevTools browser for it
                                                              @Nullable CefBrowser parentBrowser,
                                                              @Nullable Point inspectAt,
-                                                             boolean isMouseWheelEventEnabled)
-  {
+                                                             boolean isMouseWheelEventEnabled) {
     JComponent comp = factory.createComponent(isMouseWheelEventEnabled);
     CefRenderHandler handler = factory.createCefRenderHandler(comp);
     CefBrowserOsrWithHandler browser =
@@ -339,8 +296,7 @@ public abstract class JBCefBrowserBase implements JBCefDisposable {
                                                    String url,
                                                    CefRequestContext context,
                                                    CefBrowser parent,
-                                                   Point inspectAt)
-        {
+                                                   Point inspectAt) {
           return createOsrBrowser(factory, client, getUrl(), getRequestContext(), this, inspectAt, isMouseWheelEventEnabled);
         }
       };
@@ -498,7 +454,6 @@ public abstract class JBCefBrowserBase implements JBCefDisposable {
       myCefClient.removeRequestHandler(hrefProcessingRequestHandler, myCefBrowser);
       myHrefProcessingRequestHandler = null;
     }
-
   }
 
   /**
@@ -589,8 +544,8 @@ public abstract class JBCefBrowserBase implements JBCefDisposable {
    * <p>
    * The color is set for the currently displayed page and all the subsequently loaded pages.
    *
-   * @see <a href="https://www.w3schools.com/cssref/css_colors_legal.asp">CSS color format</a>
    * @param cssColor the color in CSS format
+   * @see <a href="https://www.w3schools.com/cssref/css_colors_legal.asp">CSS color format</a>
    */
   public void setPageBackgroundColor(@NotNull String cssColor) {
     myCssBgColor = cssColor;
@@ -641,8 +596,7 @@ public abstract class JBCefBrowserBase implements JBCefDisposable {
       @Override
       public @NotNull String create(CefLoadHandler.@NotNull ErrorCode errorCode,
                                     @NotNull String errorText,
-                                    @NotNull String failedUrl)
-      {
+                                    @NotNull String failedUrl) {
         int fontSize = (int)(EditorColorsManager.getInstance().getGlobalScheme().getEditorFontSize() * 1.1);
         int headerFontSize = fontSize + JBUIScale.scale(3);
         int headerPaddingTop = headerFontSize / 5;
@@ -668,7 +622,7 @@ public abstract class JBCefBrowserBase implements JBCefDisposable {
         ctx.setScale(OBJ_SCALE.of(1.2 * headerFontSize / (float)ERROR_PAGE_ICON.getIconHeight()));
         // Reset sys scale to prevent raster downscaling on passing the image to jcef.
         // Overriding is used to prevent scale change during further intermediate context transformations.
-        ctx.overrideScale(SYS_SCALE.of(1.0));
+        ctx.overrideScale(SYS_SCALE.of(1));
 
         html = html.replace("${base64Image}", ObjectUtils.notNull(BASE64_ERROR_PAGE_ICON.get().getOrProvide(ctx), ""));
         return html;
@@ -682,7 +636,9 @@ public abstract class JBCefBrowserBase implements JBCefDisposable {
      * To fallback to default error page return {@link ErrorPage#DEFAULT#create(CefLoadHandler.ErrorCode, String, String)}.
      */
     @Nullable
-    String create(@NotNull @SuppressWarnings("unused") CefLoadHandler.ErrorCode errorCode, @NotNull String errorText, @NotNull String failedUrl);
+    String create(@NotNull @SuppressWarnings("unused") CefLoadHandler.ErrorCode errorCode,
+                  @NotNull String errorText,
+                  @NotNull String failedUrl);
   }
 
   /**
@@ -785,8 +741,8 @@ public abstract class JBCefBrowserBase implements JBCefDisposable {
 
     Component comp = getComponent();
     Window ancestor = comp == null ?
-      KeyboardFocusManager.getCurrentKeyboardFocusManager().getFocusedWindow() :
-      SwingUtilities.getWindowAncestor(comp);
+                      KeyboardFocusManager.getCurrentKeyboardFocusManager().getFocusedWindow() :
+                      SwingUtilities.getWindowAncestor(comp);
 
     if (ancestor == null) return;
     Rectangle bounds = ancestor.getGraphicsConfiguration().getBounds();

@@ -21,7 +21,6 @@ import com.intellij.openapi.editor.*;
 import com.intellij.openapi.editor.colors.EditorColors;
 import com.intellij.openapi.editor.colors.EditorColorsManager;
 import com.intellij.openapi.editor.colors.EditorColorsScheme;
-import com.intellij.openapi.editor.colors.EditorColorsUtil;
 import com.intellij.openapi.editor.event.DocumentEvent;
 import com.intellij.openapi.editor.event.DocumentListener;
 import com.intellij.openapi.editor.ex.EditorEx;
@@ -48,7 +47,7 @@ import com.intellij.psi.PsiFileFactory;
 import com.intellij.ui.components.panels.NonOpaquePanel;
 import com.intellij.ui.dsl.builder.DslComponentProperty;
 import com.intellij.ui.dsl.builder.VerticalComponentGap;
-import com.intellij.ui.dsl.gridLayout.UnscaledGaps;
+import com.intellij.ui.dsl.gridLayout.UnscaledGapsKt;
 import com.intellij.ui.scale.JBUIScale;
 import com.intellij.util.IJSwingUtilities;
 import com.intellij.util.LineSeparator;
@@ -93,6 +92,7 @@ public class EditorTextField extends NonOpaquePanel implements EditorTextCompone
   private boolean myIsViewer;
   private boolean myIsSupplementary;
   private boolean myInheritSwingFont = true;
+  private boolean myIgnoreSetBgColor;
   private Color myEnforcedBgColor;
   private boolean myOneLineMode; // use getter to access this field! It is allowed to override getter and change initial behaviour
   private boolean myShowPlaceholderWhenFocused;
@@ -153,7 +153,7 @@ public class EditorTextField extends NonOpaquePanel implements EditorTextCompone
         if (myEditor == null) initEditor();
       }
     });
-    putClientProperty(DslComponentProperty.VISUAL_PADDINGS, new UnscaledGaps(3, 3, 3, 3));
+    putClientProperty(DslComponentProperty.VISUAL_PADDINGS, UnscaledGapsKt.UnscaledGaps(3));
     putClientProperty(DslComponentProperty.VERTICAL_COMPONENT_GAP, new VerticalComponentGap(true, true));
     putClientProperty(DslComponentProperty.INTERACTIVE_COMPONENT, this); // Disable warning in Kotlin UI DSL, see IDEA-309743
   }
@@ -207,7 +207,22 @@ public class EditorTextField extends NonOpaquePanel implements EditorTextCompone
   }
 
   @Override
+  public void updateUI() {
+    try {
+      myIgnoreSetBgColor = myEnforcedBgColor == null;
+      super.updateUI();
+    }
+    finally {
+      myIgnoreSetBgColor = false;
+    }
+  }
+
+  @Override
   public void setBackground(Color bg) {
+    if (myIgnoreSetBgColor) {
+      super.setBackground(getBackground());
+      return;
+    }
     super.setBackground(bg);
     myEnforcedBgColor = bg;
     EditorEx editor = getEditor(false);
@@ -269,10 +284,21 @@ public class EditorTextField extends NonOpaquePanel implements EditorTextCompone
     installDocumentListener();
     Editor editor = getEditor();
     if (editor != null) {
+      boolean wasFocused = isFocusOwner();
+
       EditorEx newEditor = createEditor();
       scheduleEditorRelease();
       myEditor = newEditor;
       add(newEditor.getComponent(), BorderLayout.CENTER);
+
+      if (myNextFocusable != null) {
+        newEditor.getContentComponent().setNextFocusableComponent(myNextFocusable);
+        myNextFocusable = null;
+      }
+      if (wasFocused) {
+        IdeFocusManager.getGlobalInstance().doWhenFocusSettlesDown(() -> requestFocus());
+      }
+
       releaseScheduledEditors();
 
       validate();
@@ -567,14 +593,13 @@ public class EditorTextField extends NonOpaquePanel implements EditorTextCompone
     EditorColorsScheme customGlobalScheme = colorsManager.getSchemeForCurrentUITheme();
     editor.setColorsScheme(editor.createBoundColorSchemeDelegate(isOneLineMode ? customGlobalScheme : null));
 
-    EditorColorsScheme colorsScheme = editor.getColorsScheme();
     editor.getSettings().setCaretRowShown(false);
     editor.getSettings().setDndEnabled(false);
 
     // color scheme settings:
     setupEditorFont(editor);
     updateBorder(editor);
-    editor.setBackgroundColor(getBackgroundColor(isEnabled(), colorsScheme));
+    editor.setBackgroundColor(getBackground());
   }
 
   public void setOneLineMode(boolean oneLineMode) {
@@ -763,22 +788,8 @@ public class EditorTextField extends NonOpaquePanel implements EditorTextCompone
 
   @Override
   public Color getBackground() {
-    Color color = getBackgroundColor(isEnabled(), EditorColorsUtil.getGlobalOrDefaultColorScheme());
+    Color color = myEnforcedBgColor != null ? myEnforcedBgColor : UIUtil.getTextFieldBackground();
     return color != null ? color : super.getBackground();
-  }
-
-  private Color getBackgroundColor(boolean enabled, final EditorColorsScheme colorsScheme){
-    if (myEnforcedBgColor != null) return myEnforcedBgColor;
-    if (ComponentUtil.getParentOfType(CellRendererPane.class, this) != null &&
-        (StartupUiUtil.isUnderDarcula() || UIUtil.isUnderIntelliJLaF())) {
-      return getParent().getBackground();
-    }
-
-    if (StartupUiUtil.isUnderDarcula()/* || UIUtil.isUnderIntelliJLaF()*/) return UIUtil.getTextFieldBackground();
-
-    return enabled
-           ? colorsScheme.getDefaultBackground()
-           : UIUtil.getInactiveTextFieldBackgroundColor();
   }
 
   @Override

@@ -8,8 +8,6 @@ import com.intellij.util.*;
 import gnu.trove.THashSet;
 import org.jetbrains.annotations.*;
 
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.WeakHashMap;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -363,10 +361,12 @@ public final class ContainerUtil {
     return new THashSet<>();
   }
 
+  /**
+   * Use {@link com.intellij.concurrency.ConcurrentCollectionFactory#createConcurrentSet()} instead, if available
+   */
   @Contract(pure = true)
   public static @NotNull <T> Set<@NotNull T> newConcurrentSet() {
-    //noinspection SSBasedInspection
-    return Collections.newSetFromMap(new ConcurrentHashMap<>());
+    return ConcurrentHashMap.newKeySet();
   }
 
   /**
@@ -780,17 +780,6 @@ public final class ContainerUtil {
         collection.add(o);
       }
     }
-  }
-
-  /**
-   * @return read-only list consisting of the elements from the input collection
-   */
-  @Unmodifiable
-  public static @NotNull <T> List<T> collect(@NotNull Iterator<? extends T> iterator) {
-    if (!iterator.hasNext()) return emptyList();
-    List<T> list = new ArrayList<>();
-    addAll(list, iterator);
-    return list;
   }
 
   @Contract(pure = true)
@@ -1242,12 +1231,38 @@ public final class ContainerUtil {
   }
 
   /**
+   * @return read-only list consisting of the elements from the input collection
+   */
+  @Unmodifiable
+  public static @NotNull <T> List<T> collect(@NotNull Iterator<? extends T> iterator) {
+    if (!iterator.hasNext()) return emptyList();
+    List<T> list = new ArrayList<>();
+    addAll(list, iterator);
+    return list;
+  }
+
+  /**
    * @return read-only list consisting of the elements from the {@code iterator} of the specified class
    */
   @Unmodifiable
   public static @NotNull <T> List<T> collect(@NotNull Iterator<?> iterator, @NotNull FilteringIterator.InstanceOf<T> instanceOf) {
     //noinspection unchecked
-    return collect(FilteringIterator.create((Iterator<T>)iterator, instanceOf));
+    return collect((Iterator<T>)iterator, t->instanceOf.value(t));
+  }
+  /**
+   * @return read-only list consisting of the elements from the {@code iterator} satisfying the {@code predicate}
+   */
+  @Unmodifiable
+  public static @NotNull <T> List<T> collect(@NotNull Iterator<? extends T> iterator, @NotNull java.util.function.Predicate<? super T> predicate) {
+    if (!iterator.hasNext()) return emptyList();
+    List<T> list = new ArrayList<>();
+    while (iterator.hasNext()) {
+      T o = iterator.next();
+      if (predicate.test(o)) {
+        list.add(o);
+      }
+    }
+    return unmodifiableOrEmptyList(list);
   }
 
   @Contract(mutates = "param1")
@@ -2186,7 +2201,8 @@ public final class ContainerUtil {
   @Contract(pure = true)
   @Unmodifiable
   public static @NotNull <T> List<T> createMaybeSingletonList(@Nullable T element) {
-    return element == null ? emptyList() : Collections.singletonList(element);
+    //noinspection SSBasedInspection
+    return element == null ? Collections.emptyList() : Collections.singletonList(element);
   }
 
   /**

@@ -2,7 +2,6 @@
 package org.editorconfig.configmanagement.extended
 
 import com.intellij.application.options.CodeStyle
-import com.intellij.application.options.codeStyle.cache.CodeStyleCachingService
 import com.intellij.application.options.codeStyle.properties.AbstractCodeStylePropertyMapper
 import com.intellij.application.options.codeStyle.properties.CodeStylePropertiesUtil
 import com.intellij.application.options.codeStyle.properties.CodeStylePropertyAccessor
@@ -22,6 +21,7 @@ import com.intellij.openapi.util.text.Strings
 import com.intellij.openapi.vfs.VfsUtilCore
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.psi.PsiFile
+import com.intellij.psi.codeStyle.CodeStyleConstraints
 import com.intellij.psi.codeStyle.CodeStyleSettings
 import com.intellij.psi.codeStyle.CodeStyleSettingsManager
 import com.intellij.psi.codeStyle.LanguageCodeStyleSettingsProvider
@@ -242,6 +242,12 @@ class EditorConfigCodeStyleSettingsModifier : CodeStyleSettingsModifier {
           return explicitTabSize
         }
       }
+      else if ("max_line_length" == optionKey) {
+        if (optionValue == "off") {
+          return CodeStyleConstraints.MAX_RIGHT_MARGIN.toString()
+        }
+      }
+      // Left for backwards compatibility
       else if (EditorConfigValueUtil.EMPTY_LIST_VALUE == optionValue &&
                CodeStylePropertiesUtil.isAccessorAllowingEmptyList(accessor)) {
         return ""

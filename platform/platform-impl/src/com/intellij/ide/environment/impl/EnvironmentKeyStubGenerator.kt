@@ -4,8 +4,7 @@ package com.intellij.ide.environment.impl
 import com.fasterxml.jackson.core.JsonFactory
 import com.fasterxml.jackson.core.util.DefaultIndenter
 import com.fasterxml.jackson.core.util.DefaultPrettyPrinter
-import com.intellij.ide.environment.EnvironmentKey
-import com.intellij.ide.environment.EnvironmentKeyRegistry
+import com.intellij.ide.environment.EnvironmentKeyProvider
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.EDT
 import com.intellij.openapi.application.ModernApplicationStarter
@@ -28,7 +27,6 @@ class EnvironmentKeyStubGenerator : ModernApplicationStarter() {
 
   override val commandName: String = COMMAND_NAME
 
-
   override suspend fun start(args: List<String>) {
     performGeneration(args)
 
@@ -37,10 +35,10 @@ class EnvironmentKeyStubGenerator : ModernApplicationStarter() {
     }
   }
 
-  suspend fun performGeneration(args: List<String>) {
+  suspend fun performGeneration(args: List<String>, configuration: EnvironmentConfiguration = EnvironmentConfiguration.EMPTY) {
     val parsedArgs = parseCommandLine(args)
 
-    val config = generateKeyConfig(!parsedArgs.noDescriptions)
+    val config = generateKeyConfig(!parsedArgs.noDescriptions, configuration)
 
     withContext(Dispatchers.IO) {
       try {
@@ -63,26 +61,26 @@ class EnvironmentKeyStubGenerator : ModernApplicationStarter() {
   }
 }
 
-private suspend fun generateKeyConfig(generateDescriptions: Boolean): ByteArray {
+private suspend fun generateKeyConfig(generateDescriptions: Boolean, configuration: EnvironmentConfiguration): ByteArray {
   val environmentKeys = blockingContext {
-    EnvironmentKeyRegistry.EP_NAME.extensionList.flatMap { it.getAllKeys() }
-  }.sortedBy(EnvironmentKey::id)
+    EnvironmentKeyProvider.EP_NAME.extensionList.flatMap { it.getKnownKeys().toList() }
+  }.sortedBy { it.first.id }
 
   val byteStream = ByteArrayOutputStream()
   val generator = JsonFactory().createGenerator(byteStream).setPrettyPrinter(KeyConfigPrettyPrinter())
   with(generator) {
     writeStartArray()
-    for (key in environmentKeys) {
+    for ((key, descr) in environmentKeys) {
       writeStartObject()
       if (generateDescriptions) {
         writeArrayFieldStart("description")
-        for (line in key.description.get().lines()) {
+        for (line in descr.lines()) {
           writeString(line)
         }
         writeEndArray()
       }
       writeStringField("key", key.id)
-      writeStringField("value", key.defaultValue)
+      writeStringField("value", configuration.get(key) ?: "")
       writeEndObject()
     }
     writeEndArray()
@@ -138,7 +136,6 @@ private fun parseCommandLine(args: List<String>) : GenerateEnvironmentKeysArgs {
     ${argsParser.usage(includeHidden = true)}""".trimMargin())
     exitProcess(2)
   }
-
 }
 
 

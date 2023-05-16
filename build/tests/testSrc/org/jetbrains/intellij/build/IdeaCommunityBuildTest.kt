@@ -2,11 +2,11 @@
 package org.jetbrains.intellij.build
 
 import com.intellij.openapi.application.PathManager
+import com.intellij.platform.buildScripts.testFramework.createBuildOptionsForTest
+import com.intellij.platform.buildScripts.testFramework.runTestBuild
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import org.jetbrains.intellij.build.impl.BuildContextImpl
-import org.jetbrains.intellij.build.testFramework.createBuildOptionsForTest
-import org.jetbrains.intellij.build.testFramework.runTestBuild
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInfo
 
@@ -15,10 +15,11 @@ class IdeaCommunityBuildTest {
   fun testBuild() {
     val homePath = PathManager.getHomeDirFor(javaClass)!!
     val communityHomePath = IdeaProjectLoaderUtil.guessCommunityHome(javaClass)
+    val productProperties = IdeaCommunityProperties(communityHomePath.communityRoot)
     runTestBuild(
       homePath = homePath,
       communityHomePath = communityHomePath,
-      productProperties = IdeaCommunityProperties(communityHomePath.communityRoot),
+      productProperties = productProperties,
     ) {
       it.classesOutputDirectory = System.getProperty(BuildOptions.PROJECT_CLASSES_OUTPUT_DIRECTORY_PROPERTY)
                                   ?: "$homePath/out/classes"

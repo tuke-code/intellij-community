@@ -4,8 +4,8 @@
 package org.jetbrains.intellij.build.impl
 
 import com.intellij.TestCaseLoader
-import com.intellij.diagnostic.telemetry.use
-import com.intellij.diagnostic.telemetry.useWithScope
+import com.intellij.platform.diagnostic.telemetry.impl.use
+import com.intellij.platform.diagnostic.telemetry.impl.useWithScope
 import com.intellij.execution.CommandLineWrapperUtil
 import com.intellij.openapi.util.Pair
 import com.intellij.openapi.util.SystemInfoRt
@@ -335,7 +335,7 @@ internal class TestingTasksImpl(private val context: CompilationContext, private
     testPatterns?.let { allSystemProperties.putIfAbsent("intellij.build.test.patterns", it) }
     testGroups?.let { allSystemProperties.putIfAbsent("intellij.build.test.groups", it) }
     allSystemProperties.putIfAbsent("intellij.build.test.sorter", System.getProperty("intellij.build.test.sorter"))
-    allSystemProperties.putIfAbsent("bootstrap.testcases", "com.intellij.AllTests")
+    allSystemProperties.putIfAbsent(TestingTasks.BOOTSTRAP_TESTCASES_PROPERTY, "com.intellij.AllTests")
     allSystemProperties.putIfAbsent(TestingOptions.PERFORMANCE_TESTS_ONLY_FLAG, options.isPerformanceTestsOnly.toString())
     val allJvmArgs = ArrayList(jvmArgs)
     prepareEnvForTestRun(allJvmArgs, allSystemProperties, bootstrapClasspath.toMutableList(), remoteDebugging)

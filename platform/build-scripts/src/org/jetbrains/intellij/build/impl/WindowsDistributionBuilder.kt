@@ -1,10 +1,10 @@
 // Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.intellij.build.impl
 
-import com.intellij.diagnostic.telemetry.useWithScope2
 import com.intellij.openapi.util.SystemInfoRt
 import com.intellij.openapi.util.io.NioFiles
 import com.intellij.openapi.util.text.StringUtilRt
+import com.intellij.platform.diagnostic.telemetry.impl.useWithScope2
 import io.opentelemetry.api.common.AttributeKey
 import io.opentelemetry.api.trace.Span
 import kotlinx.coroutines.*
@@ -209,7 +209,7 @@ internal class WindowsDistributionBuilder(
         Pair("ide_jvm_args", additionalJvmArguments.joinToString(separator = " ")),
         Pair("class_path", classPath),
         Pair("base_name", baseName),
-        Pair("main_class_name", context.productProperties.mainClassName),
+        Pair("main_class_name", context.ideMainClassName),
       )
     )
 
@@ -280,7 +280,7 @@ internal class WindowsDistributionBuilder(
         IDS_CLASSPATH_LIBS=${classPath}
         IDS_BOOTCLASSPATH_LIBS=${bootClassPath}
         IDS_INSTANCE_ACTIVATION=${context.productProperties.fastInstanceActivation}
-        IDS_MAIN_CLASS=${context.productProperties.mainClassName.replace('.', '/')}
+        IDS_MAIN_CLASS=${context.ideMainClassName.replace('.', '/')}
         """.trimIndent().trim())
 
       val communityHome = context.paths.communityHome
@@ -348,15 +348,13 @@ private suspend fun checkThatExeInstallerAndZipWithJbrAreTheSame(zipPath: Path,
     withContext(Dispatchers.IO) {
       try {
         runProcess(args = listOf("7z", "x", "-bd", exePath.toString()), workingDir = tempExe)
-        runProcess(args = listOf("unzip", "-q", zipPath.toString()), workingDir = tempZip)
+        // deleting NSIS-related files that appear after manual unpacking of .exe installer and do not belong to its contents
         @Suppress("SpellCheckingInspection")
         NioFiles.deleteRecursively(tempExe.resolve("\$PLUGINSDIR"))
-        // TODO: Remove this workaround once IDEA-297735 fixed
-        NioFiles.deleteRecursively(tempExe.resolve("bin/Uninstall.exe.nsis"))
-        /**
-         * bin/Uninstall.exe is optional, see [PatchBuilderBuildTarget.buildPatch]
-         */
-        NioFiles.deleteRecursively(tempExe.resolve("bin/Uninstall.exe"))
+        Files.deleteIfExists(tempExe.resolve("bin/Uninstall.exe.nsis"))
+        Files.deleteIfExists(tempExe.resolve("bin/Uninstall.exe"))
+
+        runProcess(args = listOf("unzip", "-q", zipPath.toString()), workingDir = tempZip)
 
         runProcess(args = listOf("diff", "-q", "-r", tempZip.toString(), tempExe.toString()))
       }
@@ -429,7 +427,8 @@ private fun generateProductJson(targetDir: Path, context: BuildContext, arch: Jv
       vmOptionsFilePath = "bin/${context.productProperties.baseFileName}64.exe.vmoptions",
       startupWmClass = null,
       bootClassPathJarNames = context.bootClassPathJarNames,
-      additionalJvmArguments = context.getAdditionalJvmArguments(OsFamily.WINDOWS, arch))),
+      additionalJvmArguments = context.getAdditionalJvmArguments(OsFamily.WINDOWS, arch),
+      mainClass = context.ideMainClassName)),
     context)
   writeProductInfoJson(targetDir.resolve(PRODUCT_INFO_FILE_NAME), json, context)
   return json

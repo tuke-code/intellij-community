@@ -1,9 +1,9 @@
-// Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 @file:Suppress("ReplaceGetOrSet", "ReplacePutWithAssignment", "LiftReturnOrAssignment")
 
 package org.jetbrains.intellij.build.devServer
 
-import com.intellij.diagnostic.telemetry.useWithScope2
+import com.intellij.platform.diagnostic.telemetry.impl.useWithScope2
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
@@ -62,7 +62,7 @@ private fun createConfiguration(productionClassOutput: Path, homePath: Path): Co
   System.setProperty(BuildOptions.PROJECT_CLASSES_OUTPUT_DIRECTORY_PROPERTY, productionClassOutput.parent.toString())
   var projectPropertiesPath = homePath.resolve(PRODUCTS_PROPERTIES_PATH)
   // Handle Rider repository layout
-  if (!projectPropertiesPath.exists()) {
+  if (!projectPropertiesPath.exists() && homePath.parent?.parent?.resolve(".dotnet-products.root.marker")?.exists() == true) {
     val riderSpecificProjectPropertiesPath = homePath.parent.resolve("ultimate").resolve(PRODUCTS_PROPERTIES_PATH)
     if (riderSpecificProjectPropertiesPath.exists()) {
       projectPropertiesPath = riderSpecificProjectPropertiesPath

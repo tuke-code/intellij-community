@@ -10,16 +10,26 @@ import org.jetbrains.plugins.gradle.util.GradleConstants
 import org.jetbrains.plugins.gradle.util.cmd.node.GradleCommandLineTask
 import java.io.File
 import java.io.IOException
-import java.nio.charset.StandardCharsets
+import java.nio.file.Path
 import java.util.regex.Matcher
+import kotlin.io.path.*
 
+const val MAIN_INIT_SCRIPT_NAME = "ijInit"
+const val MAPPER_INIT_SCRIPT_NAME = "ijMapper"
+const val WRAPPER_INIT_SCRIPT_NAME = "ijWrapper"
+const val TEST_INIT_SCRIPT_NAME = "ijTestInit"
 
-fun createMainInitScript(isBuildSrcProject: Boolean, toolingExtensionClasses: Set<Class<*>>): File {
+fun createMainInitScript(isBuildSrcProject: Boolean, toolingExtensionClasses: Set<Class<*>>): Path {
   val jarPaths = GradleExecutionHelper.getToolingExtensionsJarPaths(toolingExtensionClasses)
-  return createInitScript("ijInit", loadInitScript("/org/jetbrains/plugins/gradle/tooling/internal/init/Init.gradle", mapOf(
-    "EXTENSIONS_JARS_PATH" to jarPaths.toGroovyListLiteral { "mapPath(" + toGroovyStringLiteral() + ")" },
-    "IS_BUILD_SCR_PROJECT" to isBuildSrcProject.toString()
-  )))
+  val initScript = joinInitScripts(
+    loadInitScript("/org/jetbrains/plugins/gradle/tooling/internal/init/RegistryProcessor.gradle"),
+    loadInitScript("/org/jetbrains/plugins/gradle/tooling/internal/init/JetGradlePlugin.gradle"),
+    loadInitScript("/org/jetbrains/plugins/gradle/tooling/internal/init/Init.gradle", mapOf(
+      "EXTENSIONS_JARS_PATH" to jarPaths.toGroovyListLiteral { "mapPath(" + toGroovyStringLiteral() + ")" },
+      "IS_BUILD_SCR_PROJECT" to isBuildSrcProject.toString()
+    ))
+  )
+  return createInitScript(MAIN_INIT_SCRIPT_NAME, initScript)
 }
 
 fun loadTaskInitScript(
@@ -39,42 +49,78 @@ fun loadTaskInitScript(
   ))
 }
 
+fun createTargetPathMapperInitScript(): Path {
+  val initScript = loadInitScript("/org/jetbrains/plugins/gradle/tooling/internal/init/MapperInit.gradle")
+  return createInitScript(MAPPER_INIT_SCRIPT_NAME, initScript)
+}
+
 fun createWrapperInitScript(
   gradleVersion: GradleVersion?,
   jarFile: File,
   scriptFile: File,
   fileWithPathToProperties: File
-): File {
-  return createInitScript("ijWrapper", loadInitScript("/org/jetbrains/plugins/gradle/tooling/internal/init/WrapperInit.gradle", mapOf(
+): Path {
+  val initScript = loadInitScript("/org/jetbrains/plugins/gradle/tooling/internal/init/WrapperInit.gradle", mapOf(
     "GRADLE_VERSION" to (gradleVersion?.version?.toGroovyStringLiteral() ?: "null"),
     "JAR_FILE" to jarFile.path.toGroovyStringLiteral(),
     "SCRIPT_FILE" to scriptFile.path.toGroovyStringLiteral(),
     "FILE_WITH_PATH_TO_PROPERTIES" to fileWithPathToProperties.path.toGroovyStringLiteral()
-  )))
+  ))
+  return createInitScript(WRAPPER_INIT_SCRIPT_NAME, initScript)
 }
 
-fun createTestInitScript(tasks: List<GradleCommandLineTask>, forceExecution: Boolean): File {
-  return createInitScript("ijTestInit", loadInitScript("/org/jetbrains/plugins/gradle/tooling/internal/init/TestInit.gradle", mapOf(
-    "IMPORT_GRADLE_TASKS_UTIL" to loadInitScript("/org/jetbrains/plugins/gradle/tooling/internal/init/GradleTasksUtil.gradle"),
-    "TEST_TASKS_WITH_PATTERNS" to tasks.associate { it.name to it.getTestPatterns() }
-      .toGroovyMapLiteral({ toGroovyStringLiteral() }, { toGroovyListLiteral { toGroovyStringLiteral() } }),
-    "FORCE_TEST_EXECUTION" to forceExecution.toString()
-  )))
+fun createTestInitScript(tasks: List<GradleCommandLineTask>): Path {
+  val initScript = joinInitScripts(
+    loadInitScript("/org/jetbrains/plugins/gradle/tooling/internal/init/GradleTasksUtil.gradle"),
+    loadInitScript("/org/jetbrains/plugins/gradle/tooling/internal/init/TestInit.gradle", mapOf(
+      "TEST_TASKS_WITH_PATTERNS" to tasks.associate { it.name to it.getTestPatterns() }
+        .toGroovyMapLiteral({ toGroovyStringLiteral() }, { toGroovyListLiteral { toGroovyStringLiteral() } })
+    ))
+  )
+  return createInitScript(TEST_INIT_SCRIPT_NAME, initScript)
 }
 
 fun loadJvmDebugInitScript(
   debuggerId: String,
   parameters: String
 ): String {
-  return loadInitScript("/org/jetbrains/plugins/gradle/tooling/internal/init/JvmDebugInit.gradle", java.util.Map.of(
-    "IMPORT_GRADLE_TASKS_UTIL", loadInitScript("/org/jetbrains/plugins/gradle/tooling/internal/init/GradleTasksUtil.gradle"),
-    "DEBUGGER_ID", debuggerId.toGroovyStringLiteral(),
-    "PROCESS_PARAMETERS", parameters.toGroovyStringLiteral()
-  ))
+  return joinInitScripts(
+    loadInitScript("/org/jetbrains/plugins/gradle/tooling/internal/init/GradleTasksUtil.gradle"),
+    loadInitScript("/org/jetbrains/plugins/gradle/tooling/internal/init/JvmDebugInit.gradle", mapOf(
+      "DEBUGGER_ID" to debuggerId.toGroovyStringLiteral(),
+      "PROCESS_PARAMETERS" to parameters.toGroovyStringLiteral()
+    ))
+  )
 }
 
-private fun loadInitScript(resourcePath: String, parameters: Map<String, String>): String {
-  var script = loadInitScript(resourcePath)
+fun loadIjTestLoggerInitScript(): String {
+  return joinInitScripts(
+    loadInitScript("/org/jetbrains/plugins/gradle/tooling/internal/init/TestEventLogger.gradle"),
+    loadInitScript("/org/jetbrains/plugins/gradle/tooling/internal/init/IjTestEventLogger.gradle"),
+    loadInitScript("/org/jetbrains/plugins/gradle/tooling/internal/init/IjTestEventLoggerInit.gradle"),
+    loadInitScript("/org/jetbrains/plugins/gradle/tooling/internal/init/FileComparisonForGradleDaemonInit.gradle")
+  )
+}
+
+fun loadFileComparisonTestLoggerInitScript(): String {
+  return joinInitScripts(
+    loadInitScript("/org/jetbrains/plugins/gradle/tooling/internal/init/TestEventLogger.gradle"),
+    loadInitScript("/org/jetbrains/plugins/gradle/tooling/internal/init/FileComparisonTestEventLogger.gradle"),
+    loadInitScript("/org/jetbrains/plugins/gradle/tooling/internal/init/FileComparisonTestEventLoggerInit.gradle"),
+    loadInitScript("/org/jetbrains/plugins/gradle/tooling/internal/init/FileComparisonForGradleDaemonInit.gradle")
+  )
+}
+
+private fun joinInitScripts(vararg initScripts: String): String {
+  return initScripts.joinToString(System.lineSeparator())
+}
+
+private fun loadInitScript(resourcePath: String, parameters: Map<String, String> = emptyMap()): String {
+  return loadInitScript(Init::class.java, resourcePath, parameters)
+}
+
+private fun loadInitScript(aClass: Class<*>, resourcePath: String, parameters: Map<String, String>): String {
+  var script = loadInitScript(aClass, resourcePath)
   for ((key, value) in parameters) {
     val replacement = Matcher.quoteReplacement(value)
     script = script.replaceFirst(key.toRegex(), replacement)
@@ -82,8 +128,8 @@ private fun loadInitScript(resourcePath: String, parameters: Map<String, String>
   return script
 }
 
-private fun loadInitScript(resourcePath: String): String {
-  val resource = Init::class.java.getResource(resourcePath)
+private fun loadInitScript(aClass: Class<*>, resourcePath: String): String {
+  val resource = aClass.getResource(resourcePath)
   if (resource == null) {
     throw IllegalArgumentException("Cannot find init file $resourcePath")
   }
@@ -95,23 +141,28 @@ private fun loadInitScript(resourcePath: String): String {
   }
 }
 
-fun createInitScript(prefix: String, content: String): File {
-  val contentBytes = content.toByteArray(StandardCharsets.UTF_8)
-  val contentLength = contentBytes.size
-  return FileUtil.findSequentFile(File(FileUtil.getTempDirectory()), prefix, GradleConstants.EXTENSION) { file: File ->
-    try {
-      if (!file.exists()) {
-        FileUtil.writeToFile(file, contentBytes, false)
-        @Suppress("SSBasedInspection")
-        file.deleteOnExit()
-        return@findSequentFile true
-      }
-      if (contentLength.toLong() != file.length()) return@findSequentFile false
-      return@findSequentFile content == FileUtil.loadFile(file, StandardCharsets.UTF_8)
+fun createInitScript(prefix: String, content: String): Path {
+  val contentBytes = content.encodeToByteArray()
+  val tempDirectory = Path.of(FileUtil.getTempDirectory())
+  tempDirectory.createDirectories()
+  var suffix = 0
+  while (true) {
+    suffix++
+    val candidateName = prefix + suffix + "." + GradleConstants.EXTENSION
+    val candidate = tempDirectory.resolve(candidateName)
+    if (!candidate.exists()) {
+      candidate.createFile()
+      candidate.writeBytes(contentBytes)
+      candidate.toFile().deleteOnExit()
+      return candidate
     }
-    catch (ignore: IOException) {
-      // Skip file with access issues. Will attempt to check the next file
+    if (isContentEquals(candidate, contentBytes)) {
+      return candidate
     }
-    false
   }
+}
+
+private fun isContentEquals(path: Path, content: ByteArray): Boolean {
+  return content.size.toLong() == path.fileSize() &&
+         content.contentEquals(path.readBytes())
 }

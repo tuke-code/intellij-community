@@ -6,7 +6,7 @@ import com.intellij.codeInspection.ex.InspectionElementsMerger;
 import com.intellij.codeInspection.options.OptPane;
 import com.intellij.codeInspection.options.OptRegularComponent;
 import com.intellij.codeInspection.options.OptionContainer;
-import com.intellij.codeInspection.ui.InspectionOptionPaneRenderer;
+import com.intellij.codeInspection.ui.OptionPaneRenderer;
 import com.intellij.configurationStore.XmlSerializer;
 import com.intellij.diagnostic.PluginException;
 import com.intellij.lang.Language;
@@ -32,10 +32,7 @@ import com.intellij.util.containers.HashingStrategy;
 import com.intellij.util.xmlb.SerializationFilter;
 import com.intellij.util.xmlb.annotations.Property;
 import org.jdom.Element;
-import org.jetbrains.annotations.Nls;
-import org.jetbrains.annotations.NonNls;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.*;
 
 import javax.swing.*;
 import java.io.BufferedReader;
@@ -352,14 +349,19 @@ public abstract class InspectionProfileEntry implements BatchSuppressableTool, O
 
   /**
    * Old and discouraged way to create inspection options. Override {@link #getOptionsPane()} instead.
-   * If you need to render options, use {@link InspectionOptionPaneRenderer#createOptionsPanel(InspectionProfileEntry, Disposable, Project)}.
+   * Calling this method will throw an exception if the inspection defines options in a modern way. 
+   * If you need to render options, use {@link OptionPaneRenderer#createOptionsPanel(InspectionProfileEntry, Disposable, Project)}.
    *
    * @return {@code null} if no UI options required.
    */
+  @ApiStatus.Obsolete
+  @ApiStatus.OverrideOnly
   public @Nullable JComponent createOptionsPanel() {
     OptPane pane = getOptionsPane();
     if (pane.equals(OptPane.EMPTY)) return null;
-    return InspectionOptionPaneRenderer.getInstance().render(this, getOptionsPane(), null, null);
+    throw new UnsupportedOperationException(
+      "Use OptionPaneRenderer#createOptionsPanel(InspectionProfileEntry, Disposable, Project) " +
+      "to render the inspection options");
   }
 
   /**
@@ -368,7 +370,7 @@ public abstract class InspectionProfileEntry implements BatchSuppressableTool, O
    *
    * @see <a href="https://plugins.jetbrains.com/docs/intellij/inspection-options.html">Inspection Options (IntelliJ Platform Docs)</a>
    * @see OptPane#pane(OptRegularComponent...)
-   * @see InspectionOptionPaneRenderer#createOptionsPanel(InspectionProfileEntry, Disposable, Project)
+   * @see OptionPaneRenderer#createOptionsPanel(InspectionProfileEntry, Disposable, Project)
    * @see #getOptionController() if you need custom logic to read/write options
    */
   public @NotNull OptPane getOptionsPane() {
@@ -377,7 +379,7 @@ public abstract class InspectionProfileEntry implements BatchSuppressableTool, O
 
   /**
    * @return true iff default configuration options should be shown for the tool. E.g., scope-severity settings.
-   * @apiNote if {@code false} returned, only panel provided by {@link #createOptionsPanel()} is shown if any.
+   * @apiNote if {@code false} returned, only panel provided by {@link #getOptionsPane()} is shown if any.
    */
   public boolean showDefaultConfigurationOptions() {
     return true;

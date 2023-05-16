@@ -333,6 +333,8 @@ public class PersistentInMemoryFSRecordsStorage implements PersistentFSRecordsSt
         getNameId(recordId),
         getFlags(recordId),
         getParent(recordId),
+        getAttributeRecordId(recordId),
+        getContentRecordId(recordId),
         /* corrupted = */ false
       );
     }
@@ -359,6 +361,12 @@ public class PersistentInMemoryFSRecordsStorage implements PersistentFSRecordsSt
   @Override
   public void close() throws IOException {
     force();
+  }
+
+  @Override
+  public void closeAndRemoveAllFiles() throws IOException {
+    close();
+    //...and nothing to remove
   }
 
   /* =============== implementation =============================================================== */

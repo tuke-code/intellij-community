@@ -11,6 +11,7 @@ import org.jetbrains.annotations.TestOnly;
 import org.jetbrains.idea.maven.server.MavenEmbedderWrapper;
 import org.jetbrains.idea.maven.server.MavenServerManager;
 import org.jetbrains.idea.maven.utils.MavenLog;
+import org.jetbrains.idea.maven.utils.MavenProcessCanceledException;
 import org.jetbrains.idea.maven.utils.MavenUtil;
 
 import java.util.HashSet;
@@ -41,6 +42,7 @@ public class MavenEmbeddersManager {
   }
 
   @NotNull
+  // used in third-party plugins
   public synchronized MavenEmbedderWrapper getEmbedder(@NotNull MavenProject mavenProject, Key kind) {
     String baseDir = MavenUtil.getBaseDir(mavenProject.getDirectoryFile()).toString();
     return getEmbedder(kind, baseDir);
@@ -82,7 +84,6 @@ public class MavenEmbeddersManager {
       return;
     }
 
-    embedder.reset();
     myEmbeddersInUse.remove(embedder);
   }
 
@@ -114,5 +115,28 @@ public class MavenEmbeddersManager {
       if (!includeInUse && myEmbeddersInUse.contains(embedder)) continue;
       func.fun(embedder);
     }
+  }
+
+  public void execute(@NotNull MavenProject mavenProject,
+                      @NotNull Key embedderKind,
+                      @NotNull MavenEmbeddersManager.EmbedderTask task) throws MavenProcessCanceledException {
+    var baseDir = MavenUtil.getBaseDir(mavenProject.getDirectoryFile()).toString();
+    execute(baseDir, embedderKind, task);
+  }
+
+  public void execute(@NotNull String baseDir,
+                      @NotNull Key embedderKind,
+                      @NotNull MavenEmbeddersManager.EmbedderTask task) throws MavenProcessCanceledException {
+    MavenEmbedderWrapper embedder = getEmbedder(embedderKind, baseDir);
+    try {
+      task.run(embedder);
+    }
+    finally {
+      release(embedder);
+    }
+  }
+
+  public interface EmbedderTask {
+    void run(MavenEmbedderWrapper embedder) throws MavenProcessCanceledException;
   }
 }

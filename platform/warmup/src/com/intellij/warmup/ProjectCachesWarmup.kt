@@ -3,9 +3,8 @@ package com.intellij.warmup
 
 import com.intellij.ide.environment.impl.EnvironmentUtil
 import com.intellij.ide.warmup.WarmupStatus
-import com.intellij.openapi.application.ApplicationManager
-import com.intellij.openapi.application.EDT
-import com.intellij.openapi.application.ModernApplicationStarter
+import com.intellij.idea.AppExitCodes
+import com.intellij.openapi.application.*
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.ProjectManager
 import com.intellij.openapi.vfs.newvfs.RefreshQueueImpl
@@ -37,6 +36,11 @@ internal class ProjectCachesWarmup : ModernApplicationStarter() {
     System.setProperty("ide.slow.operations.assertion", false.toString())
 
     SystemProperties.setProperty("compile.parallel", true.toString())
+
+    /*
+     * An attempt to make warmup run close to usual UI run
+     */
+    SystemProperties.setProperty("ide.async.headless.mode", true.toString())
 
     // to avoid sync progress task execution as it works in test mode
     SystemProperties.setProperty("intellij.progress.task.ignoreHeadless", true.toString())
@@ -76,6 +80,9 @@ internal class ProjectCachesWarmup : ModernApplicationStarter() {
 
     val application = ApplicationManager.getApplication()
     WarmupStatus.statusChanged(application, WarmupStatus.InProgress)
+
+    initLogger(args)
+
     var totalIndexedFiles = 0
     application.messageBus.connect().subscribe(ProjectIndexingHistoryListener.TOPIC, object : ProjectIndexingHistoryListener {
       override fun onFinishedIndexing(projectIndexingHistory: ProjectIndexingHistory) {
@@ -89,7 +96,7 @@ internal class ProjectCachesWarmup : ModernApplicationStarter() {
         importOrOpenProject(commandArgs, it)
       }
       catch(t: Throwable) {
-        ConsoleLog.error("Failed to load project", t)
+        WarmupLogger.logError("Failed to load project", t)
         return@withLoggingProgresses null
       }
 
@@ -99,7 +106,7 @@ internal class ProjectCachesWarmup : ModernApplicationStarter() {
         waitForBuilders(project, buildMode, builders)
       }
       project
-    } ?: return
+    } ?: exitProcess(AppExitCodes.STARTUP_EXCEPTION)
 
     waitUntilProgressTasksAreFinishedOrFail()
 
@@ -112,7 +119,7 @@ internal class ProjectCachesWarmup : ModernApplicationStarter() {
     }
 
     WarmupStatus.statusChanged(application, WarmupStatus.Finished(totalIndexedFiles))
-    ConsoleLog.info("IDE Warm-up finished. $totalIndexedFiles files were indexed. Exiting the application...")
+    WarmupLogger.logInfo("IDE Warm-up finished. $totalIndexedFiles files were indexed. Exiting the application...")
     withContext(Dispatchers.EDT) {
       application.exit(false, true, false)
     }
@@ -140,13 +147,13 @@ private fun getBuildMode(args: WarmupProjectArgs) : BuildMode? {
 
 private suspend fun waitForCachesSupports(project: Project) {
   val projectIndexesWarmupSupports = ProjectIndexesWarmupSupport.EP_NAME.getExtensions(project)
-  ConsoleLog.info("Waiting for all ProjectIndexesWarmupSupport[${projectIndexesWarmupSupports.size}]...")
+  WarmupLogger.logInfo("Waiting for all ProjectIndexesWarmupSupport[${projectIndexesWarmupSupports.size}]...")
   val futures = projectIndexesWarmupSupports.mapNotNull { support ->
     try {
       support.warmAdditionalIndexes().asDeferred()
     }
     catch (t: Throwable) {
-      ConsoleLog.error("Failed to warm additional indexes $support", t)
+      WarmupLogger.logError("Failed to warm additional indexes $support", t)
       null
     }
   }
@@ -156,9 +163,9 @@ private suspend fun waitForCachesSupports(project: Project) {
     }
   }
   catch (t: Throwable) {
-    ConsoleLog.error("An exception occurred while awaiting indexes warmup", t)
+    WarmupLogger.logError("An exception occurred while awaiting indexes warmup", t)
   }
-  ConsoleLog.info("All ProjectIndexesWarmupSupport.waitForCaches completed")
+  WarmupLogger.logInfo("All ProjectIndexesWarmupSupport.waitForCaches completed")
 }
 
 private suspend fun waitForBuilders(project: Project, rebuild: BuildMode, builders: Set<String>?) {
@@ -167,22 +174,22 @@ private suspend fun waitForBuilders(project: Project, rebuild: BuildMode, builde
   val projectBuildWarmupSupports = ProjectBuildWarmupSupport.EP_NAME.getExtensions(project).filter { builder ->
     isBuilderEnabled(builder.getBuilderId())
   }
-  ConsoleLog.info("Starting additional project builders[${projectBuildWarmupSupports.size}] (rebuild=$rebuild)...")
+  WarmupLogger.logInfo("Starting additional project builders[${projectBuildWarmupSupports.size}] (rebuild=$rebuild)...")
   try {
     val statusFlow = withLoggingProgresses {
       flow {
         for (builder in projectBuildWarmupSupports) {
           try {
-            ConsoleLog.info("Starting builder $builder for id ${builder.getBuilderId()}")
+            WarmupLogger.logInfo("Starting builder $builder for id ${builder.getBuilderId()}")
             val status = builder.buildProjectWithStatus(rebuild == BuildMode.REBUILD)
-            ConsoleLog.info("Builder $builder finished with status: ${status.message}")
+            WarmupLogger.logInfo("Builder $builder finished with status: ${status.message}")
             emit(status)
           }
           catch (e: CancellationException) {
             throw e
           }
           catch (e: Throwable) {
-            ConsoleLog.error("Failed to call builder $builder", e)
+            WarmupLogger.logError("Failed to call builder $builder", e)
             emit(WarmupBuildStatus.Failure(e.stackTraceToString()))
           }
         }
@@ -192,7 +199,7 @@ private suspend fun waitForBuilders(project: Project, rebuild: BuildMode, builde
     val commonStatus =
       statuses.find { it is WarmupBuildStatus.Failure }
       ?: statuses.firstOrNull()
-    ConsoleLog.info("All warmup builders completed")
+    WarmupLogger.logInfo("All warmup builders completed")
     if (commonStatus != null) {
       WarmupBuildStatus.statusChanged(commonStatus)
     }
@@ -202,14 +209,14 @@ private suspend fun waitForBuilders(project: Project, rebuild: BuildMode, builde
   }
   catch (t: Throwable) {
     WarmupBuildStatus.statusChanged(WarmupBuildStatus.Failure(t.stackTraceToString()))
-    ConsoleLog.error("An exception occurred while awaiting builders", t)
+    WarmupLogger.logError("An exception occurred while awaiting builders", t)
   }
 }
 
 private suspend fun waitForRefreshQueue() {
   runTaskAndLogTime("RefreshQueue") {
     while (RefreshQueueImpl.isRefreshInProgress()) {
-      ConsoleLog.info("RefreshQueue is in progress... ")
+      WarmupLogger.logInfo("RefreshQueue is in progress...")
       delay(500)
     }
   }

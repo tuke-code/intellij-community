@@ -11,10 +11,6 @@ import org.jetbrains.intellij.build.BuildContext
 import java.lang.StackWalker.Option
 import kotlin.streams.asSequence
 
-const val APP_JAR: String = "app.jar"
-const val PRODUCT_JAR: String = "product.jar"
-const val TEST_FRAMEWORK_JAR: String = "testFramework.jar"
-
 /**
  * Describes layout of a plugin or the platform JARs in the product distribution
  */
@@ -155,6 +151,10 @@ sealed class BaseLayout {
     includedProjectLibraries.add(ProjectLibraryData(libraryName = libraryName, packMode = LibraryPackMode.MERGED))
   }
 
+  fun withProjectLibraries(libraryNames: Iterable<String>) {
+    libraryNames.forEach(::withProjectLibrary)
+  }
+
   fun withProjectLibrary(libraryName: String, packMode: LibraryPackMode) {
     includedProjectLibraries.add(ProjectLibraryData(libraryName = libraryName, packMode = packMode))
   }
@@ -175,7 +175,7 @@ sealed class BaseLayout {
   }
 
   /**
-   * @param resourcePath path to resource file or directory relative to {@code moduleName} module content root
+   * @param resourcePath path to resource file or directory relative to `moduleName` module content root
    * @param relativeOutputPath target path relative to the plugin root directory
    */
   fun withResourceFromModule(moduleName: String, resourcePath: String, relativeOutputPath: String) {

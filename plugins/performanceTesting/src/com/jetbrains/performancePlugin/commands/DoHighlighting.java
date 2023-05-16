@@ -7,7 +7,7 @@ import com.intellij.codeInspection.GlobalInspectionTool;
 import com.intellij.codeInspection.InspectionEngine;
 import com.intellij.codeInspection.InspectionManager;
 import com.intellij.codeInspection.ex.GlobalInspectionToolWrapper;
-import com.intellij.diagnostic.telemetry.TraceUtil;
+import com.intellij.platform.diagnostic.telemetry.impl.TraceUtil;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.editor.Editor;
@@ -29,6 +29,11 @@ import java.util.concurrent.Callable;
 
 import static com.intellij.psi.PsiManager.getInstance;
 
+/**
+ * Command runs highlighting pass.
+ * Runs all highlighting passes. Can't be invoked multiple times in a row since it drops caches before run.
+ * Example: %doHighlighting
+ */
 public final class DoHighlighting extends PerformanceCommand {
   public static final String NAME = "doHighlight";
   public static final String PREFIX = CMD_PREFIX + NAME;

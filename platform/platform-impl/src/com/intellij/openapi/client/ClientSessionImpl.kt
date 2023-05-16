@@ -2,6 +2,7 @@
 package com.intellij.openapi.client
 
 import com.intellij.codeWithMe.ClientId
+import com.intellij.codeWithMe.asContextElement2
 import com.intellij.ide.plugins.ContainerDescriptor
 import com.intellij.ide.plugins.IdeaPluginDescriptorImpl
 import com.intellij.ide.plugins.PluginManagerCore
@@ -17,18 +18,24 @@ import com.intellij.serviceContainer.ComponentManagerImpl
 import com.intellij.serviceContainer.PrecomputedExtensionModel
 import com.intellij.serviceContainer.executeRegisterTaskForOldContent
 import com.intellij.util.messages.MessageBus
+import com.intellij.util.namedChildScope
 import kotlinx.coroutines.*
 import org.jetbrains.annotations.ApiStatus
 
 private val LOG = logger<ClientSessionImpl>()
 
+@OptIn(DelicateCoroutinesApi::class)
 @ApiStatus.Experimental
 @ApiStatus.Internal
 abstract class ClientSessionImpl(
   final override val clientId: ClientId,
   final override val type: ClientType,
   private val sharedComponentManager: ClientAwareComponentManager
-) : ComponentManagerImpl(null, false), ClientSession {
+) : ComponentManagerImpl(
+  parent = null,
+  coroutineScope = GlobalScope.namedChildScope("ClientSessionImpl", clientId.asContextElement2()),
+  setExtensionsRootArea = false,
+), ClientSession {
 
   override val isLightServiceSupported = false
   override val isMessageBusSupported = false
@@ -90,8 +97,12 @@ abstract class ClientSessionImpl(
   }
 
   fun <T : Any> doGetService(serviceClass: Class<T>, createIfNeeded: Boolean, fallbackToShared: Boolean): T? {
-    val clientService = ClientId.withClientId(clientId) { super.doGetService(serviceClass, createIfNeeded) }
-    if (clientService != null || !fallbackToShared) return clientService
+    val clientService = ClientId.withClientId(clientId) {
+      super.doGetService(serviceClass = serviceClass, createIfNeeded = createIfNeeded)
+    }
+    if (clientService != null || !fallbackToShared) {
+      return clientService
+    }
 
     if (createIfNeeded && !type.isLocal) {
       val sessionsManager = sharedComponentManager.getService(ClientSessionsManager::class.java)

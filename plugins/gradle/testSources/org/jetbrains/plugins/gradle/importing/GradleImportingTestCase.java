@@ -51,6 +51,8 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.jps.model.java.JdkVersionDetector;
 import org.jetbrains.plugins.gradle.frameworkSupport.buildscript.GradleBuildScriptBuilderUtil;
+import org.jetbrains.plugins.gradle.frameworkSupport.settingsScript.GradleSettingScriptBuilder;
+import org.jetbrains.plugins.gradle.frameworkSupport.settingsScript.GroovyDslGradleSettingScriptBuilder;
 import org.jetbrains.plugins.gradle.service.execution.GradleExternalTaskConfigurationType;
 import org.jetbrains.plugins.gradle.service.execution.GradleRunConfiguration;
 import org.jetbrains.plugins.gradle.settings.DistributionType;
@@ -412,6 +414,12 @@ public abstract class GradleImportingTestCase extends JavaExternalSystemImportin
     return builder.generate();
   }
 
+  public @NotNull String settingsScript(@NotNull Consumer<GradleSettingScriptBuilder<?>> configure) {
+    var builder = new GroovyDslGradleSettingScriptBuilder();
+    configure.accept(builder);
+    return builder.generate();
+  }
+
   @Override
   protected ImportSpec createImportSpec() {
     ImportSpecBuilder importSpecBuilder = new ImportSpecBuilder(super.createImportSpec());
@@ -533,7 +541,7 @@ public abstract class GradleImportingTestCase extends JavaExternalSystemImportin
   }
 
   protected boolean isJavaLibraryPluginSupported() {
-    return GradleBuildScriptBuilderUtil.isSupportedJavaLibraryPlugin(getCurrentGradleVersion());
+    return GradleBuildScriptBuilderUtil.isJavaLibraryPluginSupported(getCurrentGradleVersion());
   }
 
   protected boolean isGradleOlderThan(@NotNull String ver) {

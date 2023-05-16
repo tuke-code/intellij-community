@@ -12,26 +12,22 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.ProjectManager
 import com.intellij.openapi.project.ProjectManagerListener
 import com.intellij.openapi.projectRoots.Sdk
-import com.intellij.openapi.roots.AdditionalLibraryRootsListener
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.VirtualFileManager
-import com.intellij.psi.PsiElementFinder
 import com.intellij.psi.PsiManager
+import com.intellij.refactoring.suggested.createSmartPointer
 import com.intellij.testFramework.LightVirtualFile
 import com.intellij.util.applyIf
 import com.intellij.util.ui.EDT.isCurrentThreadEdt
 import com.intellij.workspaceModel.ide.WorkspaceModel
-import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import org.jetbrains.kotlin.idea.base.scripting.KotlinBaseScriptingBundle
+import kotlinx.coroutines.withContext
 import org.jetbrains.kotlin.idea.base.util.CheckCanceledLock
 import org.jetbrains.kotlin.idea.core.KotlinPluginDisposable
-import org.jetbrains.kotlin.idea.core.script.KotlinScriptDependenciesClassFinder
 import org.jetbrains.kotlin.idea.core.script.ScriptDependenciesModificationTracker
 import org.jetbrains.kotlin.idea.core.script.configuration.CompositeScriptConfigurationManager
-import org.jetbrains.kotlin.idea.core.script.dependencies.hasGradleDependency
-import org.jetbrains.kotlin.idea.core.script.scriptingDebugLog
-import org.jetbrains.kotlin.idea.core.util.EDT
 import org.jetbrains.kotlin.idea.util.FirPluginOracleService
 import org.jetbrains.kotlin.idea.util.application.isUnitTestMode
 import org.jetbrains.kotlin.psi.KtFile
@@ -55,7 +51,8 @@ import java.util.concurrent.atomic.AtomicReference
  */
 abstract class ScriptClassRootsUpdater(
     val project: Project,
-    val manager: CompositeScriptConfigurationManager
+    val manager: CompositeScriptConfigurationManager,
+    val scope: CoroutineScope
 ) {
     private var lastSeen: ScriptClassRootsCache? = null
     private var invalidated: Boolean = false
@@ -165,6 +162,7 @@ abstract class ScriptClassRootsUpdater(
             invalidated = false
 
             if (syncUpdateRequired || isUnitTestMode()) {
+                concurrentUpdates.incrementAndGet()
                 syncUpdateRequired = false
                 updateSynchronously()
             } else {
@@ -181,6 +179,7 @@ abstract class ScriptClassRootsUpdater(
             scheduledUpdate?.cancel()
 
             if (!disposable.disposed) {
+                concurrentUpdates.incrementAndGet()
                 scheduledUpdate = BackgroundTaskUtil.submitTask(disposable) {
                     doUpdate()
                 }
@@ -208,71 +207,36 @@ abstract class ScriptClassRootsUpdater(
 
             if (disposable.disposed) return
 
-            if (scriptsAsEntities) { // (updates.changed && !updates.hasNewRoots)
-                val manager = VirtualFileManager.getInstance()
-                val updatedScriptPaths = when (updates) {
-                    is ScriptClassRootsCache.IncrementalUpdates -> updates.updatedScripts
-                    else -> updates.cache.scriptsPaths()
-                }
-
-                updatedScriptPaths.takeUnless { it.isEmpty() }?.asSequence()
-                    ?.map {
-                        val byNioPath = manager.findFileByNioPath(Paths.get(it))
-                        if (byNioPath == null) { // e.g. jupyter notebooks have their .kts in memory only
-                            val path = it.applyIf(it.startsWith("/")) { it.replaceFirst("/", "") }
-                            LightVirtualFile(path)
-                        } else {
-                            byNioPath
-                        }
-                    }
-                    ?.let { updatedScriptFiles ->
-                        val actualScriptPaths = updates.cache.scriptsPaths()
-                        val (filesToAddOrUpdate, filesToRemove) = updatedScriptFiles.partition { actualScriptPaths.contains(it.path) }
-
-                        // Here we're sometimes under read-lock.
-                        // There is no way to acquire write-lock (on EDT) without releasing this thread.
-
-                        applyDiffToModelAsync(filesToAddOrUpdate, filesToRemove)
-                    }
+            val manager = VirtualFileManager.getInstance()
+            val updatedScriptPaths = when (updates) {
+                is ScriptClassRootsCache.IncrementalUpdates -> updates.updatedScripts
+                else -> updates.cache.scriptsPaths()
             }
+
+            updatedScriptPaths.takeUnless { it.isEmpty() }?.asSequence()
+                ?.map {
+                    val byNioPath = manager.findFileByNioPath(Paths.get(it))
+                    if (byNioPath == null) { // e.g. jupyter notebooks have their .kts in memory only
+                        val path = it.applyIf(it.startsWith("/")) { it.replaceFirst("/", "") }
+                        LightVirtualFile(path)
+                    } else {
+                        byNioPath
+                    }
+                }
+                ?.let { updatedScriptFiles ->
+                    val actualScriptPaths = updates.cache.scriptsPaths()
+                    val (filesToAddOrUpdate, filesToRemove) = updatedScriptFiles.partition { actualScriptPaths.contains(it.path) }
+
+                    // Here we're sometimes under read-lock.
+                    // There is no way to acquire write-lock (on EDT) without releasing this thread.
+
+                    applyDiffToModelAsync(filesToAddOrUpdate, filesToRemove)
+                }
 
             if (updates.hasNewRoots) {
                 runInEdt(ModalityState.NON_MODAL) {
                     runWriteAction {
                         if (project.isDisposed) return@runWriteAction
-
-                        if (!scriptsAsEntities) {
-                            scriptingDebugLog { "kotlin.script.dependencies from ${updates.oldRoots} to ${updates.newRoots}" }
-
-                            val hasGradleDependency = updates.newSdkRoots.hasGradleDependency() || updates.newRoots.hasGradleDependency()
-                            val dependencySdkLibraryName = if (hasGradleDependency) {
-                                KotlinBaseScriptingBundle.message("script.name.gradle.script.sdk.dependencies")
-                            } else {
-                                KotlinBaseScriptingBundle.message("script.name.kotlin.script.sdk.dependencies")
-                            }
-
-                            AdditionalLibraryRootsListener.fireAdditionalLibraryChanged(
-                                project,
-                                dependencySdkLibraryName,
-                                updates.oldSdkRoots,
-                                updates.newSdkRoots,
-                                dependencySdkLibraryName
-                            )
-
-                            val dependencyLibraryName = if (hasGradleDependency) {
-                                KotlinBaseScriptingBundle.message("script.name.gradle.script.dependencies")
-                            } else {
-                                KotlinBaseScriptingBundle.message("script.name.kotlin.script.dependencies")
-                            }
-                            AdditionalLibraryRootsListener.fireAdditionalLibraryChanged(
-                                project,
-                                dependencyLibraryName,
-                                updates.oldRoots,
-                                updates.newRoots,
-                                dependencyLibraryName
-                            )
-                        }
-
                         ScriptDependenciesModificationTracker.getInstance(project).incModificationCount()
                     }
                 }
@@ -280,11 +244,6 @@ abstract class ScriptClassRootsUpdater(
 
             runReadAction {
                 if (project.isDisposed) return@runReadAction
-
-                if (!scriptsAsEntities) {
-                    PsiElementFinder.EP.findExtensionOrFail(KotlinScriptDependenciesClassFinder::class.java, project).clearCache()
-                    ScriptDependenciesModificationTracker.getInstance(project).incModificationCount()
-                }
 
                 if (updates.hasUpdatedScripts) {
                     updateHighlighting(project) { file -> updates.isScriptChanged(file.path) }
@@ -295,6 +254,7 @@ abstract class ScriptClassRootsUpdater(
             }
         } finally {
             scheduledUpdate = null
+            concurrentUpdates.decrementAndGet()
         }
     }
 
@@ -371,17 +331,21 @@ abstract class ScriptClassRootsUpdater(
          * As FIR plugin does not have scripts support yet, just disabling not working one for now
          */
         @Suppress("DEPRECATION")
-        if (project.service<FirPluginOracleService>().isFirPlugin()) return
+        if (project.isDisposed || project.service<FirPluginOracleService>().isFirPlugin()) return
 
-        GlobalScope.launch(EDT(project)) {
-            if (project.isDisposed) return@launch
+        val ktFiles = openedScripts.mapNotNull {
+            if (!it.isValid) return@mapNotNull null
 
-            openedScripts.forEach {
-                if (!it.isValid) return@forEach
-
-                PsiManager.getInstance(project).findFile(it)?.let { psiFile ->
-                    if (psiFile is KtFile) {
-                        DaemonCodeAnalyzer.getInstance(project).restart(psiFile)
+            val ktFile = PsiManager.getInstance(project).findFile(it) as? KtFile
+            ktFile?.createSmartPointer()
+        }
+        if (ktFiles.isNotEmpty()) {
+            scope.launch {
+                withContext(Dispatchers.EDT) {
+                    ktFiles.forEach {
+                        val ktFile = it.element ?: return@forEach
+                        DaemonCodeAnalyzer.getInstance(project)
+                            .restart(ktFile)
                     }
                 }
             }

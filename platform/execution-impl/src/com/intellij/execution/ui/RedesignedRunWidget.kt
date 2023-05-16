@@ -21,11 +21,13 @@ import com.intellij.openapi.project.DumbService
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.popup.JBPopupFactory
 import com.intellij.openapi.ui.popup.ListPopup
+import com.intellij.openapi.util.IconLoader
 import com.intellij.openapi.util.Key
 import com.intellij.openapi.util.NlsActions
 import com.intellij.openapi.util.registry.Registry
 import com.intellij.openapi.wm.ToolWindowId
 import com.intellij.openapi.wm.impl.customFrameDecorations.header.toolbar.getHeaderBackgroundColor
+import com.intellij.openapi.wm.impl.customFrameDecorations.header.toolbar.lightThemeDarkHeaderDisableFilter
 import com.intellij.openapi.wm.impl.headertoolbar.adjustIconForHeader
 import com.intellij.psi.PsiDocumentManager
 import com.intellij.ui.BadgeRectProvider
@@ -181,7 +183,7 @@ private class PreparedIcon(private val width: Int, private val height: Int, priv
 
 private class RunWidgetButtonLook(private val isCurrentConfigurationRunning: () -> Boolean) : IdeaActionButtonLook() {
   override fun getStateBackground(component: JComponent, state: Int): Color? {
-    val isStopButton = (component as? ActionButton)?.action is StopAction
+    val isStopButton = isStopButton(component)
     if (!isContrastRunWidget && !isStopButton) {
       if (!buttonIsRunning(component)) {
         return getHeaderBackgroundColor(component, state)
@@ -240,7 +242,7 @@ private class RunWidgetButtonLook(private val isCurrentConfigurationRunning: () 
 
   override fun getDisabledIcon(icon: Icon): Icon {
     if (!isContrastRunWidget) {
-      return super.getDisabledIcon(icon)
+      return IconLoader.getDisabledIcon(icon, lightThemeDarkHeaderDisableFilter)
     }
     return PreparedIcon(icon.iconWidth, icon.iconHeight) {
       toStrokeIcon(icon, JBUI.CurrentTheme.RunWidget.DISABLED_FOREGROUND)
@@ -274,13 +276,14 @@ private class RunWidgetButtonLook(private val isCurrentConfigurationRunning: () 
     }
 
     if (resultIcon !is PreparedIcon) {
-      val resultColor = if (!isContrastRunWidget &&
-                            (actionButton as? ActionButton)?.action is ExecutorRegistryImpl.ExecutorAction &&
-                            !buttonIsRunning(actionButton)) {
-        JBUI.CurrentTheme.RunWidget.RUN_MODE_ICON
+      val executionAction = (actionButton as? ActionButton)?.action is ExecutorRegistryImpl.ExecutorAction
+      val iconWithBackground = executionAction && buttonIsRunning(actionButton) || isStopButton(actionButton)
+      val resultColor = if (!isContrastRunWidget && iconWithBackground) {
+        JBUI.CurrentTheme.RunWidget.RUNNING_ICON_COLOR
       }
       else {
-        JBUI.CurrentTheme.RunWidget.FOREGROUND
+        if (executionAction) JBUI.CurrentTheme.RunWidget.RUN_ICON_COLOR
+        else JBUI.CurrentTheme.RunWidget.ICON_COLOR
       }
       resultIcon = toStrokeIcon(resultIcon, resultColor)
     }
@@ -346,7 +349,7 @@ private class MoreRunToolbarActions : TogglePopupAction(
     val project = e.project ?: return null
     val selectedConfiguration = RunManager.getInstance(project).selectedConfiguration
     val result = createOtherRunnersSubgroup(selectedConfiguration, project)
-    addAdditionalActionsToRunConfigurationOptions(project, selectedConfiguration, result, true)
+    addAdditionalActionsToRunConfigurationOptions(project, e, selectedConfiguration, result, true)
     return result
   }
   override fun getActionUpdateThread() = ActionUpdateThread.BGT
@@ -368,11 +371,12 @@ private fun createOtherRunnersSubgroup(runConfiguration: RunnerAndConfigurationS
 }
 
 internal fun addAdditionalActionsToRunConfigurationOptions(project: Project,
+                                                           e: AnActionEvent,
                                                            selectedConfiguration: RunnerAndConfigurationSettings?,
                                                            targetGroup: DefaultActionGroup,
                                                            isWidget: Boolean) {
   val additionalActions = AdditionalRunningOptions.getInstance(project).getAdditionalActions(selectedConfiguration, isWidget)
-  for (action in additionalActions.getChildren(null).reversed()) {
+  for (action in additionalActions.getChildren(e).reversed()) {
     targetGroup.add(action, Constraints.FIRST)
   }
 }
@@ -388,7 +392,7 @@ private class RedesignedRunConfigurationSelector : TogglePopupAction(), CustomCo
 
   override fun getActionGroup(e: AnActionEvent): ActionGroup? {
     val project = e.project ?: return null
-    return createRunConfigurationsActionGroup(project)
+    return createRunConfigurationsActionGroup(project, e)
   }
 
   override fun createPopup(actionGroup: ActionGroup, e: AnActionEvent, disposeCallback: () -> Unit): ListPopup =
@@ -482,3 +486,6 @@ else
 private fun buttonIsRunning(component: Any): Boolean =
   (component as? ActionButton)?.presentation?.getClientProperty(ExecutorRegistryImpl.EXECUTOR_ACTION_STATUS) ==
     ExecutorRegistryImpl.ExecutorActionStatus.RUNNING
+
+private fun isStopButton(component: Any): Boolean =
+  (component as? ActionButton)?.action is StopAction

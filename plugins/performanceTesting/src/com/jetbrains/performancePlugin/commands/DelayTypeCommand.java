@@ -1,6 +1,6 @@
 package com.jetbrains.performancePlugin.commands;
 
-import com.intellij.diagnostic.telemetry.TraceUtil;
+import com.intellij.platform.diagnostic.telemetry.impl.TraceUtil;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.ui.TypingTarget;
 import com.intellij.openapi.ui.playback.PlaybackContext;
@@ -21,6 +21,12 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
+/**
+ * Command types text with some delay between typing.
+ * Text and delay are being set as parameters.
+ * Syntax: %delayType <delay in ms>|<Text to type>
+ * Example: %delayType 150|Sample text for typing scenario
+ */
 public class DelayTypeCommand extends KeyCodeTypeCommand {
 
   public static final String PREFIX = CMD_PREFIX + "delayType";
@@ -66,7 +72,7 @@ public class DelayTypeCommand extends KeyCodeTypeCommand {
             () -> {
               if (currentChar == END_CHAR) {
                 if (calculateAnalyzesTime) {
-                  job.set(DaemonCodeAnalyzerListener.INSTANCE.listen(connection, spanRef, scopeRef, 0));
+                  job.set(DaemonCodeAnalyzerListener.INSTANCE.listen(connection, spanRef, scopeRef, 0, null));
                   var spanBuilder = PerformanceTestSpan.TRACER.spanBuilder(CODE_ANALYSIS_SPAN_NAME).setParent(Context.current().with(span));
                   spanRef.set(spanBuilder.startSpan());
                   scopeRef.set(spanRef.get().makeCurrent());
@@ -94,7 +100,7 @@ public class DelayTypeCommand extends KeyCodeTypeCommand {
       });
 
       if (calculateAnalyzesTime) {
-        job.get().waitForComplete();
+        job.get().blockingWaitForComplete();
       }
       result.setResult(null);
     }));

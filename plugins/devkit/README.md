@@ -4,6 +4,8 @@
 
 See `org.jetbrains.idea.devkit.inspections.DevKitInspectionUtil` for common utility methods.
 
+Consider marking inspections with _safe-only_ fixes ready for _Code | Code Cleanup..._(`com.intellij.codeInspection.CleanupLocalInspectionTool`).
+
 Inspections should avoid running whenever they are not applicable in the current context.
 This includes:
 
@@ -50,6 +52,7 @@ Same for declaring platform extension points, declare them in testdata `plugin.x
 Always write explicit tests for both Java and Kotlin sources.
 
 Tests and test data go to `intellij.devkit.java.tests` and `intellij.devkit.kotlin.tests`, respectively.
+Related `plugin.xml` can be put on same level as code test data files.
 
 Test data path constants: `org.jetbrains.idea.devkit.DevkitJavaTestsUtil` & `org.jetbrains.idea.devkit.kotlin.DevkitKtTestsUtil`.
 

@@ -2,11 +2,12 @@
 package org.jetbrains.idea.devkit.inspections
 
 import com.intellij.testFramework.TestDataPath
+import org.jetbrains.idea.devkit.DevKitBundle
 import org.jetbrains.idea.devkit.DevkitJavaTestsUtil
 import org.jetbrains.idea.devkit.inspections.quickfix.RetrievingServiceInspectionTestBase
 
 @TestDataPath("\$CONTENT_ROOT/testData/inspections/retrievingService")
-class RetrievingServiceInspectionTest : RetrievingServiceInspectionTestBase() {
+internal class RetrievingServiceInspectionTest : RetrievingServiceInspectionTestBase() {
 
   override fun getBasePath() = DevkitJavaTestsUtil.TESTDATA_PATH + "inspections/retrievingService/"
 
@@ -21,10 +22,10 @@ class RetrievingServiceInspectionTest : RetrievingServiceInspectionTestBase() {
   }
 
   fun testReplaceWithGetInstanceApplicationLevel() {
-    doTest()
+    doTest(DevKitBundle.message("inspection.retrieving.service.replace.with", "MyService", "getInstance"))
   }
 
   fun testReplaceWithGetInstanceProjectLevel() {
-    doTest()
+    doTest(DevKitBundle.message("inspection.retrieving.service.replace.with", "MyService", "getInstance"))
   }
 }

@@ -5,7 +5,6 @@ import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.invokeLater
 import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.ui.ComponentContainer
 import com.intellij.terminal.JBTerminalSystemSettingsProviderBase
 import com.jediterm.core.util.TermSize
 import java.awt.event.ComponentAdapter
@@ -16,18 +15,22 @@ class TerminalBlocksController(
   project: Project,
   private val session: TerminalSession,
   settings: JBTerminalSystemSettingsProviderBase
-) : ComponentContainer, TerminalCommandExecutor, ShellCommandListener {
+) : TerminalContentController, TerminalCommandExecutor, ShellCommandListener {
   private val blocksComponent: TerminalBlocksComponent
 
   init {
     blocksComponent = TerminalBlocksComponent(project, session, settings, commandExecutor = this, parentDisposable = this)
+    // Show initial terminal output (prior to the first prompt) in a separate block.
+    // `initialized` event will finish the block.
+    blocksComponent.installRunningPanel()
     blocksComponent.addComponentListener(object : ComponentAdapter() {
       override fun componentResized(e: ComponentEvent?) {
-        sizeTerminalToComponent()
+        val newSize = getTerminalSize() ?: return
+        session.postResize(newSize)
       }
     })
 
-    session.addCommandListener(this, parentDisposable = this)
+    session.addCommandListener(this)
     session.model.addTerminalListener(object : TerminalModel.TerminalListener {
       override fun onAlternateBufferChanged(enabled: Boolean) {
         invokeLater {
@@ -55,12 +58,20 @@ class TerminalBlocksController(
     }
   }
 
+  override fun initialized() {
+    finishCommandBlock(true)
+  }
+
   override fun commandStarted(command: String) {
     session.model.isCommandRunning = true
   }
 
   override fun commandFinished(command: String, exitCode: Int, duration: Long) {
-    blocksComponent.makeCurrentBlockReadOnly()
+    finishCommandBlock(false)
+  }
+
+  private fun finishCommandBlock(removeIfEmpty: Boolean) {
+    blocksComponent.makeCurrentBlockReadOnly(removeIfEmpty)
 
     val model = session.model
     model.isCommandRunning = false
@@ -77,19 +88,9 @@ class TerminalBlocksController(
     }
   }
 
-  fun sizeTerminalToComponent() {
-    val newSize = blocksComponent.getTerminalSize()
-    val model = session.model
-    if (newSize.columns != model.width || newSize.rows != model.height) {
-      // TODO: is it needed?
-      //myTypeAheadManager.onResize()
-      session.postResize(newSize)
-    }
-  }
+  override fun getTerminalSize(): TermSize? = blocksComponent.getTerminalSize()
 
-  fun getTerminalSize(): TermSize = blocksComponent.getTerminalSize()
-
-  fun isFocused(): Boolean {
+  override fun isFocused(): Boolean {
     return blocksComponent.isFocused()
   }
 

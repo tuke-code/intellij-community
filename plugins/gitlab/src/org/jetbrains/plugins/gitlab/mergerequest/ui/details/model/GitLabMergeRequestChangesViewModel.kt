@@ -8,17 +8,23 @@ import com.intellij.openapi.ListSelection
 import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.vcs.changes.Change
 import com.intellij.util.childScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import org.jetbrains.plugins.gitlab.api.dto.GitLabCommitDTO
 import org.jetbrains.plugins.gitlab.mergerequest.data.GitLabMergeRequestChanges
+import org.jetbrains.plugins.gitlab.mergerequest.diff.isEqual
 
 internal interface GitLabMergeRequestChangesViewModel : CodeReviewChangesViewModel<GitLabCommitDTO> {
   val changesResult: Flow<Result<Collection<Change>>>
-  val selectedChanges: StateFlow<ListSelection<Change>>
 
-  fun updateSelectedChanges(changes: ListSelection<Change>)
+  val userChangesSelection: Flow<ListSelection<Change>>
+  val changeSelectionRequests: Flow<Change>
+
+  fun selectChange(change: Change)
+
+  fun updateChangesSelectedByUser(changes: ListSelection<Change>)
 
   fun showDiff()
 }
@@ -34,18 +40,38 @@ internal class GitLabMergeRequestChangesViewModelImpl(
     changes.map { it.commits }
       .stateIn(cs, SharingStarted.Lazily, listOf())
 
+  private val parsedChanges = changes.map { runCatching { it.getParsedChanges() } }
+    .modelFlow(cs, thisLogger())
   override val changesResult: Flow<Result<Collection<Change>>> =
-    combine(changes.map { runCatching { it.getParsedChanges() } }, selectedCommit) { changesResult, commit ->
+    combine(parsedChanges, selectedCommit) { changesResult, commit ->
       changesResult.map {
         it.changesByCommits[commit?.sha] ?: it.changes
       }
     }.modelFlow(cs, thisLogger())
 
-  private val _selectedChangesEvents = MutableSharedFlow<ListSelection<Change>>()
-  override val selectedChanges: StateFlow<ListSelection<Change>> =
-    _selectedChangesEvents
-      .distinctUntilChanged(::isSelectionEqual)
-      .stateIn(cs, SharingStarted.Lazily, ListSelection.empty())
+  private val _userChangesSelection = MutableSharedFlow<ListSelection<Change>>()
+  override val userChangesSelection: Flow<ListSelection<Change>> = _userChangesSelection.asSharedFlow().distinctUntilChanged { old, new ->
+    isSelectionEqual(old, new)
+  }
+
+  private val _changeSelectionRequests = MutableSharedFlow<Change>()
+  override val changeSelectionRequests: Flow<Change> = _changeSelectionRequests.asSharedFlow()
+
+  override fun selectChange(change: Change) {
+    cs.launch {
+      val commit = combine(reviewCommits, parsedChanges) { commits, changesRes ->
+        val changes = changesRes.getOrNull() ?: throw CancellationException("Missing changes")
+        if (changes.changes.find { it.isEqual(change) } != null) {
+          null
+        }
+        else {
+          changes.commitByChange[change]?.let { commitSha -> commits.find { it.sha == commitSha } }
+        }
+      }.first()
+      selectCommit(commit)
+      _changeSelectionRequests.emit(change)
+    }
+  }
 
   private val _showDiffRequests = MutableSharedFlow<Unit>()
   val showDiffRequests = _showDiffRequests.asSharedFlow()
@@ -54,9 +80,9 @@ internal class GitLabMergeRequestChangesViewModelImpl(
     return commit.shortId
   }
 
-  override fun updateSelectedChanges(changes: ListSelection<Change>) {
+  override fun updateChangesSelectedByUser(changes: ListSelection<Change>) {
     cs.launch {
-      _selectedChangesEvents.emit(changes)
+      _userChangesSelection.emit(changes)
     }
   }
 
@@ -69,28 +95,12 @@ internal class GitLabMergeRequestChangesViewModelImpl(
   companion object {
     private fun isSelectionEqual(old: ListSelection<Change>, new: ListSelection<Change>): Boolean {
       if (old.selectedIndex != new.selectedIndex) return false
+      if (old.isExplicitSelection != new.isExplicitSelection) return false
       val oldList = old.list
       val newList = new.list
       if (oldList.size != newList.size) return false
 
-      return oldList.equalsVia(newList) { o1, o2 ->
-        o1 == o2 &&
-        o1.beforeRevision == o2.beforeRevision &&
-        o1.afterRevision == o2.afterRevision
-      }
-    }
-
-    private fun <E> List<E>.equalsVia(other: List<E>, isEqual: (E, E) -> Boolean): Boolean {
-      if (other === this) return true
-      val i1 = listIterator()
-      val i2 = other.listIterator()
-
-      while (i1.hasNext() && i2.hasNext()) {
-        val e1 = i1.next()
-        val e2 = i2.next()
-        if (!isEqual(e1, e2)) return false
-      }
-      return !(i1.hasNext() || i2.hasNext())
+      return oldList.isEqual(newList)
     }
   }
 }

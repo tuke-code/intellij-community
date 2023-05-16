@@ -127,7 +127,8 @@ public class LightAnnotatorHighlightingTest extends LightDaemonAnalyzerTestCase 
       """;
     configureFromFileText("x.java", text);
     ((EditorImpl)getEditor()).getScrollPane().getViewport().setSize(1000, 1000);
-    assertEquals(getFile().getTextRange(), VisibleHighlightingPassFactory.calculateVisibleRange(getEditor()));
+    @NotNull Editor editor = getEditor();
+    assertEquals(getFile().getTextRange(), editor.calculateVisibleRange());
 
     CodeInsightTestFixtureImpl.ensureIndexesUpToDate(getProject());
     TextEditor textEditor = TextEditorProvider.getInstance().getTextEditor(getEditor());
@@ -461,7 +462,7 @@ public class LightAnnotatorHighlightingTest extends LightDaemonAnalyzerTestCase 
       ((EditorEx)getEditor()).getScrollPane().getViewport().setSize(new Dimension(1000,1000)); // whole file fit onscreen
       List<HighlightInfo> infos = doHighlighting(HighlightSeverity.WARNING);
       HighlightInfo info = assertOneElement(infos);
-      assertEquals(HighlightSeverity.ERROR, info.getSeverity());
+      MyErrorAnnotator.assertMy(info);
     });
   }
   
@@ -471,7 +472,7 @@ public class LightAnnotatorHighlightingTest extends LightDaemonAnalyzerTestCase 
       ((EditorEx)getEditor()).getScrollPane().getViewport().setSize(new Dimension(1000,1000)); // whole file fit onscreen
       List<HighlightInfo> infos = doHighlighting(HighlightSeverity.INFORMATION);
       HighlightInfo info = assertOneElement(infos);
-      assertEquals(HighlightSeverity.ERROR, info.getSeverity());
+      MyErrorAnnotator.assertMy(info);
     });
   }
 
@@ -492,6 +493,10 @@ public class LightAnnotatorHighlightingTest extends LightDaemonAnalyzerTestCase 
         holder.newAnnotation(HighlightSeverity.ERROR, "error2").range(((PsiClass)psiElement).getNameIdentifier()).create();
         iDidIt();
       }
+    }
+    static void assertMy(HighlightInfo info) {
+      assertEquals(HighlightSeverity.ERROR, info.getSeverity());
+      assertEquals("error2", info.getDescription());
     }
   }
   public static class MyWarningAnnotator extends DaemonRespondToChangesTest.MyRecordingAnnotator {

@@ -1,8 +1,8 @@
 // Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.intellij.build.impl
 
-import com.intellij.diagnostic.telemetry.useWithScope2
 import com.intellij.openapi.util.SystemInfoRt
+import com.intellij.platform.diagnostic.telemetry.impl.useWithScope2
 import com.intellij.util.SystemProperties
 import io.opentelemetry.api.common.AttributeKey
 import io.opentelemetry.api.trace.Span
@@ -246,7 +246,8 @@ class MacDistributionBuilder(override val context: BuildContext,
     val bootClassPath = context.xBootClassPathJarNames.joinToString(separator = ":") { "\$APP_PACKAGE/Contents/lib/${it}" }
     val classPath = context.bootClassPathJarNames.joinToString(separator = ":") { "\$APP_PACKAGE/Contents/lib/${it}" }
 
-    val fileVmOptions = VmOptionsGenerator.computeVmOptions(context.applicationInfo.isEAP, context.productProperties)
+    val fileVmOptions = VmOptionsGenerator.computeVmOptions(context.applicationInfo.isEAP, context.productProperties) +
+                        listOf("-Dapple.awt.application.appearance=system")
     VmOptionsGenerator.writeVmOptions(macDistDir.resolve("bin/${executable}.vmoptions"), fileVmOptions, "\n")
 
     val errorFilePath = "-XX:ErrorFile=\$USER_HOME/java_error_in_${executable}_%p.log"
@@ -256,9 +257,7 @@ class MacDistributionBuilder(override val context: BuildContext,
       //noinspection SpellCheckingInspection
       additionalJvmArgs.add("-Xbootclasspath/a:${bootClassPath}")
     }
-    val predicate: (String) -> Boolean = { it.startsWith("-D") }
-    val launcherProperties = additionalJvmArgs.filter(predicate)
-    val launcherVmOptions = additionalJvmArgs.filterNot(predicate)
+    val (launcherProperties, launcherVmOptions) = additionalJvmArgs.partition { it.startsWith("-D") }
 
     val urlSchemes = macCustomizer.urlSchemes
     val urlSchemesString = if (urlSchemes.isEmpty()) {
@@ -303,7 +302,7 @@ class MacDistributionBuilder(override val context: BuildContext,
         Pair("vm_options", optionsToXml(launcherVmOptions)),
         Pair("vm_properties", propertiesToXml(launcherProperties, mapOf("idea.executable" to context.productProperties.baseFileName))),
         Pair("class_path", classPath),
-        Pair("main_class_name", context.productProperties.mainClassName.replace('.', '/')),
+        Pair("main_class_name", context.ideMainClassName.replace('.', '/')),
         Pair("url_schemes", urlSchemesString),
         Pair("architectures", "<key>LSArchitecturePriority</key>\n    <array>\n" +
                               macCustomizer.architectures.joinToString(separator = "\n") { "      <string>$it</string>\n" } +
@@ -455,7 +454,8 @@ private fun generateProductJson(context: BuildContext, arch: JvmArchitecture, wi
       vmOptionsFilePath = "../bin/${context.productProperties.baseFileName}.vmoptions",
       startupWmClass = null,
       bootClassPathJarNames = context.bootClassPathJarNames,
-      additionalJvmArguments = context.getAdditionalJvmArguments(OsFamily.MACOS, arch))),
+      additionalJvmArguments = context.getAdditionalJvmArguments(OsFamily.MACOS, arch),
+      mainClass = context.ideMainClassName)),
     context = context)
 
 private suspend fun buildMacZip(macDistributionBuilder: MacDistributionBuilder,
@@ -500,6 +500,7 @@ private suspend fun buildMacZip(macDistributionBuilder: MacDistributionBuilder,
                   zipOutStream.entry("$zipRoot/Resources/$relativePath", sourceFile)
                   false
                 }
+                sourceFile.fileName.toString() == ".DS_Store" -> false
                 isContentDir && sourceFile.fileName.toString() != "Info.plist" -> {
                   error("Only Info.plist file is allowed in $zipRoot directory but found $zipRoot/$relativePath")
                 }

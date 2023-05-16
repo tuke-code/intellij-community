@@ -1,4 +1,4 @@
-// Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.openapi.application;
 
 import com.intellij.openapi.util.SystemInfoRt;
@@ -686,7 +686,7 @@ public final class PathManager {
       // support projects in ULTIMATE_REPO/remote-dev/extras/SUBDIR
       return homePath + "/../../../community";
     }
-    if (Files.isRegularFile(Paths.get(homePath, "../../Product.Root"))) { // .NET products directory
+    if (Files.isRegularFile(Paths.get(homePath, "../../.dotnet-products.root.marker"))) {
       return homePath + "/../ultimate/community";
     }
     return homePath;

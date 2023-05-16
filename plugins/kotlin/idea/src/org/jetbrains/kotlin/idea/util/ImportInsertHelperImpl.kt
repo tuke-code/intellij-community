@@ -6,9 +6,12 @@ import com.intellij.openapi.application.runWriteAction
 import com.intellij.openapi.project.Project
 import com.intellij.psi.PsiClass
 import com.intellij.psi.PsiElement
+import com.intellij.psi.PsiWhiteSpace
+import com.intellij.psi.util.nextLeaf
 import org.jetbrains.kotlin.descriptors.*
 import org.jetbrains.kotlin.idea.base.facet.platform.platform
 import org.jetbrains.kotlin.idea.base.projectStructure.compositeAnalysis.findAnalyzerServices
+import org.jetbrains.kotlin.idea.base.psi.isMultiLine
 import org.jetbrains.kotlin.idea.base.utils.fqname.isImported
 import org.jetbrains.kotlin.idea.caches.resolve.getResolutionFacade
 import org.jetbrains.kotlin.idea.core.formatter.KotlinCodeStyleSettings
@@ -488,9 +491,28 @@ class ImportInsertHelperImpl(private val project: Project) : ImportInsertHelper(
             if (importList != null) {
                 val newDirective = psiFactory.createImportDirective(importPath)
                 val imports = importList.imports
-                return if (imports.isEmpty()) { //TODO: strange hack
-                    importList.add(psiFactory.createNewLine())
-                    (importList.add(newDirective) as KtImportDirective)
+                return if (imports.isEmpty()) {
+                    val packageDirective = file.packageDirective?.takeIf { it.packageKeyword != null }
+                    packageDirective?.let {
+                        file.addAfter(psiFactory.createNewLine(2), it)
+                    }
+
+                    (importList.add(newDirective) as KtImportDirective).also {
+                        if (packageDirective == null) {
+                            val whiteSpace = importList.nextLeaf(true)
+                            if (whiteSpace is PsiWhiteSpace) {
+                                val newLineBreak = if (whiteSpace.isMultiLine()) {
+                                    psiFactory.createWhiteSpace("\n" + whiteSpace.text)
+                                } else {
+                                    psiFactory.createWhiteSpace("\n\n" + whiteSpace.text)
+                                }
+
+                                whiteSpace.replace(newLineBreak)
+                            } else {
+                                file.addAfter(psiFactory.createNewLine(2), importList)
+                            }
+                        }
+                    }
                 } else {
                     val importPathComparator = ImportInsertHelperImpl(project).getImportSortComparator(file)
                     val insertAfter = imports.lastOrNull {
@@ -498,7 +520,9 @@ class ImportInsertHelperImpl(private val project: Project) : ImportInsertHelper(
                         directivePath != null && importPathComparator.compare(directivePath, importPath) <= 0
                     }
 
-                    (importList.addAfter(newDirective, insertAfter) as KtImportDirective)
+                    (importList.addAfter(newDirective, insertAfter) as KtImportDirective).also {
+                        importList.addBefore(psiFactory.createNewLine(1), it)
+                    }
                 }
             } else {
                 error("Trying to insert import $fqName into a file ${file.name} of type ${file::class.java} with no import list.")

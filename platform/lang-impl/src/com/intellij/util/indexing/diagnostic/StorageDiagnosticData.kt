@@ -4,8 +4,9 @@ package com.intellij.util.indexing.diagnostic
 import com.fasterxml.jackson.annotation.JsonIgnore
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import com.fasterxml.jackson.annotation.JsonInclude
-import com.intellij.diagnostic.telemetry.TraceManager
-import com.intellij.diagnostic.telemetry.helpers.ReentrantReadWriteLockUsageMonitor
+import com.intellij.platform.diagnostic.telemetry.Storage
+import com.intellij.platform.diagnostic.telemetry.TelemetryTracer
+import com.intellij.platform.diagnostic.telemetry.impl.helpers.ReentrantReadWriteLockUsageMonitor
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.PathManager
 import com.intellij.openapi.components.PathMacroManager
@@ -246,7 +247,7 @@ object StorageDiagnosticData {
   //         b) we already have monitoring of FilePageCache here, so better to keep old/new monitoring in one
   //            place for a while
   private fun setupReportingToOpenTelemetry() {
-    val otelMeter = TraceManager.getMeter("storage")
+    val otelMeter = TelemetryTracer.getMeter(Storage)
 
     if (MONITOR_STORAGE_LOCK) {
       ReentrantReadWriteLockUsageMonitor(
@@ -289,6 +290,11 @@ object StorageDiagnosticData {
     val directBufferAllocatorDisposed = otelMeter.counterBuilder("DirectByteBufferAllocator.disposed").buildObserver()
     val directBufferAllocatorTotalSizeCached = otelMeter.gaugeBuilder("DirectByteBufferAllocator.totalSizeOfBuffersCachedInBytes")
       .ofLongs()
+      .setUnit("bytes")
+      .buildObserver()
+    val directBufferAllocatorTotalSizeAllocated = otelMeter.gaugeBuilder("DirectByteBufferAllocator.totalSizeOfBuffersAllocatedInBytes")
+      .ofLongs()
+      .setUnit("bytes")
       .buildObserver()
 
     otelMeter.batchCallback(
@@ -318,7 +324,9 @@ object StorageDiagnosticData {
           directBufferAllocatorMisses.record(bufferAllocatorStats.misses.toLong())
           directBufferAllocatorReclaimed.record(bufferAllocatorStats.reclaimed.toLong())
           directBufferAllocatorDisposed.record(bufferAllocatorStats.disposed.toLong())
-          directBufferAllocatorTotalSizeCached.record(bufferAllocatorStats.totalSizeOfBuffersCachedInBytes.toLong())
+
+          directBufferAllocatorTotalSizeCached.record(bufferAllocatorStats.totalSizeOfBuffersCachedInBytes)
+          directBufferAllocatorTotalSizeAllocated.record(bufferAllocatorStats.totalSizeOfBuffersAllocatedInBytes)
         }
         catch (_: AlreadyDisposedException) {
 
@@ -331,7 +339,7 @@ object StorageDiagnosticData {
 
       directBufferAllocatorHits, directBufferAllocatorMisses,
       directBufferAllocatorReclaimed, directBufferAllocatorDisposed,
-      directBufferAllocatorTotalSizeCached
+      directBufferAllocatorTotalSizeAllocated, directBufferAllocatorTotalSizeCached
     )
   }
 }

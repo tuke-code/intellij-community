@@ -86,15 +86,9 @@
     <xs:attribute type="xs:string" name="script">
       <xs:annotation>
         <xs:documentation>
-          Base name of the script files (*.exe, *.bat, *.sh) from the product 'bin' directory without extension.
-        </xs:documentation>
-      </xs:annotation>
-    </xs:attribute>
-    <xs:attribute type="xs:string" name="default-launcher-name">
-      <xs:annotation>
-        <xs:documentation>
-          Default name of the command-line launcher to be suggested in 'Create Launcher Script' dialog.
-          May be omitted if same as the @script attribute.
+          The base name (i.e. a name without the extension and architecture suffix)
+          of launcher files (bin/xxx64.exe, bin/xxx.bat, bin/xxx.sh, MacOS/xxx),
+          usually a short product name in lower case (e.g. "idea").
         </xs:documentation>
       </xs:annotation>
     </xs:attribute>
@@ -421,6 +415,8 @@
   <xs:complexType name="default-lafType">
     <xs:attribute type="xs:string" name="light"/>
     <xs:attribute type="xs:string" name="dark"/>
+    <xs:attribute type="xs:string" name="light-classic"/>
+    <xs:attribute type="xs:string" name="dark-classic"/>
   </xs:complexType>
   <xs:complexType name="zendeskFormType">
     <xs:sequence>

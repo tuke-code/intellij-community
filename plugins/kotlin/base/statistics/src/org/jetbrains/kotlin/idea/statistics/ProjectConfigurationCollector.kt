@@ -11,17 +11,13 @@ import com.intellij.openapi.module.Module
 import com.intellij.openapi.project.Project
 import org.jetbrains.kotlin.idea.base.facet.isMultiPlatformModule
 import org.jetbrains.kotlin.idea.base.facet.isNewMultiPlatformModule
-import org.jetbrains.kotlin.idea.base.facet.platform.platform
 import org.jetbrains.kotlin.idea.compiler.configuration.KotlinIdePlugin
 import org.jetbrains.kotlin.idea.configuration.BuildSystemType
 import org.jetbrains.kotlin.idea.configuration.buildSystemType
+import org.jetbrains.kotlin.idea.configuration.getPlatform
 import org.jetbrains.kotlin.idea.facet.KotlinFacet
 import org.jetbrains.kotlin.idea.facet.KotlinFacetType
 import org.jetbrains.kotlin.konan.target.KonanTarget
-import org.jetbrains.kotlin.platform.isCommon
-import org.jetbrains.kotlin.platform.isJs
-import org.jetbrains.kotlin.platform.jvm.isJvm
-import org.jetbrains.kotlin.platform.konan.isNative
 
 class ProjectConfigurationCollector : ProjectUsagesCollector() {
     override fun getGroup() = GROUP
@@ -51,19 +47,6 @@ class ProjectConfigurationCollector : ProjectUsagesCollector() {
         return metrics
     }
 
-    private fun getPlatform(it: Module): String {
-        return when {
-            it.platform.isJvm() -> {
-                if (it.name.contains("android")) "jvm.android"
-                else "jvm"
-            }
-            it.platform.isJs() -> "js"
-            it.platform.isCommon() -> "common"
-            it.platform.isNative() -> "native." + (it.platform?.componentPlatforms?.first()?.targetName ?: "unknown")
-            else -> "unknown"
-        }
-    }
-
     private fun getBuildSystemType(it: Module): String {
         val buildSystem = it.buildSystemType
         return when {
@@ -75,11 +58,11 @@ class ProjectConfigurationCollector : ProjectUsagesCollector() {
     }
 
     companion object {
-        private val GROUP = EventLogGroup("kotlin.project.configuration", 8)
+        private val GROUP = EventLogGroup("kotlin.project.configuration", 10)
 
         private val systemField = EventFields.String("system", listOf("JPS", "Maven", "Gradle", "unknown"))
         private val platformField = EventFields.String("platform", composePlatformFields())
-        private val languageLevelField = EventFields.StringValidatedByRegexp("languageVersion", "version_lang_api")
+        private val languageLevelField = EventFields.StringValidatedByRegexp("languageLevel", "version")
         private val isMPPBuild = EventFields.Boolean("isMPP")
         private val pluginInfoField = EventFields.PluginInfo
 
@@ -87,7 +70,7 @@ class ProjectConfigurationCollector : ProjectUsagesCollector() {
 
         private fun composePlatformFields(): List<String> {
             return listOf(
-                listOf("jvm", "jvm.android", "js", "common", "native.unknown", "unknown"),
+                listOf("jvm", "jvm.android", "js", "wasm", "common", "native.unknown", "unknown"),
                 KonanTarget.predefinedTargets.keys.map { "native.$it" }
             ).flatten()
         }

@@ -7,18 +7,20 @@ import org.jetbrains.uast.*
 
 internal class LoggingUtil {
   companion object {
-    private const val SLF4J_LOGGER = "org.slf4j.Logger"
+    internal const val SLF4J_LOGGER = "org.slf4j.Logger"
 
-    private const val LOG4J_LOGGER = "org.apache.logging.log4j.Logger"
+    internal const val LOG4J_LOGGER = "org.apache.logging.log4j.Logger"
 
-    private const val LOG4J_LOG_BUILDER = "org.apache.logging.log4j.LogBuilder"
+    internal const val LOG4J_LOG_BUILDER = "org.apache.logging.log4j.LogBuilder"
 
-    private const val SLF4J_EVENT_BUILDER = "org.slf4j.spi.LoggingEventBuilder"
+    internal const val SLF4J_EVENT_BUILDER = "org.slf4j.spi.LoggingEventBuilder"
 
     private const val LEGACY_LOG4J_LOGGER = "org.apache.log4j.Logger"
     private const val LEGACY_CATEGORY_LOGGER = "org.apache.log4j.Category"
     private const val LEGACY_APACHE_COMMON_LOGGER = "org.apache.commons.logging.Log"
     private const val LEGACY_JAVA_LOGGER = "java.util.logging.Logger"
+
+    internal const val AKKA_LOGGING = "akka.event.LoggingAdapter"
 
     private val LOGGER_CLASSES = setOf(SLF4J_LOGGER, LOG4J_LOGGER)
     private val LEGACY_LOGGER_CLASSES = setOf(LEGACY_LOG4J_LOGGER, LEGACY_CATEGORY_LOGGER,
@@ -35,6 +37,10 @@ internal class LoggingUtil {
       LOG4J_BUILDER_MATCHER,
       SLF4J_BUILDER_MATCHER,
     )
+
+    internal val FORMATTED_LOG4J: CallMatcher = CallMatcher.staticCall("org.apache.logging.log4j.LogManager", "getFormatterLogger")
+
+    internal const val LOG_4_J_LOGGER = "org.apache.logging.slf4j.Log4jLogger"
 
     internal val LEGACY_LOG_MATCHERS: CallMatcher = CallMatcher.anyOf(
       CallMatcher.instanceCall(LEGACY_LOG4J_LOGGER, "trace", "debug", "info", "warn", "error", "fatal", "log", "l7dlog"),
@@ -122,9 +128,9 @@ internal class LoggingUtil {
 
     internal fun getGuardedCondition(call: UCallExpression?): UExpression? {
       if (call == null) return null
-      val loggerSource: UElement = getLoggerQualifier(call) ?: return null
-      val ifExpression: UIfExpression? = call.getParentOfType<UIfExpression>()
-      var condition = ifExpression?.condition?.skipParenthesizedExprDown() ?: return null
+      val loggerSource = getLoggerQualifier(call) ?: return null
+      val ifExpression = call.getParentOfType<UIfExpression>() ?: return null
+      var condition = ifExpression.condition.skipParenthesizedExprDown()
       if (condition is UPrefixExpression) {
         if (condition.operator != UastPrefixOperator.LOGICAL_NOT) return null
         val elseExpression = ifExpression.elseExpression
@@ -173,7 +179,7 @@ internal class LoggingUtil {
 
     private fun getLoggerQualifier(call: UCallExpression?): UElement? {
       if (call == null) return null
-      var receiver: UExpression? = call.receiver
+      var receiver = call.receiver?.skipParenthesizedExprDown()
       if (receiver is UCallExpression) {
         receiver = receiver.receiver
       }
@@ -201,7 +207,6 @@ internal class LoggingUtil {
             return resolvedReceiver
           }
         }
-
       }
       return null
     }
@@ -234,7 +239,7 @@ internal class LoggingUtil {
         if (levelTypeFromLog != null) {
           return levelTypeFromLog
         }
-        var receiver: UElement = uCall.receiver ?: return null
+        var receiver = uCall.receiver ?: return null
         if (receiver is UQualifiedReferenceExpression) {
           receiver = receiver.selector
         }

@@ -53,7 +53,9 @@ import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiManager;
 import com.intellij.serviceContainer.AlreadyDisposedException;
 import com.intellij.util.*;
+import com.intellij.util.concurrency.annotations.RequiresBlockingContext;
 import com.intellij.util.containers.ContainerUtil;
+import com.intellij.util.containers.MultiMap;
 import com.intellij.util.text.VersionComparatorUtil;
 import com.intellij.util.xml.NanoXmlBuilder;
 import com.intellij.util.xml.NanoXmlUtil;
@@ -65,10 +67,7 @@ import org.jetbrains.idea.maven.MavenVersionAwareSupportExtension;
 import org.jetbrains.idea.maven.buildtool.MavenSyncConsole;
 import org.jetbrains.idea.maven.dom.MavenDomUtil;
 import org.jetbrains.idea.maven.execution.MavenRunnerSettings;
-import org.jetbrains.idea.maven.model.MavenConstants;
-import org.jetbrains.idea.maven.model.MavenId;
-import org.jetbrains.idea.maven.model.MavenPlugin;
-import org.jetbrains.idea.maven.model.MavenRemoteRepository;
+import org.jetbrains.idea.maven.model.*;
 import org.jetbrains.idea.maven.project.*;
 import org.jetbrains.idea.maven.server.*;
 import org.xml.sax.Attributes;
@@ -87,7 +86,6 @@ import java.nio.file.InvalidPathException;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
@@ -320,6 +318,10 @@ public class MavenUtil {
   public static java.nio.file.Path getBaseDir(@NotNull VirtualFile file) {
     VirtualFile virtualBaseDir = getVFileBaseDir(file);
     return virtualBaseDir.toNioPath();
+  }
+
+  public static MultiMap<String, MavenProject> groupByBasedir(@NotNull Collection<MavenProject> projects, @NotNull MavenProjectsTree tree) {
+    return ContainerUtil.groupBy(projects, p -> getBaseDir(tree.findRootProject(p).getDirectoryFile()).toString());
   }
 
   public static VirtualFile getVFileBaseDir(@NotNull VirtualFile file) {
@@ -575,25 +577,14 @@ public class MavenUtil {
     if (errorEx[0] != null) throw errorEx[0];
   }
 
-
   @NotNull
-  public static MavenTaskHandler runInBackground(@NotNull final Project project,
-                                                 @NotNull @NlsContexts.Command final String title,
-                                                 final boolean cancellable,
-                                                 @NotNull final MavenTask task) {
-    return runInBackground(project, title, cancellable, task, null);
-  }
-
-  @NotNull
-  public static MavenTaskHandler runInBackground(@NotNull final Project project,
-                                                 @NotNull @NlsContexts.Command final String title,
-                                                 final boolean cancellable,
-                                                 @NotNull final MavenTask task,
-                                                 @Nullable("null means application pooled thread")
-                                                 ExecutorService executorService) {
+  public static MavenTaskHandler runInBackground(@NotNull Project project,
+                                                 @NotNull @NlsContexts.Command String title,
+                                                 boolean cancellable,
+                                                 @NotNull MavenTask task) {
     MavenProjectsManager manager = MavenProjectsManager.getInstanceIfCreated(project);
     Supplier<MavenSyncConsole> syncConsoleSupplier = manager == null ? null : () -> manager.getSyncConsole();
-    final MavenProgressIndicator indicator = new MavenProgressIndicator(project, syncConsoleSupplier);
+    MavenProgressIndicator indicator = new MavenProgressIndicator(project, syncConsoleSupplier);
 
     Runnable runnable = () -> {
       if (project.isDisposed()) return;
@@ -615,14 +606,9 @@ public class MavenUtil {
       };
     }
     else {
-      final Future<?> future;
-      if (executorService == null) {
-        future = ApplicationManager.getApplication().executeOnPooledThread(runnable);
-      }
-      else {
-        future = executorService.submit(runnable);
-      }
-      final MavenTaskHandler handler = new MavenTaskHandler() {
+      Future<?> future;
+      future = ApplicationManager.getApplication().executeOnPooledThread(runnable);
+      MavenTaskHandler handler = new MavenTaskHandler() {
         @Override
         public void waitFor() {
           try {
@@ -1188,6 +1174,7 @@ public class MavenUtil {
    * @param wait if true, then maven server(s) restarted synchronously
    * @param condition only connectors satisfied for this predicate will be restarted
    */
+  @RequiresBlockingContext
   public static void restartMavenConnectors(@NotNull Project project, boolean wait, Predicate<MavenServerConnector> condition) {
     MavenServerManager.getInstance().restartMavenConnectors(project, wait, condition);
   }
@@ -1657,5 +1644,12 @@ public class MavenUtil {
 
   public static boolean isLinearImportEnabled() {
     return Registry.is("maven.linear.import");
+  }
+
+  @ApiStatus.Internal
+  public static boolean shouldResetDependenciesAndFolders(Collection<MavenProjectProblem> readingProblems) {
+    if (Registry.is("maven.always.reset")) return true;
+    MavenProjectProblem unrecoverable = ContainerUtil.find(readingProblems, it -> !it.isRecoverable());
+    return unrecoverable == null;
   }
 }

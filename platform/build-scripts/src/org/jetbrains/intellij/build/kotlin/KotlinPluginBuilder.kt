@@ -86,7 +86,8 @@ object KotlinPluginBuilder {
     "kotlin.compiler-plugins.sam-with-receiver.common",
     "kotlin.compiler-plugins.sam-with-receiver.gradle",
     "kotlin.compiler-plugins.sam-with-receiver.maven",
-    "kotlin.compiler-plugins.assignment.common",
+    "kotlin.compiler-plugins.assignment.common-k1",
+    "kotlin.compiler-plugins.assignment.common-k2",
     "kotlin.compiler-plugins.assignment.gradle",
     "kotlin.compiler-plugins.assignment.maven",
     "kotlin.compiler-plugins.lombok.gradle",
@@ -185,6 +186,7 @@ object KotlinPluginBuilder {
     "kotlin.navigation",
     "kotlin.refactorings.common",
     "kotlin.refactorings.k2",
+    "kotlin.refactorings.move.k2",
     "kotlin.refactorings.rename.k2",
     "kotlin.performanceExtendedPlugin",
     "kotlin.bundled-compiler-plugins-support",
@@ -236,11 +238,6 @@ object KotlinPluginBuilder {
       kind = KotlinPluginKind.valueOf(System.getProperty("kotlin.plugin.kind", "IJ")),
       ultimateSources = ultimateSources,
     )
-  }
-
-  // weird groovy bug - remove method once AppCodeProperties will be converted to kotlin
-  fun kotlinPluginAcKmm(): PluginLayout {
-    return kotlinPlugin(KotlinPluginKind.AC_KMM, KotlinUltimateSources.WITH_ULTIMATE_MODULES)
   }
 
   @JvmStatic
@@ -371,9 +368,6 @@ object KotlinPluginBuilder {
               "<!-- IJ/AS-DEPENDENCY-PLACEHOLDER -->",
               "<plugin id=\"com.intellij.modules.androidstudio\"/>"
             )
-          KotlinPluginKind.AC_KMM ->
-            replace(text, "<plugin id=\"com.intellij.java\"/>", "<plugin id=\"com.intellij.kotlinNative.platformDeps\"/>\n" +
-                                                                "<plugin id=\"com.intellij.modules.appcode\"/>")
           else -> throw IllegalStateException("Unknown kind = $kind")
         }
       }
@@ -419,10 +413,5 @@ object KotlinPluginBuilder {
 
   enum class KotlinPluginKind {
     IJ, AS, MI,
-
-    // AppCode KMM plugin
-    AC_KMM {
-      override fun toString() = "AC"
-    }
   }
 }

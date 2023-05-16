@@ -55,6 +55,9 @@ import static com.intellij.ui.paint.PaintUtil.RoundingMode.ROUND;
  */
 public final class JBCefApp {
   private static final Logger LOG = Logger.getInstance(JBCefApp.class);
+  private static final boolean SKIP_VERSION_CHECK = Boolean.getBoolean("ide.browser.jcef.skip_version_check");
+  private static final boolean SKIP_MODULE_CHECK = Boolean.getBoolean("ide.browser.jcef.skip_module_check");
+
   private static String ourLinuxDistribution = null;
 
   public static final @NotNull NotNullLazyValue<NotificationGroup> NOTIFICATION_GROUP = NotNullLazyValue.createValue(() -> {
@@ -65,7 +68,7 @@ public final class JBCefApp {
 
   private static final int MIN_SUPPORTED_CEF_MAJOR_VERSION = 104;
   private static final int MIN_SUPPORTED_JCEF_API_MAJOR_VERSION = 1;
-  private static final int MIN_SUPPORTED_JCEF_API_MINOR_VERSION = 10;
+  private static final int MIN_SUPPORTED_JCEF_API_MINOR_VERSION = 11;
 
   @NotNull private final CefApp myCefApp;
 
@@ -242,10 +245,13 @@ public final class JBCefApp {
       }
     }
 
+    if (settings.remote_debugging_port > 0) {
+      args = ArrayUtil.mergeArrays(args, "--remote-allow-origins=*");
+    }
+
     CefApp.addAppHandler(new MyCefAppHandler(args, trackGPUCrashes));
     myCefSettings = settings;
     myCefApp = CefApp.getInstance(settings);
-    LOG.info(String.format("jcef version: %s | cmd args: %s", myCefApp.getVersion().getJcefVersion(), Arrays.toString(args)));
     Disposer.register(ApplicationManager.getApplication(), myDisposable);
   }
 
@@ -419,35 +425,40 @@ public final class JBCefApp {
       {
         return unsupported.apply("JCEF is manually disabled in headless env via 'ide.browser.jcef.headless.enabled=false'");
       }
-      JCefVersionDetails version;
-      try {
-        version = JCefAppConfig.getVersionDetails();
+      if (!SKIP_VERSION_CHECK) {
+        JCefVersionDetails version;
+        try {
+          version = JCefAppConfig.getVersionDetails();
+        }
+        catch (Throwable e) {
+          return unsupported.apply("JCEF runtime version is not supported");
+        }
+        if (MIN_SUPPORTED_CEF_MAJOR_VERSION > version.cefVersion.major) {
+          return unsupported.apply("JCEF: minimum supported CEF major version is " + MIN_SUPPORTED_CEF_MAJOR_VERSION +
+                                   ", current is " + version.cefVersion.major);
+        }
+        if (MIN_SUPPORTED_JCEF_API_MAJOR_VERSION > version.apiVersion.major ||
+            (MIN_SUPPORTED_JCEF_API_MAJOR_VERSION == version.apiVersion.major &&
+             MIN_SUPPORTED_JCEF_API_MINOR_VERSION > version.apiVersion.minor))
+        {
+          return unsupported.apply("JCEF: minimum supported API version is " +
+                                   MIN_SUPPORTED_JCEF_API_MAJOR_VERSION + "." + MIN_SUPPORTED_JCEF_API_MINOR_VERSION +
+                                   ", current is " + version.apiVersion.major + "." + version.apiVersion.minor);
+        }
       }
-      catch (Throwable e) {
-        return unsupported.apply("JCEF runtime version is not supported");
+      if (!SKIP_MODULE_CHECK) {
+        URL url = JCefAppConfig.class.getResource("JCefAppConfig.class");
+        if (url == null) {
+          return unsupported.apply("JCefAppConfig.class not found");
+        }
+        String path = url.toString();
+        String name = JCefAppConfig.class.getName().replace('.', '/');
+        boolean isJbrModule = path != null && path.contains("/jcef/" + name);
+        if (!isJbrModule) {
+          return unsupported.apply("JCefAppConfig.class is not from a JBR module, url: " + path);
+        }
       }
-      if (MIN_SUPPORTED_CEF_MAJOR_VERSION > version.cefVersion.major) {
-        return unsupported.apply("JCEF: minimum supported CEF major version is " + MIN_SUPPORTED_CEF_MAJOR_VERSION +
-                                 ", current is " + version.cefVersion.major);
-      }
-      if (MIN_SUPPORTED_JCEF_API_MAJOR_VERSION > version.apiVersion.major ||
-          (MIN_SUPPORTED_JCEF_API_MAJOR_VERSION == version.apiVersion.major &&
-           MIN_SUPPORTED_JCEF_API_MINOR_VERSION > version.apiVersion.minor))
-      {
-        return unsupported.apply("JCEF: minimum supported API version is " +
-                                 MIN_SUPPORTED_JCEF_API_MAJOR_VERSION + "." + MIN_SUPPORTED_JCEF_API_MINOR_VERSION +
-                                 ", current is " + version.apiVersion.major + "." + version.apiVersion.minor);
-      }
-      URL url = JCefAppConfig.class.getResource("JCefAppConfig.class");
-      if (url == null) {
-        return unsupported.apply("JCefAppConfig.class not found");
-      }
-      String path = url.toString();
-      String name = JCefAppConfig.class.getName().replace('.', '/');
-      boolean isJbrModule = path != null && path.contains("/jcef/" + name);
-      if (!isJbrModule) {
-        LOG.warn("JCefAppConfig is not from a JBR module, path: " + path);
-      }
+
       ourSupported = new AtomicBoolean(true);
       return true;
     }
@@ -537,9 +548,11 @@ public final class JBCefApp {
     private final int myGPUCrashLimit;
     private int myGPUCrashCounter = 0;
     private boolean myNotificationShown = false;
+    private final String myArgs;
 
     MyCefAppHandler(String @Nullable [] args, boolean trackGPUCrashes) {
       super(args);
+      myArgs = Arrays.toString(args);
       myGPUCrashLimit = trackGPUCrashes ? Integer.getInteger("ide.browser.jcef.gpu.infinitecrash.internallimit", 10) : -1;
     }
 
@@ -556,6 +569,12 @@ public final class JBCefApp {
         f.registerCustomScheme(registrar);
       }
       ourSourceSchemeHandlerFactory.registerCustomScheme(registrar);
+    }
+
+    @Override
+    public void stateHasChanged(CefApp.CefAppState state) {
+      if (state.equals(CefApp.CefAppState.INITIALIZED))
+        LOG.info(String.format("jcef version: %s | cmd args: %s", CefApp.getInstance().getVersion().getJcefVersion(), myArgs));
     }
 
     @Override

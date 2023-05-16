@@ -3,7 +3,7 @@
 
 package org.jetbrains.intellij.build.tasks
 
-import com.intellij.diagnostic.telemetry.use
+import com.intellij.platform.diagnostic.telemetry.impl.use
 import com.intellij.util.lang.HashMapZipFile
 import io.opentelemetry.api.common.AttributeKey
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap
@@ -84,7 +84,7 @@ private fun computeAppClassPath(sourceToNames: Map<Path, List<String>>, libDir: 
 
   val result = LinkedHashSet<Path>()
   // add first - should be listed first
-  sequenceOf(UTIL_JAR).map(libDir::resolve).filterTo(result, existing::contains)
+  sequenceOf(PLATFORM_LOADER_JAR, UTIL_JAR).map(libDir::resolve).filterTo(result, existing::contains)
   sourceToNames.keys.filterTo(result) { it.parent == libDir && existing.contains(it) }
   // sorted to ensure stable performance results
   result.addAll(if (isWindows) existing.sortedBy(Path::toString) else existing.sorted())

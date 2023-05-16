@@ -28,6 +28,7 @@ import com.intellij.execution.process.ProcessAdapter;
 import com.intellij.execution.process.ProcessEvent;
 import com.intellij.execution.process.ProcessHandler;
 import com.intellij.execution.runners.ExecutionEnvironment;
+import com.intellij.execution.testDiscovery.JvmToggleAutoTestAction;
 import com.intellij.execution.testframework.TestTreeView;
 import com.intellij.execution.testframework.sm.SMTestRunnerConnectionUtil;
 import com.intellij.execution.testframework.sm.runner.SMRunnerConsolePropertiesProvider;
@@ -65,11 +66,9 @@ import org.jetbrains.plugins.gradle.action.GradleRerunFailedTestsAction;
 import org.jetbrains.plugins.gradle.execution.filters.ReRunTaskFilter;
 import org.jetbrains.plugins.gradle.execution.test.runner.events.GradleTestEventsProcessor;
 import org.jetbrains.plugins.gradle.execution.test.runner.events.GradleTestsExecutionConsoleOutputProcessor;
-import org.jetbrains.plugins.gradle.service.execution.GradleTestExecutionUtil;
+import org.jetbrains.plugins.gradle.service.execution.GradleRunConfiguration;
 import org.jetbrains.plugins.gradle.util.GradleBundle;
 import org.jetbrains.plugins.gradle.util.GradleConstants;
-
-import static org.jetbrains.plugins.gradle.util.GradleConstants.RUN_TASK_AS_TEST;
 
 /**
  * @author Vladislav.Soroka
@@ -262,15 +261,8 @@ public class GradleTestsExecutionConsoleManager
   public boolean isApplicableFor(@NotNull ExternalSystemTask task) {
     if (task instanceof ExternalSystemExecuteTaskTask taskTask) {
       if (StringUtil.equals(taskTask.getExternalSystemId().getId(), GradleConstants.SYSTEM_ID.getId())) {
-        var project = taskTask.getIdeProject();
-        var externalProjectPath = taskTask.getExternalProjectPath();
-        var tasksAndArguments = taskTask.getTasksToExecute();
-        var arguments = StringUtil.notNullize(taskTask.getArguments());
-        var commandLine = GradleTestExecutionUtil.parseCommandLine(tasksAndArguments, arguments);
-        if (GradleTestExecutionUtil.hasTestTasks(commandLine, project, externalProjectPath)) {
-          taskTask.putUserData(RUN_TASK_AS_TEST, true);
-          return true;
-        }
+        var isRunAsTest = taskTask.getUserData(GradleRunConfiguration.RUN_AS_TEST_KEY);
+        return ObjectUtils.chooseNotNull(isRunAsTest, false);
       }
     }
     return false;
@@ -281,6 +273,6 @@ public class GradleTestsExecutionConsoleManager
     JavaRerunFailedTestsAction rerunFailedTestsAction =
       new GradleRerunFailedTestsAction(consoleView);
     rerunFailedTestsAction.setModelProvider(() -> consoleView.getResultsViewer());
-    return new AnAction[]{rerunFailedTestsAction};
+    return new AnAction[]{rerunFailedTestsAction, new JvmToggleAutoTestAction()};
   }
 }

@@ -1,6 +1,6 @@
 // Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 @file:JvmName("Main")
-@file:Suppress("RAW_RUN_BLOCKING")
+@file:Suppress("RAW_RUN_BLOCKING", "JAVA_MODULE_DOES_NOT_EXPORT_PACKAGE")
 
 package com.intellij.idea
 
@@ -15,11 +15,16 @@ import com.intellij.ide.startup.StartupActionScriptManager
 import com.intellij.openapi.application.ApplicationNamesInfo
 import com.intellij.openapi.application.PathManager
 import com.intellij.openapi.application.impl.ApplicationInfoImpl
+import com.intellij.platform.impl.toolkit.IdeFontManager
+import com.intellij.platform.impl.toolkit.IdeGraphicsEnvironment
+import com.intellij.platform.impl.toolkit.IdeToolkit
 import com.intellij.util.lang.PathClassLoader
 import com.intellij.util.lang.UrlClassLoader
 import com.jetbrains.JBR
 import kotlinx.coroutines.*
+import sun.font.FontManagerFactory
 import java.awt.GraphicsEnvironment
+import java.awt.Toolkit
 import java.io.IOException
 import java.lang.invoke.MethodHandles
 import java.lang.invoke.MethodType
@@ -46,14 +51,14 @@ fun main(rawArgs: Array<String>) {
       StartUpMeasurer.addTimings(startupTimings, "bootstrap")
       val appInitPreparationActivity = StartUpMeasurer.startActivity("app initialization preparation")
 
-      launch(CoroutineName("ForkJoin CommonPool configuration") + Dispatchers.Default) {
-        IdeaForkJoinWorkerThreadFactory.setupForkJoinCommonPool(AppMode.isHeadless())
-      }
-
       // not IO-, but CPU-bound due to descrambling, don't use here IO dispatcher
       val appStarterDeferred = async(CoroutineName("main class loading") + Dispatchers.Default) {
         val aClass = AppStarter::class.java.classLoader.loadClass("com.intellij.idea.MainImpl")
         MethodHandles.lookup().findConstructor(aClass, MethodType.methodType(Void.TYPE)).invoke() as AppStarter
+      }
+
+      launch(CoroutineName("ForkJoin CommonPool configuration") + Dispatchers.Default) {
+        IdeaForkJoinWorkerThreadFactory.setupForkJoinCommonPool(AppMode.isHeadless())
       }
 
       initRemoteDevIfNeeded(args)
@@ -81,51 +86,59 @@ private fun initRemoteDevIfNeeded(args: List<String>) {
   if (!isRemoteDevEnabled) {
     return
   }
+  if (!JBR.isGraphicsUtilsSupported()) {
+    error("JBR version 17.0.6b796 or later is required to run a remote-dev server with lux")
+  }
 
   runActivity("cwm host init") {
-    if (System.getProperty("lux.enabled", "true").toBoolean()) {
+    initRemoteDevGraphicsEnvironment()
+    if (isLuxEnabled()) {
       initLux()
-    }
-    else {
+    } else {
       initProjector()
     }
   }
 }
 
+private fun isLuxEnabled() = System.getProperty("lux.enabled", "true").toBoolean()
+
 private fun initProjector() {
-  if (!JBR.isProjectorUtilsSupported()) {
-    error("JBR version 17.0.5b653.12 or later is required to run a remote-dev server")
-  }
-
-  JBR.getProjectorUtils().setLocalGraphicsEnvironmentProvider {
-    val projectorEnvClass = AppStarter::class.java.classLoader.loadClass("org.jetbrains.projector.awt.image.PGraphicsEnvironment")
-    projectorEnvClass.getDeclaredMethod("getInstance").invoke(null) as GraphicsEnvironment
-  }
-
   val projectorMainClass = AppStarter::class.java.classLoader.loadClass("org.jetbrains.projector.server.ProjectorLauncher\$Starter")
   MethodHandles.privateLookupIn(projectorMainClass, MethodHandles.lookup()).findStatic(
     projectorMainClass, "runProjectorServer", MethodType.methodType(Boolean::class.javaPrimitiveType)
   ).invoke()
 }
 
+private fun initRemoteDevGraphicsEnvironment() {
+  JBR.getProjectorUtils().setLocalGraphicsEnvironmentProvider {
+    if (isLuxEnabled()) IdeGraphicsEnvironment.instance
+    else AppStarter::class.java.classLoader.loadClass("org.jetbrains.projector.awt.image.PGraphicsEnvironment").getDeclaredMethod("getInstance").invoke(null) as GraphicsEnvironment
+  }
+}
+
+private fun setStaticField(clazz: Class<out Any>, fieldName: String, value: Any) {
+  val lookup = MethodHandles.lookup()
+
+  val field = clazz.getDeclaredField(fieldName)
+  field.isAccessible = true
+  val handle = lookup.unreflectSetter(field)
+  handle.invoke(value)
+}
+
 private fun initLux() {
-  if (!JBR.isGraphicsUtilsSupported()) {
-    error("JBR version 17.0.6b796 or later is required to run a remote-dev server with lux")
-  }
+  if (!isLuxEnabled()) return
 
-  if (System.getProperty("lux.fonts.disable.projector.font.manager", "false").toBoolean()) {
-    // disable PFontManager
-    System.setProperty("org.jetbrains.projector.server.enable.font.manager", "false")
-
-    // X11GraphicsEnvironment initializer is necessary for X11FontManager
-    // Do it before Projector sets its own PGraphicsEnvironment
-    GraphicsEnvironment.getLocalGraphicsEnvironment()
-  }
-
-  initProjector()
-
+  System.setProperty("java.awt.headless", false.toString())
+  System.setProperty("swing.volatileImageBufferEnabled", false.toString())
+  System.setProperty("keymap.current.os.only", false.toString())
   System.setProperty("awt.nativeDoubleBuffering", false.toString())
   System.setProperty("swing.bufferPerWindow", true.toString())
+
+  setStaticField(Toolkit::class.java, "toolkit", IdeToolkit())
+  System.setProperty("awt.toolkit", IdeToolkit::class.java.canonicalName)
+
+  setStaticField(FontManagerFactory::class.java, "instance", IdeFontManager())
+  System.setProperty("sun.font.fontmanager", IdeFontManager::class.java.canonicalName)
 }
 
 private fun bootstrap(startupTimings: MutableList<Any>) {

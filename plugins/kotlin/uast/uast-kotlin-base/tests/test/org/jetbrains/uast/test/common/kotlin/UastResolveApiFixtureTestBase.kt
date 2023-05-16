@@ -23,9 +23,9 @@ import org.jetbrains.kotlin.utils.addToStdlib.cast
 import org.jetbrains.uast.*
 import org.jetbrains.uast.kotlin.KotlinUFile
 import org.jetbrains.uast.kotlin.KotlinUFunctionCallExpression
-import org.jetbrains.uast.test.env.findElementByText
-import org.jetbrains.uast.test.env.findElementByTextFromPsi
-import org.jetbrains.uast.test.env.findUElementByTextFromPsi
+import com.intellij.platform.uast.testFramework.env.findElementByText
+import com.intellij.platform.uast.testFramework.env.findElementByTextFromPsi
+import com.intellij.platform.uast.testFramework.env.findUElementByTextFromPsi
 import org.jetbrains.uast.visitor.AbstractUastVisitor
 
 interface UastResolveApiFixtureTestBase : UastPluginSelection {
@@ -1105,6 +1105,65 @@ interface UastResolveApiFixtureTestBase : UastPluginSelection {
         )
     }
 
+    fun checkResolveSyntheticJavaPropertyCompoundAccess(myFixture: JavaCodeInsightTestFixture, isK2 : Boolean = true) {
+        myFixture.addClass(
+            """public class X {
+        |int getFoo() { return 42; }
+        |void setFoo(int s) {}
+        |}""".trimMargin()
+        )
+
+        myFixture.configureByText(
+            "main.kt", """
+                fun box(x : X) {
+                  x.foo += 42
+                  x.foo++
+                }
+            """.trimIndent()
+        )
+
+        val uFile = myFixture.file.toUElement()!!
+        val plusEq = uFile.findElementByTextFromPsi<UBinaryExpression>("x.foo +=", strict = false)
+            .orFail("cant convert to UBinaryExpression")
+        val wholePlusEq = plusEq.resolveOperator()
+        TestCase.assertNull(wholePlusEq)
+        // `x.foo` from `x.foo += 42`
+        val left = (plusEq.leftOperand as? UResolvable)?.resolve() as? PsiMethod
+        if (isK2) {
+            TestCase.assertEquals("getFoo", left?.name)
+        } else {
+            TestCase.assertEquals("setFoo", left?.name)
+        }
+
+        val plusEqMulti = (plusEq as UMultiResolvable).multiResolve()
+        val plusEqMultiStrings = plusEqMulti.map { it.element?.text ?: "<null>" }
+        assertContainsElements(
+            plusEqMultiStrings,
+            "int getFoo() { return 42; }",
+            "void setFoo(int s) {}",
+        )
+
+        val plusPlus = uFile.findElementByTextFromPsi<UUnaryExpression>("x.foo++", strict = false)
+            .orFail("cant convert to UUnaryExpression")
+        val wholePlusPlus = plusPlus.resolveOperator()
+        TestCase.assertNull(wholePlusPlus)
+        // `x.foo` from `x.foo++`
+        val operand = (plusPlus.operand as? UResolvable)?.resolve() as? PsiMethod
+        if (isK2) {
+            TestCase.assertEquals("getFoo", operand?.name)
+        } else {
+            TestCase.assertEquals("setFoo", operand?.name)
+        }
+
+        val plusPlusMulti = (plusPlus as UMultiResolvable).multiResolve()
+        val plusPlusMultiStrings = plusPlusMulti.map { it.element?.text ?: "<null>" }
+        assertContainsElements(
+            plusPlusMultiStrings,
+            "int getFoo() { return 42; }",
+            "void setFoo(int s) {}",
+        )
+    }
+
     fun checkResolveSyntheticJavaPropertyAccessor(myFixture: JavaCodeInsightTestFixture) {
         myFixture.addClass(
             """public class X {
@@ -1324,7 +1383,6 @@ interface UastResolveApiFixtureTestBase : UastPluginSelection {
         myFixture.checkIsMethodNameCanBeOneOf(listOf("invoke"))
     }
 
-
     fun checkIsMethodCallCanBeOneOfRegularMethod(myFixture: JavaCodeInsightTestFixture) {
         @Language("kotlin")
         val mainCode = """               
@@ -1365,7 +1423,7 @@ interface UastResolveApiFixtureTestBase : UastPluginSelection {
 
     private fun JavaCodeInsightTestFixture.checkIsMethodNameCanBeOneOf(names: Collection<String>) {
         var call: UCallExpression? = null
-        val uFile =  file.toUElement() as KotlinUFile
+        val uFile = file.toUElement() as KotlinUFile
         uFile.accept(
             object : AbstractUastVisitor() {
                 override fun visitCallExpression(node: UCallExpression): Boolean {
@@ -1383,6 +1441,33 @@ interface UastResolveApiFixtureTestBase : UastPluginSelection {
         TestCase.assertTrue(call is KotlinUFunctionCallExpression)
         val ktCall = call as KotlinUFunctionCallExpression
         TestCase.assertTrue("expected method name to be one of ${names}", ktCall.methodNameCanBeOneOf(names))
+    }
+
+    fun checkParentOfParameterOfCatchClause(myFixture: JavaCodeInsightTestFixture) {
+        myFixture.configureByText(
+            "main.kt", """
+                try {
+                } catch (exception : Exception) {
+                  println(exception)
+                }
+            """.trimIndent()
+        )
+
+        myFixture.file.toUElement()!!.accept(object : AbstractUastVisitor() {
+            private var catchClause: UCatchClause? = null
+
+            override fun visitCatchClause(node: UCatchClause): Boolean {
+                catchClause = node
+                return super.visitCatchClause(node)
+            }
+
+            override fun visitSimpleNameReferenceExpression(node: USimpleNameReferenceExpression): Boolean {
+                val resolved = node.resolve()?.toUElement()
+                TestCase.assertTrue(resolved?.uastParent is UCatchClause)
+                TestCase.assertEquals(catchClause, resolved)
+                return super.visitSimpleNameReferenceExpression(node)
+            }
+        })
     }
 
 }

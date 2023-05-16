@@ -61,9 +61,15 @@ public final class WelcomeScreenComponentFactory {
     String welcomeScreenLogoUrl = appInfo.getApplicationSvgIconUrl();
     if (welcomeScreenLogoUrl != null) {
       Icon icon = IconLoader.getIcon(welcomeScreenLogoUrl, WelcomeScreenComponentFactory.class.getClassLoader());
-      float scale = 28f / icon.getIconWidth();
-      Icon smallLogoIcon = IconUtil.scale(icon, null, scale);
-      JLabel logo = new JLabel(smallLogoIcon);
+      JLabel logo = new JLabel() {
+        @Override
+        public void updateUI() {
+          super.updateUI();
+          float scale = JBUIScale.scale(28f) / icon.getIconWidth();
+          Icon smallLogoIcon = IconUtil.scale(icon, null, scale);
+          setIcon(smallLogoIcon);
+        }
+      };
       logo.setBorder(JBUI.Borders.empty(29, 0, 27, 0));
       logo.setHorizontalAlignment(SwingConstants.CENTER);
       panel.add(logo, BorderLayout.WEST);
@@ -72,7 +78,7 @@ public final class WelcomeScreenComponentFactory {
     String applicationName = getAppName();
     JLabel appName = new JLabel(applicationName);
     appName.setForeground(JBColor.foreground());
-    appName.setFont(appName.getFont().deriveFont(Font.PLAIN));
+    appName.setFont(JBFont.create(appName.getFont().deriveFont(Font.PLAIN), false));
 
     ActionLink copyAbout = new ActionLink("", EmptyIcon.ICON_16, createCopyAboutAction());
     copyAbout.setHoveringIcon(AllIcons.Actions.Copy);

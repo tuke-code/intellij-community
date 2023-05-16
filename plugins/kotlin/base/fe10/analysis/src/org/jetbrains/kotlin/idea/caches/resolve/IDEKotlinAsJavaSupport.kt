@@ -2,7 +2,7 @@
 
 package org.jetbrains.kotlin.idea.caches.resolve
 
-import com.intellij.codeInsight.JavaLibraryModificationTracker
+import com.intellij.java.library.JavaLibraryModificationTracker
 import com.intellij.openapi.application.runReadAction
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.ModificationTracker
@@ -165,6 +165,10 @@ class IDEKotlinAsJavaSupport(project: Project) : KotlinAsJavaSupportBase<IdeaMod
 
     override fun findFilesForFacade(facadeFqName: FqName, searchScope: GlobalSearchScope): Collection<KtFile> = runReadAction {
         KotlinFileFacadeFqNameIndex[facadeFqName.asString(), project, searchScope].platformSourcesFirst()
+    }
+
+    override fun findFilesForScript(scriptFqName: FqName, searchScope: GlobalSearchScope): Collection<KtScript> = runReadAction {
+        KotlinScriptFqnIndex[scriptFqName.asString(), project, searchScope]
     }
 
     override fun getFakeLightClass(classOrObject: KtClassOrObject): KtFakeLightClass = KtDescriptorBasedFakeLightClass(classOrObject)

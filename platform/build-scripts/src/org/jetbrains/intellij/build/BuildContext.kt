@@ -1,8 +1,8 @@
 // Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.intellij.build
 
-import com.intellij.diagnostic.telemetry.use
-import com.intellij.diagnostic.telemetry.useWithScope2
+import com.intellij.platform.diagnostic.telemetry.impl.use
+import com.intellij.platform.diagnostic.telemetry.impl.useWithScope
 import io.opentelemetry.api.common.AttributeKey
 import io.opentelemetry.api.common.Attributes
 import io.opentelemetry.api.trace.Span
@@ -10,6 +10,8 @@ import io.opentelemetry.api.trace.SpanBuilder
 import kotlinx.collections.immutable.PersistentList
 import kotlinx.collections.immutable.PersistentMap
 import kotlinx.collections.immutable.persistentMapOf
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.serialization.Serializable
 import org.jetbrains.annotations.ApiStatus.Obsolete
 import org.jetbrains.intellij.build.TraceManager.spanBuilder
@@ -62,6 +64,17 @@ interface BuildContext : CompilationContext {
   var bootClassPathJarNames: PersistentList<String>
 
   /**
+   * Specifies name of Java class which should be used to start the IDE.
+   */
+  val ideMainClassName: String
+
+  /**
+   * Specifies whether the new modular loader should be used in the IDE distributions, see [ProductProperties.supportModularLoading] and
+   * [BuildOptions.useModularLoader].
+   */
+  val useModularLoader: Boolean
+  
+  /**
    * see BuildTasksImpl.buildProvidedModuleList
    */
   var builtinModule: BuiltinModulesFileData?
@@ -81,7 +94,7 @@ interface BuildContext : CompilationContext {
   fun patchInspectScript(path: Path)
 
   /**
-   * Unlike VM options produced by {@link org.jetbrains.intellij.build.impl.VmOptionsGenerator},
+   * Unlike VM options produced by [org.jetbrains.intellij.build.impl.VmOptionsGenerator],
    * these are hard-coded into launchers and aren't supposed to be changed by a user.
    */
   fun getAdditionalJvmArguments(os: OsFamily,
@@ -99,6 +112,10 @@ interface BuildContext : CompilationContext {
     proprietaryBuildTools.signTool.signFiles(files = files, context = this, options = options)
   }
 
+  val jetBrainsClientModuleFilter: JetBrainsClientModuleFilter
+  
+  val isEmbeddedJetBrainsClientEnabled: Boolean
+  
   fun shouldBuildDistributions(): Boolean
 
   fun shouldBuildDistributionForOS(os: OsFamily, arch: JvmArchitecture): Boolean
@@ -119,12 +136,12 @@ fun executeStepSync(context: BuildContext, stepMessage: String, stepId: String, 
   return true
 }
 
-suspend inline fun BuildContext.executeStep(spanBuilder: SpanBuilder, stepId: String, crossinline step: suspend (Span) -> Unit) {
+suspend inline fun BuildContext.executeStep(spanBuilder: SpanBuilder, stepId: String, crossinline step: suspend CoroutineScope.(Span) -> Unit) {
   if (isStepSkipped(stepId)) {
     spanBuilder.startSpan().addEvent("skip '$stepId' step").end()
   }
   else {
-    spanBuilder.useWithScope2(step)
+    spanBuilder.useWithScope(Dispatchers.IO, step)
   }
 }
 

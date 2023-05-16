@@ -16,27 +16,24 @@
 package org.jetbrains.idea.maven.project;
 
 import com.intellij.openapi.project.Project;
-import com.intellij.openapi.util.Pair;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.idea.maven.server.NativeMavenProjectHolder;
 import org.jetbrains.idea.maven.utils.MavenProcessCanceledException;
 import org.jetbrains.idea.maven.utils.MavenProgressIndicator;
 
 import java.util.Collection;
 
 public class MavenProjectsProcessorPluginsResolvingTask implements MavenProjectsProcessorTask {
-  private final @NotNull Collection<Pair<MavenProject, NativeMavenProjectHolder>> myMavenProjects;
-  private final @NotNull MavenProjectResolver myResolver;
+  private final @NotNull Collection<MavenProjectWithHolder> myMavenProjects;
+  private final @NotNull MavenPluginResolver myResolver;
 
-  public MavenProjectsProcessorPluginsResolvingTask(@NotNull Collection<Pair<MavenProject, NativeMavenProjectHolder>> projects,
-                                                    @NotNull MavenProjectResolver resolver) {
-    myMavenProjects = projects;
+  public MavenProjectsProcessorPluginsResolvingTask(@NotNull Collection<MavenProjectWithHolder> mavenProjects, MavenPluginResolver resolver) {
+    myMavenProjects = mavenProjects;
     myResolver = resolver;
   }
 
   @Override
   public void perform(Project project, MavenEmbeddersManager embeddersManager, MavenConsole console, MavenProgressIndicator indicator)
     throws MavenProcessCanceledException {
-    myResolver.resolvePlugins(myMavenProjects, embeddersManager, console, indicator, true, false);
+    myResolver.resolvePlugins(myMavenProjects, embeddersManager, console, indicator, true);
   }
 }

@@ -1,12 +1,11 @@
 // Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.openapi.application.rw
 
+import com.intellij.concurrency.ContextAwareRunnable
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.ModalityState
-import com.intellij.openapi.application.ReadAction.CannotReadException
 import com.intellij.openapi.application.ReadConstraint
 import com.intellij.openapi.application.ex.ApplicationEx
-import com.intellij.openapi.progress.Cancellation
 import com.intellij.openapi.progress.blockingContext
 import kotlinx.coroutines.*
 import kotlin.coroutines.coroutineContext
@@ -96,14 +95,8 @@ internal class InternalReadAction<T>(
       insideReadAction(loopJob)
     }
   }
-  catch (e: CancellationException) {
-    val cause = Cancellation.getCause(e)
-    if (cause is CannotReadException) {
-      ReadResult.WritePending
-    }
-    else {
-      throw e
-    }
+  catch (readCe: ReadCancellationException) {
+    ReadResult.WritePending
   }
 
   private fun insideReadAction(loopJob: Job): ReadResult<T> {
@@ -152,7 +145,7 @@ private suspend fun yieldUntilRun(schedule: (Runnable) -> Unit) {
   }
 }
 
-private class ResumeContinuationRunnable(continuation: CancellableContinuation<Unit>) : Runnable {
+private class ResumeContinuationRunnable(continuation: CancellableContinuation<Unit>) : ContextAwareRunnable {
 
   @Volatile
   private var myContinuation: CancellableContinuation<Unit>? = continuation

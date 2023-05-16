@@ -10,11 +10,14 @@ import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.application.contextModality
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.util.Computable
+import com.intellij.util.concurrency.annotations.RequiresBackgroundThread
+import com.intellij.util.concurrency.annotations.RequiresBlockingContext
 import kotlinx.coroutines.*
 import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.ApiStatus.Internal
 import kotlin.coroutines.ContinuationInterceptor
 import kotlin.coroutines.CoroutineContext
+import kotlin.coroutines.cancellation.CancellationException
 import kotlin.coroutines.coroutineContext
 
 private val LOG = Logger.getInstance("#com.intellij.openapi.progress")
@@ -102,12 +105,14 @@ suspend fun checkCancelled() {
  * ```
  *
  * @throws ProcessCanceledException if [current indicator][ProgressManager.getGlobalProgressIndicator] is cancelled
- * @throws CancellationException if [current job][Cancellation.currentJob] is cancelled
+ * or [current job][Cancellation.currentJob] is cancelled
  * @see coroutineToIndicator
  * @see blockingContext
  * @see blockingContextToIndicator
  * @see runBlocking
  */
+@RequiresBackgroundThread(generateAssertion = false)
+@RequiresBlockingContext
 fun <T> runBlockingCancellable(action: suspend CoroutineScope.() -> T): T {
   return runBlockingCancellable(allowOrphan = false, action)
 }
@@ -118,8 +123,13 @@ private fun <T> runBlockingCancellable(allowOrphan: Boolean, action: suspend Cor
     if (!allowOrphan && ctx[Job] == null) {
       LOG.error(IllegalStateException("There is no ProgressIndicator or Job in this thread, the current job is not cancellable."))
     }
-    @Suppress("RAW_RUN_BLOCKING")
-    runBlocking(ctx, action)
+    try {
+      @Suppress("RAW_RUN_BLOCKING")
+      runBlocking(ctx, action)
+    }
+    catch (ce: CancellationException) {
+      throw CeProcessCanceledException(ce)
+    }
   }
 }
 
@@ -133,6 +143,8 @@ private fun <T> runBlockingCancellable(allowOrphan: Boolean, action: suspend Cor
  * which makes inner [runBlockingCancellable] a child of the orphan job.
  */
 @Internal
+@RequiresBackgroundThread(generateAssertion = false)
+@RequiresBlockingContext
 fun <T> runBlockingMaybeCancellable(action: suspend CoroutineScope.() -> T): T {
   return runBlockingCancellable(allowOrphan = true, action)
 }
@@ -143,13 +155,19 @@ fun <T> runBlockingMaybeCancellable(action: suspend CoroutineScope.() -> T): T {
   "Use `runBlockingCancellable` instead."
 )
 @Internal
+@RequiresBlockingContext
 fun <T> indicatorRunBlockingCancellable(indicator: ProgressIndicator, action: suspend CoroutineScope.() -> T): T {
   assertBackgroundThreadOrWriteAction()
   return prepareIndicatorThreadContext(indicator) { ctx ->
     val context = ctx +
                   CoroutineName("indicator run blocking")
-    @Suppress("RAW_RUN_BLOCKING")
-    runBlocking(context, action)
+    try {
+      @Suppress("RAW_RUN_BLOCKING")
+      runBlocking(context, action)
+    }
+    catch (ce: CancellationException) {
+      throw CeProcessCanceledException(ce)
+    }
   }
 }
 
@@ -192,6 +210,9 @@ fun <T> blockingContext(currentContext: CoroutineContext, action: () -> T): T {
         throw IllegalStateException("JobCanceledException must be thrown by ProgressManager.checkCanceled()", e)
       }
       throw CurrentJobCancellationException(e)
+    }
+    catch (pce: ProcessCanceledException) {
+      throw PceCancellationException(pce)
     }
   }
 }
@@ -250,7 +271,7 @@ suspend fun <T> coroutineToIndicator(action: () -> T): T {
  * ```
  * launch {
  *   // inside a coroutine
- *   withBackgroundProgressIndicator(...) { // installs ProgressReporter into coroutine context
+ *   withBackgroundProgress(...) { // installs ProgressReporter into coroutine context
  *     ...
  *     readAction { // installs coroutine context as thread context
  *       ...
@@ -264,11 +285,12 @@ suspend fun <T> coroutineToIndicator(action: () -> T): T {
  *   }
  * }
  * ```
- * In the example, either `readAction` call or the whole action, which was passed into `withBackgroundProgressIndicator`,
+ * In the example, either `readAction` call or the whole action, which was passed into [withBackgroundProgress][com.intellij.openapi.progress.withBackgroundProgress],
  * should be wrapped into [withRawProgressReporter].
  * - If [RawProgressReporter] is found in the coroutine context, updates of the installed indicator are sent into the reporter.
  */
 @Internal
+@RequiresBlockingContext
 fun <T> blockingContextToIndicator(action: () -> T): T {
   val ctx = currentThreadContext()
   return contextToIndicator(ctx, action)
@@ -355,28 +377,8 @@ private fun assertBackgroundThreadOrWriteAction() {
   replaceWith = ReplaceWith("indicatorRunBlockingCancellable(indicator, action)"),
   level = DeprecationLevel.ERROR,
 )
+@RequiresBlockingContext
 fun <T> runBlockingCancellable(indicator: ProgressIndicator, action: suspend CoroutineScope.() -> T): T {
-  @Suppress("DEPRECATION")
-  return indicatorRunBlockingCancellable(indicator, action)
-}
-
-@ApiStatus.ScheduledForRemoval
-@Deprecated(
-  message = "Method was renamed",
-  replaceWith = ReplaceWith("runBlockingCancellable(action)"),
-  level = DeprecationLevel.ERROR,
-)
-fun <T> runSuspendingAction(action: suspend CoroutineScope.() -> T): T {
-  return runBlockingCancellable(action)
-}
-
-@ApiStatus.ScheduledForRemoval
-@Deprecated(
-  message = "Method was renamed",
-  replaceWith = ReplaceWith("runBlockingCancellable(indicator, action)"),
-  level = DeprecationLevel.ERROR,
-)
-fun <T> runSuspendingAction(indicator: ProgressIndicator, action: suspend CoroutineScope.() -> T): T {
   @Suppress("DEPRECATION")
   return indicatorRunBlockingCancellable(indicator, action)
 }

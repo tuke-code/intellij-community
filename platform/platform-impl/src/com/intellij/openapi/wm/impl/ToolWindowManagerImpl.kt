@@ -4,6 +4,7 @@
 
 package com.intellij.openapi.wm.impl
 
+import com.intellij.concurrency.ContextAwareRunnable
 import com.intellij.diagnostic.LoadingState
 import com.intellij.diagnostic.PluginException
 import com.intellij.icons.AllIcons
@@ -377,7 +378,7 @@ open class ToolWindowManagerImpl @NonInjectable @TestOnly internal constructor(
 
   private fun revalidateStripeButtons() {
     val buttonManagers = toolWindowPanes.values.mapNotNull { it.buttonManager as? ToolWindowPaneNewButtonManager }
-    ApplicationManager.getApplication().invokeLater({ buttonManagers.forEach { it.refreshUi() } }, project.disposed)
+    ApplicationManager.getApplication().invokeLater(ContextAwareRunnable { buttonManagers.forEach { it.refreshUi() } }, project.disposed)
   }
 
   internal fun createNotInHierarchyIterable(paneId: String): Iterable<Component> {
@@ -573,20 +574,6 @@ open class ToolWindowManagerImpl @NonInjectable @TestOnly internal constructor(
     dispatcher.addListener(listener)
   }
 
-  @ApiStatus.ScheduledForRemoval
-  @Deprecated("Use {@link ToolWindowManagerListener#TOPIC}", level = DeprecationLevel.ERROR,
-              replaceWith = ReplaceWith("project.messageBus.connect(parentDisposable).subscribe(ToolWindowManagerListener.TOPIC, listener)",
-                                                    "com.intellij.openapi.wm.ex.ToolWindowManagerListener"))
-  override fun addToolWindowManagerListener(listener: ToolWindowManagerListener, parentDisposable: Disposable) {
-    project.messageBus.connect(parentDisposable).subscribe(ToolWindowManagerListener.TOPIC, listener)
-  }
-
-  @ApiStatus.ScheduledForRemoval
-  @Deprecated("Use {@link ToolWindowManagerListener#TOPIC}", level = DeprecationLevel.ERROR)
-  override fun removeToolWindowManagerListener(listener: ToolWindowManagerListener) {
-    dispatcher.removeListener(listener)
-  }
-
   override fun activateEditorComponent() {
     EditorsSplitters.focusDefaultComponentInSplittersIfPresent(project)
   }
@@ -749,6 +736,8 @@ open class ToolWindowManagerImpl @NonInjectable @TestOnly internal constructor(
       .map { activeStack.peekPersistent(it).toolWindow }
       .filter { it.isAvailable }
   }
+
+  override fun isStripeButtonShow(toolWindow: ToolWindow): Boolean = idToEntry.get(toolWindow.id)?.stripeButton != null
 
   /**
    * @return windowed decorator for the tool window with specified `ID`.
@@ -1010,9 +999,7 @@ open class ToolWindowManagerImpl @NonInjectable @TestOnly internal constructor(
     return entry.toolWindow
   }
 
-  internal fun registerToolWindow(task: RegisterToolWindowTask,
-                                  buttonManager: ToolWindowButtonManager,
-                                  ensureToolWindowActionRegisteredIsNeeded: Boolean = true): ToolWindowEntry {
+  internal fun registerToolWindow(task: RegisterToolWindowTask, buttonManager: ToolWindowButtonManager): ToolWindowEntry {
     LOG.debug { "registerToolWindow($task)" }
 
     if (idToEntry.containsKey(task.id)) {
@@ -1025,7 +1012,7 @@ open class ToolWindowManagerImpl @NonInjectable @TestOnly internal constructor(
                          && stripeManager.allowToShowOnStripe(task.id, info == null, isNewUi)
     // do not create layout for New UI - button is not created for toolwindow by default
     if (info == null) {
-      info = layoutState.create(task, isNewUi = isNewUi)
+      info = layoutState.create(task)
       if (isButtonNeeded) {
         // we must allocate order - otherwise, on drag-n-drop, we cannot move some tool windows to the end
         // because sibling's order is equal to -1, so, always in the end
@@ -1077,9 +1064,7 @@ open class ToolWindowManagerImpl @NonInjectable @TestOnly internal constructor(
       }
     }
 
-    if (ensureToolWindowActionRegisteredIsNeeded) {
-      ActivateToolWindowAction.ensureToolWindowActionRegistered(toolWindow, ActionManager.getInstance())
-    }
+    ActivateToolWindowAction.ensureToolWindowActionRegistered(toolWindow, ActionManager.getInstance())
 
     val stripeButton = if (isButtonNeeded) {
       buttonManager.createStripeButton(toolWindow, infoSnapshot, task)
@@ -1114,6 +1099,8 @@ open class ToolWindowManagerImpl @NonInjectable @TestOnly internal constructor(
   }
 
   private fun isToolwindowOfBundledPlugin(task: RegisterToolWindowTask): Boolean {
+    if (ToolWindowId.BUILD_DEPENDENCIES == task.id) return true // platform toolwindow but registered dynamically
+
     val taskPlugin = task.pluginDescriptor
     if (taskPlugin != null) return taskPlugin.isBundled
 
@@ -1246,6 +1233,9 @@ open class ToolWindowManagerImpl @NonInjectable @TestOnly internal constructor(
         newLayout.addInfo(entry.id, old.copy())
       }
       else if (old != new) {
+        if (!entry.toolWindow.isAvailable) {
+          new.isVisible = false // Preserve invariants: if it can't be shown, don't consider it visible.
+        }
         list.add(LayoutData(old = old, new = new, entry = entry))
       }
     }
@@ -1256,8 +1246,20 @@ open class ToolWindowManagerImpl @NonInjectable @TestOnly internal constructor(
       return
     }
 
-    for (item in list) {
+    // Now, show/hide/dock/undock/rearrange tool windows and their stripe buttons.
+    val iterator = list.iterator()
+    while (iterator.hasNext()) {
+      val item = iterator.next()
+
+      // Apply the new info to all windows, including unavailable ones
+      // (so they're shown in their appropriate places if they ARE shown later by some user action).
       item.entry.applyWindowInfo(item.new)
+
+      // Then remove unavailable tool windows to exclude them from further processing.
+      if (!item.entry.toolWindow.isAvailable) {
+        iterator.remove()
+        continue
+      }
 
       if (item.old.isVisible && !item.new.isVisible) {
         updateStateAndRemoveDecorator(item.new, item.entry, dirtyMode = true)
@@ -1301,7 +1303,6 @@ open class ToolWindowManagerImpl @NonInjectable @TestOnly internal constructor(
     }
 
     // Now that the windows are shown/hidden/docked/whatever, we can adjust their sizes properly:
-
     for (item in list) {
       if (item.new.isVisible && item.new.isDocked) {
         val toolWindowPane = getToolWindowPane(item.entry.toolWindow)
@@ -1340,6 +1341,21 @@ open class ToolWindowManagerImpl @NonInjectable @TestOnly internal constructor(
     fireStateChanged(ToolWindowManagerEventType.SetLayout)
 
     checkInvariants(null)
+  }
+
+  override fun getMoreButtonSide() = state.moreButton
+
+  override fun setMoreButtonSide(side: ToolWindowAnchor) {
+    state.moreButton = side
+
+    if (isNewUi) {
+      for (pane in toolWindowPanes.values) {
+        val buttonManager = pane.buttonManager
+        if (buttonManager is ToolWindowPaneNewButtonManager) {
+          buttonManager.updateMoreButtons()
+        }
+      }
+    }
   }
 
   override fun invokeLater(runnable: Runnable) {
@@ -1449,7 +1465,7 @@ open class ToolWindowManagerImpl @NonInjectable @TestOnly internal constructor(
     val buttonManager = toolWindowPane.buttonManager as ToolWindowPaneNewButtonManager
     var button = buttonManager.getSquareStripeFor(entry.readOnlyWindowInfo.anchor).getButtonFor(options.toolWindowId)?.getComponent()
     if (button == null || !button.isShowing) {
-      button = (buttonManager.getSquareStripeFor(ToolWindowAnchor.LEFT) as? ToolWindowLeftToolbar)?.moreButton!!
+      button = buttonManager.getMoreButton(getMoreButtonSide())
       position = Balloon.Position.atLeft
     }
     val show = Runnable {

@@ -123,6 +123,16 @@ class KotlinUFunctionCallExpression(
         baseResolveProviderService.callKind(sourcePsi)
     }
 
+    override fun hasKind(expectedKind: UastCallKind): Boolean {
+        if (expectedKind == UastCallKind.NESTED_ARRAY_INITIALIZER
+            && !sourcePsi.isAnnotationArgument) {
+            // do not try to resolve arbitrary calls if we only need array initializer inside annotations
+            return false
+        }
+
+        return super.hasKind(expectedKind)
+    }
+
     override val receiver: UExpression? by lz {
         (uastParent as? UQualifiedReferenceExpression)?.let {
             if (it.selector == this) return@lz it.receiver
@@ -229,15 +239,17 @@ class KotlinUFunctionCallExpression(
      * ```
      * The call `collectAliasedNamesForName(ktFile, listOf("c")` will return `["foo"]`
      */
-    private fun collectAliasedNamesForName(ktFile: KtFile, actualNames: Collection<String>): Set<String> =
-        buildSet {
-            for (importDirective in ktFile.importDirectives) {
-                val importedName = importDirective.importedFqName?.pathSegments()?.lastOrNull()?.asString()
-                if (importedName in actualNames) {
-                    importDirective.aliasName?.let(::add)
-                }
+    private fun collectAliasedNamesForName(
+        ktFile: KtFile,
+        actualNames: Collection<String>,
+    ): Set<String> = buildSet {
+        for (importDirective in ktFile.importDirectives) {
+            val importedName = importDirective.importedFqName?.pathSegments()?.lastOrNull()?.asString() ?: continue
+            if (importedName in actualNames) {
+                importDirective.aliasName?.let(::add)
             }
         }
+    }
 
 
     private fun isMethodNameOneOfWithoutConsideringImportAliases(names: Collection<String>): Boolean {

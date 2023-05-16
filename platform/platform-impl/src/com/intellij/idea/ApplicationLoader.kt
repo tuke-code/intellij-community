@@ -2,6 +2,7 @@
 @file:JvmName("ApplicationLoader")
 @file:Internal
 @file:Suppress("RAW_RUN_BLOCKING")
+
 package com.intellij.idea
 
 import com.intellij.diagnostic.*
@@ -13,25 +14,31 @@ import com.intellij.ide.plugins.PluginManagerMain
 import com.intellij.ide.plugins.PluginSet
 import com.intellij.ide.ui.IconMapLoader
 import com.intellij.ide.ui.LafManager
+import com.intellij.ide.ui.UISettings
 import com.intellij.ide.util.PropertiesComponent
+import com.intellij.internal.statistic.collectors.fus.actions.persistence.ActionsEventLogGroup
+import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.application.*
 import com.intellij.openapi.application.ex.ApplicationEx
 import com.intellij.openapi.application.impl.ApplicationImpl
 import com.intellij.openapi.application.impl.RawSwingDispatcher
 import com.intellij.openapi.components.service
+import com.intellij.openapi.components.serviceAsync
 import com.intellij.openapi.components.stateStore
 import com.intellij.openapi.diagnostic.Logger
+import com.intellij.openapi.diagnostic.getOrLogException
 import com.intellij.openapi.editor.colors.EditorColorsManager
 import com.intellij.openapi.extensions.ExtensionPointName
 import com.intellij.openapi.extensions.PluginDescriptor
 import com.intellij.openapi.extensions.impl.ExtensionsAreaImpl
 import com.intellij.openapi.extensions.impl.findByIdOrFromInstance
 import com.intellij.openapi.fileTypes.FileTypeManager
-import com.intellij.openapi.progress.ProcessCanceledException
+import com.intellij.openapi.keymap.KeymapManager
 import com.intellij.openapi.projectRoots.ProjectJdkTable
 import com.intellij.openapi.util.IconLoader
 import com.intellij.openapi.util.SystemPropertyBean
 import com.intellij.openapi.util.io.OSAgnosticPathUtil
+import com.intellij.openapi.util.registry.RegistryManager
 import com.intellij.openapi.vfs.VirtualFileManager
 import com.intellij.openapi.vfs.newvfs.ManagingFS
 import com.intellij.openapi.vfs.pointers.VirtualFilePointerManager
@@ -87,32 +94,29 @@ private suspend fun doInitApplication(rawArgs: List<String>,
                            listenerCallbacks = null)
   }
 
-  val loadIconMapping = if (app.isHeadlessEnvironment) null else app.coroutineScope.launchAndMeasure("icon mapping loading") {
-    try {
-      service<IconMapLoader>().preloadIconMapping()
-    }
-    catch (e: CancellationException) {
-      throw e
-    }
-    catch (e: Throwable) {
-      LOG.error(e)
-    }
-  }
-
-  withContext(Dispatchers.IO) {
-    initConfigurationStore(app)
-  }
-
   coroutineScope {
+    val loadIconMapping = if (app.isHeadlessEnvironment) {
+      null
+    }
+    else {
+      launch(CoroutineName("icon mapping loading") + Dispatchers.Default) {
+        runCatching {
+          service<IconMapLoader>().preloadIconMapping()
+        }.getOrLogException(LOG)
+      }
+    }
+
+    initConfigurationStore(app)
+
     // LaF must be initialized before app init because icons maybe requested and, as a result,
     // a scale must be already initialized (especially important for Linux)
-    runActivity("init laf waiting") {
+    subtask("init laf waiting") {
       initLafJob.join()
     }
 
     euaTaskDeferred?.await()?.invoke()
 
-    // executed in the main scope
+    // executed in the main scope with a sequential dispatcher
     launch {
       loadIconMapping?.join()
       val lafManagerDeferred = launch(CoroutineName("laf initialization") + RawSwingDispatcher) {
@@ -136,6 +140,7 @@ private suspend fun doInitApplication(rawArgs: List<String>,
                           initAppActivity = initAppActivity,
                           pluginSet = pluginSet,
                           app = app,
+                          asyncScope = this,
                           deferredStarter = deferredStarter)
     }
   }
@@ -145,11 +150,27 @@ private suspend fun initApplicationImpl(args: List<String>,
                                         initAppActivity: Activity,
                                         pluginSet: PluginSet,
                                         app: ApplicationImpl,
+                                        asyncScope: CoroutineScope,
                                         deferredStarter: Deferred<ApplicationStarter>) {
   val appInitializedListeners = coroutineScope {
     preloadCriticalServices(app)
 
-    app.preloadServices(modules = pluginSet.getEnabledModules(), activityPrefix = "", syncScope = this, asyncScope = app.coroutineScope)
+    if (!app.isHeadlessEnvironment) {
+      asyncScope.launch {
+        subtask("UISettings preloading") { app.serviceAsync<UISettings>().join() }
+        subtask("KeymapManager preloading") { app.serviceAsync<KeymapManager>().join() }
+        subtask("ActionManager preloading") { app.serviceAsync<ActionManager>().join() }
+      }
+    }
+
+    app.preloadServices(modules = pluginSet.getEnabledModules(), activityPrefix = "", syncScope = this, asyncScope = asyncScope)
+
+    if (!app.isHeadlessEnvironment) {
+      asyncScope.launch(CoroutineName("FUS class preloading")) {
+        // preload FUS classes (IDEA-301206)
+        ActionsEventLogGroup.GROUP.id
+      }
+    }
 
     launch {
       initAppActivity.runChild("old component init task creating", app::createInitOldComponentsTask)?.let { loadComponentInEdtTask ->
@@ -162,20 +183,18 @@ private suspend fun initApplicationImpl(args: List<String>,
       StartUpMeasurer.setCurrentState(LoadingState.COMPONENTS_LOADED)
     }
 
-    runActivity("app init listener preload") {
+    subtask("app init listener preload") {
       getAppInitializedListeners(app)
     }
   }
 
-  val asyncScope = app.coroutineScope
-  coroutineScope {
-    initAppActivity.runChild("app initialized callback") {
-      callAppInitialized(appInitializedListeners, asyncScope)
-    }
-
-    // doesn't block app start-up
-    asyncScope.runPostAppInitTasks(app)
+  subtask("app initialized callback") {
+    // An async scope here is intended for FLOW. FLOW!!! DO NOT USE the surrounding main scope.
+    callAppInitialized(listeners = appInitializedListeners, asyncScope = app.coroutineScope)
   }
+
+  // doesn't block app start-up
+  asyncScope.runPostAppInitTasks(app)
 
   initAppActivity.end()
 
@@ -216,6 +235,20 @@ fun CoroutineScope.preloadCriticalServices(app: ApplicationImpl) {
     launch { app.getServiceAsyncIfDefined(LocalHistory::class.java) }
   }
   launch {
+    // required for any persistence state component (pathMacroSubstitutor.expandPaths), so, preload
+    app.serviceAsync<PathMacros>().join()
+
+    launch {
+      app.serviceAsync<RegistryManager>().join()
+      // wants RegistryManager
+      if (!app.isHeadlessEnvironment) {
+        app.serviceAsync<PerformanceWatcher>().join()
+        // cache it (CachedSingletonsRegistry is used,
+        // and IdeEventQueue should use loaded PerformanceWatcher service as soon as it is ready)
+        PerformanceWatcher.getInstance()
+      }
+    }
+
     // required for indexing tasks (see JavaSourceModuleNameIndex for example)
     // FileTypeManager by mistake uses PropertiesComponent instead of own state - it should be fixed someday
     app.getServiceAsync(PropertiesComponent::class.java).join()
@@ -396,16 +429,11 @@ fun findStarter(key: String): ApplicationStarter? {
 fun initConfigurationStore(app: ApplicationImpl) {
   var activity = StartUpMeasurer.startActivity("beforeApplicationLoaded")
   val configPath = PathManager.getConfigDir()
+
   for (listener in ApplicationLoadListener.EP_NAME.lazySequence()) {
-    try {
-      (listener ?: break).beforeApplicationLoaded(app, configPath)
-    }
-    catch (e: ProcessCanceledException) {
-      throw e
-    }
-    catch (e: Throwable) {
-      LOG.error(e)
-    }
+    runCatching {
+      listener.beforeApplicationLoaded(app, configPath)
+    }.getOrLogException(LOG)
   }
 
   activity = activity.endAndStart("init app store")

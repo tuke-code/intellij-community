@@ -4,6 +4,7 @@ package com.intellij.openapi.vfs.newvfs.persistent;
 import com.intellij.openapi.util.IntRef;
 import com.intellij.openapi.util.io.BufferExposingByteArrayOutputStream;
 import com.intellij.openapi.util.io.ByteArraySequence;
+import com.intellij.openapi.util.io.FileUtil;
 import com.intellij.openapi.vfs.newvfs.AttributeInputStream;
 import com.intellij.openapi.vfs.newvfs.AttributeOutputStream;
 import com.intellij.openapi.vfs.newvfs.AttributeOutputStreamBase;
@@ -21,16 +22,18 @@ import org.jetbrains.annotations.VisibleForTesting;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
+import static com.intellij.openapi.vfs.newvfs.persistent.AbstractAttributesStorage.checkAttributeValueSize;
+
 /**
- *
+ * Attribute storage implemented on the top of {@link StreamlinedBlobStorage}
  */
 public class AttributesStorageOverBlobStorage implements AbstractAttributesStorage {
   public static final int MAX_ATTRIBUTE_ID = Byte.MAX_VALUE;
+
   //Persistent format (see AttributesRecord/AttributeEntry):
   //  Storage := (AttributeDirectoryRecord | AttributeDedicatedRecord)*
   //
@@ -263,7 +266,7 @@ public class AttributesStorageOverBlobStorage implements AbstractAttributesStora
   }
 
   public static boolean deleteStorageFiles(final Path file) throws IOException {
-    return Files.deleteIfExists(file);
+    return FileUtil.delete(file.toFile());
   }
 
   /**
@@ -671,16 +674,20 @@ public class AttributesStorageOverBlobStorage implements AbstractAttributesStora
     @Override
     public void close() throws IOException {
       super.close();
+
+      final BufferExposingByteArrayOutputStream attributeValueHolder = (BufferExposingByteArrayOutputStream)out;
+      final int attributeValueSize = attributeValueHolder.size();
+      checkAttributeValueSize(attribute, attributeValueSize);
+
       lock.writeLock().lock();
       try {
         final int encodedAttributeId = connection.getAttributeId(attribute.getId());
         final int attributesRecordId = connection.getRecords().getAttributeRecordId(fileId);
-        final BufferExposingByteArrayOutputStream valueHolder = (BufferExposingByteArrayOutputStream)out;
 
         final int updatedAttributesRecordId = updateAttribute(
           attributesRecordId,
           fileId, encodedAttributeId,
-          valueHolder.getInternalBuffer(), valueHolder.size()
+          attributeValueHolder.getInternalBuffer(), attributeValueSize
         );
 
         if (updatedAttributesRecordId != attributesRecordId) {

@@ -149,7 +149,7 @@ class IdeEventQueue private constructor() : EventQueue() {
    *
    * @apiNote be careful with this method. It may run `runnable` synchronously in the context of the current thread, or may queue
    * runnable until the focus events queue is empty. In the latter case, runnable is going to be run while processing the last focus
-   * event from the queue, without any context, e.g. outside the write-safe context. Consider using safer [IdeFocusManager.doWhenFocusSettlesDown]
+   * event from the queue, without any context, e.g., outside the write-safe context. Consider using safer [IdeFocusManager.doWhenFocusSettlesDown]
    */
   fun executeWhenAllFocusEventsLeftTheQueue(runnable: Runnable) {
     ifFocusEventsInTheQueue(
@@ -211,12 +211,14 @@ class IdeEventQueue private constructor() : EventQueue() {
   @Suppress("DeprecatedCallableAddReplaceWith")
   @Deprecated("Use IdleFlow and coroutines")
   fun addIdleListener(runnable: Runnable, timeoutMillis: Int) {
+    @Suppress("DEPRECATION")
     IdleTracker.getInstance().addIdleListener(runnable = runnable, timeoutMillis = timeoutMillis)
   }
 
   @Suppress("DeprecatedCallableAddReplaceWith")
   @Deprecated("Use IdleFlow and coroutines")
   fun removeIdleListener(runnable: Runnable) {
+    @Suppress("DEPRECATION")
     IdleTracker.getInstance().removeIdleListener(runnable)
   }
 
@@ -268,7 +270,7 @@ class IdeEventQueue private constructor() : EventQueue() {
 
     // DO NOT ADD ANYTHING BEFORE fixNestedSequenceEvent is called
     val startedAt = System.currentTimeMillis()
-    val performanceWatcher = PerformanceWatcher.getInstanceOrNull()
+    val performanceWatcher = PerformanceWatcher.getInstanceIfCreated()
     val eventWatcher = EventWatcher.getInstanceOrNull()
     try {
       performanceWatcher?.edtEventStarted()
@@ -486,7 +488,7 @@ class IdeEventQueue private constructor() : EventQueue() {
    * @param e event to be patched
    * @return new 'patched' event if you need, otherwise null
    *
-   * Note: As side effect this method tracks a special flag for 'Windows' key state that is valuable on itself
+   * Note: As a side effect, this method tracks a special flag for 'Windows' key state that is valuable in itself
    */
   private fun mapMetaState(e: AWTEvent): AWTEvent? {
     if (winMetaPressed) {
@@ -728,7 +730,7 @@ class IdeEventQueue private constructor() : EventQueue() {
   private val isReady: Boolean
     get() = !keyboardBusy && keyEventDispatcher.isReady
 
-  fun maybeReady() {
+  internal fun maybeReady() {
     if (ready.isNotEmpty() && isReady) {
       invokeReadyHandlers()
     }
@@ -800,7 +802,7 @@ class IdeEventQueue private constructor() : EventQueue() {
       }
     }
     if (event is InvocationEvent && !isCurrentlyUnderLocalId) {
-      // only do wrapping trickery with non-local events to preserve correct behaviour -
+      // only do wrapping trickery with non-local events to preserve correct behavior -
       // local events will get dispatched under local ID anyway
       val clientId = current
       super.postEvent(InvocationEvent(event.getSource()) { withClientId(clientId).use { dispatchEvent(event) } })
@@ -838,7 +840,7 @@ class IdeEventQueue private constructor() : EventQueue() {
     //addDispatcher(new UIMouseTracker(), null);
     abracadabraDaberBoreh()
     if (SystemProperties.getBooleanProperty("skip.move.resize.events", true)) {
-      postEventListeners.add(::skipMoveResizeEvents)
+      postEventListeners.add { skipMoveResizeEvents(it) } // hot path, do not use method reference
     }
   }
 
@@ -898,6 +900,7 @@ typealias PostEventHook = (event: AWTEvent) -> Boolean
 
 private val DISPATCHER_EP = ExtensionPointName<IdeEventQueue.EventDispatcher>("com.intellij.ideEventQueueDispatcher")
 
+@Suppress("ConstPropertyName")
 private const val defaultEventWithWrite = true
 
 private val isSkipMetaPressOnLinux = java.lang.Boolean.getBoolean("keymap.skip.meta.press.on.linux")
@@ -1107,6 +1110,14 @@ private object SequencedEventNestedFieldHolder {
       .findVirtual(SEQUENCED_EVENT_CLASS, "dispose", MethodType.methodType(Void.TYPE))
   }
 }
+
+/**
+ * This should've been an item in [IdeEventQueue.dispatchers],
+ * but [IdeEventQueue.dispatchByCustomDispatchers] is run after [IdePopupManager.dispatch]
+ * and after [processAppActivationEvent], which defeats the very purpose of this flag.
+ */
+@Internal
+internal var skipWindowDeactivationEvents: Boolean = false
 
 // we have to stop editing with <ESC> (if any) and consume the event to prevent any further processing (dialog closing etc.)
 private class EditingCanceller : IdeEventQueue.EventDispatcher {

@@ -7,18 +7,17 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
 
-public class TestAssertionFailure implements Failure {
+public class TestAssertionFailure extends TestFailure {
 
-  private final @NotNull @Nls String message;
-  private final @Nullable @Nls String description;
-  private final @NotNull List<Failure> causes;
   private final @NotNull String expectedText;
   private final @NotNull String actualText;
   private final @Nullable String expectedFile;
   private final @Nullable String actualFile;
 
   public TestAssertionFailure(
-    @NotNull @Nls String message,
+    @Nullable String exceptionName,
+    @Nullable @Nls String message,
+    @Nullable @Nls String stackTrace,
     @Nullable @Nls String description,
     @NotNull List<Failure> causes,
     @NotNull String expectedText,
@@ -26,28 +25,23 @@ public class TestAssertionFailure implements Failure {
     @Nullable String expectedFile,
     @Nullable String actualFile
   ) {
-    this.message = message;
-    this.description = description;
-    this.causes = causes;
+    super(exceptionName, message, stackTrace, description, causes, false);
     this.expectedText = expectedText;
     this.actualText = actualText;
     this.expectedFile = expectedFile;
     this.actualFile = actualFile;
   }
 
-  @Override
-  public @NotNull @Nls String getMessage() {
-    return message;
-  }
-
-  @Override
-  public @Nullable @Nls String getDescription() {
-    return description;
-  }
-
-  @Override
-  public @NotNull List<? extends Failure> getCauses() {
-    return causes;
+  public TestAssertionFailure(
+    @Nullable String exceptionName,
+    @Nullable @Nls String message,
+    @Nullable @Nls String stackTrace,
+    @Nullable @Nls String description,
+    @NotNull List<Failure> causes,
+    @NotNull String expectedText,
+    @NotNull String actualText
+  ) {
+    this(exceptionName, message, stackTrace, description, causes, expectedText, actualText, null, null);
   }
 
   public @NotNull String getExpectedText() {

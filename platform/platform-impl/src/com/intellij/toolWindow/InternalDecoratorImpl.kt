@@ -1,6 +1,7 @@
-// Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.toolWindow
 
+import com.intellij.accessibility.AccessibilityUtils
 import com.intellij.ide.IdeBundle
 import com.intellij.openapi.actionSystem.ActionGroup
 import com.intellij.openapi.actionSystem.AnAction
@@ -44,6 +45,7 @@ import java.awt.*
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
 import javax.accessibility.AccessibleContext
+import javax.accessibility.AccessibleRole
 import javax.swing.*
 import javax.swing.border.Border
 
@@ -517,7 +519,8 @@ class InternalDecoratorImpl internal constructor(
   fun updateActiveAndHoverState() {
     val isHoverAlphaAnimationEnabled =
       toolWindow.toolWindowManager.isNewUi &&
-      !AdvancedSettings.getBoolean("ide.always.show.tool.window.header.icons")
+      !AdvancedSettings.getBoolean("ide.always.show.tool.window.header.icons") &&
+      toolWindow.component.getClientProperty(ToolWindowContentUi.DONT_HIDE_TOOLBAR_IN_HEADER) != true
     val narrow = this.toolWindow.decorator?.width?.let { it < JBUI.scale(120) } ?: false
     val isVisible = narrow || !isHoverAlphaAnimationEnabled || isWindowHovered || header.isPopupShowing || toolWindow.isActive
 
@@ -734,6 +737,10 @@ class InternalDecoratorImpl internal constructor(
                ((toolWindow.title?.takeIf(String::isNotEmpty) ?: toolWindow.stripeTitle).takeIf(String::isNotEmpty) ?: toolWindow.id)
                + " " + IdeBundle.message("internal.decorator.accessible.postfix")
                 )
+    }
+
+    override fun getAccessibleRole(): AccessibleRole {
+      return AccessibilityUtils.GROUPED_ELEMENTS
     }
   }
 }

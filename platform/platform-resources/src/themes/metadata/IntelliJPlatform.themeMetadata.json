@@ -105,6 +105,14 @@
       "description": "Used in tool buttons bars and the navigation bar"
     },
     {
+      "key": "Button.Split.default.separatorColor",
+      "description": "Separator color for default split button"
+    },
+    {
+      "key": "Button.Split.default.iconColor",
+      "description": "Chevron arrow color for default split button"
+    },
+    {
       "key": "ComboPopup.border",
       "description": "Combo box drop-down menu. Format: \"top, left, bottom, right, hex\", e.g. “1,1,1,1,FFFFFF\". Size in pixels"
     },
@@ -535,6 +543,21 @@
     {
       "key": "GotItTooltip.linkForeground",
       "description": "GotIt tooltip link foreground color if different from Link.activeForeground"
+    },
+    {
+      "key": "GotItTooltip.codeForeground",
+      "description": "GotIt tooltip inline code element foreground color if different from GotItTooltip.foreground",
+      "since": "2023.1.1"
+    },
+    {
+      "key": "GotItTooltip.codeBackground",
+      "description": "GotIt tooltip inline code element background color if different from GotItTooltip.background",
+      "since": "2023.1.1"
+    },
+    {
+      "key": "GotItTooltip.codeBorderColor",
+      "description": "GotIt tooltip inline code element border color if different from GotItTooltip.shortcutBackground",
+      "since": "2023.1.1"
     },
     {
       "key": "GotItTooltip.stepForeground",
@@ -998,6 +1021,14 @@
     },
     {
       "key": "Plugins.ScreenshotPagination.CurrentImage.fillColor"
+    },
+    {
+      "key": "Plugins.suggestedLabelBackground"
+    },
+    {
+      "key": "ProgressIcon.color",
+      "description": "Color of the spinning icon",
+      "since": "2022.1"
     },
     {
       "key": "ComplexPopup.Header.background",
@@ -1854,6 +1885,11 @@
       "since": "2021.2"
     },
     {
+      "key": "Tooltip.Learning.codeBorderColor",
+      "description": "Inline code elements border color for tooltips used in lessons",
+      "since": "2023.1.1"
+    },
+    {
       "key": "Tooltip.Learning.spanBackground",
       "description": "Background for buttons and shortcuts used in lesson tooltips",
       "since": "2021.2"
@@ -1913,8 +1949,13 @@
     },
     {
       "key": "RunWidget.foreground",
-      "description": "Foreground for run widget components and stroke icons on the contrast background",
+      "description": "Foreground for run widget components",
       "since": "2022.3"
+    },
+    {
+      "key": "RunWidget.iconColor",
+      "description": "Color for non-debug/stop icons like More Actions or spinning icon",
+      "since": "2023.2"
     },
     {
       "key": "RunWidget.disabledForeground",
@@ -1934,6 +1975,11 @@
       "since": "2022.3"
     },
     {
+      "key": "RunWidget.runningIconColor",
+      "description": "Color for icons like stop/re-run in the running state",
+      "since": "2023.2"
+    },
+    {
       "key": "RunWidget.hoverBackground",
       "description": "Background for hover state in run widget. Will be applied over RunWidget.background or RunWidget.runningBackground.",
       "since": "2022.3"
@@ -1950,8 +1996,8 @@
       "deprecated": true
     },
     {
-      "key": "RunWidget.runModeIconColor",
-      "description": "The non-running state color for stroke icons in the non-contrast run widget",
+      "key": "RunWidget.runIconColor",
+      "description": "Color for icons like debug/run in the non-running state",
       "since": "2023.1"
     },
     {
@@ -1985,6 +2031,9 @@
     },
     {
       "key": "MainWindow.Tab.borderColor"
+    },
+    {
+      "key": "MainWindow.FullScreeControl.Background"
     }
   ]
 }

@@ -1,6 +1,7 @@
 // Copyright 2000-2021 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
 package com.intellij.openapi.ui.popup.util;
 
+import com.intellij.codeWithMe.ClientId;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.actionSystem.ActionButtonComponent;
 import com.intellij.openapi.actionSystem.AnActionEvent;
@@ -19,6 +20,7 @@ import com.intellij.ui.ExperimentalUI;
 import com.intellij.ui.awt.RelativePoint;
 import com.intellij.ui.popup.list.SelectablePanel;
 import com.intellij.util.ReflectionUtil;
+import com.intellij.util.ui.JBEmptyBorder;
 import com.intellij.util.ui.JBInsets;
 import com.intellij.util.ui.JBUI;
 import com.intellij.util.ui.UIUtil;
@@ -33,6 +35,7 @@ import java.awt.*;
 import java.awt.event.ComponentEvent;
 import java.awt.event.InputEvent;
 import java.lang.ref.WeakReference;
+import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 
 public final class PopupUtil {
@@ -91,6 +94,11 @@ public final class PopupUtil {
 
   public static int getPopupType(@NotNull final PopupFactory factory) {
     try {
+      if (!ClientId.isCurrentlyUnderLocalId()) {
+        final Field field = PopupFactory.class.getDeclaredField("HEAVY_WEIGHT_POPUP");
+        field.setAccessible(true);
+        return (Integer)field.get(null);
+      }
       final Method method = PopupFactory.class.getDeclaredMethod("getPopupType");
       method.setAccessible(true);
       final Object result = method.invoke(factory);
@@ -220,10 +228,10 @@ public final class PopupUtil {
   }
 
   public static Border createComplexPopupTextFieldBorder() {
-    return JBUI.Borders.compound(new EmptyBorder(JBUI.CurrentTheme.ComplexPopup.textFieldBorderInsets()),
+    return JBUI.Borders.compound(new JBEmptyBorder(JBUI.CurrentTheme.ComplexPopup.textFieldBorderInsets().getUnscaled()),
                                  JBUI.Borders.customLine(JBUI.CurrentTheme.CustomFrameDecorations.separatorForeground(), 0, 0,
                                                          JBUI.CurrentTheme.ComplexPopup.TEXT_FIELD_SEPARATOR_HEIGHT, 0),
-                                 new EmptyBorder(JBUI.CurrentTheme.ComplexPopup.textFieldInputInsets()));
+                                 new JBEmptyBorder(JBUI.CurrentTheme.ComplexPopup.textFieldInputInsets().getUnscaled()));
   }
 
   public static void applyNewUIBackground(@Nullable Component component) {
@@ -233,15 +241,13 @@ public final class PopupUtil {
   }
 
   public static Border getComplexPopupHorizontalHeaderBorder() {
-    Insets headerInsets = JBUI.CurrentTheme.ComplexPopup.headerInsets();
-    //noinspection UseDPIAwareBorders
-    return new EmptyBorder(0, headerInsets.left, 0, headerInsets.right);
+    Insets headerInsets = JBUI.CurrentTheme.ComplexPopup.headerInsets().getUnscaled();
+    return new JBEmptyBorder(0, headerInsets.left, 0, headerInsets.right);
   }
 
   public static Border getComplexPopupVerticalHeaderBorder() {
-    Insets headerInsets = JBUI.CurrentTheme.ComplexPopup.headerInsets();
-    //noinspection UseDPIAwareBorders
-    return new EmptyBorder(headerInsets.top, 0, headerInsets.bottom, 0);
+    Insets headerInsets = JBUI.CurrentTheme.ComplexPopup.headerInsets().getUnscaled();
+    return new JBEmptyBorder(headerInsets.top, 0, headerInsets.bottom, 0);
   }
 
   public static void configListRendererFixedHeight(SelectablePanel selectablePanel) {

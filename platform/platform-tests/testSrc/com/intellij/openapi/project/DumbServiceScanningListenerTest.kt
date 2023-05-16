@@ -4,25 +4,26 @@ package com.intellij.openapi.project
 import com.intellij.openapi.components.service
 import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.progress.impl.ProgressSuspender
-import com.intellij.testFramework.ProjectExtension
-import com.intellij.testFramework.junit5.TestApplication
+import com.intellij.testFramework.ProjectRule
 import com.intellij.util.SystemProperties
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
-import org.junit.jupiter.api.AfterEach
-import org.junit.jupiter.api.Assertions.*
-import org.junit.jupiter.api.BeforeEach
-import org.junit.jupiter.api.extension.RegisterExtension
-import org.junit.jupiter.api.fail
-import org.junit.jupiter.params.ParameterizedTest
-import org.junit.jupiter.params.provider.ValueSource
+import org.junit.After
+import org.junit.Before
+import org.junit.ClassRule
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.junit.runners.JUnit4
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
+import kotlin.test.assertEquals
+import kotlin.test.assertNull
+import kotlin.test.fail
 
 
-@TestApplication
+@RunWith(JUnit4::class)
 class DumbServiceScanningListenerTest {
   private val ignoreHeadlessKey: String = "intellij.progress.task.ignoreHeadless"
   private val forceDumbQueueTaskKey: String = "idea.force.dumb.queue.tasks"
@@ -32,12 +33,12 @@ class DumbServiceScanningListenerTest {
   private val cs = CoroutineScope(Dispatchers.IO + Job())
 
   companion object {
+    @ClassRule
     @JvmField
-    @RegisterExtension
-    val p = ProjectExtension(runPostStartUpActivities = false, preloadServices = false)
+    val p = ProjectRule(runPostStartUpActivities = false, preloadServices = false)
   }
 
-  @BeforeEach
+  @Before
   fun setUp() {
     prevIgnoreHeadlessVal = SystemProperties.setProperty(ignoreHeadlessKey, "true")
     prevForceDumbQueueTaskVal = SystemProperties.setProperty(forceDumbQueueTaskKey, "true")
@@ -45,16 +46,24 @@ class DumbServiceScanningListenerTest {
     project.service<DumbService>().waitForSmartMode()
   }
 
-  @AfterEach
+  @After
   fun tearDown() {
     cs.cancel("End of test")
     SystemProperties.setProperty(ignoreHeadlessKey, prevIgnoreHeadlessVal)
     SystemProperties.setProperty(forceDumbQueueTaskKey, prevForceDumbQueueTaskVal)
   }
 
-  @ParameterizedTest(name = "With initial scanning state = {0}")
-  @ValueSource(booleans = [true, false])
-  fun `test dumb service suspends when listener started in different initial scanning states`(initialScanningRunState: Boolean) {
+  @Test
+  fun `test dumb service suspends when listener started in state (false)`() {
+    `test dumb service suspends when listener started in state`(false)
+  }
+
+  @Test
+  fun `test dumb service suspends when listener started in state (true)`() {
+    `test dumb service suspends when listener started in state`(true)
+  }
+
+  private fun `test dumb service suspends when listener started in state`(initialScanningRunState: Boolean) {
     val listener = DumbServiceScanningListener(project, cs)
     val tc = DumbServiceScanningListener.TestCompanion(listener)
     val scanningState = MutableStateFlow(initialScanningRunState)
@@ -79,22 +88,32 @@ class DumbServiceScanningListenerTest {
 
     dumbTaskStarted.awaitOrThrow(1, "Dumb task didn't start")
 
-    Thread.sleep(10) // this is for our test to update isPaused in background thread
-    assertFalse(isPaused.get(), "Listener is not active yet. Should be resumed.")
+    waitOneSecondOrFail("Listener is not active yet. Should be resumed.") { !isPaused.get() }
 
     tc.subscribe(scanningState)
 
-    Thread.sleep(10) // this is for our test to update isPaused in background thread
     assertEquals(initialScanningRunState, scanningState.value, "Sanity")
-    assertEquals(initialScanningRunState, isPaused.get(), "Listener should respect initialScanningRunState after subscription")
+    waitOneSecondOrFail("Listener should respect initialScanningRunState after subscription (expected: $initialScanningRunState)") {
+      isPaused.get() == initialScanningRunState
+    }
 
     repeat(10) {
       scanningState.value = !scanningState.value
-      Thread.sleep(10) // this is for our test to update isPaused in background thread
-      assertEquals(scanningState.value, isPaused.get(), "Should respect current scanning state after change")
+      waitOneSecondOrFail("Should respect current scanning state after change (expected: ${scanningState.value})") {
+        isPaused.get() == scanningState.value
+      }
     }
 
     assertNull(exception.get())
+  }
+
+  private fun waitOneSecondOrFail(message: String, condition: () -> Boolean) {
+    repeat(1000 / 10) {
+      if (condition()) return
+      else Thread.sleep(10)
+    }
+
+    fail(message)
   }
 
   private fun CountDownLatch.awaitOrThrow(seconds: Long, message: String) {

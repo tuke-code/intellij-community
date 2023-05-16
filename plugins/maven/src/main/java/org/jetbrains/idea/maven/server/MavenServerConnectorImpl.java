@@ -128,7 +128,6 @@ public class MavenServerConnectorImpl extends MavenServerConnectorBase {
       () -> {
         try {
           List<DownloadArtifactEvent> artifactEvents = listener.pull();
-          if (artifactEvents == null) return;
           for (DownloadArtifactEvent e : artifactEvents) {
             ApplicationManager.getApplication().getMessageBus().syncPublisher(DOWNLOAD_LISTENER_TOPIC).artifactDownloaded(new File(e.getFile()), e.getPath());
           }
@@ -155,7 +154,6 @@ public class MavenServerConnectorImpl extends MavenServerConnectorBase {
       () -> {
         try {
           List<ServerLogEvent> logEvents = logger.pull();
-          if (logEvents == null) return;
           for (ServerLogEvent e : logEvents) {
             switch (e.getType()) {
               case PRINT, INFO -> MavenLog.LOG.info(e.getMessage());

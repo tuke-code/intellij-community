@@ -1,8 +1,12 @@
 // Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.plugins.gradle.service.execution;
 
+import com.intellij.execution.ExecutionException;
 import com.intellij.execution.configurations.GeneralCommandLine;
 import com.intellij.execution.target.TargetEnvironmentConfiguration;
+import com.intellij.execution.target.TargetProgressIndicator;
+import com.intellij.execution.target.local.LocalTargetEnvironment;
+import com.intellij.execution.target.local.LocalTargetEnvironmentRequest;
 import com.intellij.openapi.application.Application;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.PathManager;
@@ -24,6 +28,7 @@ import com.intellij.openapi.util.io.FileUtilRt;
 import com.intellij.openapi.util.registry.Registry;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.openapi.vfs.VfsUtil;
+import com.intellij.task.RunConfigurationTaskState;
 import com.intellij.util.*;
 import com.intellij.util.containers.ContainerUtil;
 import com.intellij.util.containers.MultiMap;
@@ -51,6 +56,8 @@ import org.jetbrains.plugins.gradle.settings.GradleExecutionSettings;
 import org.jetbrains.plugins.gradle.util.GradleConstants;
 import org.jetbrains.plugins.gradle.util.GradleUtil;
 import org.jetbrains.plugins.gradle.util.cmd.node.GradleCommandLine;
+import org.jetbrains.plugins.gradle.util.cmd.node.GradleCommandLineOption;
+import org.jetbrains.plugins.gradle.util.cmd.node.GradleCommandLineTask;
 
 import java.awt.geom.IllegalPathStateException;
 import java.io.File;
@@ -187,6 +194,7 @@ public class GradleExecutionHelper {
         propertiesFixes.put("user.dir", projectDir);
       }
       propertiesFixes.put("java.system.class.loader", null);
+      propertiesFixes.put("jna.noclasspath", null);
       return propertiesFixes;
     }
   }
@@ -298,7 +306,7 @@ public class GradleExecutionHelper {
     File fileWithPathToProperties = new File(wrapperFilesLocation, "path.tmp");
 
     var initScriptFile = GradleInitScriptUtil.createWrapperInitScript(gradleVersion, jarFile, scriptFile, fileWithPathToProperties);
-    settings.withArguments(GradleConstants.INIT_SCRIPT_CMD_OPTION, initScriptFile.getAbsolutePath());
+    settings.withArguments(GradleConstants.INIT_SCRIPT_CMD_OPTION, initScriptFile.toString());
 
     return () -> FileUtil.loadFileOrNull(fileWithPathToProperties);
   }
@@ -436,7 +444,11 @@ public class GradleExecutionHelper {
     @NotNull List<String> tasksAndArguments,
     @NotNull GradleExecutionSettings settings
   ) {
-    var commandLine = GradleTestExecutionUtil.parseCommandLine(tasksAndArguments, settings.getArguments());
+    var commandLine = GradleCommandLineUtil.parseCommandLine(
+      tasksAndArguments,
+      settings.getArguments()
+    );
+    commandLine = fixUpGradleCommandLine(commandLine);
 
     LOG.info("Passing command-line to Gradle Tooling API: " +
              StringUtil.join(obfuscatePasswordParameters(commandLine.getTokens()), " "));
@@ -445,15 +457,30 @@ public class GradleExecutionHelper {
       setupTestLauncherArguments(testLauncher, commandLine);
     }
     else if (operation instanceof BuildLauncher buildLauncher) {
-      setupBuildLauncherArguments(buildLauncher, commandLine, isTestExecForced(settings));
+      setupBuildLauncherArguments(buildLauncher, commandLine, settings.isRunAsTest());
     }
     else {
       operation.withArguments(commandLine.getTokens());
     }
   }
 
-  private static boolean isTestExecForced(@NotNull GradleExecutionSettings settings) {
-    return ObjectUtils.chooseNotNull(settings.getUserData(GradleConstants.FORCE_TEST_EXECUTION), false);
+  private static @NotNull GradleCommandLine fixUpGradleCommandLine(@NotNull GradleCommandLine commandLine) {
+    var tasks = new ArrayList<GradleCommandLineTask>();
+    for (var task : commandLine.getTasks()) {
+      var name = task.getName();
+      var options = ContainerUtil.filter(task.getOptions(), it -> !isWildcardTestPattern(it));
+      tasks.add(new GradleCommandLineTask(name, options));
+    }
+    return new GradleCommandLine(tasks, commandLine.getOptions());
+  }
+
+  private static boolean isWildcardTestPattern(@NotNull GradleCommandLineOption option) {
+    return option.getName().equals(GradleConstants.TESTS_ARG_NAME) &&
+           option.getValues().size() == 1 && (
+             option.getValues().get(0).equals("*") ||
+             option.getValues().get(0).equals("'*'") ||
+             option.getValues().get(0).equals("\"*\"")
+           );
   }
 
   private static void setupTestLauncherArguments(
@@ -461,7 +488,7 @@ public class GradleExecutionHelper {
     @NotNull GradleCommandLine commandLine
   ) {
     for (var task : commandLine.getTasks()) {
-      var patterns = GradleTestExecutionUtil.getTestPatterns(task);
+      var patterns = GradleCommandLineUtil.getTestPatterns(task);
       if (!patterns.isEmpty()) {
         testLauncher.withTestsFor(
           it -> it.forTaskPath(task.getName())
@@ -478,16 +505,14 @@ public class GradleExecutionHelper {
   private static void setupBuildLauncherArguments(
     @NotNull BuildLauncher buildLauncher,
     @NotNull GradleCommandLine commandLine,
-    boolean forceExecution
+    boolean isRunAsTest
   ) {
-    var tasks = ContainerUtil.flatMap(commandLine.getTasks(), it ->
-      GradleTestExecutionUtil.getTestPatterns(it).isEmpty() ? it.getTokens() : List.of(it.getName())
-    );
-    buildLauncher.forTasks(ArrayUtil.toStringArray(tasks));
+    buildLauncher.forTasks(ArrayUtil.toStringArray(commandLine.getTasks().getTokens()));
     buildLauncher.withArguments(commandLine.getOptions().getTokens());
-
-    var initScript = GradleInitScriptUtil.createTestInitScript(commandLine.getTasks(), forceExecution);
-    buildLauncher.addArguments(GradleConstants.INIT_SCRIPT_CMD_OPTION, initScript.getAbsolutePath());
+    if (isRunAsTest) {
+      var initScript = GradleInitScriptUtil.createTestInitScript(commandLine.getTasks());
+      buildLauncher.addArguments(GradleConstants.INIT_SCRIPT_CMD_OPTION, initScript.toString());
+    }
   }
 
   private static void setupLogging(@NotNull GradleExecutionSettings settings,
@@ -673,8 +698,8 @@ public class GradleExecutionHelper {
 
   @ApiStatus.Internal
   public static void attachTargetPathMapperInitScript(@NotNull GradleExecutionSettings executionSettings) {
-    var initScriptFile = GradleInitScriptUtil.createInitScript("ijmapper", "if (!ext.has('mapPath')) ext.mapPath = { path -> path }\n");
-    executionSettings.prependArguments(GradleConstants.INIT_SCRIPT_CMD_OPTION, initScriptFile.getAbsolutePath());
+    var initScriptFile = GradleInitScriptUtil.createTargetPathMapperInitScript();
+    executionSettings.prependArguments(GradleConstants.INIT_SCRIPT_CMD_OPTION, initScriptFile.toString());
   }
 
   @ApiStatus.Experimental
@@ -688,9 +713,29 @@ public class GradleExecutionHelper {
       );
       Map<String, String> map = new LinkedHashMap<>();
       map.put(prefix, initScript);
+      String taskStateInitScript = getTaskStateInitScript(configuration);
+      if (taskStateInitScript != null) {
+        map.put("ijtgttaskstate", taskStateInitScript);
+      }
       return map;
     }
     return Collections.emptyMap();
+  }
+
+  private static @Nullable String getTaskStateInitScript(@NonNls GradleRunConfiguration configuration) {
+    RunConfigurationTaskState taskState = configuration.getUserData(RunConfigurationTaskState.getKEY());
+    if (taskState == null) return null;
+
+    LocalTargetEnvironmentRequest request = new LocalTargetEnvironmentRequest();
+    TargetProgressIndicator progressIndicator = TargetProgressIndicator.EMPTY;
+    try {
+      taskState.prepareTargetEnvironmentRequest(request, progressIndicator);
+      LocalTargetEnvironment environment = request.prepareEnvironment(progressIndicator);
+      return taskState.handleCreatedTargetEnvironment(environment, progressIndicator);
+    }
+    catch (ExecutionException e) {
+      return null;
+    }
   }
 
   @Nullable

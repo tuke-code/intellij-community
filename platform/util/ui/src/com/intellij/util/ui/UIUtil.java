@@ -315,7 +315,6 @@ public final class UIUtil {
 
   public static final char MNEMONIC = BundleBase.MNEMONIC;
   public static final @NlsSafe String HTML_MIME = "text/html";
-  public static final @NonNls String JSLIDER_ISFILLED = "JSlider.isFilled";
   public static final @NonNls String TABLE_FOCUS_CELL_BACKGROUND_PROPERTY = "Table.focusCellBackground";
   /**
    * Prevent component DataContext from returning parent editor
@@ -403,22 +402,6 @@ public final class UIUtil {
         return ourRetina.get();
       }
     }
-  }
-
-  /**
-   * @deprecated use {@link ClientProperty#get(Component, Object)} instead
-   */
-  @Deprecated(forRemoval = true)
-  public static Object getWindowClientProperty(Window window, @NotNull Object key) {
-    return ClientProperty.get(window, key);
-  }
-
-  /**
-   * @deprecated use {@link ClientProperty#put(Window, Object, Object)}  instead
-   */
-  @Deprecated(forRemoval = true)
-  public static void putWindowClientProperty(Window window, @NotNull Object key, Object value) {
-    ClientProperty.put(window, key, value);
   }
 
   /**
@@ -678,7 +661,6 @@ public final class UIUtil {
   public static void setActionNameAndMnemonic(@NotNull @Nls String text, @NotNull Action action) {
     assignMnemonic(text, action);
 
-    //noinspection HardCodedStringLiteral
     text = text.replaceAll("&", "");
     action.putValue(Action.NAME, text);
   }
@@ -949,10 +931,6 @@ public final class UIUtil {
     return UIManager.getFont("Menu.font");
   }
 
-  public static Color getSeparatorShadow() {
-    return UIManager.getColor("Separator.shadow");
-  }
-
   /**
    * @deprecated use {@link JBUI.CurrentTheme.CustomFrameDecorations#separatorForeground()}
    */
@@ -1148,6 +1126,12 @@ public final class UIUtil {
     );
   }
 
+  /**
+   * @param c1 first color to mix
+   * @param c2 second color to mix
+   * @param factor impact of color specified in {@code c2}
+   * @return Mixed color
+   */
   public static @NotNull Color mix(@NotNull Color c1, final Color c2, final double factor) {
     assert 0 <= factor && factor <= 1.0 : factor;
     final double backFactor = 1.0 - factor;
@@ -1248,10 +1232,6 @@ public final class UIUtil {
     sb.append(Integer.toHexString(color.getGreen()));
     if (color.getBlue() < 16) sb.append('0');
     sb.append(Integer.toHexString(color.getBlue()));
-  }
-
-  public static void drawDottedRectangle(@NotNull Graphics g, @NotNull Rectangle r) {
-    drawDottedRectangle(g, r.x, r.y, r.x + r.width, r.y + r.height);
   }
 
   /**
@@ -1775,14 +1755,6 @@ public final class UIUtil {
     return ComponentUtil.findParentByCondition(c, Component::isOpaque);
   }
 
-  /**
-   * @deprecated use {@link ComponentUtil#findParentByCondition(Component, java.util.function.Predicate)}
-   */
-  @Deprecated(forRemoval = true)
-  public static Component findParentByCondition(@Nullable Component c, @NotNull Condition<? super Component> condition) {
-    return ComponentUtil.findParentByCondition(c, it -> condition.value(it));
-  }
-
   //x and y should be from {0, 0} to {parent.getWidth(), parent.getHeight()}
   public static @Nullable Component getDeepestComponentAt(@NotNull Component parent, int x, int y) {
     Component component = SwingUtilities.getDeepestComponentAt(parent, x, y);
@@ -1864,7 +1836,7 @@ public final class UIUtil {
    * @deprecated use {@link com.intellij.openapi.wm.IdeFocusManager}
    */
   @Deprecated
-  public static void requestFocus(final @NotNull JComponent c) {
+  public static void requestFocus(@NotNull JComponent c) {
     if (c.isShowing()) {
       c.requestFocus();
     }
@@ -1873,7 +1845,7 @@ public final class UIUtil {
     }
   }
 
-  //Whitelist for component types that provide obvious 'focused' view
+  // whitelist for component types that provide obvious 'focused' view
   public static boolean canDisplayFocusedState(@NotNull Component component) {
     return component instanceof JTextComponent || component instanceof AbstractButton || component instanceof JComboBox;
   }

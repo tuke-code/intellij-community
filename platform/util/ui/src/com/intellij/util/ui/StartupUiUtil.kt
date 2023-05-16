@@ -47,8 +47,6 @@ object StartupUiUtil {
                                        "TextField.font", "FormattedTextField.font", "Spinner.font", "PasswordField.font",
                                        "TextArea.font", "TextPane.font", "EditorPane.font",
                                        "TitledBorder.font", "ToolBar.font", "ToolTip.font", "Tree.font")
-  const val ARIAL_FONT_NAME = "Arial"
-
   @JvmStatic
   val isUnderDarcula: Boolean
     get() = UIManager.getLookAndFeel().name.contains("Darcula")
@@ -282,8 +280,8 @@ fun drawImage(g: Graphics,
               observer: ImageObserver? = null) {
   val hasDestinationSize = dw >= 0 && dh >= 0
   if (image is JBHiDPIScaledImage) {
-    doDrawHiDpi(userWidth = image.getUserWidth(null),
-                userHeight = image.getUserHeight(null),
+    doDrawHiDpi(userWidth = image.getUserWidth(),
+                userHeight = image.getUserHeight(),
                 g = g,
                 scale = image.scale,
                 dx = x,

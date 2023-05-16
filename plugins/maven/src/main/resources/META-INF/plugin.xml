@@ -77,7 +77,6 @@
     <projectImportBuilder implementation="org.jetbrains.idea.maven.wizards.MavenProjectBuilder"/>
     <externalSystemUnlinkedProjectAware implementation="org.jetbrains.idea.maven.project.MavenUnlinkedProjectAware"/>
     <externalSystemDependencyAnalyzer implementation="org.jetbrains.idea.maven.project.MavenDependencyAnalyzerExtension"/>
-    <moduleBuilder builderClass="org.jetbrains.idea.maven.wizards.InternalMavenModuleBuilder"/>
     <moduleBuilder builderClass="org.jetbrains.idea.maven.wizards.archetype.MavenArchetypeNewProjectWizard$Builder"/>
     <frameworkSupport implementation="org.jetbrains.idea.maven.wizards.MavenFrameworkSupportProvider"/>
     <moduleExtension implementation="org.jetbrains.idea.maven.importing.MavenSourceFoldersModuleExtension"/>
@@ -90,6 +89,9 @@
                         serviceImplementation="org.jetbrains.idea.maven.server.MavenServerManager$MavenServerConnectorFactoryImpl"/>
 
     <applicationService serviceImplementation="org.jetbrains.idea.maven.server.MavenWrapperMapping"/>
+
+    <projectService serviceInterface="org.jetbrains.idea.maven.project.MavenProjectResolver"
+                    serviceImplementation="org.jetbrains.idea.maven.project.MavenProjectResolverImpl"/>
 
     <projectService serviceImplementation="org.jetbrains.idea.maven.server.MavenDistributionsCache"/>
     <projectService serviceImplementation="org.jetbrains.idea.maven.project.importing.MavenImportingManager"/>
@@ -353,6 +355,9 @@
     <registryKey key="maven.server.use.custom.dependencies.resolver" defaultValue="true"
                  description="Use custom maven dependencies resolver to speed up dependency resolution"/>
 
+    <registryKey key="maven.server.generate.sources.for.aggregator.projects" defaultValue="true"
+                 description="Generate sources for aggregator projects (instead of all projects) for better performance"/>
+
     <registryKey key="maven.import.to.workspace.model.fast.facet.creation" defaultValue="false"
                  description="Create facets in a background thread instead of EDT"/>
 
@@ -524,6 +529,7 @@
     <mavenServerSupportFactory implementation="org.jetbrains.idea.maven.server.wsl.WslMavenRemoteProcessSupportFactory"/>
     <remotePathTransformerFactory implementation="org.jetbrains.idea.maven.server.wsl.WslRemotePathTransformFactory"/>
     <versionAwareMavenSupport implementation="org.jetbrains.idea.maven.maven3.Maven3Support"/>
+    <versionAwareMavenSupport implementation="org.jetbrains.idea.maven.maven4.Maven4Support"/>
 
     <importer implementation="org.jetbrains.idea.maven.importing.MavenCompilerConfigurator"/>
     <importing.workspaceConfigurator implementation="org.jetbrains.idea.maven.importing.MavenCompilerConfigurator"/>

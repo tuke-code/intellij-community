@@ -13,6 +13,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.TextRange
 import com.intellij.psi.*
 import com.intellij.psi.codeStyle.CodeStyleManager
+import com.intellij.psi.search.LocalSearchScope
 import com.intellij.psi.util.PsiEditorUtil
 import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.refactoring.JavaRefactoringSettings
@@ -164,7 +165,17 @@ class DuplicatesMethodExtractor(val extractOptions: ExtractOptions, val targetCl
     val sizeAfter = callAfter.sumOf(::calculateCodeLeafs)
     val sizeBefore = callBefore.sumOf(::calculateCodeLeafs)
     val addedParameters = updatedParameters.size - initialParameters.size
-    return 1.75 * sizeAfter < sizeBefore && addedParameters <= 3 && updatedParameters.size <= 5
+    if (addedParameters <= 0) {
+      // do not require reduce in call size if we just replace parameter
+      return sizeAfter <= sizeBefore
+    }
+    else if (addedParameters <= 3) {
+      // require significant reduce in call if we introduce new parameters
+      return 1.75 * sizeAfter < sizeBefore && updatedParameters.size <= 5
+    }
+    else {
+      return false
+    }
   }
 
   private fun calculateCodeLeafs(element: PsiElement): Int {
@@ -191,8 +202,11 @@ class DuplicatesMethodExtractor(val extractOptions: ExtractOptions, val targetCl
   }
 
   private fun findNewParameters(parameters: List<InputParameter>, duplicates: List<Duplicate>): List<InputParameter> {
-    return duplicates
-      .fold(parameters) { updatedParameters, duplicate -> updateParameters(updatedParameters, duplicate.changedExpressions) }
+    if (duplicates.isEmpty()) return parameters
+    val updatedParameters = duplicates.fold(parameters) { updatedParameters, duplicate ->
+      updateParameters(updatedParameters, duplicate.changedExpressions)
+    }
+    return ExtractMethodPipeline.foldParameters(updatedParameters, LocalSearchScope(duplicates.first().pattern.toTypedArray()))
   }
 
   private fun confirmDuplicates(project: Project, editor: Editor, duplicates: List<Duplicate>): List<Duplicate> {

@@ -3,9 +3,9 @@ package org.jetbrains.plugins.gitlab.mergerequest.ui.details.model
 
 import com.intellij.collaboration.messages.CollaborationToolsBundle
 import com.intellij.collaboration.ui.codereview.action.ReviewMergeCommitMessageDialog
-import com.intellij.collaboration.ui.codereview.details.RequestState
-import com.intellij.collaboration.ui.codereview.details.ReviewRole
-import com.intellij.collaboration.ui.codereview.details.ReviewState
+import com.intellij.collaboration.ui.codereview.details.data.ReviewRequestState
+import com.intellij.collaboration.ui.codereview.details.data.ReviewRole
+import com.intellij.collaboration.ui.codereview.details.data.ReviewState
 import com.intellij.collaboration.ui.codereview.details.model.CodeReviewFlowViewModel
 import com.intellij.openapi.application.EDT
 import com.intellij.openapi.project.Project
@@ -32,13 +32,14 @@ internal interface GitLabMergeRequestReviewFlowViewModel : CodeReviewFlowViewMod
   val approvedBy: Flow<List<GitLabUserDTO>>
   val reviewers: StateFlow<List<GitLabUserDTO>>
   val role: Flow<ReviewRole>
-  val requestState: Flow<RequestState>
+  val reviewRequestState: Flow<ReviewRequestState>
+  val isMergeable: Flow<Boolean>
   val isApproved: StateFlow<Boolean>
   val reviewState: Flow<ReviewState>
 
   val userCanApproveReviewer: Flow<Boolean>
   val userCanManageReview: Flow<Boolean>
-  val userCanMergeReviewer: Flow<Boolean>
+  val userCanMergeReview: Flow<Boolean>
 
   fun merge()
 
@@ -87,8 +88,8 @@ internal class GitLabMergeRequestReviewFlowViewModelImpl(
     }
   }
 
-  override val requestState: Flow<RequestState> = mergeRequest.requestState
-
+  override val reviewRequestState: Flow<ReviewRequestState> = mergeRequest.reviewRequestState
+  override val isMergeable: Flow<Boolean> = mergeRequest.isMergeable
   override val isApproved: StateFlow<Boolean> = approvedBy
     .map { it.isNotEmpty() }
     .stateIn(scope, SharingStarted.Lazily, false)
@@ -108,7 +109,7 @@ internal class GitLabMergeRequestReviewFlowViewModelImpl(
 
   override val userCanApproveReviewer: Flow<Boolean> = mergeRequest.userPermissions.map { it.canApprove }
   override val userCanManageReview: Flow<Boolean> = mergeRequest.userPermissions.map { it.updateMergeRequest }
-  override val userCanMergeReviewer: Flow<Boolean> = mergeRequest.userPermissions.map { it.canMerge }
+  override val userCanMergeReview: Flow<Boolean> = mergeRequest.userPermissions.map { it.canMerge }
 
   override fun merge() = runAction {
     val title = mergeRequest.title.stateIn(scope).value
@@ -138,7 +139,7 @@ internal class GitLabMergeRequestReviewFlowViewModelImpl(
     val targetBranch = mergeRequest.targetBranch.stateIn(scope).value
     val changesState = mergeRequest.changes.stateIn(scope).value
     val commitMessage: String? = withContext(scope.coroutineContext + Dispatchers.EDT) {
-      val body = "* " + StringUtil.join(changesState.commits, { it.title }, "\n\n* ")
+      val body = "* " + StringUtil.join(changesState.commits, { it.fullTitle }, "\n\n* ")
       val dialog = ReviewMergeCommitMessageDialog(
         project,
         CollaborationToolsBundle.message("dialog.review.merge.commit.title.with.squash"),

@@ -10,6 +10,7 @@ import com.intellij.openapi.util.registry.Registry;
 import com.intellij.openapi.vfs.InvalidVirtualFileAccessException;
 import com.intellij.openapi.vfs.newvfs.NewVirtualFileSystem;
 import com.intellij.openapi.vfs.newvfs.persistent.FSRecords;
+import com.intellij.openapi.vfs.newvfs.persistent.FileNameCache;
 import com.intellij.openapi.vfs.newvfs.persistent.PersistentFS;
 import com.intellij.openapi.vfs.newvfs.persistent.PersistentFSImpl;
 import com.intellij.testFramework.TestModeFlags;
@@ -145,8 +146,11 @@ public final class VfsData {
     }
     final int nameId = segment.getNameId(id);
     if (nameId <= 0) {
-      FSRecords.invalidateCaches();
-      throw new AssertionError("nameId=" + nameId + "; data=" + o + "; parent=" + parent + "; parent.id=" + parent.getId() + "; db.parent=" + FSRecords.getParent(id));
+      String message = "nameId=" + nameId + "; data=" + o + "; parent=" + parent + "; parent.id=" + parent.getId() +
+                             "; db.parent=" + FSRecords.getParent(id);
+      final AssertionError error = new AssertionError(message);
+      FSRecords.invalidateCaches(message, error);
+      throw error;
     }
 
     if (o instanceof DirectoryData) {
@@ -198,7 +202,9 @@ public final class VfsData {
     Object existingData = segment.myObjectArray.get(offset);
     if (existingData != null) {
       String msg = FSRecords.describeAlreadyCreatedFile(id, nameId);
-      throw new FileAlreadyCreatedException(msg);
+      final FileAlreadyCreatedException exception = new FileAlreadyCreatedException(msg);
+      FSRecords.invalidateCaches(msg, exception);
+      throw exception;
     }
     segment.myObjectArray.set(offset, data);
   }

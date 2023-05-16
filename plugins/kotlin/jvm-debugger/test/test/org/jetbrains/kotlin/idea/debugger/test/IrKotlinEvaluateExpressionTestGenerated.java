@@ -708,6 +708,49 @@ public abstract class IrKotlinEvaluateExpressionTestGenerated extends AbstractIr
         }
 
         @RunWith(JUnit3RunnerWithInners.class)
+        @TestMetadata("testData/evaluation/singleBreakpoint/implicitClassReceiver")
+        public static class ImplicitClassReceiver extends AbstractIrKotlinEvaluateExpressionTest {
+            private void runTest(String testDataFilePath) throws Exception {
+                KotlinTestUtils.runTest(this::doSingleBreakpointTest, this, TargetBackend.JVM_IR_WITH_OLD_EVALUATOR, testDataFilePath);
+            }
+
+            @TestMetadata("localClass.kt")
+            public void testLocalClass() throws Exception {
+                runTest("testData/evaluation/singleBreakpoint/implicitClassReceiver/localClass.kt");
+            }
+
+            @TestMetadata("localClass2.kt")
+            public void testLocalClass2() throws Exception {
+                runTest("testData/evaluation/singleBreakpoint/implicitClassReceiver/localClass2.kt");
+            }
+
+            @TestMetadata("localClass3.kt")
+            public void testLocalClass3() throws Exception {
+                runTest("testData/evaluation/singleBreakpoint/implicitClassReceiver/localClass3.kt");
+            }
+
+            @TestMetadata("localObject.kt")
+            public void testLocalObject() throws Exception {
+                runTest("testData/evaluation/singleBreakpoint/implicitClassReceiver/localObject.kt");
+            }
+
+            @TestMetadata("localObject2.kt")
+            public void testLocalObject2() throws Exception {
+                runTest("testData/evaluation/singleBreakpoint/implicitClassReceiver/localObject2.kt");
+            }
+
+            @TestMetadata("localObject3.kt")
+            public void testLocalObject3() throws Exception {
+                runTest("testData/evaluation/singleBreakpoint/implicitClassReceiver/localObject3.kt");
+            }
+
+            @TestMetadata("localObjectInFunArguments.kt")
+            public void testLocalObjectInFunArguments() throws Exception {
+                runTest("testData/evaluation/singleBreakpoint/implicitClassReceiver/localObjectInFunArguments.kt");
+            }
+        }
+
+        @RunWith(JUnit3RunnerWithInners.class)
         @TestMetadata("testData/evaluation/singleBreakpoint/javaContext")
         public static class JavaContext extends AbstractIrKotlinEvaluateExpressionTest {
             private void runTest(String testDataFilePath) throws Exception {
@@ -808,6 +851,51 @@ public abstract class IrKotlinEvaluateExpressionTestGenerated extends AbstractIr
             @TestMetadata("lambdaOnSecondLine.kt")
             public void testLambdaOnSecondLine() throws Exception {
                 runTest("testData/evaluation/singleBreakpoint/lambdas/lambdaOnSecondLine.kt");
+            }
+
+            @TestMetadata("notCapturedClassParameter.kt")
+            public void testNotCapturedClassParameter() throws Exception {
+                runTest("testData/evaluation/singleBreakpoint/lambdas/notCapturedClassParameter.kt");
+            }
+
+            @TestMetadata("notCapturedFunLiteralParameter.kt")
+            public void testNotCapturedFunLiteralParameter() throws Exception {
+                runTest("testData/evaluation/singleBreakpoint/lambdas/notCapturedFunLiteralParameter.kt");
+            }
+
+            @TestMetadata("notCapturedFunParameter.kt")
+            public void testNotCapturedFunParameter() throws Exception {
+                runTest("testData/evaluation/singleBreakpoint/lambdas/notCapturedFunParameter.kt");
+            }
+
+            @TestMetadata("notCapturedFunParameterSecond.kt")
+            public void testNotCapturedFunParameterSecond() throws Exception {
+                runTest("testData/evaluation/singleBreakpoint/lambdas/notCapturedFunParameterSecond.kt");
+            }
+
+            @TestMetadata("notCapturedLambdaParameter.kt")
+            public void testNotCapturedLambdaParameter() throws Exception {
+                runTest("testData/evaluation/singleBreakpoint/lambdas/notCapturedLambdaParameter.kt");
+            }
+
+            @TestMetadata("notCapturedLambdaParameterFourth.kt")
+            public void testNotCapturedLambdaParameterFourth() throws Exception {
+                runTest("testData/evaluation/singleBreakpoint/lambdas/notCapturedLambdaParameterFourth.kt");
+            }
+
+            @TestMetadata("notCapturedLambdaParameterSecond.kt")
+            public void testNotCapturedLambdaParameterSecond() throws Exception {
+                runTest("testData/evaluation/singleBreakpoint/lambdas/notCapturedLambdaParameterSecond.kt");
+            }
+
+            @TestMetadata("notCapturedLambdaParameterThird.kt")
+            public void testNotCapturedLambdaParameterThird() throws Exception {
+                runTest("testData/evaluation/singleBreakpoint/lambdas/notCapturedLambdaParameterThird.kt");
+            }
+
+            @TestMetadata("notCapturedSecondaryConstructorParameter.kt")
+            public void testNotCapturedSecondaryConstructorParameter() throws Exception {
+                runTest("testData/evaluation/singleBreakpoint/lambdas/notCapturedSecondaryConstructorParameter.kt");
             }
 
             @TestMetadata("oneLineFunctionalExpression.kt")
@@ -1218,6 +1306,11 @@ public abstract class IrKotlinEvaluateExpressionTestGenerated extends AbstractIr
             @TestMetadata("inlineFunctionBreakpointVariants.kt")
             public void testInlineFunctionBreakpointVariants() throws Exception {
                 runTest("testData/evaluation/singleBreakpoint/inlineFunctionBreakpointVariants.kt");
+            }
+
+            @TestMetadata("inlineFunctionClassFileLoading.kt")
+            public void testInlineFunctionClassFileLoading() throws Exception {
+                runTest("testData/evaluation/singleBreakpoint/inlineFunctionClassFileLoading.kt");
             }
 
             @TestMetadata("inlineFunctionDeepInlining.kt")
@@ -1648,11 +1741,6 @@ public abstract class IrKotlinEvaluateExpressionTestGenerated extends AbstractIr
             @TestMetadata("isInsideInlineLambda.kt")
             public void testIsInsideInlineLambda() throws Exception {
                 runTest("testData/evaluation/multipleBreakpoints/isInsideInlineLambda.kt");
-            }
-
-            @TestMetadata("kt51755.kt")
-            public void testKt51755() throws Exception {
-                runTest("testData/evaluation/multipleBreakpoints/kt51755.kt");
             }
 
             @TestMetadata("lambdaParameters.kt")

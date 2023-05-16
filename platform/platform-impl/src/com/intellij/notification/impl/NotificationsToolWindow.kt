@@ -5,6 +5,7 @@ import com.intellij.UtilBundle
 import com.intellij.icons.AllIcons
 import com.intellij.ide.DataManager
 import com.intellij.ide.IdeBundle
+import com.intellij.ide.IdeCoreBundle
 import com.intellij.ide.ui.LafManagerListener
 import com.intellij.ide.ui.UISettingsListener
 import com.intellij.idea.ActionsBundle
@@ -1058,10 +1059,15 @@ private class NotificationComponent(val project: Project,
 
         button.isVisible = false
 
+        val timeWrapper = JPanel(BorderLayout())
+        timeWrapper.isOpaque = false
+        timeWrapper.border = JBUI.Borders.emptyTop(3)
+        timeWrapper.add(timeComponent, BorderLayout.NORTH)
+
         val eastPanel = JPanel(BorderLayout())
         eastPanel.isOpaque = false
         eastPanel.add(buttonWrapper, BorderLayout.WEST)
-        eastPanel.add(timeComponent, BorderLayout.EAST)
+        eastPanel.add(timeWrapper, BorderLayout.EAST)
         titlePanel!!.add(eastPanel, BorderLayout.EAST)
       }
       else {
@@ -1374,7 +1380,7 @@ private class MoreAction(val notificationComponent: NotificationComponent, actio
       })
     }, null)
 
-    text = IdeBundle.message("notifications.action.more")
+    text = IdeCoreBundle.message("notifications.action.more")
 
     Notification.setDataProvider(notificationComponent.myNotificationWrapper.notification!!, this)
   }
@@ -1473,8 +1479,6 @@ private class DropDownActionLayout(layout: LayoutManager2) : FinalLayoutWrapper(
 
     if (parent.preferredSize.width > width) {
       myDropDownAction.isVisible = true
-      actions[collapseIndex].isVisible = false
-      collapseIndex += collapseDelta
       actions[collapseIndex].isVisible = false
       collapseIndex += collapseDelta
       layout.layoutContainer(parent)

@@ -53,6 +53,7 @@
     <orderEntry type="library" name="gson" level="project" />
     <orderEntry type="library" name="protobuf" level="project" />
     <orderEntry type="module" module-name="intellij.devkit.jps" scope="RUNTIME" />
+    <orderEntry type="module" module-name="intellij.devkit.runtimeModuleRepository.jps" />
     <orderEntry type="module" module-name="intellij.java.guiForms.jps" scope="RUNTIME" />
     <orderEntry type="module" module-name="intellij.idea.community.build.tasks" />
     <orderEntry type="module" module-name="intellij.tools.jps.antTasks" scope="RUNTIME" />
@@ -62,9 +63,11 @@
     <orderEntry type="library" name="json-schema-validator" level="project" />
     <orderEntry type="library" name="decentxml" level="project" />
     <orderEntry type="module" module-name="intellij.platform.diagnostic.telemetry" />
+    <orderEntry type="module" module-name="intellij.platform.diagnostic.telemetry.impl" />
     <orderEntry type="library" name="kotlinx-serialization-json" level="project" />
     <orderEntry type="library" name="kotlinx-serialization-core" level="project" />
     <orderEntry type="module" module-name="intellij.platform.util.zip" />
+    <orderEntry type="module" module-name="intellij.platform.runtime.repository" />
     <orderEntry type="library" name="okhttp" level="project" />
     <orderEntry type="library" name="zstd-jni" level="project" />
     <orderEntry type="library" name="zstd-jni-windows-aarch64" level="project" />
@@ -108,7 +111,6 @@
     <orderEntry type="library" name="jackson-datatype-joda" level="project" />
     <orderEntry type="library" name="http-client" level="project" />
     <orderEntry type="library" name="commons-codec" level="project" />
-    <orderEntry type="library" scope="PROVIDED" name="kotlinc.kotlin-stdlib" level="project" />
     <orderEntry type="library" name="ktor-serialization-kotlinx-json" level="project" />
     <orderEntry type="library" name="ktor-client" level="project" />
     <orderEntry type="library" name="kotlinx-coroutines-slf4j" level="project" />

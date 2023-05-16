@@ -6,7 +6,7 @@ import com.intellij.execution.executors.DefaultDebugExecutor
 import com.intellij.execution.impl.RunManagerImpl
 import com.intellij.execution.impl.RunManagerImpl.Companion.getInstanceImpl
 import com.intellij.execution.impl.RunnerAndConfigurationSettingsImpl
-import com.intellij.openapi.application.WriteAction
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.ui.playback.PlaybackContext
 import com.intellij.openapi.util.ActionCallback
 import com.intellij.openapi.util.Ref
@@ -17,25 +17,32 @@ import com.intellij.xdebugger.XDebuggerManagerListener
 import com.jetbrains.performancePlugin.PerformanceTestSpan
 import com.jetbrains.performancePlugin.utils.AbstractCallbackBasedCommand
 import io.opentelemetry.api.trace.Span
+import io.opentelemetry.context.Context
 import io.opentelemetry.context.Scope
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import org.jetbrains.annotations.NonNls
-import java.io.IOException
 import java.util.concurrent.TimeUnit
 
+/**
+ *   Command debug specified configuration if configuration exists and list of breakpoint is not empty.
+ *   Command finished when debug process stopped on first breakpoint or by timeout if timeout was set.
+ *   Example: %runConfiguration IDEA
+ *   Example: %runConfiguration IDEA, 60
+ */
 class DebugRunConfigurationCommand(text: String, line: Int) : AbstractCallbackBasedCommand(text, line, true) {
 
   override fun execute(callback: ActionCallback, context: PlaybackContext) {
     val arguments = extractCommandList(PREFIX, ",")
-    if (arguments.size < 2) {
-      callback.reject("Usage %debugStep &lt;configuration_name&gt; &lt;timeout_in_seconds&gt;")
+    if (arguments.isEmpty()) {
+      callback.reject("Usage %debugStep &lt;configuration_name&gt; [&lt;timeout_in_seconds&gt;]")
       return
     }
     val configurationNameToRun = arguments[0]
-    val timeoutInSeconds = arguments[1].toLong()
+    var timeoutInSeconds: Long? = null
+    if (arguments.size > 1) timeoutInSeconds = arguments[1].toLong()
 
     val breakpointManager = XDebuggerManager.getInstance(context.project).breakpointManager
     val nonDefaultBreakpoints = breakpointManager.allBreakpoints.filter { !breakpointManager.isDefaultBreakpoint(it) }
@@ -50,19 +57,21 @@ class DebugRunConfigurationCommand(text: String, line: Int) : AbstractCallbackBa
       return
     }
 
-    val spanBuilder = PerformanceTestSpan.TRACER.spanBuilder(DebugStepCommand.SPAN_NAME).setParent(PerformanceTestSpan.getContext())
+    val spanBuilder = PerformanceTestSpan.TRACER.spanBuilder(SPAN_NAME).setParent(PerformanceTestSpan.getContext())
     val spanRef = Ref<Span>()
     val scopeRef = Ref<Scope>()
 
     val connection = context.project.messageBus.connect()
-    var job: Job
+    var job: Job? = null
     connection.subscribe(XDebuggerManager.TOPIC, object : XDebuggerManagerListener {
       override fun processStarted(debugProcess: XDebugProcess) {
-        job = CoroutineScope(Dispatchers.IO).launch {
-          if (!Waiter.checkCondition { callback.isDone || callback.isRejected }.await(timeoutInSeconds, TimeUnit.SECONDS)) {
-            callback.reject(
-              "Debug run configuration $configurationNameToRun was started $timeoutInSeconds seconds ago but was not paused by any breakpoint yet")
-            connection.disconnect()
+        if (timeoutInSeconds != null) {
+          job = CoroutineScope(Dispatchers.IO).launch {
+            if (!Waiter.checkCondition { callback.isDone || callback.isRejected }.await(timeoutInSeconds, TimeUnit.SECONDS)) {
+              callback.reject(
+                "Debug run configuration $configurationNameToRun was started $timeoutInSeconds seconds ago but was not paused by any breakpoint yet")
+              connection.disconnect()
+            }
           }
         }
 
@@ -73,20 +82,20 @@ class DebugRunConfigurationCommand(text: String, line: Int) : AbstractCallbackBa
             spanRef.get().end()
             scopeRef.get().close()
             connection.disconnect()
-            job.cancel()
+            job?.cancel()
           }
         })
       }
     })
 
-    WriteAction.runAndWait<IOException> {
+    ApplicationManager.getApplication().runWriteAction(Context.current().wrap(Runnable {
       val runnerAndConfigurationSettings = RunnerAndConfigurationSettingsImpl(runManager, configurationToRun)
       spanRef.set(spanBuilder.startSpan())
       scopeRef.set(spanRef.get().makeCurrent())
       ExecutionManager.getInstance(context.project).restartRunProfile(context.project, DefaultDebugExecutor(),
                                                                       DefaultExecutionTarget.INSTANCE, runnerAndConfigurationSettings,
                                                                       null)
-    }
+    }))
   }
 
   companion object {

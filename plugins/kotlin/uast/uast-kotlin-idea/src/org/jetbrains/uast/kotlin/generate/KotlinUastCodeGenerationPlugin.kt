@@ -194,6 +194,11 @@ class KotlinUastElementFactory(project: Project) : UastElementFactory {
                     (receiver.sourcePsi?.nextSibling as? PsiWhiteSpace)?.let { whitespaces ->
                         append(whitespaces.text)
                     }
+
+                    receiver.comments.takeIf { it.isNotEmpty() }?.let {
+                        append(receiver.comments.joinToString { it.text })
+                        append("\n")
+                    }
                     append(".")
                 }
                 append(name)
@@ -437,7 +442,7 @@ class KotlinUastElementFactory(project: Project) : UastElementFactory {
     }
 
     override fun createBlockExpression(expressions: List<UExpression>, context: PsiElement?): UBlockExpression {
-        val sourceExpressions = expressions.flatMap { it.toSourcePsiFakeAware() }
+        val sourceExpressions = expressions.flatMap { it.toSourcePsiFakeAndCommentsAware() }
         val block = psiFactory(context).createBlock(
             sourceExpressions.joinToString(separator = "\n") { "println()" }
         )

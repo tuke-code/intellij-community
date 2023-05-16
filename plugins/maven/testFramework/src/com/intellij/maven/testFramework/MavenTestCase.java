@@ -192,7 +192,6 @@ public abstract class MavenTestCase extends UsefulTestCase {
       () -> MavenServerManager.getInstance().shutdown(true),
       () -> tearDownEmbedders(),
       () -> checkAllMavenConnectorsDisposed(),
-      () -> MavenArtifactDownloader.awaitQuiescence(100, TimeUnit.SECONDS),
       () -> myProject = null,
       () -> {
         Project defaultProject = ProjectManager.getInstance().getDefaultProject();
@@ -518,18 +517,6 @@ public abstract class MavenTestCase extends UsefulTestCase {
       VirtualFile f = myProjectRoot.findChild("profiles.xml");
       if (f != null) f.delete(this);
     });
-  }
-
-  protected void createStdProjectFolders() {
-    createStdProjectFolders("");
-  }
-
-  protected void createStdProjectFolders(String subdir) {
-    if (!subdir.isEmpty()) subdir += "/";
-    createProjectSubDirs(subdir + "src/main/java",
-                         subdir + "src/main/resources",
-                         subdir + "src/test/java",
-                         subdir + "src/test/resources");
   }
 
   protected void createProjectSubDirs(String... relativePaths) {

@@ -7,21 +7,19 @@ import serviceDeclarations.*;
 
 class MyClass {
 
-  static final <warning descr="Application service must not be assigned to a static final field">LightServiceAppAndProjectLevelAnnotation</warning> myAppService1 = LightServiceAppAndProjectLevelAnnotation.getInstance();
+  static final LightServiceAppAndProjectLevelAnnotation <warning descr="Application service must not be assigned to a static final field">myAppService1</warning> = LightServiceAppAndProjectLevelAnnotation.getInstance();
 
-  private static final <warning descr="Application service must not be assigned to a static final field">LightServiceAppLevelAnnotation</warning> myAppService2 = ApplicationManager.getApplication().getService(LightServiceAppLevelAnnotation.class);
+  private static final LightServiceAppLevelAnnotation <warning descr="Application service must not be assigned to a static final field">myAppService2</warning> = ApplicationManager.getApplication().getService(LightServiceAppLevelAnnotation.class);
 
-  static final <error descr="Cannot resolve symbol 'LightServiceCoroutineConstructor'">LightServiceCoroutineConstructor</error> myAppService3 = <error descr="Cannot resolve symbol 'LightServiceCoroutineConstructor'">LightServiceCoroutineConstructor</error>.getInstance();
+  static final LightServiceDefaultAnnotation <warning descr="Application service must not be assigned to a static final field">myAppService3</warning> = LightServiceDefaultAnnotation.getInstance();
 
-  public static final <error descr="Cannot resolve symbol 'LightServiceEmptyAnnotationEmptyConstructor'">LightServiceEmptyAnnotationEmptyConstructor</error> myAppService4 = <error descr="Cannot resolve symbol 'LightServiceEmptyAnnotationEmptyConstructor'">LightServiceEmptyAnnotationEmptyConstructor</error>.getInstance();
-
-  static final <error descr="Cannot resolve symbol 'LightServiceEmptyConstructor'">LightServiceEmptyConstructor</error> myAppService5 = ApplicationManager.getApplication().getService(<error descr="Cannot resolve symbol 'LightServiceEmptyConstructor'">LightServiceEmptyConstructor</error>.class);
+  public static final LightServiceEmptyAnnotation <warning descr="Application service must not be assigned to a static final field">myAppService4</warning> = LightServiceEmptyAnnotation.getInstance();
 
   // not final
-  static LightServiceAppAndProjectLevelAnnotation myAppService6 = LightServiceAppAndProjectLevelAnnotation.getInstance();
+  static LightServiceAppAndProjectLevelAnnotation myAppService5 = LightServiceAppAndProjectLevelAnnotation.getInstance();
 
   // not static
-  final LightServiceAppLevelAnnotation myAppService7 = LightServiceAppLevelAnnotation.getInstance();
+  final LightServiceAppLevelAnnotation myAppService6 = LightServiceAppLevelAnnotation.getInstance();
 
   // not an application service
   static final LightServiceProjecLevelAnnotation myProjectService = new LightServiceProjecLevelAnnotation();

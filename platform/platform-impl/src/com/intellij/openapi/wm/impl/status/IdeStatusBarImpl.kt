@@ -3,6 +3,7 @@
 
 package com.intellij.openapi.wm.impl.status
 
+import com.intellij.accessibility.AccessibilityUtils
 import com.intellij.diagnostic.runActivity
 import com.intellij.ide.HelpTooltipManager
 import com.intellij.ide.IdeEventQueue
@@ -74,9 +75,9 @@ private val WIDGET_ID = Key.create<String>("STATUS_BAR_WIDGET_ID")
 private val MIN_ICON_HEIGHT = JBUI.scale(18 + 1 + 1)
 
 open class IdeStatusBarImpl internal constructor(
+  private val disposable: Disposable,
   private val frameHelper: ProjectFrameHelper,
   addToolWindowWidget: Boolean,
-  private var editorProvider: () -> FileEditor? = createDefaultEditorProvider(frameHelper),
 ) : JComponent(), Accessible, StatusBarEx, DataProvider {
   private val infoAndProgressPanel: InfoAndProgressPanel
 
@@ -97,7 +98,7 @@ open class IdeStatusBarImpl internal constructor(
 
   private var preferredTextHeight: Int = 0
 
-  private val initialEditorProvider = editorProvider
+  private var editorProvider: () -> FileEditor? = createDefaultEditorProvider(frameHelper)
 
   private val children = LinkedHashSet<IdeStatusBarImpl>()
   private val listeners = EventDispatcher.create(StatusBarListener::class.java)
@@ -126,12 +127,13 @@ open class IdeStatusBarImpl internal constructor(
     }
   }
 
-  override fun createChild(frame: IdeFrame, editorProvider: () -> FileEditor?): StatusBar {
+  override fun createChild(disposable: Disposable, frame: IdeFrame, editorProvider: () -> FileEditor?): StatusBar {
     EDT.assertIsEdt()
-    val bar = IdeStatusBarImpl(frameHelper = frameHelper, addToolWindowWidget = false, editorProvider = editorProvider)
+    val bar = IdeStatusBarImpl(disposable = disposable, frameHelper = frameHelper, addToolWindowWidget = false)
+    bar.editorProvider = editorProvider
     bar.isVisible = isVisible
     children.add(bar)
-    Disposer.register(frameHelper) { children.remove(bar) }
+    Disposer.register(disposable) { children.remove(bar) }
     for (eachBean in widgetMap.values) {
       if (eachBean.widget is Multiframe) {
         bar.addWidget(widget = eachBean.widget.copy(), position = eachBean.position, anchor = eachBean.order)
@@ -170,18 +172,18 @@ open class IdeStatusBarImpl internal constructor(
                                                         position = Position.CENTER,
                                                         component = infoAndProgressPanel.component,
                                                         order = LoadingOrder.ANY))
-    Disposer.register(frameHelper, infoAndProgressPanel)
+    Disposer.register(disposable, infoAndProgressPanel)
 
     registerCloneTasks()
 
     if (addToolWindowWidget) {
-      val toolWindowWidget = ToolWindowsWidget(frameHelper, this)
+      val toolWindowWidget = ToolWindowsWidget(disposable, this)
       val toolWindowWidgetComponent = wrapCustomStatusBarWidget(toolWindowWidget)
       widgetMap.put(toolWindowWidget.ID(), WidgetBean(widget = toolWindowWidget,
                                                       position = Position.LEFT,
                                                       component = toolWindowWidgetComponent,
                                                       order = LoadingOrder.ANY))
-      Disposer.register(frameHelper, toolWindowWidget)
+      Disposer.register(disposable, toolWindowWidget)
       toolWindowWidgetComponent.border = if (SystemInfoRt.isMac) JBUI.Borders.empty(2, 0, 2, 4) else JBUI.Borders.empty()
       leftPanel().add(toolWindowWidgetComponent)
     }
@@ -190,7 +192,7 @@ open class IdeStatusBarImpl internal constructor(
 
     enableEvents(AWTEvent.MOUSE_EVENT_MASK)
     enableEvents(AWTEvent.MOUSE_MOTION_EVENT_MASK)
-    IdeEventQueue.getInstance().addDispatcher({ e -> if (e is MouseEvent) dispatchMouseEvent(e) else false }, frameHelper)
+    IdeEventQueue.getInstance().addDispatcher({ e -> if (e is MouseEvent) dispatchMouseEvent(e) else false }, disposable)
   }
 
   override fun getPreferredSize(): Dimension {
@@ -361,7 +363,7 @@ open class IdeStatusBarImpl internal constructor(
     val component = wrap(widget)
 
     widgetMap.put(widget.ID(), WidgetBean(widget = widget, position = position, component = component, order = anchor))
-    Disposer.register(frameHelper, widget)
+    Disposer.register(disposable, widget)
 
     widget.install(this)
 
@@ -515,7 +517,7 @@ open class IdeStatusBarImpl internal constructor(
   private fun dispatchMouseEvent(e: MouseEvent): Boolean {
     val rightPanel = rightPanel.takeIf { it.isVisible } ?: return false
     val component = e.component ?: return false
-    if (ComponentUtil.getWindow(frameHelper.frame) !== ComponentUtil.getWindow(component)) {
+    if (ComponentUtil.getWindow(this) !== ComponentUtil.getWindow(component)) {
       applyWidgetEffect(null, null)
       return false
     }
@@ -650,12 +652,13 @@ open class IdeStatusBarImpl internal constructor(
 
   @ApiStatus.Internal
   fun resetEditorProvider() {
-    editorProvider = initialEditorProvider
+    editorProvider = createDefaultEditorProvider(frameHelper)
   }
 
   override fun getAccessibleContext(): AccessibleContext {
     if (accessibleContext == null) {
       accessibleContext = AccessibleIdeStatusBarImpl()
+      accessibleContext.accessibleName = UIBundle.message("status.bar.accessible.group.name")
     }
     return accessibleContext
   }
@@ -681,7 +684,7 @@ open class IdeStatusBarImpl internal constructor(
       .collectCloneableProjects()
       .map { it.cloneableProject }
       .forEach { addProgress(indicator = it.progressIndicator, info = it.cloneTaskInfo) }
-    ApplicationManager.getApplication().messageBus.connect(frameHelper)
+    ApplicationManager.getApplication().messageBus.connect(disposable)
       .subscribe(CloneableProjectsService.TOPIC, object : CloneProjectListener {
         override fun onCloneAdded(progressIndicator: ProgressIndicatorEx, taskInfo: TaskInfo) {
           addProgress(progressIndicator, taskInfo)
@@ -690,7 +693,7 @@ open class IdeStatusBarImpl internal constructor(
   }
 
   protected inner class AccessibleIdeStatusBarImpl : AccessibleJComponent() {
-    override fun getAccessibleRole(): AccessibleRole = AccessibleRole.PANEL
+    override fun getAccessibleRole(): AccessibleRole = AccessibilityUtils.GROUPED_ELEMENTS
   }
 }
 
@@ -816,7 +819,8 @@ private fun wrapCustomStatusBarWidget(widget: CustomStatusBarWidget): JComponent
 
 private fun createDefaultEditorProvider(frameHelper: ProjectFrameHelper): () -> FileEditor? {
   return p@{
-    (frameHelper.project ?: return@p null).service<StatusBarWidgetsManager>().dataContext.currentFileEditor.value
+    val project = frameHelper.project ?: return@p null
+    project.service<StatusBarWidgetsManager>().dataContext.currentFileEditor.value
   }
 }
 
@@ -855,7 +859,9 @@ private class TextPresentationComponent(
   }
 }
 
-private class MultipleTextValues(private val presentation: MultipleTextValuesPresentation) : WithIconAndArrows(presentation::getTooltipText), StatusBarWidgetWrapper {
+private class MultipleTextValues(private val presentation: MultipleTextValuesPresentation)
+  : WithIconAndArrows(presentation::getTooltipText), StatusBarWidgetWrapper {
+
   init {
     isVisible = !presentation.getSelectedValue().isNullOrEmpty()
     setTextAlignment(CENTER_ALIGNMENT)

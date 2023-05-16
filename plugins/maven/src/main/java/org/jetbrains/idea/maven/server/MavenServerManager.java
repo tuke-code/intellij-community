@@ -5,6 +5,7 @@ import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.projectRoots.Sdk;
+import com.intellij.util.concurrency.annotations.RequiresBlockingContext;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -18,10 +19,12 @@ import java.util.function.Predicate;
 public interface MavenServerManager extends Disposable {
   String BUNDLED_MAVEN_2 = "Bundled (Maven 2)";
   String BUNDLED_MAVEN_3 = "Bundled (Maven 3)";
+  String BUNDLED_MAVEN_4 = "Bundled (Maven 4)";
   String WRAPPED_MAVEN = "Use Maven wrapper";
 
   Collection<MavenServerConnector> getAllConnectors();
 
+  @RequiresBlockingContext
   void restartMavenConnectors(Project project, boolean wait, Predicate<MavenServerConnector> condition);
 
   MavenServerConnector getConnector(@NotNull Project project, @NotNull String workingDirectory);

@@ -1,13 +1,13 @@
 // Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.ui
 
-import com.intellij.ide.ui.laf.darcula.ui.DarculaJBPopupComboPopup
 import com.intellij.openapi.ui.ComboBox
 import com.intellij.openapi.ui.popup.ListSeparator
 import com.intellij.openapi.ui.popup.util.PopupUtil
 import com.intellij.openapi.util.NlsContexts
 import com.intellij.ui.components.panels.NonOpaquePanel
 import com.intellij.ui.popup.list.ComboBoxPopup
+import com.intellij.ui.popup.list.ListPopupModel
 import com.intellij.ui.popup.list.SelectablePanel
 import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.UIUtil
@@ -26,7 +26,7 @@ import javax.swing.border.CompoundBorder
  * this renderer makes it possible to use [ComboBox]<[T]> and specify which items should be preceded
  * by a separator. (see [GroupedComboBoxRenderer.separatorFor])
  */
-abstract class GroupedComboBoxRenderer<T>(val combo: ComboBox<T>) : GroupedElementsRenderer(), ListCellRenderer<T> {
+abstract class GroupedComboBoxRenderer<T>(val combo: ComboBox<T>? = null) : GroupedElementsRenderer(), ListCellRenderer<T> {
 
   /**
    * @return The item title displayed in the combo
@@ -50,7 +50,11 @@ abstract class GroupedComboBoxRenderer<T>(val combo: ComboBox<T>) : GroupedEleme
   /**
    * Appends text fragments to the item [SimpleColoredComponent].
    */
-  open fun customize(item: SimpleColoredComponent, value: T, index: Int) {
+  open fun customize(item: SimpleColoredComponent,
+                     value: T,
+                     index: Int,
+                     isSelected: Boolean,
+                     cellHasFocus: Boolean) {
     val text = getText(value)
     item.append(text)
 
@@ -97,17 +101,15 @@ abstract class GroupedComboBoxRenderer<T>(val combo: ComboBox<T>) : GroupedEleme
     return layoutComponent(coloredComponent)
   }
 
-  private fun layoutComponent(component: JComponent): JComponent = when {
+  open fun layoutComponent(component: JComponent): JComponent = when {
     ExperimentalUI.isNewUI() -> SelectablePanel.wrap(component)
     else -> JBUI.Panels.simplePanel(component).apply {
       border = JBUI.Borders.empty(20, 16)
     }
   }
 
-  // TODO: remove when old UI is not supported
-  @Suppress("UNNECESSARY_SAFE_CALL")
   private val enabled: Boolean
-    get() = combo?.isEnabled == true
+    get() = combo?.isEnabled ?: true
 
   override fun getBackground(): Color = if (enabled) UIUtil.getListBackground(false, false) else UIUtil.getComboBoxDisabledBackground()
   override fun getForeground(): Color = if (enabled) UIUtil.getListForeground(false, false) else UIUtil.getComboBoxDisabledForeground()
@@ -119,17 +121,17 @@ abstract class GroupedComboBoxRenderer<T>(val combo: ComboBox<T>) : GroupedEleme
                                             index: Int,
                                             isSelected: Boolean,
                                             cellHasFocus: Boolean): Component {
-    val popup = (combo.popup as? DarculaJBPopupComboPopup<*>)?.popup
+    val model = (list?.model as? ListPopupModel)
 
     coloredComponent.apply {
       clear()
-      customize(this, value, index)
+      customize(this, value, index, isSelected, cellHasFocus)
     }
 
     mySeparatorComponent.apply {
-      isVisible = popup?.isSeparatorAboveOf(value) == true
+      isVisible = model?.isSeparatorAboveOf(value) == true
       if (isVisible) {
-        caption = popup!!.getCaptionAboveOf(value)
+        caption = model!!.getCaptionAboveOf(value)
         (this as GroupHeaderSeparator).setHideLine(index == 0)
       }
     }

@@ -29,21 +29,20 @@ import com.intellij.usages.UsageView
 import com.intellij.util.containers.map2Array
 import java.awt.event.MouseEvent
 import java.util.function.*
-import java.util.function.Function
 
 class PsiTargetNavigator<T: PsiElement>(val supplier: Supplier<Collection<T>>) {
 
   constructor(elements: Array<T>) : this(Supplier { elements.toList() })
 
   private var selection: PsiElement? = null
-  private var presentationProvider: Function<T, TargetPresentation> = Function { targetPresentation(it) }
+  private var presentationProvider: TargetPresentationProvider<T> = TargetPresentationProvider { targetPresentation(it) }
   private var elementsConsumer: BiConsumer<Collection<T>, PsiTargetNavigator<T>>? = null
   private var title: @PopupTitle String? = null
   private var tabTitle: @TabTitle String? = null
   private var updater: BackgroundUpdaterTaskBase<ItemWithPresentation>? = null
 
   fun selection(selection: PsiElement?): PsiTargetNavigator<T> = apply { this.selection = selection }
-  fun presentationProvider(provider: Function<T, TargetPresentation>): PsiTargetNavigator<T> = apply { this.presentationProvider = provider }
+  fun presentationProvider(provider: TargetPresentationProvider<T>): PsiTargetNavigator<T> = apply { this.presentationProvider = provider }
   fun elementsConsumer(consumer: BiConsumer<Collection<T>, PsiTargetNavigator<T>>): PsiTargetNavigator<T> = apply { elementsConsumer = consumer }
   fun title(title: @PopupTitle String?): PsiTargetNavigator<T> = apply { this.title = title }
   fun tabTitle(title: @TabTitle String?): PsiTargetNavigator<T> = apply { this.tabTitle = title }
@@ -62,8 +61,16 @@ class PsiTargetNavigator<T: PsiElement>(val supplier: Supplier<Collection<T>>) {
     return navigate(editor.project!!, title, processor, Consumer { it.showInBestPositionFor(editor) })
   }
 
+  fun navigate(editor: Editor, @PopupTitle title: String?): Boolean {
+    return navigate(editor.project!!, title, { element -> EditSourceUtil.navigateToPsiElement(element) }, Consumer { it.showInBestPositionFor(editor) })
+  }
+
   fun navigate(e: MouseEvent, @PopupTitle title: String?, project: Project): Boolean {
     return navigate(project, title, { element -> EditSourceUtil.navigateToPsiElement(element) }, Consumer { it.show(RelativePoint(e)) })
+  }
+
+  fun navigate(point: RelativePoint?, @PopupTitle title: String?, project: Project, processor: (element: T) -> Boolean): Boolean {
+    return navigate(project, title, processor, Consumer { if (point == null) it.showInFocusCenter() else it.show(point) })
   }
 
   private fun getPredicate(processor: PsiElementProcessor<T>) = Predicate<ItemWithPresentation> {
@@ -109,7 +116,7 @@ class PsiTargetNavigator<T: PsiElement>(val supplier: Supplier<Collection<T>>) {
                                            elementsConsumer?.accept(elements, this)
                                            val list = elements.map {
                                              ItemWithPresentation(SmartPointerManager.createPointer(it),
-                                                                  presentationProvider.apply(it))
+                                                                  presentationProvider.getPresentation(it))
                                            }
                                            val selected = if (selection == null) null
                                            else list[elements.indexOf(selection)]
@@ -141,6 +148,10 @@ class PsiTargetNavigator<T: PsiElement>(val supplier: Supplier<Collection<T>>) {
     updater?.init(popup, builder.backgroundUpdater, ref)
     return popup
   }
+}
+
+fun interface TargetPresentationProvider<T: PsiElement> {
+  fun getPresentation(element: T): TargetPresentation
 }
 
 abstract class TargetUpdaterTask(project: Project, @NlsContexts.ProgressTitle title: String):

@@ -1,8 +1,11 @@
 // Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.openapi.vfs.newvfs.persistent;
 
+import com.intellij.openapi.util.SystemInfoRt;
+import com.intellij.openapi.util.io.FileUtil;
 import com.intellij.openapi.vfs.newvfs.persistent.PersistentFSRecordsLockFreeOverMMappedFile.MMappedFileStorage.Page;
 import com.intellij.util.SystemProperties;
+import com.intellij.util.io.ClosedStorageException;
 import com.intellij.util.io.IOUtil;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
@@ -17,6 +20,8 @@ import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.Date;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReferenceArray;
@@ -31,14 +36,15 @@ import static java.nio.file.StandardOpenOption.*;
 @ApiStatus.Internal
 public class PersistentFSRecordsLockFreeOverMMappedFile implements PersistentFSRecordsStorage, IPersistentFSRecordsStorage {
 
-  /* ================ RECORD FIELDS LAYOUT (in ints = 4 bytes) ======================================== */
-
+  /* ================ FILE HEADER FIELDS LAYOUT ======================================================= */
   /**
    * For mmapped implementation file size is page-aligned, we can't calculate records size from it. Instead
    * we store allocated records count in header, in a reserved field (HEADER_RESERVED_4BYTES_OFFSET)
    */
   private static final int HEADER_RECORDS_ALLOCATED = HEADER_VERSION_OFFSET + Integer.BYTES;
   public static final int HEADER_SIZE = PersistentFSHeaders.HEADER_SIZE;
+
+  /* ================ RECORD FIELDS LAYOUT  =========================================================== */
 
   private static final int PARENT_REF_OFFSET = 0;
   private static final int PARENT_REF_SIZE = Integer.BYTES;
@@ -60,15 +66,14 @@ public class PersistentFSRecordsLockFreeOverMMappedFile implements PersistentFSR
 
   public static final int RECORD_SIZE_IN_BYTES = LENGTH_OFFSET + LENGTH_SIZE;
 
-  public static final int DEFAULT_MAPPED_CHUNK_SIZE = SystemProperties.getIntProperty("vfs.records-storage.memory-mapped.mapped-chunk-size", 1 << 26);//64Mb
+  /* ================ RECORD FIELDS LAYOUT end             ======================================== */
+
+  public static final int DEFAULT_MAPPED_CHUNK_SIZE =
+    SystemProperties.getIntProperty("vfs.records-storage.memory-mapped.mapped-chunk-size", 1 << 26);//64Mb
 
   private static final VarHandle INT_HANDLE = MethodHandles.byteBufferViewVarHandle(int[].class, ByteOrder.nativeOrder());
   private static final VarHandle LONG_HANDLE = MethodHandles.byteBufferViewVarHandle(long[].class, ByteOrder.nativeOrder());
 
-
-
-
-  /* ================ RECORD FIELDS LAYOUT end             ======================================== */
 
   private final @NotNull MMappedFileStorage storage;
 
@@ -117,9 +122,9 @@ public class PersistentFSRecordsLockFreeOverMMappedFile implements PersistentFSR
   public <R, E extends Throwable> R readRecord(final int recordId,
                                                final @NotNull RecordReader<R, E> reader) throws E, IOException {
     final long recordOffsetInFile = recordOffsetInFile(recordId);
-    final int recordOffsetOnPage = toOffsetOnPage(recordOffsetInFile);
+    final int recordOffsetOnPage = storage.toOffsetInPage(recordOffsetInFile);
     try (final Page page = storage.pageByOffset(recordOffsetInFile)) {
-      final RecordAccessor recordAccessor = new RecordAccessor(recordId, recordOffsetOnPage, page);
+      final RecordAccessor recordAccessor = new RecordAccessor(recordId, recordOffsetOnPage, page, allocatedRecordsCount);
       return reader.readRecord(recordAccessor);
     }
   }
@@ -131,10 +136,10 @@ public class PersistentFSRecordsLockFreeOverMMappedFile implements PersistentFSR
                              allocateRecord() :
                              recordId;
     final long recordOffsetInFile = recordOffsetInFile(recordId);
-    final int recordOffsetOnPage = toOffsetOnPage(recordOffsetInFile);
+    final int recordOffsetOnPage = storage.toOffsetInPage(recordOffsetInFile);
     try (final Page page = storage.pageByOffset(recordOffsetInFile)) {
       //RC: hope EscapeAnalysis removes the allocation here:
-      final RecordAccessor recordAccessor = new RecordAccessor(recordId, recordOffsetOnPage, page);
+      final RecordAccessor recordAccessor = new RecordAccessor(recordId, recordOffsetOnPage, page, allocatedRecordsCount);
       final boolean updated = updater.updateRecord(recordAccessor);
       if (updated) {
         incrementRecordVersion(recordAccessor.pageBuffer, recordOffsetOnPage);
@@ -145,6 +150,7 @@ public class PersistentFSRecordsLockFreeOverMMappedFile implements PersistentFSR
 
   @Override
   public <R, E extends Throwable> R readHeader(final @NotNull HeaderReader<R, E> reader) throws E, IOException {
+    //'acquire' page in advance -- ensure page will not be evicted during .readHeader()
     try (final Page page = storage.pageByOffset(0)) {
       return reader.readHeader(headerAccessor);
     }
@@ -164,13 +170,16 @@ public class PersistentFSRecordsLockFreeOverMMappedFile implements PersistentFSR
     private final int recordId;
     private final int recordOffsetInPage;
     private final transient ByteBuffer pageBuffer;
+    private final AtomicInteger allocatedRecordsCount;
 
     private RecordAccessor(final int recordId,
                            final int recordOffsetInPage,
-                           final Page recordPage) {
+                           final Page recordPage,
+                           final AtomicInteger allocatedRecordsCount) {
       this.recordId = recordId;
       this.recordOffsetInPage = recordOffsetInPage;
       pageBuffer = recordPage.rawPageBuffer();
+      this.allocatedRecordsCount = allocatedRecordsCount;
     }
 
     @Override
@@ -221,19 +230,19 @@ public class PersistentFSRecordsLockFreeOverMMappedFile implements PersistentFSR
 
     @Override
     public void setAttributeRecordId(final int attributeRecordId) {
-      if (attributeRecordId < NULL_ID) {
-        throw new IllegalArgumentException("file[id: " + recordId + "].attributeRecordId(=" + attributeRecordId + ") must be >=0");
-      }
+      checkValidIdField(recordId, attributeRecordId, "attributeRecordId");
       setIntField(ATTR_REF_OFFSET, attributeRecordId);
     }
 
     @Override
     public void setParent(final int parentId) {
+      checkParentIdIsValid(parentId);
       setIntField(PARENT_REF_OFFSET, parentId);
     }
 
     @Override
     public void setNameId(final int nameId) {
+      checkValidIdField(recordId, nameId, "nameId");
       setIntField(NAME_REF_OFFSET, nameId);
     }
 
@@ -254,6 +263,7 @@ public class PersistentFSRecordsLockFreeOverMMappedFile implements PersistentFSR
 
     @Override
     public boolean setContentRecordId(final int contentRecordId) {
+      checkValidIdField(recordId, contentRecordId, "contentRecordId");
       return setIntFieldIfChanged(CONTENT_REF_OFFSET, contentRecordId);
     }
 
@@ -267,7 +277,7 @@ public class PersistentFSRecordsLockFreeOverMMappedFile implements PersistentFSR
       final int fieldOffsetInPage = recordOffsetInPage + fieldRelativeOffset;
       final long oldValue = (long)LONG_HANDLE.getVolatile(pageBuffer, fieldOffsetInPage);
       if (oldValue != newValue) {
-        LONG_HANDLE.setVolatile(pageBuffer, fieldOffsetInPage, newValue);
+        setLongVolatile(pageBuffer, fieldOffsetInPage, newValue);
         return true;
       }
       return false;
@@ -279,7 +289,7 @@ public class PersistentFSRecordsLockFreeOverMMappedFile implements PersistentFSR
 
     private void setIntField(final int fieldRelativeOffset,
                              final int newValue) {
-      INT_HANDLE.setVolatile(pageBuffer, recordOffsetInPage + fieldRelativeOffset, newValue);
+      setIntVolatile(pageBuffer, recordOffsetInPage + fieldRelativeOffset, newValue);
     }
 
     private boolean setIntFieldIfChanged(final int fieldRelativeOffset,
@@ -287,10 +297,18 @@ public class PersistentFSRecordsLockFreeOverMMappedFile implements PersistentFSR
       final int fieldOffsetInPage = recordOffsetInPage + fieldRelativeOffset;
       final int oldValue = (int)INT_HANDLE.getVolatile(pageBuffer, fieldOffsetInPage);
       if (oldValue != newValue) {
-        INT_HANDLE.setVolatile(pageBuffer, fieldOffsetInPage, newValue);
+        setIntVolatile(pageBuffer, fieldOffsetInPage, newValue);
         return true;
       }
       return false;
+    }
+
+    private void checkParentIdIsValid(final int parentId) throws IndexOutOfBoundsException {
+      final int recordsAllocatedSoFar = allocatedRecordsCount.get();
+      if (!(NULL_ID <= parentId && parentId <= recordsAllocatedSoFar)) {
+        throw new IndexOutOfBoundsException(
+          "parentId(=" + parentId + ") is outside of allocated IDs range [0, " + recordsAllocatedSoFar + "]");
+      }
     }
   }
 
@@ -343,11 +361,9 @@ public class PersistentFSRecordsLockFreeOverMMappedFile implements PersistentFSR
 
   @Override
   public void setAttributeRecordId(final int recordId,
-                                   final int recordRef) throws IOException {
-    if (recordRef < NULL_ID) {
-      throw new IllegalArgumentException("file[id: " + recordId + "].attributeRecordId(=" + recordRef + ") must be >=0");
-    }
-    setIntField(recordId, ATTR_REF_OFFSET, recordRef);
+                                   final int attributeRecordId) throws IOException {
+    checkValidIdField(recordId, attributeRecordId, "attributeRecordId");
+    setIntField(recordId, ATTR_REF_OFFSET, attributeRecordId);
   }
 
   @Override
@@ -363,7 +379,7 @@ public class PersistentFSRecordsLockFreeOverMMappedFile implements PersistentFSR
   @Override
   public void setParent(final int recordId,
                         final int parentId) throws IOException {
-    checkRecordIdIsValid(parentId);
+    checkParentIdIsValid(parentId);
     setIntField(recordId, PARENT_REF_OFFSET, parentId);
   }
 
@@ -412,7 +428,7 @@ public class PersistentFSRecordsLockFreeOverMMappedFile implements PersistentFSR
       final ByteBuffer pageBuffer = page.rawPageBuffer();
       final long storedLength = (long)LONG_HANDLE.getVolatile(pageBuffer, fieldOffsetOnPage);
       if (storedLength != newLength) {
-        LONG_HANDLE.setVolatile(pageBuffer, fieldOffsetOnPage, newLength);
+        setLongVolatile(pageBuffer, fieldOffsetOnPage, newLength);
         incrementRecordVersion(pageBuffer, recordOffsetOnPage);
 
         return true;
@@ -420,6 +436,7 @@ public class PersistentFSRecordsLockFreeOverMMappedFile implements PersistentFSR
       return false;
     }
   }
+
 
   @Override
   public long getTimestamp(final int recordId) throws IOException {
@@ -450,12 +467,13 @@ public class PersistentFSRecordsLockFreeOverMMappedFile implements PersistentFSR
 
   @Override
   public boolean setContentRecordId(final int recordId,
-                                    final int newContentRef) throws IOException {
+                                    final int newContentRecordId) throws IOException {
+    checkValidIdField(recordId, newContentRecordId, "contentRecordId");
     final long recordOffsetInFile = recordOffsetInFile(recordId);
     final int recordOffsetOnPage = storage.toOffsetInPage(recordOffsetInFile);
     try (final Page page = storage.pageByOffset(recordOffsetInFile)) {
       final ByteBuffer pageBuffer = page.rawPageBuffer();
-      return setIntFieldIfChanged(pageBuffer, recordOffsetOnPage, CONTENT_REF_OFFSET, newContentRef);
+      return setIntFieldIfChanged(pageBuffer, recordOffsetOnPage, CONTENT_REF_OFFSET, newContentRecordId);
     }
   }
 
@@ -468,17 +486,17 @@ public class PersistentFSRecordsLockFreeOverMMappedFile implements PersistentFSR
                          final int parentId,
                          final boolean overwriteAttrRef) throws IOException {
     final long recordOffsetInFile = recordOffsetInFile(recordId);
-    final int recordOffsetOnPage = toOffsetOnPage(recordOffsetInFile);
+    final int recordOffsetOnPage = storage.toOffsetInPage(recordOffsetInFile);
     try (final Page page = storage.pageByOffset(recordOffsetInFile)) {
       final ByteBuffer pageBuffer = page.rawPageBuffer();
-      INT_HANDLE.setVolatile(pageBuffer, recordOffsetOnPage + PARENT_REF_OFFSET, parentId);
-      INT_HANDLE.setVolatile(pageBuffer, recordOffsetOnPage + NAME_REF_OFFSET, nameId);
-      INT_HANDLE.setVolatile(pageBuffer, recordOffsetOnPage + FLAGS_OFFSET, flags);
+      setIntVolatile(pageBuffer, recordOffsetOnPage + PARENT_REF_OFFSET, parentId);
+      setIntVolatile(pageBuffer, recordOffsetOnPage + NAME_REF_OFFSET, nameId);
+      setIntVolatile(pageBuffer, recordOffsetOnPage + FLAGS_OFFSET, flags);
       if (overwriteAttrRef) {
-        INT_HANDLE.setVolatile(pageBuffer, recordOffsetOnPage + ATTR_REF_OFFSET, 0);
+        setIntVolatile(pageBuffer, recordOffsetOnPage + ATTR_REF_OFFSET, 0);
       }
-      LONG_HANDLE.setVolatile(pageBuffer, recordOffsetOnPage + TIMESTAMP_OFFSET, timestamp);
-      LONG_HANDLE.setVolatile(pageBuffer, recordOffsetOnPage + LENGTH_OFFSET, length);
+      setLongVolatile(pageBuffer, recordOffsetOnPage + TIMESTAMP_OFFSET, timestamp);
+      setLongVolatile(pageBuffer, recordOffsetOnPage + LENGTH_OFFSET, length);
 
       incrementRecordVersion(pageBuffer, recordOffsetOnPage);
     }
@@ -502,12 +520,12 @@ public class PersistentFSRecordsLockFreeOverMMappedFile implements PersistentFSR
     final int recordSizeInInts = RECORD_SIZE_IN_BYTES / Integer.BYTES;
 
     final long recordOffsetInFile = recordOffsetInFile(recordId);
-    final int recordOffsetOnPage = toOffsetOnPage(recordOffsetInFile);
+    final int recordOffsetOnPage = storage.toOffsetInPage(recordOffsetInFile);
     try (final Page page = storage.pageByOffset(recordOffsetInFile)) {
       final ByteBuffer pageBuffer = page.rawPageBuffer();
       for (int wordNo = 0; wordNo < recordSizeInInts; wordNo++) {
         final int offsetOfWord = recordOffsetOnPage + wordNo * Integer.BYTES;
-        INT_HANDLE.setVolatile(pageBuffer, offsetOfWord, 0);
+        setIntVolatile(pageBuffer, offsetOfWord, 0);
       }
     }
   }
@@ -521,6 +539,8 @@ public class PersistentFSRecordsLockFreeOverMMappedFile implements PersistentFSR
         getNameId(recordId),
         getFlags(recordId),
         getParent(recordId),
+        getAttributeRecordId(recordId),
+        getContentRecordId(recordId),
         /* corrupted = */ false
       );
     }
@@ -601,6 +621,21 @@ public class PersistentFSRecordsLockFreeOverMMappedFile implements PersistentFSR
     storage.close();
   }
 
+  /** Close the storage and remove all its data files */
+  @Override
+  public void closeAndRemoveAllFiles() throws IOException {
+    close();
+    if (SystemInfoRt.isWindows) {
+      //On Win there are a lot of issues with removing file that was mmapped.
+      // Let's give mapped buffers at least a chance to be collected & unmapped -- not a guarantee from that kind of
+      // issues, but a small step in the right direction
+
+      //noinspection CallToSystemGC
+      System.gc();
+    }
+    FileUtil.delete(storage.storagePath);
+  }
+
   //TODO RC: do we need method like 'unmap', which forcibly unmaps pages, or it is enough to rely
   //         on JVM which will unmap pages eventually, as they are collected by GC?
   //         Forcible unmap allows to 'clean after yourself', but carries a risk of JVM crash if
@@ -642,16 +677,28 @@ public class PersistentFSRecordsLockFreeOverMMappedFile implements PersistentFSR
     return recordOffsetInFileUnchecked(recordId);
   }
 
-  private int toOffsetOnPage(final long recordOffsetInFile) {
-    return (int)(recordOffsetInFile % pageSize);
-  }
-
 
   private void checkRecordIdIsValid(final int recordId) throws IndexOutOfBoundsException {
     final int recordsAllocatedSoFar = allocatedRecordsCount.get();
     if (!(NULL_ID < recordId && recordId <= recordsAllocatedSoFar)) {
       throw new IndexOutOfBoundsException(
         "recordId(=" + recordId + ") is outside of allocated IDs range (0, " + recordsAllocatedSoFar + "]");
+    }
+  }
+
+  private void checkParentIdIsValid(final int parentId) throws IndexOutOfBoundsException {
+    final int recordsAllocatedSoFar = allocatedRecordsCount.get();
+    if (!(NULL_ID <= parentId && parentId <= recordsAllocatedSoFar)) {
+      throw new IndexOutOfBoundsException(
+        "parentId(=" + parentId + ") is outside of allocated IDs range [0, " + recordsAllocatedSoFar + "]");
+    }
+  }
+
+  private static void checkValidIdField(int recordId,
+                                        int idFieldValue,
+                                        @NotNull String fieldName) {
+    if (idFieldValue < NULL_ID) {
+      throw new IllegalArgumentException("file[id: " + recordId + "]." + fieldName + "(=" + idFieldValue + ") must be >=0");
     }
   }
 
@@ -666,7 +713,7 @@ public class PersistentFSRecordsLockFreeOverMMappedFile implements PersistentFSR
     final int recordOffsetOnPage = storage.toOffsetInPage(recordOffsetInFile);
     try (final Page page = storage.pageByOffset(recordOffsetInFile)) {
       final ByteBuffer pageBuffer = page.rawPageBuffer();
-      LONG_HANDLE.setVolatile(pageBuffer, recordOffsetOnPage + fieldRelativeOffset, fieldValue);
+      setLongVolatile(pageBuffer, recordOffsetOnPage + fieldRelativeOffset, fieldValue);
       incrementRecordVersion(pageBuffer, recordOffsetOnPage);
     }
   }
@@ -686,9 +733,9 @@ public class PersistentFSRecordsLockFreeOverMMappedFile implements PersistentFSR
                                         final int fieldRelativeOffset,
                                         final long newValue) {
     final int fieldOffsetOnPage = recordOffsetOnPage + fieldRelativeOffset;
-    final long oldTimestamp = (long)LONG_HANDLE.getVolatile(pageBuffer, fieldOffsetOnPage);
-    if (oldTimestamp != newValue) {
-      LONG_HANDLE.setVolatile(pageBuffer, fieldOffsetOnPage, newValue);
+    final long oldValue = (long)LONG_HANDLE.getVolatile(pageBuffer, fieldOffsetOnPage);
+    if (oldValue != newValue) {
+      setLongVolatile(pageBuffer, fieldOffsetOnPage, newValue);
       incrementRecordVersion(pageBuffer, recordOffsetOnPage);
       return true;
     }
@@ -703,7 +750,7 @@ public class PersistentFSRecordsLockFreeOverMMappedFile implements PersistentFSR
     final int recordOffsetOnPage = storage.toOffsetInPage(recordOffsetInFile);
     try (final Page page = storage.pageByOffset(recordOffsetInFile)) {
       final ByteBuffer pageBuffer = page.rawPageBuffer();
-      INT_HANDLE.setVolatile(pageBuffer, recordOffsetOnPage + fieldRelativeOffset, fieldValue);
+      setIntVolatile(pageBuffer, recordOffsetOnPage + fieldRelativeOffset, fieldValue);
       incrementRecordVersion(pageBuffer, recordOffsetOnPage);
     }
   }
@@ -722,9 +769,10 @@ public class PersistentFSRecordsLockFreeOverMMappedFile implements PersistentFSR
                                        final int recordOffsetOnPage,
                                        final int fieldRelativeOffset,
                                        final int newValue) {
-    final int oldFlags = (int)INT_HANDLE.getVolatile(pageBuffer, fieldRelativeOffset);
-    if (oldFlags != newValue) {
-      INT_HANDLE.setVolatile(pageBuffer, fieldRelativeOffset, newValue);
+    final int fieldOffsetOnPage = recordOffsetOnPage + fieldRelativeOffset;
+    final int oldValue = (int)INT_HANDLE.getVolatile(pageBuffer, fieldOffsetOnPage);
+    if (oldValue != newValue) {
+      setIntVolatile(pageBuffer, fieldOffsetOnPage, newValue);
       incrementRecordVersion(pageBuffer, recordOffsetOnPage);
 
       return true;
@@ -732,9 +780,10 @@ public class PersistentFSRecordsLockFreeOverMMappedFile implements PersistentFSR
     return false;
   }
 
+
   private void incrementRecordVersion(final @NotNull ByteBuffer pageBuffer,
                                       final int recordOffsetOnPage) {
-    INT_HANDLE.setVolatile(pageBuffer, recordOffsetOnPage + MOD_COUNT_OFFSET, globalModCount.incrementAndGet());
+    setIntVolatile(pageBuffer, recordOffsetOnPage + MOD_COUNT_OFFSET, globalModCount.incrementAndGet());
     dirty.compareAndSet(false, true);
   }
 
@@ -744,7 +793,7 @@ public class PersistentFSRecordsLockFreeOverMMappedFile implements PersistentFSR
                                   final long headerValue) throws IOException {
     checkHeaderOffset(headerRelativeOffsetBytes);
     try (final Page page = storage.pageByOffset(headerRelativeOffsetBytes)) {
-      LONG_HANDLE.setVolatile(page.rawPageBuffer(), headerRelativeOffsetBytes, headerValue);
+      setLongVolatile(page.rawPageBuffer(), headerRelativeOffsetBytes, headerValue);
     }
   }
 
@@ -759,7 +808,7 @@ public class PersistentFSRecordsLockFreeOverMMappedFile implements PersistentFSR
                                  final int headerValue) throws IOException {
     checkHeaderOffset(headerRelativeOffsetBytes);
     try (final Page page = storage.pageByOffset(headerRelativeOffsetBytes)) {
-      INT_HANDLE.setVolatile(page.rawPageBuffer(), headerRelativeOffsetBytes, headerValue);
+      setIntVolatile(page.rawPageBuffer(), headerRelativeOffsetBytes, headerValue);
     }
   }
 
@@ -776,6 +825,18 @@ public class PersistentFSRecordsLockFreeOverMMappedFile implements PersistentFSR
       throw new IndexOutOfBoundsException(
         "headerFieldOffset(=" + headerRelativeOffset + ") is outside of header [0, " + HEADER_SIZE + ") ");
     }
+  }
+
+  private static void setIntVolatile(final ByteBuffer pageBuffer,
+                                     final int offsetInBuffer,
+                                     final int value) {
+    INT_HANDLE.setVolatile(pageBuffer, offsetInBuffer, value);
+  }
+
+  private static void setLongVolatile(final ByteBuffer pageBuffer,
+                                      final int offsetInBuffer,
+                                      final long value) {
+    LONG_HANDLE.setVolatile(pageBuffer, offsetInBuffer, value);
   }
 
   protected static class MMappedFileStorage {
@@ -826,7 +887,7 @@ public class PersistentFSRecordsLockFreeOverMMappedFile implements PersistentFSR
       channel = FileChannel.open(storagePath, READ, WRITE, CREATE);
 
       for (int i = 0; i < pagesCount; i++) {
-        pages.set(i, new Page(i));
+        pages.set(i, new Page(i, channel, pageSize));
       }
     }
 
@@ -841,9 +902,12 @@ public class PersistentFSRecordsLockFreeOverMMappedFile implements PersistentFSR
       Page page = pages.get(pageIndex);
       if (page == null) {
         synchronized (pages) {
+          if (!channel.isOpen()) {
+            throw new ClosedStorageException("Storage already closed");
+          }
           page = pages.get(pageIndex);
           if (page == null) {
-            page = new Page(pageIndex);
+            page = new Page(pageIndex, channel, pageSize);
             pages.set(pageIndex, page);
           }
         }
@@ -856,21 +920,33 @@ public class PersistentFSRecordsLockFreeOverMMappedFile implements PersistentFSR
     }
 
     public void close() throws IOException {
-      channel.close();
+      synchronized (pages) {
+        channel.close();
+        for (int i = 0; i < pages.length(); i++) {
+          final Page page = pages.get(i);
+          if (page != null) {
+            page.close();
+          }
+          pages.set(i, null);//give GC a chance to unmap buffers
+        }
+      }
     }
 
-    public class Page implements AutoCloseable {
+    public static class Page implements AutoCloseable {
       private final int pageIndex;
       private final long offsetInFile;
       private final ByteBuffer pageBuffer;
 
-      private Page(final int pageIndex) throws IOException {
+      private Page(int pageIndex,
+                   FileChannel channel,
+                   int pageSize) throws IOException {
         this.pageIndex = pageIndex;
         this.offsetInFile = pageIndex * (long)pageSize;
-        this.pageBuffer = map();
+        this.pageBuffer = map(channel, pageSize);
       }
 
-      public MappedByteBuffer map() throws IOException {
+      private MappedByteBuffer map(FileChannel channel,
+                                   int pageSize) throws IOException {
         //TODO RC: this could cause noticeable pauses, hence it may worth to enlarge file in advance, async
         IOUtil.allocateFileRegion(channel, offsetInFile, pageSize);
         return channel.map(READ_WRITE, offsetInFile, pageSize);
@@ -883,6 +959,51 @@ public class PersistentFSRecordsLockFreeOverMMappedFile implements PersistentFSR
 
       public ByteBuffer rawPageBuffer() {
         return pageBuffer;
+      }
+
+      @Override
+      public String toString() {
+        return "Page[#" + pageIndex + "][offset: " + offsetInFile + ", length: " + pageBuffer.capacity() + " b)";
+      }
+    }
+  }
+
+  /** Opens records.dat file given as args[0], prints header fields, and first records (up to 1024) */
+  public static void main(String[] args) throws IOException {
+    if (args.length < 1) {
+      System.err.println("Args: <path-to-records.dat>");
+      return;
+    }
+    final Path pathToRecordsDat = Paths.get(args[0]);
+    if (!Files.exists(pathToRecordsDat)) {
+      System.err.println("path: " + pathToRecordsDat + " does not exist");
+      return;
+    }
+
+    System.out.println("storage: " + pathToRecordsDat);
+    try (PersistentFSRecordsLockFreeOverMMappedFile records = new PersistentFSRecordsLockFreeOverMMappedFile(pathToRecordsDat,
+                                                                                                             DEFAULT_MAPPED_CHUNK_SIZE)) {
+
+      final int recordsCount = records.recordsCount();
+      System.out.println("length: " + records.length() + " b");
+      System.out.println("version: " + records.getVersion());
+      System.out.println("timestamp: " + new Date(records.getTimestamp()).toGMTString());
+      System.out.println("connectionStatus: " + Integer.toHexString(records.getConnectionStatus()));
+      System.out.println("recordsCount: " + recordsCount);
+      System.out.println("globalModCount: " + records.getGlobalModCount());
+
+      System.out.println("First records (<=1024)");
+      for (int recordId = FSRecords.ROOT_FILE_ID; recordId <= Math.min(recordsCount, 1024); recordId++) {
+        records.readRecord(recordId, record -> {
+          System.out.printf(
+            "{id:%4d, nameId: %d, parentId: %d, length: %d, flags: %s, timestamp: %d, attributeId: %d, contentId:%d, modCount: %d}\n",
+            record.recordId(), record.getNameId(), record.getParent(),
+            record.getLength(), Integer.toBinaryString(record.getFlags()), record.getTimestamp(),
+            record.getAttributeRecordId(), record.getContentRecordId(),
+            record.getModCount()
+          );
+          return true;
+        });
       }
     }
   }

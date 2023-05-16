@@ -2,6 +2,7 @@
 package org.jetbrains.plugins.github.pullrequest.ui.details
 
 import com.intellij.collaboration.messages.CollaborationToolsBundle
+import com.intellij.collaboration.ui.SimpleHtmlPane
 import com.intellij.collaboration.ui.codereview.details.*
 import com.intellij.collaboration.ui.codereview.details.model.CodeReviewDetailsViewModel
 import com.intellij.collaboration.ui.util.emptyBorders
@@ -28,7 +29,6 @@ import org.jetbrains.plugins.github.pullrequest.ui.details.model.GHPRReviewFlowV
 import org.jetbrains.plugins.github.pullrequest.ui.details.model.GHPRStatusViewModel
 import org.jetbrains.plugins.github.pullrequest.ui.details.model.impl.GHPRCommitsViewModel
 import org.jetbrains.plugins.github.ui.avatars.GHAvatarIconsProvider
-import org.jetbrains.plugins.github.ui.util.HtmlEditorPane
 import javax.swing.JComponent
 import javax.swing.JPanel
 
@@ -56,7 +56,7 @@ internal object GHPRDetailsComponentFactory {
       add(GHPRDetailsBranchesComponentFactory.create(project, dataProvider, repositoryDataService, branchesModel))
     }
     val statusChecks = GHPRStatusChecksComponentFactory.create(scope, reviewStatusVm, reviewFlowVm, securityService, avatarIconsProvider)
-    val actionsComponent = GHPRDetailsActionsComponentFactory.create(scope, reviewDetailsVm.requestState, reviewFlowVm, dataProvider)
+    val actionsComponent = GHPRDetailsActionsComponentFactory.create(scope, reviewDetailsVm.reviewRequestState, reviewFlowVm, dataProvider)
     val actionGroup = ActionManager.getInstance().getAction("Github.PullRequest.Details.Popup") as ActionGroup
 
     return JPanel(MigLayout(
@@ -69,18 +69,18 @@ internal object GHPRDetailsComponentFactory {
       isOpaque = false
 
       add(CodeReviewDetailsTitleComponentFactory.create(scope, reviewDetailsVm, GithubBundle.message("open.on.github.action"), actionGroup,
-                                                        htmlPaneFactory = { HtmlEditorPane() }),
+                                                        htmlPaneFactory = { SimpleHtmlPane() }),
           CC().growX().gap(ReviewDetailsUIUtil.TITLE_GAPS))
       add(CodeReviewDetailsDescriptionComponentFactory.create(scope, reviewDetailsVm, actionGroup, ::showTimelineAction,
-                                                              htmlPaneFactory = { HtmlEditorPane() }),
+                                                              htmlPaneFactory = { SimpleHtmlPane() }),
           CC().growX().gap(ReviewDetailsUIUtil.DESCRIPTION_GAPS))
       add(commitsAndBranches, CC().growX().gap(ReviewDetailsUIUtil.COMMIT_POPUP_BRANCHES_GAPS))
       add(CodeReviewDetailsCommitInfoComponentFactory.create(scope, commitsVm.selectedCommit,
                                                              commitPresenter = { commit ->
                                                                createCommitInfoPresenter(commit, commitsVm.ghostUser)
                                                              },
-                                                             htmlPaneFactory = { HtmlEditorPane() }),
-          CC().growX().gap(ReviewDetailsUIUtil.COMMIT_INFO_GAPS).maxHeight("${ReviewDetailsUIUtil.COMMIT_INFO_MAX_HEIGHT}"))
+                                                             htmlPaneFactory = { SimpleHtmlPane() }),
+          CC().growX().gap(ReviewDetailsUIUtil.COMMIT_INFO_GAPS))
       add(commitFilesBrowserComponent, CC().grow().push())
       add(statusChecks, CC().growX().gap(ReviewDetailsUIUtil.STATUSES_GAPS).maxHeight("${ReviewDetailsUIUtil.STATUSES_MAX_HEIGHT}"))
       add(actionsComponent, CC().growX().pushX().gap(ReviewDetailsUIUtil.ACTIONS_GAPS).minHeight("pref"))
@@ -106,6 +106,7 @@ internal object GHPRDetailsComponentFactory {
   private fun createCommitInfoPresenter(commit: GHCommit, ghostUser: GHUser): CommitPresenter {
     return CommitPresenter.SingleCommit(
       title = commit.messageHeadlineHTML,
+      description = commit.messageBodyHTML,
       author = (commit.author?.user ?: ghostUser).getPresentableName(),
       committedDate = commit.committedDate
     )

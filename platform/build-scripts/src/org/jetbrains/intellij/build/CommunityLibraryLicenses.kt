@@ -172,7 +172,7 @@ object CommunityLibraryLicenses {
                      "lucene-highlighter",
                      "lucene-queryparser",
                      "lucene-queries",
-                     "lucene-analyzers-common",
+                     "lucene-analysis-common",
                      "org.apache.lucene:lucene-core:2.4.1",
                      "lucene-query-parser:ind-deps",
                      "lucene-core:ind-deps",
@@ -318,6 +318,7 @@ object CommunityLibraryLicenses {
                                                    "ai.grazie.nlp.tokenizer",
                                                    "ai.grazie.utils.common",
                                                    "ai.grazie.utils.json",
+                                                   "ai.grazie.utils.lucene.lt.compatibility",
                                                    "ai.grazie.model.common",
                                                    "ai.grazie.model.gec",
                                                    "ai.grazie.model.text",
@@ -462,6 +463,9 @@ object CommunityLibraryLicenses {
     LibraryLicense(name = "JCodings", libraryName = "joni", transitiveDependency = true, version = "1.0.55",
                    url = "https://github.com/jruby/jcodings")
       .mit("https://github.com/jruby/jcodings/blob/master/LICENSE.txt"),
+    LibraryLicense(name = "JDOM (JetBrains's fork)", version = "2", attachedTo = "intellij.platform.util.jdom",
+                   url = "http://jdom.org/",
+                   licenseUrl = "https://github.com/JetBrains/intellij-deps-jdom/blob/master/LICENSE.txt"),
     LibraryLicense(libraryName = "jediterm-core", license = "LGPL 3",
                    url = "https://github.com/JetBrains/jediterm",
                    licenseUrl = "https://github.com/JetBrains/jediterm/blob/master/LICENSE-LGPLv3.txt"),
@@ -484,9 +488,9 @@ object CommunityLibraryLicenses {
       .apache("https://github.com/JetBrains/jetCheck/blob/master/LICENSE"),
     LibraryLicense(name = "JGit", libraryName = "JGit", license = "Eclipse Distribution License 1.0",
                    licenseUrl = "https://www.eclipse.org/org/documents/edl-v10.php", url = "https://www.eclipse.org/jgit/"),
-    LibraryLicense(name = "JGit (develar's fork)", libraryName = "jgit-develar", version = "4.0",
+    LibraryLicense(name = "JGit (Settings Sync and SettingsRepo)", libraryName = "jetbrains.intellij.deps.eclipse.jgit",
                    license = "Eclipse Distribution License 1.0",
-                   licenseUrl = "https://www.eclipse.org/org/documents/edl-v10.php", url = "https://github.com/develar/jgit"),
+                   licenseUrl = "https://www.eclipse.org/org/documents/edl-v10.php", url = "https://www.eclipse.org/jgit/"),
     LibraryLicense(name = "JGoodies Common", libraryName = "jgoodies-common",
                    url = "https://www.jgoodies.com/freeware/libraries/looks/").simplifiedBsd(),
     LibraryLicense(name = "JGoodies Forms", libraryName = "jgoodies-forms",
@@ -672,6 +676,9 @@ object CommunityLibraryLicenses {
     LibraryLicense(libraryName = "opentelemetry-extension-kotlin", url = "https://opentelemetry.io/", licenseUrl = "https://github.com/open-telemetry/opentelemetry-java/blob/main/LICENSE", license = "Apache 2.0"),
     LibraryLicense(libraryName = "opentest4j", url = "https://github.com/ota4j-team/opentest4j")
       .apache("https://github.com/ota4j-team/opentest4j/blob/master/LICENSE"),
+    LibraryLicense(name="OverlayScrollbars", attachedTo = "intellij.idea.community.main",
+                   url = "https://kingsora.github.io/OverlayScrollbars", version = "2.1.1")
+      .mit("https://github.com/KingSora/OverlayScrollbars/blob/master/LICENSE"),
     LibraryLicense(name = "Package Search API Models", libraryName = "package-search-api-models",
                    url = "https://github.com/JetBrains/package-search-api-models").apache(),
     LibraryLicense(name = "Package Search Version Utils", libraryName = "package-search-version-utils",
@@ -705,8 +712,6 @@ object CommunityLibraryLicenses {
       .newBsd("https://github.com/RobRuana/pockets/blob/master/LICENSE"),
     LibraryLicense(name = "Protocol Buffers", libraryName = "protobuf", url = "https://developers.google.com/protocol-buffers")
       .newBsd("https://github.com/google/protobuf/blob/master/LICENSE"),
-    LibraryLicense(name = "Protocol Buffers", libraryName = "protobuf-java6", url = "https://developers.google.com/protocol-buffers")
-      .newBsd("https://github.com/protocolbuffers/protobuf/blob/v3.5.1/LICENSE"),
     LibraryLicense(name = "Proxy Vole", libraryName = "proxy-vole", url = "https://github.com/akuhtz/proxy-vole")
       .apache("https://github.com/akuhtz/proxy-vole/blob/master/LICENSE.md"),
     LibraryLicense(name = "pty4j", libraryName = "pty4j",

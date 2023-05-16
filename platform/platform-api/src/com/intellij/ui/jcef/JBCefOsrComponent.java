@@ -7,9 +7,12 @@ import com.intellij.openapi.util.SystemInfoRt;
 import com.intellij.openapi.util.registry.RegistryManager;
 import com.intellij.ui.JBColor;
 import com.intellij.ui.JreHiDpiUtil;
+import com.intellij.ui.scroll.TouchScrollUtil;
 import com.intellij.util.Alarm;
 import org.cef.browser.CefBrowser;
+import org.cef.input.CefTouchEvent;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
 import java.awt.*;
@@ -31,7 +34,7 @@ class JBCefOsrComponent extends JPanel {
   private volatile @NotNull CefBrowser myBrowser;
   private final @NotNull MyScale myScale = new MyScale();
 
-  private @NotNull Alarm myAlarm;
+  private @Nullable Alarm myAlarm;
   private @NotNull Disposable myDisposable;
 
   JBCefOsrComponent(boolean isMouseWheelEventEnabled) {
@@ -98,10 +101,12 @@ class JBCefOsrComponent extends JPanel {
   @Override
   public void reshape(int x, int y, int w, int h) {
     super.reshape(x, y, w, h);
-    myAlarm.cancelAllRequests();
+    if (myAlarm != null) {
+      myAlarm.cancelAllRequests();
 
-    double scale = myScale.getInverted();
-    myAlarm.addRequest(() -> myBrowser.wasResized(CEIL.round(w * scale), CEIL.round(h * scale)), 100);
+      double scale = myScale.getInverted();
+      myAlarm.addRequest(() -> myBrowser.wasResized(CEIL.round(w * scale), CEIL.round(h * scale)), 100);
+    }
   }
 
   @SuppressWarnings("DuplicatedCode")
@@ -135,6 +140,24 @@ class JBCefOsrComponent extends JPanel {
   protected void processMouseWheelEvent(MouseWheelEvent e) {
     super.processMouseWheelEvent(e);
     if (e.isConsumed()) {
+      return;
+    }
+
+    if (TouchScrollUtil.isTouchScroll(e)) {
+      CefTouchEvent.EventType type;
+      if (TouchScrollUtil.isBegin(e)) {
+        type = CefTouchEvent.EventType.PRESSED;
+      }
+      else if (TouchScrollUtil.isUpdate(e)) {
+        type = CefTouchEvent.EventType.MOVED;
+      }
+      else if (TouchScrollUtil.isEnd(e)) {
+        type = CefTouchEvent.EventType.RELEASED;
+      } else {
+        type = CefTouchEvent.EventType.CANCELLED;
+      }
+      myBrowser.sendTouchEvent(new CefTouchEvent(0, e.getX(), e.getY(), 0, 0, 0, 0, type, e.getModifiersEx(),
+                                                 CefTouchEvent.PointerType.UNKNOWN));
       return;
     }
 
@@ -184,17 +207,7 @@ class JBCefOsrComponent extends JPanel {
   @Override
   protected void processKeyEvent(KeyEvent e) {
     super.processKeyEvent(e);
-
-    // Vladimir.Kharitonov@jetbrains.com:
-    // This substitution of characters is a quick fix for JBR-5297.
-    // To be removed after updating JBR to 829.6+
-    char c = e.getKeyChar();
-    if (c == '\n') {
-      e.setKeyChar('\r');
-    }
     myBrowser.sendKeyEvent(e);
-
-    e.setKeyChar(c);
   }
 
   static class MyScale {

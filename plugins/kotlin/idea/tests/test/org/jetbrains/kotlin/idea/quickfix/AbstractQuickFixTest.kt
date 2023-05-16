@@ -1,4 +1,4 @@
-// Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 
 package org.jetbrains.kotlin.idea.quickfix
 
@@ -50,10 +50,9 @@ abstract class AbstractQuickFixTest : KotlinLightCodeInsightFixtureTestCase(), Q
             """.trimIndent(),
         )
 
-        private fun unwrapIntention(action: Any): Any = when (action) {
-            is IntentionActionDelegate -> unwrapIntention(action.delegate)
-            is QuickFixWrapper -> unwrapIntention(action.fix)
-            else -> action
+        private fun unwrapIntention(action: IntentionAction): Any {
+            val original = IntentionActionDelegate.unwrap(action)
+            return QuickFixWrapper.unwrap(original) ?: original
         }
     }
 

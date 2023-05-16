@@ -4,7 +4,8 @@ package com.intellij.openapi.wm.impl.customFrameDecorations.header.toolbar
 import com.intellij.icons.ExpUiIcons
 import com.intellij.ide.DataManager
 import com.intellij.ide.IdeBundle
-import com.intellij.ide.ui.UISettings.Companion.getInstance
+import com.intellij.ide.lightEdit.LightEditCompatible
+import com.intellij.ide.ui.UISettings
 import com.intellij.ide.ui.customization.CustomActionsSchema
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.actionSystem.*
@@ -30,19 +31,21 @@ import java.awt.event.ActionListener
 import java.awt.event.HierarchyEvent
 import java.awt.event.KeyEvent
 import javax.swing.JComponent
+import javax.swing.JRootPane
 import javax.swing.KeyStroke
 import javax.swing.SwingUtilities
 
 @ApiStatus.Internal
 internal class MainMenuButton {
 
+  var expandableMenu: ExpandableMenu? = null
   private val menuAction = ShowMenuAction()
   private var disposable: Disposable? = null
   private var shortcutsChangeConnection: MessageBusConnection? = null
   private var registeredKeyStrokes = mutableListOf<KeyStroke>()
 
   val button: ActionButton = createMenuButton(menuAction)
-  var rootPane: JComponent? = null
+  var rootPane: JRootPane? = null
     set(value) {
       if (field !== value) {
         uninstall()
@@ -128,30 +131,36 @@ internal class MainMenuButton {
     }
   }
 
-  private inner class ShowMenuAction : DumbAwareAction(
+  private inner class ShowMenuAction : LightEditCompatible, DumbAwareAction (
     IdeBundle.messagePointer("main.toolbar.menu.button"),
     ExpUiIcons.General.WindowsMenu_20x20) {
 
-    override fun actionPerformed(e: AnActionEvent) = showPopup(e.dataContext)
+    override fun actionPerformed(e: AnActionEvent) {
+      if (expandableMenu?.isEnabled() == true) {
+        expandableMenu!!.switchState(button.size)
+      } else {
+        showPopup(e.dataContext)
+      }
+    }
+  }
 
-    fun showPopup(context: DataContext, actionToShow: AnAction? = null) {
-      val mainMenu = getMainMenuGroup()
-      val popup = JBPopupFactory.getInstance()
-        .createActionGroupPopup(null, mainMenu, context, JBPopupFactory.ActionSelectionAid.SPEEDSEARCH, true,
-                                ActionPlaces.MAIN_MENU)
-        .apply { isShowSubmenuOnHover = true }
-        .apply { setMinimumSize(Dimension(JBUI.CurrentTheme.CustomFrameDecorations.menuPopupMinWidth(), 0)) }
-        as ListPopupImpl
-      popup.showUnderneathOf(button)
+  fun showPopup(context: DataContext, actionToShow: AnAction? = null) {
+    val mainMenu = getMainMenuGroup()
+    val popup = JBPopupFactory.getInstance()
+      .createActionGroupPopup(null, mainMenu, context, JBPopupFactory.ActionSelectionAid.SPEEDSEARCH, true,
+                              ActionPlaces.MAIN_MENU)
+      .apply { isShowSubmenuOnHover = true }
+      .apply { setMinimumSize(Dimension(JBUI.CurrentTheme.CustomFrameDecorations.menuPopupMinWidth(), 0)) }
+      as ListPopupImpl
+    popup.showUnderneathOf(button)
 
-      if (actionToShow != null) {
-        for (listStep in popup.listStep.values) {
-          listStep as PopupFactoryImpl.ActionItem
-          if (listStep.action.unwrap() === actionToShow.unwrap()) {
-            SwingUtilities.invokeLater {
-              // Wait popup showing
-              popup.selectAndExpandValue(listStep)
-            }
+    if (actionToShow != null) {
+      for (listStep in popup.listStep.values) {
+        listStep as PopupFactoryImpl.ActionItem
+        if (listStep.action.unwrap() === actionToShow.unwrap()) {
+          SwingUtilities.invokeLater {
+            // Wait popup showing
+            popup.selectAndExpandValue(listStep)
           }
         }
       }
@@ -161,18 +170,22 @@ internal class MainMenuButton {
   private inner class ShowSubMenuAction(private val actionToShow: AnAction) : ActionListener {
 
     override fun actionPerformed(e: ActionEvent?) {
-      if (!getInstance().disableMnemonics) {
-        val component = IdeFocusManager.getGlobalInstance().focusOwner ?: button
-        menuAction.showPopup(DataManager.getInstance().getDataContext(component), actionToShow)
+      if (!UISettings.getInstance().disableMnemonics) {
+        if (expandableMenu?.isEnabled() == true) {
+          expandableMenu!!.switchState(button.size, actionToShow)
+        } else {
+          val component = IdeFocusManager.getGlobalInstance().focusOwner ?: button
+          showPopup(DataManager.getInstance().getDataContext(component), actionToShow)
+        }
       }
     }
   }
 }
 
 
-private fun createMenuButton(action: AnAction): ActionButton {
+internal fun createMenuButton(action: AnAction): ActionButton {
   val button = object : ActionButton(action, PresentationFactory().getPresentation(action),
-                                     ActionPlaces.MAIN_MENU, {ActionToolbar.experimentalToolbarMinimumButtonSize() }) {
+                                     ActionPlaces.MAIN_MENU, { ActionToolbar.experimentalToolbarMinimumButtonSize() }) {
     override fun getDataContext(): DataContext {
       return DataManager.getInstance().dataContextFromFocusAsync.blockingGet(200) ?: super.getDataContext()
     }
@@ -182,7 +195,7 @@ private fun createMenuButton(action: AnAction): ActionButton {
   return button
 }
 
-private fun getMainMenuGroup(): ActionGroup {
+internal fun getMainMenuGroup(): ActionGroup {
   val mainMenuGroup = CustomActionsSchema.getInstance().getCorrectedAction(IdeActions.GROUP_MAIN_MENU)
   mainMenuGroup as ActionGroup
   return DefaultActionGroup(
@@ -191,7 +204,8 @@ private fun getMainMenuGroup(): ActionGroup {
         // Wrap action groups to force them to be popup groups,
         // otherwise they end up as separate items in the burger menu (IDEA-294669).
         ActionGroupPopupWrapper(child)
-      } else {
+      }
+      else {
         LOG.error("A top-level child of the main menu is not an action group: $child")
         null
       }

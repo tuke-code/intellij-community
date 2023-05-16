@@ -1,6 +1,6 @@
 package com.jetbrains.performancePlugin.commands
 
-import com.intellij.openapi.application.WriteAction
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.ui.playback.PlaybackContext
 import com.intellij.openapi.util.ActionCallback
 import com.intellij.openapi.util.Ref
@@ -9,16 +9,27 @@ import com.intellij.xdebugger.XDebuggerManager
 import com.jetbrains.performancePlugin.PerformanceTestSpan
 import com.jetbrains.performancePlugin.utils.AbstractCallbackBasedCommand
 import io.opentelemetry.api.trace.Span
+import io.opentelemetry.context.Context
 import io.opentelemetry.context.Scope
 import org.jetbrains.annotations.NonNls
-import java.io.IOException
 
+/**
+ * Command to debug step OVER/IN/INTO in debug process.
+ * Example: %debugStep OVER
+ */
 class DebugStepCommand(text: String, line: Int) : AbstractCallbackBasedCommand(text, line, true) {
   override fun execute(callback: ActionCallback, context: PlaybackContext) {
-    val debugStepType = extractCommandArgument(PREFIX)
-    val debugSessions = XDebuggerManager.getInstance(context.project).debugSessions
+    val debugStepType: DebugStepTypes
+    try {
+      debugStepType = DebugStepTypes.valueOf(extractCommandArgument(PREFIX))
+    }
+    catch (e: IllegalArgumentException) {
+      callback.reject("Unknown special character. Please use: OVER, INTO or OUT")
+      return
+    }
 
-    val spanBuilder = PerformanceTestSpan.TRACER.spanBuilder(SPAN_NAME + "_" + debugStepType.lowercase()).setParent(
+    val debugSessions = XDebuggerManager.getInstance(context.project).debugSessions
+    val spanBuilder = PerformanceTestSpan.TRACER.spanBuilder(SPAN_NAME + "_" + debugStepType.name.lowercase()).setParent(
       PerformanceTestSpan.getContext())
     val spanRef = Ref<Span>()
     val scopeRef = Ref<Scope>()
@@ -32,7 +43,8 @@ class DebugStepCommand(text: String, line: Int) : AbstractCallbackBasedCommand(t
       return
     }
 
-    debugSessions.first().debugProcess.session.addSessionListener(object : XDebugSessionListener {
+    val debugSession = debugSessions.first()
+    debugSession.debugProcess.session.addSessionListener(object : XDebugSessionListener {
       override fun sessionPaused() {
         super.sessionPaused()
         callback.setDone()
@@ -41,32 +53,20 @@ class DebugStepCommand(text: String, line: Int) : AbstractCallbackBasedCommand(t
       }
     })
 
-    WriteAction.runAndWait<IOException> {
+    ApplicationManager.getApplication().runWriteAction(Context.current().wrap(Runnable {
+      spanRef.set(spanBuilder.startSpan())
+      scopeRef.set(spanRef.get().makeCurrent())
       when (debugStepType) {
-        "OVER" -> {
-          spanRef.set(spanBuilder.startSpan())
-          scopeRef.set(spanRef.get().makeCurrent())
-          debugSessions[0].stepOver(false)
-        }
-        "INTO" -> {
-          spanRef.set(spanBuilder.startSpan())
-          scopeRef.set(spanRef.get().makeCurrent())
-          debugSessions[0].stepInto()
-        }
-        "OUT" -> {
-          spanRef.set(spanBuilder.startSpan())
-          scopeRef.set(spanRef.get().makeCurrent())
-          debugSessions[0].stepOut()
-        }
-        else -> {
-          callback.reject("Unknown special character. Please use: OVER, INTO or OUT")
-          return@runAndWait
-        }
+        DebugStepTypes.OVER -> debugSession.stepOver(false)
+        DebugStepTypes.INTO -> debugSession.stepInto()
+        DebugStepTypes.OUT -> debugSession.stepOut()
       }
-    }
+    }))
   }
 
   companion object {
+    private enum class DebugStepTypes { OVER, INTO, OUT }
+
     const val PREFIX: @NonNls String = CMD_PREFIX + "debugStep"
     const val SPAN_NAME: @NonNls String = "debugStep"
   }

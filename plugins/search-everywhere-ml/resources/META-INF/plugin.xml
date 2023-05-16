@@ -13,6 +13,7 @@
   ]]></description>
 
   <content>
+    <module name="intellij.searchEverywhereMl.typos"/>
     <module name="intellij.searchEverywhereMl.yaml"/>
     <module name="intellij.searchEverywhereMl.vcs"/>
   </content>
@@ -85,6 +86,8 @@
 
     <statistics.validation.customValidationRule
       implementation="com.intellij.ide.actions.searcheverywhere.ml.features.SearchEverywhereRunConfigurationFeaturesProvider$RunConfigurationTypeValidator"/>
+    <statistics.validation.customValidationRule
+      implementation="com.intellij.ide.actions.searcheverywhere.ml.features.SearchEverywhereMlElementFeatureValidationRule"/>
     <statistics.counterUsagesCollector
       implementationClass="com.intellij.ide.actions.searcheverywhere.ml.SearchEverywhereMLStatisticsCollector"/>
   </extensions>

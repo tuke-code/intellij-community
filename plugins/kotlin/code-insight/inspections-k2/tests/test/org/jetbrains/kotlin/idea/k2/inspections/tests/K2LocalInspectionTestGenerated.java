@@ -337,6 +337,11 @@ public abstract class K2LocalInspectionTestGenerated extends AbstractK2LocalInsp
             runTest("../../../idea/tests/testData/inspectionsLocal/enumValuesSoftDeprecate/callWithQualifiedClassName.kt");
         }
 
+        @TestMetadata("enumFromStdlib.kt")
+        public void testEnumFromStdlib() throws Exception {
+            runTest("../../../idea/tests/testData/inspectionsLocal/enumValuesSoftDeprecate/enumFromStdlib.kt");
+        }
+
         @TestMetadata("equalsCheck.kt")
         public void testEqualsCheck() throws Exception {
             runTest("../../../idea/tests/testData/inspectionsLocal/enumValuesSoftDeprecate/equalsCheck.kt");
@@ -385,6 +390,11 @@ public abstract class K2LocalInspectionTestGenerated extends AbstractK2LocalInsp
         @TestMetadata("functionWithoutOverrideForList.kt")
         public void testFunctionWithoutOverrideForList() throws Exception {
             runTest("../../../idea/tests/testData/inspectionsLocal/enumValuesSoftDeprecate/functionWithoutOverrideForList.kt");
+        }
+
+        @TestMetadata("lambdaReturnType.kt")
+        public void testLambdaReturnType() throws Exception {
+            runTest("../../../idea/tests/testData/inspectionsLocal/enumValuesSoftDeprecate/lambdaReturnType.kt");
         }
 
         @TestMetadata("listOfCallOnArray.kt")
@@ -2149,6 +2159,11 @@ public abstract class K2LocalInspectionTestGenerated extends AbstractK2LocalInsp
             runTest("../../../idea/tests/testData/inspectionsLocal/removeRedundantQualifierName/notApplicableObject3.kt");
         }
 
+        @TestMetadata("notApplicableObject4.kt")
+        public void testNotApplicableObject4() throws Exception {
+            runTest("../../../idea/tests/testData/inspectionsLocal/removeRedundantQualifierName/notApplicableObject4.kt");
+        }
+
         @TestMetadata("notApplicableOuterClass.kt")
         public void testNotApplicableOuterClass() throws Exception {
             runTest("../../../idea/tests/testData/inspectionsLocal/removeRedundantQualifierName/notApplicableOuterClass.kt");
@@ -2366,6 +2381,39 @@ public abstract class K2LocalInspectionTestGenerated extends AbstractK2LocalInsp
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("testData/inspectionsLocal")
     public abstract static class InspectionsLocal extends AbstractK2LocalInspectionTest {
+        @RunWith(JUnit3RunnerWithInners.class)
+        @TestMetadata("testData/inspectionsLocal/canBePrimaryConstructorProperty")
+        public static class CanBePrimaryConstructorProperty extends AbstractK2LocalInspectionTest {
+            private void runTest(String testDataFilePath) throws Exception {
+                KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+            }
+
+            @TestMetadata("commentAfter.kt")
+            public void testCommentAfter() throws Exception {
+                runTest("testData/inspectionsLocal/canBePrimaryConstructorProperty/commentAfter.kt");
+            }
+
+            @TestMetadata("commentAhead.kt")
+            public void testCommentAhead() throws Exception {
+                runTest("testData/inspectionsLocal/canBePrimaryConstructorProperty/commentAhead.kt");
+            }
+
+            @TestMetadata("protectedOpenVar.kt")
+            public void testProtectedOpenVar() throws Exception {
+                runTest("testData/inspectionsLocal/canBePrimaryConstructorProperty/protectedOpenVar.kt");
+            }
+
+            @TestMetadata("simple.kt")
+            public void testSimple() throws Exception {
+                runTest("testData/inspectionsLocal/canBePrimaryConstructorProperty/simple.kt");
+            }
+
+            @TestMetadata("vararg.kt")
+            public void testVararg() throws Exception {
+                runTest("testData/inspectionsLocal/canBePrimaryConstructorProperty/vararg.kt");
+            }
+        }
+
         @RunWith(JUnit3RunnerWithInners.class)
         @TestMetadata("testData/inspectionsLocal/destructuringWrongNameInspection")
         public static class DestructuringWrongNameInspection extends AbstractK2LocalInspectionTest {
