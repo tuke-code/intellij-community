@@ -303,7 +303,8 @@
 
     "MainMenu": {
       "selectionForeground": "Grey12",
-      "selectionBackground": "Grey3"
+      "selectionBackground": "Grey3",
+      "transparentSelectionBackground": "#FFFFFF1A"
     },
 
     "MemoryIndicator": {
@@ -750,13 +751,10 @@
     "RunWidget" : {
       "foreground": "Grey12",
       "iconColor": "Grey12",
-      "disabledForeground": "#FFFFFF66",
-      "background": "Blue5",
       "runningBackground": "Green5",
       "runningIconColor": "Grey12",
       "hoverBackground": "#00000019",
-      "pressedBackground": "#00000028",
-      "separatorColor": "#FFFFFF40"
+      "pressedBackground": "#00000028"
     },
 
     "MainWindow.Tab" : {
@@ -772,7 +770,35 @@
     },
 
     "MainWindow.FullScreeControl.Background": "#575A5C",
-
+    "Profiler": {
+      "ChartSlider": {
+        "foreground": "Grey12",
+        "lineColor": "Grey5"
+      },
+      "CpuChart": {
+        "background": "Green2",
+        "borderColor": "Green5",
+        "inactiveBackground": "Green1",
+        "inactiveBorderColor": "Green2",
+        "pointBackground": "Green5",
+        "pointBorderColor": "Grey2"
+      },
+      "MemoryChart": {
+        "background": "Blue2",
+        "borderColor": "Blue8",
+        "inactiveBackground": "Blue1",
+        "inactiveBorderColor": "Blue3",
+        "pointBackground": "Blue5",
+        "pointBorderColor": "Grey2"
+      },
+      "Timer": {
+        "foreground": "Grey12",
+        "disabledForeground": "Grey7"
+      },
+      "LiveChart": {
+        "horizontalAxisColor": "Grey4"
+      }
+    },
     "FlameGraph.Tooltip": {
       "scaleBackground": "#43454A",
       "scaleColor": "#375FAD",

@@ -139,7 +139,7 @@ public final class PersistentFSImpl extends PersistentFS implements Disposable {
   private void doConnect() {
     if (myConnected.compareAndSet(false, true)) {
       Activity activity = StartUpMeasurer.startActivity("connect FSRecords", ActivityCategory.DEFAULT);
-      FSRecords.connect(myVfsLog);
+      FSRecords.connect(myVfsLog.getConnectionInterceptors());
       activity.end();
     }
   }
@@ -793,15 +793,25 @@ public final class PersistentFSImpl extends PersistentFS implements Disposable {
           requestor, file, file.getModificationStamp(), modStamp, file.getTimeStamp(), -1, oldLength, count, false);
         List<VFileEvent> events = List.of(event);
         fireBeforeEvents(getPublisher(), events);
+        getVfsLog().getVFileEventApplicationListener().beforeApply(event);
+        IOException exception = null;
 
         NewVirtualFileSystem fs = getFileSystem(file);
         // `FSRecords.ContentOutputStream` already buffered, no need to wrap in `BufferedStream`
         try (OutputStream persistenceStream = writeContent(file, fs.isReadOnly())) {
           persistenceStream.write(buf, 0, count);
         }
+        catch (IOException e) {
+          exception = e;
+          throw e;
+        }
         finally {
           try (OutputStream ioFileStream = fs.getOutputStream(file, requestor, modStamp, timeStamp)) {
             ioFileStream.write(buf, 0, count);
+          }
+          catch (IOException e) {
+            exception = Suppressions.addSuppressed(exception, e);
+            throw exception;
           }
           finally {
             closed = true;
@@ -811,6 +821,7 @@ public final class PersistentFSImpl extends PersistentFS implements Disposable {
             long newTimestamp = attributes != null ? attributes.lastModified : DEFAULT_TIMESTAMP;
             long newLength = attributes != null ? attributes.length : DEFAULT_LENGTH;
             executeTouch(file, false, event.getModificationStamp(), newLength, newTimestamp);
+            getVfsLog().getVFileEventApplicationListener().afterApply(event, exception);
             fireAfterEvents(getPublisher(), events);
           }
         }

@@ -17,6 +17,7 @@ class CodeFloatingToolbar(editor: Editor): FloatingToolbar(editor, "Floating.Cod
 
   override fun hasIgnoredParent(element: PsiElement): Boolean {
     return AdvancedSettings.getBoolean("floating.codeToolbar.hide")
+           || !element.isWritable
            || TemplateManagerImpl.getInstance(element.project).getActiveTemplate(editor) != null
   }
 
@@ -24,24 +25,32 @@ class CodeFloatingToolbar(editor: Editor): FloatingToolbar(editor, "Floating.Cod
 
   override fun shouldSurviveDocumentChange() = false
 
+  override fun hideByOtherHints(): Boolean = true
+
   override fun getHintPosition(hint: LightweightHint): Point {
     val isOneLineSelection = isOneLineSelection(editor)
-    val offsetForHint = if (isOneLineSelection) {
-      editor.selectionModel.selectionStart
-    }
-    else {
-      getTextStart(editor, editor.caretModel.offset)
+    val isAbove = isOneLineSelection
+                  || editor.selectionModel.selectionStart == editor.caretModel.offset
+                  || Registry.get("floating.codeToolbar.showAbove").asBoolean() && isSelectionStartVisible(editor)
+    val offsetForHint = when {
+      isOneLineSelection -> editor.selectionModel.selectionStart
+      isAbove -> getTextStart(editor, editor.selectionModel.selectionStart)
+      else -> getTextStart(editor, editor.selectionModel.selectionEnd)
     }
     val visualPosition = editor.offsetToVisualPosition(offsetForHint)
     val hintPos = HintManagerImpl.getHintPosition(hint, editor, visualPosition, HintManager.DEFAULT)
     val verticalGap = Registry.get("floating.codeToolbar.verticalOffset").asInteger()
-    val dy = if (editor.selectionModel.selectionEnd == editor.caretModel.offset && !isOneLineSelection) {
+    val dy = if (editor.selectionModel.selectionEnd == editor.caretModel.offset && !isAbove) {
       editor.lineHeight + verticalGap
     } else {
       -(hint.component.preferredSize.height + verticalGap)
     }
     hintPos.translate(0, dy)
     return hintPos
+  }
+
+  private fun isSelectionStartVisible(editor: Editor): Boolean {
+    return editor.offsetToXY(editor.selectionModel.selectionStart) in editor.scrollingModel.visibleArea
   }
 
   private fun isOneLineSelection(editor: Editor): Boolean {

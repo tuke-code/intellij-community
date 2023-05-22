@@ -23,6 +23,7 @@ public final class ExpUiIcons {
     /** 16x16 */ public static final @NotNull Icon Generated = load("expui/actions/generated.svg", 284359763, 2);
     /** 16x16 */ public static final @NotNull Icon GroupByMethod = load("expui/actions/groupByMethod.svg", 788449648, 2);
     /** 16x16 */ public static final @NotNull Icon GroupByModule = load("expui/actions/groupByModule.svg", -245074045, 2);
+    /** 16x16 */ public static final @NotNull Icon GroupByPackage = load("expui/actions/groupByPackage.svg", 457655697, 2);
     /** 16x16 */ public static final @NotNull Icon GroupByTestProduction = load("expui/actions/groupByTestProduction.svg", 174137220, 2);
     /** 16x16 */ public static final @NotNull Icon InSelection = load("expui/actions/inSelection.svg", -1349439138, 2);
     /** 16x16 */ public static final @NotNull Icon Install = load("expui/actions/install.svg", 1897308119, 2);
@@ -105,6 +106,20 @@ public final class ExpUiIcons {
     /** 16x16 */ public static final @NotNull Icon ToggleSkipTestsMode = load("expui/build/toggleSkipTestsMode.svg", 1729191088, 2);
   }
 
+  public static final class CodeInsight {
+    /** 12x12 */ public static final @NotNull Icon InlayGlobe = load("expui/codeInsight/inlayGlobe.svg", 1272747810, 2);
+    /** 12x12 */ public static final @NotNull Icon InlayRenameInComments = load("expui/codeInsight/inlayRenameInComments.svg", 1595182474, 2);
+    /** 12x12 */ public static final @NotNull Icon InlayRenameInCommentsActive = load("expui/codeInsight/inlayRenameInCommentsActive.svg", 515338830, 2);
+    /** 12x12 */ public static final @NotNull Icon InlayRenameInNoCodeFiles = load("expui/codeInsight/inlayRenameInNoCodeFiles.svg", -1177231620, 2);
+    /** 12x12 */ public static final @NotNull Icon InlayRenameInNoCodeFilesActive = load("expui/codeInsight/inlayRenameInNoCodeFilesActive.svg", -1807189813, 2);
+    /** 12x12 */ public static final @NotNull Icon InlaySecuredShield = load("expui/codeInsight/inlaySecuredShield.svg", -177800517, 2);
+    /** 12x12 */ public static final @NotNull Icon InlaySettings = load("expui/codeInsight/inlaySettings.svg", 1269425100, 2);
+    /** 16x16 */ public static final @NotNull Icon IntentionBulb = load("expui/codeInsight/intentionBulb.svg", -817361690, 2);
+    /** 16x16 */ public static final @NotNull Icon IntentionBulbGrey = load("expui/codeInsight/intentionBulbGrey.svg", 1662358059, 2);
+    /** 16x16 */ public static final @NotNull Icon QuickfixBulb = load("expui/codeInsight/quickfixBulb.svg", -1357781753, 2);
+    /** 16x16 */ public static final @NotNull Icon QuickfixOffBulb = load("expui/codeInsight/quickfixOffBulb.svg", -1807849386, 2);
+  }
+
   public static final class CodeWithMe {
     /** 16x16 */ public static final @NotNull Icon CwmAccess = load("expui/codeWithMe/cwmAccess.svg", 2108404369, 2);
     /** 20x20 */ public static final @NotNull Icon CwmAccess_20x20 = load("expui/codeWithMe/cwmAccess@20x20.svg", -1029761333, 2);
@@ -152,20 +167,6 @@ public final class ExpUiIcons {
     /** 16x16 */ public static final @NotNull Icon MagicResolveToolbar = load("expui/diff/magicResolveToolbar.svg", -294534028, 2);
     /** 14x14 */ public static final @NotNull Icon Remove_14x14 = load("expui/diff/remove@14x14.svg", -1672195955, 2);
     /** 14x14 */ public static final @NotNull Icon Revert_14x14 = load("expui/diff/revert@14x14.svg", -170893073, 2);
-  }
-
-  public static final class Editor {
-    /** 12x12 */ public static final @NotNull Icon InlayGlobe = load("expui/editor/inlayGlobe.svg", 1272747810, 2);
-    /** 12x12 */ public static final @NotNull Icon InlayRenameInComments = load("expui/editor/inlayRenameInComments.svg", 1595182474, 2);
-    /** 12x12 */ public static final @NotNull Icon InlayRenameInCommentsActive = load("expui/editor/inlayRenameInCommentsActive.svg", 515338830, 2);
-    /** 12x12 */ public static final @NotNull Icon InlayRenameInNoCodeFiles = load("expui/editor/inlayRenameInNoCodeFiles.svg", -1177231620, 2);
-    /** 12x12 */ public static final @NotNull Icon InlayRenameInNoCodeFilesActive = load("expui/editor/inlayRenameInNoCodeFilesActive.svg", -1807189813, 2);
-    /** 12x12 */ public static final @NotNull Icon InlaySecuredShield = load("expui/editor/inlaySecuredShield.svg", -177800517, 2);
-    /** 12x12 */ public static final @NotNull Icon InlaySettings = load("expui/editor/inlaySettings.svg", 1269425100, 2);
-    /** 16x16 */ public static final @NotNull Icon IntentionBulb = load("expui/editor/intentionBulb.svg", -817361690, 2);
-    /** 16x16 */ public static final @NotNull Icon IntentionBulbGrey = load("expui/editor/intentionBulbGrey.svg", 1662358059, 2);
-    /** 16x16 */ public static final @NotNull Icon QuickfixBulb = load("expui/editor/quickfixBulb.svg", -1357781753, 2);
-    /** 16x16 */ public static final @NotNull Icon QuickfixOffBulb = load("expui/editor/quickfixOffBulb.svg", -1807849386, 2);
   }
 
   /** 16x16 */ public static final @NotNull Icon Empty = load("expui/empty.svg", -149269092, 0);
@@ -251,7 +252,7 @@ public final class ExpUiIcons {
     /** 16x16 */ public static final @NotNull Icon Down = load("expui/general/down.svg", 1811331429, 2);
     /** 16x16 */ public static final @NotNull Icon Download = load("expui/general/download.svg", 616133920, 2);
     /** 16x16 */ public static final @NotNull Icon Dropdown = load("expui/general/dropdown.svg", 706458557, 2);
-    /** 13x13 */ public static final @NotNull Icon DropdownGutter = load("expui/general/dropdownGutter.svg", -1697148111, 2);
+    /** 15x15 */ public static final @NotNull Icon DropdownGutter = load("expui/general/dropdownGutter.svg", -1772670472, 2);
     /** 16x16 */ public static final @NotNull Icon Edit = load("expui/general/edit.svg", 813514731, 2);
     /** 16x16 */ public static final @NotNull Icon EditorOnly = load("expui/general/editorOnly.svg", -652267841, 2);
     /** 16x16 */ public static final @NotNull Icon EditorPreview = load("expui/general/editorPreview.svg", 9030504, 2);
@@ -339,6 +340,10 @@ public final class ExpUiIcons {
     /** 20x20 */ public static final @NotNull Icon WindowsMenu_20x20 = load("expui/general/windowsMenu@20x20.svg", -1866593102, 2);
   }
 
+  public static final class Graph {
+    /** 16x16 */ public static final @NotNull Icon GraphLayout = load("expui/graph/graphLayout.svg", 1638364830, 2);
+  }
+
   public static final class Gutter {
     /** 14x14 */ public static final @NotNull Icon Bookmark = load("expui/gutter/bookmark.svg", 862964872, 2);
     /** 14x14 */ public static final @NotNull Icon Colors = load("expui/gutter/colors.svg", -523732802, 2);
@@ -369,6 +374,7 @@ public final class ExpUiIcons {
   }
 
   public static final class Ide {
+    /** 16x16 */ public static final @NotNull Icon ConfigFile = load("expui/ide/configFile.svg", -2027985991, 2);
     /** 32x32 */ public static final @NotNull Icon FeedbackRating = load("expui/ide/feedbackRating.svg", -188817661, 2);
     /** 32x32 */ public static final @NotNull Icon FeedbackRatingFocused = load("expui/ide/feedbackRatingFocused.svg", 1349378665, 2);
     /** 32x32 */ public static final @NotNull Icon FeedbackRatingFocusedOn = load("expui/ide/feedbackRatingFocusedOn.svg", 1494031502, 2);
@@ -663,15 +669,15 @@ public final class ExpUiIcons {
   }
 
   public static final class Vcs {
-    /** 16x16 */ public static final @NotNull Icon Branch = load("expui/vcs/branch.svg", 340913267, 2);
+    /** 16x16 */ public static final @NotNull Icon Branch = load("expui/vcs/branch.svg", 630957623, 2);
     /** 16x16 */ public static final @NotNull Icon Changelist = load("expui/vcs/changelist.svg", 1875245078, 2);
     /** 16x16 */ public static final @NotNull Icon Changes = load("expui/vcs/changes.svg", 410488325, 2);
     /** 12x12 */ public static final @NotNull Icon ChangesPush_12x12 = load("expui/vcs/changesPush@12x12.svg", -270756484, 2);
     /** 12x12 */ public static final @NotNull Icon ChangesUpdate_12x12 = load("expui/vcs/changesUpdate@12x12.svg", 1184139210, 2);
     /** 16x16 */ public static final @NotNull Icon CherryPick = load("expui/vcs/cherryPick.svg", -1766768318, 2);
     /** 16x16 */ public static final @NotNull Icon Commit = load("expui/vcs/commit.svg", -709706102, 2);
-    /** 16x16 */ public static final @NotNull Icon CurrentBranch = load("expui/vcs/currentBranch.svg", 1448816109, 2);
-    /** 16x16 */ public static final @NotNull Icon CurrentBranchFavorite = load("expui/vcs/currentBranchFavorite.svg", -1432367259, 2);
+    /** 16x16 */ public static final @NotNull Icon CurrentBranch = load("expui/vcs/currentBranch.svg", 1031462547, 2);
+    /** 16x16 */ public static final @NotNull Icon CurrentBranchFavorite = load("expui/vcs/currentBranchFavorite.svg", 2141298929, 2);
     /** 16x16 */ public static final @NotNull Icon Diff = load("expui/vcs/diff.svg", -877920577, 2);
     /** 16x16 */ public static final @NotNull Icon Fetch = load("expui/vcs/fetch.svg", -2085161800, 2);
     /** 16x16 */ public static final @NotNull Icon IntelliSort = load("expui/vcs/intelliSort.svg", -54487799, 2);

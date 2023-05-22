@@ -1,13 +1,12 @@
-// Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.workspaceModel.ide.impl.legacyBridge.module
 
-import com.intellij.diagnostic.ActivityCategory
 import com.intellij.diagnostic.StartUpMeasurer
 import com.intellij.ide.plugins.PluginManagerCore
-import com.intellij.openapi.application.ApplicationManager
-import com.intellij.openapi.application.EDT
+import com.intellij.openapi.application.writeAction
 import com.intellij.openapi.components.impl.stores.IComponentStore
 import com.intellij.openapi.components.service
+import com.intellij.openapi.components.serviceAsync
 import com.intellij.openapi.module.ModuleManager
 import com.intellij.openapi.module.impl.NonPersistentModuleStore
 import com.intellij.openapi.project.Project
@@ -35,8 +34,6 @@ import com.intellij.workspaceModel.storage.bridgeEntities.ModuleId
 import com.intellij.workspaceModel.storage.url.VirtualFileUrl
 import com.intellij.workspaceModel.storage.url.VirtualFileUrlManager
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import java.io.IOException
 import java.nio.file.Path
 
@@ -46,8 +43,8 @@ internal class ModuleManagerComponentBridge(private val project: Project, corout
 
   internal class ModuleManagerInitProjectActivity : InitProjectActivity {
     override suspend fun run(project: Project) {
-      val moduleManager = ModuleManager.getInstance(project) as ModuleManagerComponentBridge
-      var activity = StartUpMeasurer.startActivity("firing modules_added event", ActivityCategory.DEFAULT)
+      val moduleManager = project.serviceAsync<ModuleManager>() as ModuleManagerComponentBridge
+      var activity = StartUpMeasurer.startActivity("firing modules_added event")
       val modules = moduleManager.modules().toList()
       fireModulesAdded(project, modules)
 
@@ -60,12 +57,10 @@ internal class ModuleManagerComponentBridge(private val project: Project, corout
         }
       }
       if (!deprecatedComponents.isEmpty()) {
-        withContext(Dispatchers.EDT) {
-          ApplicationManager.getApplication().runWriteAction {
-            for (deprecatedComponent in deprecatedComponents) {
-              @Suppress("DEPRECATION", "removal")
-              deprecatedComponent.moduleAdded()
-            }
+        writeAction {
+          for (deprecatedComponent in deprecatedComponents) {
+            @Suppress("DEPRECATION", "removal")
+            deprecatedComponent.moduleAdded()
           }
         }
       }
@@ -94,6 +89,7 @@ internal class ModuleManagerComponentBridge(private val project: Project, corout
 
     // Initialize module libraries
     val moduleLibraryChanges = ((event[LibraryEntity::class.java] as? List<EntityChange<LibraryEntity>>) ?: emptyList())
+      .asSequence()
       .filterModuleLibraryChanges()
     for (change in moduleLibraryChanges) {
       initializeModuleLibraryBridge(change, builder)

@@ -4,6 +4,7 @@ package org.jetbrains.plugins.gitlab.ui.comment
 import com.intellij.collaboration.async.mapCaching
 import com.intellij.collaboration.async.modelFlow
 import com.intellij.collaboration.ui.codereview.diff.DiffLineLocation
+import com.intellij.collaboration.ui.codereview.diff.DiscussionsViewOption
 import com.intellij.collaboration.ui.codereview.diff.viewer.DiffMapped
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.util.childScope
@@ -42,7 +43,8 @@ class GitLabMergeRequestDiffDiscussionViewModelImpl(
   parentCs: CoroutineScope,
   diffData: GitTextFilePatchWithHistory,
   currentUser: GitLabUserDTO,
-  discussion: GitLabMergeRequestDiscussion
+  discussion: GitLabMergeRequestDiscussion,
+  discussionsViewOption: Flow<DiscussionsViewOption>
 ) : GitLabMergeRequestDiffDiscussionViewModel {
 
   private val cs = parentCs.childScope(CoroutineExceptionHandler { _, e -> LOG.warn(e) })
@@ -89,6 +91,14 @@ class GitLabMergeRequestDiffDiscussionViewModelImpl(
     mapToLocation(diffData, it)
   }
 
+  override val isVisible: Flow<Boolean> = combine(resolveVm?.resolved ?: flowOf(false), discussionsViewOption) { isResolved, viewOption ->
+    return@combine when (viewOption) {
+      DiscussionsViewOption.ALL -> true
+      DiscussionsViewOption.UNRESOLVED_ONLY -> !isResolved
+      DiscussionsViewOption.DONT_SHOW -> false
+    }
+  }
+
   private fun GitLabMergeRequestDiscussion.firstNote(): Flow<GitLabMergeRequestNote?> =
     notes.map(List<GitLabMergeRequestNote>::firstOrNull).distinctUntilChangedBy { it?.id }
 
@@ -120,6 +130,8 @@ class GitLabMergeRequestDiffDraftDiscussionViewModel(
     if (it == null) return@map null
     mapToLocation(diffData, it)
   }
+
+  override val isVisible: Flow<Boolean> = flowOf(true)
 
   override val resolveVm: GitLabDiscussionResolveViewModel? = null
   override val replyVm: GitLabDiscussionReplyViewModel? = null

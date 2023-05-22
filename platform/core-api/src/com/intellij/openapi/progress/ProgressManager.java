@@ -2,7 +2,6 @@
 package com.intellij.openapi.progress;
 
 import com.intellij.openapi.application.ApplicationManager;
-import com.intellij.openapi.application.CachedSingletonsRegistry;
 import com.intellij.openapi.application.ModalityState;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Computable;
@@ -13,7 +12,6 @@ import com.intellij.openapi.util.NlsContexts.ProgressTitle;
 import com.intellij.openapi.util.Ref;
 import com.intellij.openapi.util.ThrowableComputable;
 import com.intellij.util.concurrency.annotations.RequiresBlockingContext;
-import kotlin.jvm.functions.Function1;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -21,17 +19,19 @@ import org.jetbrains.annotations.Nullable;
 import javax.swing.*;
 import java.util.HashSet;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 
 public abstract class ProgressManager extends ProgressIndicatorProvider {
-  private final static Function1<Boolean, ProgressManager> ourInstance = CachedSingletonsRegistry.INSTANCE.lazyWithNullProtection(() -> {
-    return ApplicationManager.getApplication().getService(ProgressManager.class);
-  });
+  private static ProgressManager ourInstance;
 
   @SuppressWarnings("MethodOverridesStaticMethodOfSuperclass")
   public static @NotNull ProgressManager getInstance() {
-    return ourInstance.invoke(true);
+    ProgressManager instance = ourInstance;
+    if (instance == null) {
+      instance = ApplicationManager.getApplication().getService(ProgressManager.class);
+      ourInstance = instance;
+    }
+    return instance;
   }
 
   /**
@@ -39,7 +39,7 @@ public abstract class ProgressManager extends ProgressIndicatorProvider {
    */
   @ApiStatus.Internal
   public static @Nullable ProgressManager getInstanceOrNull() {
-    return ourInstance.invoke(false);
+    return ourInstance;
   }
 
   public abstract boolean hasProgressIndicator();
@@ -237,16 +237,6 @@ public abstract class ProgressManager extends ProgressIndicatorProvider {
    */
   public abstract void executeProcessUnderProgress(@NotNull Runnable process, @Nullable ProgressIndicator progress) throws ProcessCanceledException;
 
-  /**
-   * @param progress an indicator to use, {@code null} means reuse current progress
-   */
-  @ApiStatus.Experimental
-  public <T> T computeResultUnderProgress(@NotNull Supplier<T> supplier, @Nullable ProgressIndicator progress) throws ProcessCanceledException {
-    AtomicReference<T> result = new AtomicReference<T>();
-    executeProcessUnderProgress(() -> result.set(supplier.get()), progress);
-    return result.get();
-  }
-
   public static void assertNotCircular(@NotNull ProgressIndicator original) {
     Set<ProgressIndicator> wrappedParents = null;
     for (ProgressIndicator i = original; i instanceof WrappedProgressIndicator; i = ((WrappedProgressIndicator)i).getOriginalProgressIndicator()) {
@@ -297,4 +287,8 @@ public abstract class ProgressManager extends ProgressIndicatorProvider {
 
   @ApiStatus.Internal
   public abstract @Nullable ModalityState getCurrentProgressModality();
+
+  static {
+    ApplicationManager.registerCleaner(() -> ourInstance = null);
+  }
 }

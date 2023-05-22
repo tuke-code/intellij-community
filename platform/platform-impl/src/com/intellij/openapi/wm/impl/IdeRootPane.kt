@@ -52,6 +52,8 @@ import com.jetbrains.JBR
 import org.jetbrains.annotations.ApiStatus
 import java.awt.*
 import java.awt.event.MouseMotionAdapter
+import javax.accessibility.AccessibleContext
+import javax.accessibility.AccessibleRole
 import javax.swing.*
 
 private const val EXTENSION_KEY = "extensionKey"
@@ -156,7 +158,9 @@ open class IdeRootPane internal constructor(frame: JFrame,
         layeredPane.add(customFrameTitlePane.getComponent(), (JLayeredPane.DEFAULT_LAYER - 3) as Any)
       }
       else if (hideNativeLinuxTitle) {
-        frame.isUndecorated = true
+        if (!frame.isDisplayable) {
+          frame.isUndecorated = true
+        }
         val customFrameTitlePane = ToolbarFrameHeader(frame = frame, root = this)
         helper = DecoratedHelper(
           customFrameTitlePane = customFrameTitlePane,
@@ -255,6 +259,25 @@ open class IdeRootPane internal constructor(frame: JFrame,
                                     paneId = paneId,
                                     buttonManager = toolWindowButtonManager)
     return toolWindowPane!!
+  }
+
+  override fun getAccessibleContext(): AccessibleContext {
+    return if (SystemInfo.isMac) {
+      if (accessibleContext == null) {
+        // We need to turn IdeRootPane into an accessible group in order to make notifications announcing working
+        accessibleContext = object : AccessibleJRootPane() {
+          override fun getAccessibleRole(): AccessibleRole {
+            return AccessibleRole.GROUP_BOX
+          }
+
+          override fun getAccessibleName(): String {
+            return UIBundle.message("root.pane.accessible.group.name")
+          }
+        }
+      }
+      accessibleContext
+    }
+    else super.getAccessibleContext()
   }
 
   open fun getToolWindowPane(): ToolWindowPane = toolWindowPane!!

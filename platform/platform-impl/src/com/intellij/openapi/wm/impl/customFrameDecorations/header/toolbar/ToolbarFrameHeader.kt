@@ -44,6 +44,7 @@ private enum class ShowMode {
 
 internal class ToolbarFrameHeader(frame: JFrame, private val root: IdeRootPane) : FrameHeader(frame), UISettingsListener, ToolbarHolder, MainFrameCustomHeader {
   private val myMenuBar = IdeMenuBar.createMenuBar()
+  private val ideMenuHelper = IdeMenuHelper(myMenuBar)
   private val menuBarHeaderTitle = SimpleCustomDecorationPath(frame, true).apply {
     isOpaque = false
   }
@@ -184,12 +185,14 @@ internal class ToolbarFrameHeader(frame: JFrame, private val root: IdeRootPane) 
     super.installListeners()
     mainMenuButton.rootPane = frame.rootPane
     myMenuBar.addComponentListener(contentResizeListener)
+    ideMenuHelper.installListeners()
   }
 
   override fun uninstallListeners() {
     super.uninstallListeners()
     myMenuBar.removeComponentListener(contentResizeListener)
     toolbar?.removeComponentListener(contentResizeListener)
+    ideMenuHelper.uninstallListeners()
   }
 
   override fun updateMenuActions(forceRebuild: Boolean) {
@@ -208,13 +211,13 @@ internal class ToolbarFrameHeader(frame: JFrame, private val root: IdeRootPane) 
     if (parent != null) {
       updateToolbar()
       updateMenuBar()
+      ideMenuHelper.updateUI()
     }
   }
 
   private fun updateMenuBar() {
     if (IdeRootPane.hideNativeLinuxTitle) {
       myMenuBar.border = null
-      setMenuColor(myMenuBar, myHeaderContent.background)
     }
   }
 
@@ -251,7 +254,6 @@ internal class ToolbarFrameHeader(frame: JFrame, private val root: IdeRootPane) 
     super.updateActive()
 
     expandableMenu.updateColor()
-    updateMenuBar()
   }
 
   private fun getElementRect(comp: Component, rectProcessor: ((Rectangle) -> Unit)? = null): RelativeRectangle {
@@ -295,13 +297,5 @@ internal class ToolbarFrameHeader(frame: JFrame, private val root: IdeRootPane) 
       windowMoveListener.installTo(this)
     }
     return result
-  }
-}
-
-internal fun setMenuColor(menu: IdeMenuBar, color: Color?) {
-  if (IdeRootPane.hideNativeLinuxTitle) {
-    for (i in 0..menu.menuCount - 1) {
-      menu.getMenu(i).background = color
-    }
   }
 }

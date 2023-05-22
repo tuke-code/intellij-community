@@ -1,4 +1,4 @@
-// Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.openapi.components;
 
 import com.intellij.diagnostic.ActivityCategory;
@@ -7,8 +7,6 @@ import com.intellij.openapi.client.ClientKind;
 import com.intellij.openapi.extensions.*;
 import com.intellij.openapi.util.Condition;
 import com.intellij.openapi.util.UserDataHolder;
-import com.intellij.util.ReflectionUtil;
-import com.intellij.util.containers.ContainerUtil;
 import com.intellij.util.messages.MessageBus;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NonNls;
@@ -71,14 +69,6 @@ public interface ComponentManager extends UserDataHolder, Disposable, AreaInstan
   boolean isDisposed();
 
   /**
-   * @deprecated Use {@link ExtensionPointName#getExtensionList(AreaInstance)}
-   */
-  @Deprecated
-  default <T> T @NotNull [] getExtensions(@NotNull ExtensionPointName<T> extensionPointName) {
-    return getExtensionArea().getExtensionPoint(extensionPointName).getExtensions();
-  }
-
-  /**
    * @return condition for this component being disposed.
    * see {@link com.intellij.openapi.application.Application#invokeLater(Runnable, Condition)} for the usage example.
    */
@@ -101,22 +91,14 @@ public interface ComponentManager extends UserDataHolder, Disposable, AreaInstan
   <T> T getService(@NotNull Class<T> serviceClass);
 
   /**
-   * @deprecated Use override accepting {@link ClientKind} for better control over kinds of clients the services are requested for.
-   */
-  @ApiStatus.Experimental
-  @Deprecated
-  default @NotNull <T> List<T> getServices(@NotNull Class<T> serviceClass, boolean includeLocal) {
-    return getServices(serviceClass, includeLocal ? ClientKind.ALL : ClientKind.REMOTE);
-  }
-
-  /**
    * Collects all services registered with matching client="..." attribute in xml.
    * Take a look at {@link com.intellij.openapi.client.ClientSession}
    */
   @ApiStatus.Experimental
   default @NotNull <T> List<T> getServices(@NotNull Class<T> serviceClass, ClientKind client) {
     T service = getService(serviceClass);
-    return ContainerUtil.createMaybeSingletonList(service);
+    //noinspection SSBasedInspection
+    return service == null ? Collections.emptyList() : Collections.singletonList(service);
   }
 
   default @Nullable <T> T getServiceIfCreated(@NotNull Class<T> serviceClass) {
@@ -127,9 +109,7 @@ public interface ComponentManager extends UserDataHolder, Disposable, AreaInstan
   @NotNull ExtensionsArea getExtensionArea();
 
   @ApiStatus.Internal
-  default <T> T instantiateClass(@NotNull Class<T> aClass, @NotNull PluginId pluginId) {
-    return ReflectionUtil.newInstance(aClass, false);
-  }
+  <T> T instantiateClass(@NotNull Class<T> aClass, @NotNull PluginId pluginId);
 
   @ApiStatus.Internal
   <T> T instantiateClassWithConstructorInjection(@NotNull Class<T> aClass, @NotNull Object key, @NotNull PluginId pluginId);

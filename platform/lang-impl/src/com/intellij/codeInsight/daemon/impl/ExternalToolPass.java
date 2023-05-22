@@ -20,6 +20,8 @@ import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.editor.event.DocumentEvent;
 import com.intellij.openapi.editor.event.DocumentListener;
+import com.intellij.openapi.editor.ex.MarkupModelEx;
+import com.intellij.openapi.editor.impl.DocumentMarkupModel;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.progress.ProgressManager;
@@ -36,18 +38,25 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
 
 public class ExternalToolPass extends ProgressableTextEditorHighlightingPass {
   private static final Logger LOG = Logger.getInstance(ExternalToolPass.class);
 
   private final AnnotationHolderImpl myAnnotationHolder;
-  private final boolean myMainHighlightingPass;
   private final List<MyData<?,?>> myAnnotationData = new ArrayList<>();
+  @NotNull
+  private volatile List<? extends HighlightInfo> myHighlightInfos = Collections.emptyList();
 
   private static class MyData<K,V> {
+    @NotNull
     final ExternalAnnotator<K,V> annotator;
+    @NotNull
     final PsiFile psiRoot;
+    @NotNull
     final K collectedInfo;
     volatile V annotationResult;
 
@@ -63,11 +72,9 @@ public class ExternalToolPass extends ProgressableTextEditorHighlightingPass {
                    @Nullable Editor editor,
                    int startOffset,
                    int endOffset,
-                   @NotNull HighlightInfoProcessor processor,
-                   boolean mainHighlightingPass) {
+                   @NotNull HighlightInfoProcessor processor) {
     super(file.getProject(), document, LangBundle.message("pass.external.annotators"), file, editor, new TextRange(startOffset, endOffset), false, processor);
     myAnnotationHolder = new AnnotationHolderImpl(new AnnotationSession(file), false);
-    myMainHighlightingPass = mainHighlightingPass;
   }
 
   @Override
@@ -145,24 +152,27 @@ public class ExternalToolPass extends ProgressableTextEditorHighlightingPass {
       @Override
       public void setRejected() {
         super.setRejected();
-        doFinish(getHighlights());
+        doFinish(convertToHighlights());
       }
 
       @Override
       public void run() {
-        if (!documentChanged(modificationStampBefore) && !myProject.isDisposed()) {
-          BackgroundTaskUtil.runUnderDisposeAwareIndicator(myProject, () -> {
-            // run annotators outside the read action because they could start OSProcessHandler
-            runChangeAware(myDocument, ExternalToolPass.this::doAnnotate);
-            ReadAction.run(() -> {
-              ProgressManager.checkCanceled();
-              if (!documentChanged(modificationStampBefore)) {
-                doApply();
-                doFinish(getHighlights());
-              }
-            });
-          });
+        if (documentChanged(modificationStampBefore) || myProject.isDisposed()) {
+          return;
         }
+        // have to instantiate new indicator because the old one (progress) might have already been canceled
+        DaemonProgressIndicator indicator = new DaemonProgressIndicator();
+        BackgroundTaskUtil.runUnderDisposeAwareIndicator(myProject, () -> {
+          // run annotators outside the read action because they could start OSProcessHandler
+          runChangeAware(myDocument, ExternalToolPass.this::doAnnotate);
+          ReadAction.run(() -> {
+            ProgressManager.checkCanceled();
+            if (!documentChanged(modificationStampBefore)) {
+              doApply();
+              doFinish(convertToHighlights());
+            }
+          });
+        }, indicator);
       }
     };
     ExternalAnnotatorManager.getInstance().queue(update);
@@ -171,17 +181,14 @@ public class ExternalToolPass extends ProgressableTextEditorHighlightingPass {
   @NotNull
   @Override
   public List<HighlightInfo> getInfos() {
-    if (myProject.isDisposed()) {
-      return Collections.emptyList();
+    try {
+      ExternalAnnotatorManager.getInstance().waitForAllExecuted(1, TimeUnit.MINUTES);
     }
-    if (myMainHighlightingPass) {
-      doAnnotate();
-      return ReadAction.compute(() -> {
-        doApply();
-        return getHighlights();
-      });
+    catch (ExecutionException | InterruptedException | TimeoutException e) {
+      throw new RuntimeException(e);
     }
-    return super.getInfos();
+    //noinspection unchecked
+    return (List<HighlightInfo>)myHighlightInfos;
   }
 
   @Override
@@ -215,7 +222,7 @@ public class ExternalToolPass extends ProgressableTextEditorHighlightingPass {
   }
 
   private <K,V> void doApply(@NotNull MyData<K,V> data) {
-    if (data.annotationResult != null && data.psiRoot != null && data.psiRoot.isValid()) {
+    if (data.annotationResult != null && data.psiRoot.isValid()) {
       try {
         myAnnotationHolder.applyExternalAnnotatorWithContext(data.psiRoot, data.annotator, data.annotationResult);
       }
@@ -226,7 +233,7 @@ public class ExternalToolPass extends ProgressableTextEditorHighlightingPass {
   }
 
   @NotNull
-  private List<HighlightInfo> getHighlights() {
+  private List<HighlightInfo> convertToHighlights() {
     List<HighlightInfo> infos = new ArrayList<>(myAnnotationHolder.size());
     for (Annotation annotation : myAnnotationHolder) {
       infos.add(HighlightInfo.fromAnnotation(annotation));
@@ -235,10 +242,11 @@ public class ExternalToolPass extends ProgressableTextEditorHighlightingPass {
   }
 
   private void doFinish(@NotNull List<? extends HighlightInfo> highlights) {
-    int start = myRestrictRange.getStartOffset();
-    int end = myRestrictRange.getEndOffset();
-    BackgroundUpdateHighlightersUtil.setHighlightersToEditor(myProject, myDocument, start, end, highlights, getColorsScheme(), getId());
+    MarkupModelEx markupModel = (MarkupModelEx)DocumentMarkupModel.forDocument(myDocument, myProject, true);
+    // use the method which doesn't retrieve a HighlightingSession from the indicator, because we likely destroyed the one already
+    BackgroundUpdateHighlightersUtil.setHighlightersInRange(myRestrictRange, highlights, markupModel, getId(), myHighlightingSession);
     DaemonCodeAnalyzerEx.getInstanceEx(myProject).getFileStatusMap().markFileUpToDate(myDocument, getId());
+    myHighlightInfos = highlights;
   }
 
   private static void processError(@NotNull Throwable t, @NotNull ExternalAnnotator<?,?> annotator, @NotNull PsiFile root) {

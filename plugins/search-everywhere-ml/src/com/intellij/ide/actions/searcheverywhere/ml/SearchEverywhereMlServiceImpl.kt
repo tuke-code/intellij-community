@@ -2,11 +2,14 @@
 package com.intellij.ide.actions.searcheverywhere.ml
 
 import com.intellij.ide.actions.searcheverywhere.*
-import com.intellij.ide.actions.searcheverywhere.ml.settings.SearchEverywhereMlSettings
+import com.intellij.ide.actions.searcheverywhere.SearchEverywhereMlService.Companion.EP_NAME
 import com.intellij.ide.util.scopeChooser.ScopeDescriptor
 import com.intellij.openapi.components.service
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.registry.Registry
+import com.intellij.searchEverywhereMl.common.SearchEverywhereMlExperiment
+import com.intellij.searchEverywhereMl.common.SearchEverywhereTabWithMlRanking
+import com.intellij.searchEverywhereMl.common.settings.SearchEverywhereMlSettings
 import com.intellij.ui.components.JBList
 import org.jetbrains.annotations.ApiStatus
 import java.util.concurrent.atomic.AtomicInteger
@@ -15,7 +18,7 @@ import javax.swing.ListCellRenderer
 
 
 @ApiStatus.Internal
-class SearchEverywhereMlServiceImpl : SearchEverywhereMlService() {
+class SearchEverywhereMlServiceImpl : SearchEverywhereMlService {
   companion object {
     internal const val RECORDER_CODE = "MLSE"
 
@@ -33,7 +36,7 @@ class SearchEverywhereMlServiceImpl : SearchEverywhereMlService() {
   }
 
   internal fun shouldUseExperimentalModel(tabId: String): Boolean {
-    val tab = SearchEverywhereTabWithMl.findById(tabId) ?: return false
+    val tab = SearchEverywhereTabWithMlRanking.findById(tabId) ?: return false
     return experiment.getExperimentForTab(tab) == SearchEverywhereMlExperiment.ExperimentType.USE_EXPERIMENTAL_MODEL
   }
 
@@ -62,7 +65,7 @@ class SearchEverywhereMlServiceImpl : SearchEverywhereMlService() {
     val session = getCurrentSession() ?: return foundElementInfoWithoutMl
     val state = session.getCurrentSearchState() ?: return foundElementInfoWithoutMl
 
-    val tab = SearchEverywhereTabWithMl.findById(state.tabId)
+    val tab = SearchEverywhereTabWithMlRanking.findById(state.tabId)
     tab?.let {
       if (experiment.getExperimentForTab(tab) == SearchEverywhereMlExperiment.ExperimentType.NO_ML_FEATURES)
         return foundElementInfoWithoutMl
@@ -100,7 +103,7 @@ class SearchEverywhereMlServiceImpl : SearchEverywhereMlService() {
   }
 
   private fun shouldOrderByMlInTab(tabId: String, searchQuery: String): Boolean {
-    val tab = SearchEverywhereTabWithMl.findById(tabId) ?: return false // Tab does not support ML ordering
+    val tab = SearchEverywhereTabWithMlRanking.findById(tabId) ?: return false // Tab does not support ML ordering
     val settings = service<SearchEverywhereMlSettings>()
 
     if (tabId == SearchEverywhereManagerImpl.ALL_CONTRIBUTORS_GROUP_ID && searchQuery.isEmpty()) return false
@@ -116,8 +119,9 @@ class SearchEverywhereMlServiceImpl : SearchEverywhereMlService() {
     }
   }
 
-  override fun onItemSelected(project: Project?, indexes: IntArray, selectedItems: List<Any>, closePopup: Boolean,
-                              elementsProvider: () -> List<SearchEverywhereFoundElementInfo>) {
+  override fun onItemSelected(project: Project?, tabId: String, indexes: IntArray, selectedItems: List<Any>,
+                              elementsProvider: () -> List<SearchEverywhereFoundElementInfo>,
+                              closePopup: Boolean) {
     getCurrentSession()?.onItemSelected(project, experiment, indexes, selectedItems, closePopup, mapElementsProvider(elementsProvider))
   }
 

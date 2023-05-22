@@ -1,15 +1,18 @@
 // Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.ide.ui.customization
 
+import com.intellij.openapi.actionSystem.ActionGroup
 import com.intellij.openapi.actionSystem.ActionManager
+import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.keymap.impl.ui.ActionsTreeUtil
 import com.intellij.openapi.keymap.impl.ui.Group
+import com.intellij.openapi.util.NlsSafe
 import com.intellij.openapi.util.text.StringUtil
-import java.util.ArrayList
 
 class BeforeAction(private val rootID: String, private val destActionID: String): ToolbarQuickActionInsertStrategy {
   override fun addToSchema(actionIds: List<String>, schema: CustomActionsSchema): Boolean {
-    val (path, index) = calcPath(rootID, destActionID, schema, false) ?: return false
+    val group = getGroup(rootID, schema) ?: return false
+    val (path, index) = calcPath(group, destActionID, false) ?: return false
     actionIds.map { id -> ActionUrl(path, id, ActionUrl.ADDED, index) }
       .reversed()
       .forEach { schema.addAction(it) }
@@ -20,7 +23,8 @@ class BeforeAction(private val rootID: String, private val destActionID: String)
 
 class AfterAction(private val rootID: String, private val destActionID: String): ToolbarQuickActionInsertStrategy {
   override fun addToSchema(actionIds: List<String>, schema: CustomActionsSchema): Boolean {
-    val (path, index) = calcPath(rootID, destActionID, schema, false) ?: return false
+    val group = getGroup(rootID, schema) ?: return false
+    val (path, index) = calcPath(group, destActionID, false) ?: return false
     actionIds.map { id -> ActionUrl(path, id, ActionUrl.ADDED, index + 1) }.forEach { schema.addAction(it) }
     return true
   }
@@ -28,9 +32,10 @@ class AfterAction(private val rootID: String, private val destActionID: String):
 
 class GroupStart(private val rootID: String, private val groupID: String = rootID) : ToolbarQuickActionInsertStrategy {
   override fun addToSchema(actionIds: List<String>, schema: CustomActionsSchema): Boolean {
+    val group = getGroup(rootID, schema) ?: return false
     val path = ActionManager.getInstance().getAction(groupID)
       ?.let { StringUtil.nullize(ActionsTreeUtil.getName(it)) }
-      ?.let { calcPath(rootID, it, schema, true) }
+      ?.let { calcPath(group, it, true) }
       ?.first ?: return false
     actionIds.map { id -> ActionUrl(path, id, ActionUrl.ADDED, 0) }
       .reversed()
@@ -41,22 +46,41 @@ class GroupStart(private val rootID: String, private val groupID: String = rootI
 
 class GroupEnd(private val rootID: String, private val groupID: String = rootID) : ToolbarQuickActionInsertStrategy {
   override fun addToSchema(actionIds: List<String>, schema: CustomActionsSchema): Boolean {
+    val group = getGroup(rootID, schema) ?: return false
     val path = ActionManager.getInstance().getAction(groupID)
                  ?.let { StringUtil.nullize(ActionsTreeUtil.getName(it)) }
-                 ?.let { calcPath(rootID, it, schema, true) }
+                 ?.let { calcPath(group, it, true) }
                  ?.first ?: return false
-    val index = CustomizationUtil.getGroup(groupID, schema)?.size ?: return false
-    actionIds.map { id -> ActionUrl(path, id, ActionUrl.ADDED, index) }.forEach { schema.addAction(it) }
+    val index = getSubGroup(group, path)?.size ?: return false
+    actionIds.map { id -> ActionUrl(path, id, ActionUrl.ADDED, index) }
+      .reversed()
+      .forEach { schema.addAction(it) }
     return true
   }
 }
 
 fun groupContainsAction(groupID: String, actionID: String, schema: CustomActionsSchema): Boolean {
-  return calcPath(groupID, actionID, schema, false) != null
+  val group = getGroup(groupID, schema) ?: return false
+  return calcPath(group, actionID, false) != null
 }
 
-private fun calcPath(parentID: String, searchStr: String, schema: CustomActionsSchema, inclusive: Boolean): Pair<ArrayList<String>, Int>? {
-  val group = CustomizationUtil.getGroup(parentID, schema) ?: return null
+private fun getGroup(groupID: String, schema: CustomActionsSchema): Group? {
+  val group = (schema.getCorrectedAction(groupID) as? ActionGroup) ?: return null
+  @NlsSafe val name = schema.getDisplayName(groupID)
+  return ActionsTreeUtil.createGroup(group, name, null, null, false, { _: AnAction? -> true }, false)
+}
+
+private fun getSubGroup(group: Group, path: List<String>): Group? {
+  var currentGroup = group
+  val searchPath = path.subList(2, path.size)
+  for (str in searchPath) {
+    if (str == "root") continue
+    currentGroup = (currentGroup.children.find { (it as? Group)?.name == str } as? Group) ?: return null
+  }
+  return currentGroup
+}
+
+private fun calcPath(group: Group, searchStr: String, inclusive: Boolean): Pair<ArrayList<String>, Int>? {
   val found = findChild(group, searchStr, inclusive)
   if (found != null) {
     val list = listOf("root") + found.first

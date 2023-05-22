@@ -152,18 +152,14 @@ private suspend fun initApplicationImpl(args: List<String>,
                                         app: ApplicationImpl,
                                         asyncScope: CoroutineScope,
                                         deferredStarter: Deferred<ApplicationStarter>) {
-  val appInitializedListeners = coroutineScope {
-    preloadCriticalServices(app)
-
-    if (!app.isHeadlessEnvironment) {
-      asyncScope.launch {
-        subtask("UISettings preloading") { app.serviceAsync<UISettings>().join() }
-        subtask("KeymapManager preloading") { app.serviceAsync<KeymapManager>().join() }
-        subtask("ActionManager preloading") { app.serviceAsync<ActionManager>().join() }
-      }
+  val appInitializedListeners = subtask("app preloading") {
+    subtask("critical services preloading") {
+      preloadCriticalServices(app, asyncScope)
     }
 
-    app.preloadServices(modules = pluginSet.getEnabledModules(), activityPrefix = "", syncScope = this, asyncScope = asyncScope)
+    subtask("app service preloading (sync)") {
+      app.preloadServices(modules = pluginSet.getEnabledModules(), activityPrefix = "", syncScope = this, asyncScope = asyncScope)
+    }
 
     if (!app.isHeadlessEnvironment) {
       asyncScope.launch(CoroutineName("FUS class preloading")) {
@@ -225,44 +221,53 @@ private suspend fun initApplicationImpl(args: List<String>,
   ZipFilePool.POOL = null
 }
 
-fun CoroutineScope.preloadCriticalServices(app: ApplicationImpl) {
+fun CoroutineScope.preloadCriticalServices(app: ApplicationImpl, asyncScope: CoroutineScope) {
   launch {
     // LocalHistory wants ManagingFS.
     // It should be fixed somehow, but for now, to avoid thread contention, preload it in a controlled manner.
-    app.getServiceAsync(ManagingFS::class.java).join()
+    app.serviceAsync<ManagingFS>()
     // PlatformVirtualFileManager also wants ManagingFS
-    launch { app.getServiceAsync(VirtualFileManager::class.java) }
+    launch { app.serviceAsync<VirtualFileManager>() }
     launch { app.getServiceAsyncIfDefined(LocalHistory::class.java) }
   }
   launch {
     // required for any persistence state component (pathMacroSubstitutor.expandPaths), so, preload
-    app.serviceAsync<PathMacros>().join()
+    app.serviceAsync<PathMacros>()
 
     launch {
-      app.serviceAsync<RegistryManager>().join()
-      // wants RegistryManager
-      if (!app.isHeadlessEnvironment) {
-        app.serviceAsync<PerformanceWatcher>().join()
-        // cache it (CachedSingletonsRegistry is used,
-        // and IdeEventQueue should use loaded PerformanceWatcher service as soon as it is ready)
-        PerformanceWatcher.getInstance()
+      // required for indexing tasks (see JavaSourceModuleNameIndex for example)
+      // FileTypeManager by mistake uses PropertiesComponent instead of own state - it should be fixed someday
+      app.serviceAsync<PropertiesComponent>()
+      app.serviceAsync<FileTypeManager>()
+
+      // ProjectJdkTable wants FileTypeManager
+      launch {
+        // and VirtualFilePointerManager
+        app.serviceAsync<VirtualFilePointerManager>()
+        app.serviceAsync<ProjectJdkTable>()
       }
     }
 
-    // required for indexing tasks (see JavaSourceModuleNameIndex for example)
-    // FileTypeManager by mistake uses PropertiesComponent instead of own state - it should be fixed someday
-    app.getServiceAsync(PropertiesComponent::class.java).join()
-    app.getServiceAsync(FileTypeManager::class.java).join()
+    asyncScope.launch {
+      if (!app.isHeadlessEnvironment) {
+        launch {
+          subtask("UISettings preloading") { app.serviceAsync<UISettings>() }
+          subtask("KeymapManager preloading") { app.serviceAsync<KeymapManager>() }
+          subtask("ActionManager preloading") { app.serviceAsync<ActionManager>() }
+        }
+      }
 
-    // ProjectJdkTable wants FileTypeManager
-    launch {
-      // and VirtualFilePointerManager
-      app.getServiceAsync(VirtualFilePointerManager::class.java).join()
-      app.getServiceAsync(ProjectJdkTable::class.java)
+      // wants PropertiesComponent
+      launch { app.serviceAsync<DebugLogManager>() }
+
+      app.serviceAsync<RegistryManager>()
+      // wants RegistryManager
+      if (!app.isHeadlessEnvironment) {
+        app.serviceAsync<PerformanceWatcher>()
+        // cache it as IdeEventQueue should use loaded PerformanceWatcher service as soon as it is ready (getInstanceIfCreated is used)
+        PerformanceWatcher.getInstance()
+      }
     }
-
-    // wants PropertiesComponent
-    launch { app.getServiceAsync(DebugLogManager::class.java) }
   }
 }
 

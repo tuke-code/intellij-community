@@ -1,6 +1,7 @@
 // Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.ide
 
+import com.intellij.ide.ui.LafManagerListener
 import com.intellij.ide.ui.UISettings
 import com.intellij.ide.ui.UISettingsListener
 import com.intellij.ide.util.PropertiesComponent
@@ -9,7 +10,6 @@ import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.project.ProjectManager
 import com.intellij.openapi.project.ex.ProjectManagerEx
 import com.intellij.openapi.startup.ProjectActivity
 import com.intellij.openapi.util.Disposer
@@ -21,9 +21,46 @@ import com.intellij.ui.JBColor
 import com.intellij.util.PlatformUtils
 import com.intellij.util.ui.ColorPalette
 import java.awt.*
-import java.awt.geom.Rectangle2D
 import javax.swing.Icon
 import javax.swing.JComponent
+
+private fun getProjectPath(project: Project): String {
+  val recentProjectManager = RecentProjectsManagerBase.getInstanceEx()
+  return recentProjectManager.getProjectPath(project) ?: project.basePath ?: run {
+    //thisLogger().warn("Impossible: no path for project $project")
+    ""
+  }
+}
+
+private fun getProjectNameForIcon(project: Project): String {
+  val path = getProjectPath(project)
+  return RecentProjectIconHelper.getProjectName(path)
+}
+
+@Service(Service.Level.PROJECT)
+private class ProjectWindowCustomizerIconCache(private val project: Project) {
+  var cachedIcon = getIconRaw()
+    private set
+
+  init {
+    project.messageBus.connect().subscribe(UISettingsListener.TOPIC, UISettingsListener {
+      revalidate()
+    })
+
+    project.messageBus.connect().subscribe(LafManagerListener.TOPIC, LafManagerListener {
+      revalidate()
+    })
+  }
+
+  private fun revalidate() {
+    cachedIcon = getIconRaw()
+  }
+
+  private fun getIconRaw(): Icon {
+    val path = getProjectPath(project)
+    return RecentProjectsManagerBase.getInstanceEx().getProjectIcon(path, true)
+  }
+}
 
 @Service
 class ProjectWindowCustomizerService : Disposable {
@@ -51,21 +88,7 @@ class ProjectWindowCustomizerService : Disposable {
     )
 
   fun getProjectIcon(project: Project): Icon {
-    val path = getProjectPath(project)
-    return RecentProjectsManagerBase.getInstanceEx().getProjectIcon(path, true)
-  }
-
-  private fun getProjectPath(project: Project): String {
-    val recentProjectManager = RecentProjectsManagerBase.getInstanceEx()
-    return recentProjectManager.getProjectPath(project) ?: project.basePath ?: run {
-      thisLogger().warn("Impossible: no path for project $project")
-      ""
-    }
-  }
-
-  private fun getProjectNameForIcon(project: Project): String {
-    val path = getProjectPath(project)
-    return RecentProjectIconHelper.getProjectName(path)
+    return project.service<ProjectWindowCustomizerIconCache>().cachedIcon
   }
 
   internal fun update(newValue: Boolean) {
@@ -88,7 +111,7 @@ class ProjectWindowCustomizerService : Disposable {
     g ?: return false
     val project = ProjectFrameHelper.getFrameHelper(window)?.project ?: return false
 
-    return paint(project, parent, g)
+    return paint(project, parent, g as Graphics2D)
   }
 
   fun enableIfNeeded() {
@@ -121,10 +144,14 @@ class ProjectWindowCustomizerService : Disposable {
   }
 
   fun showGotIt(project: Project, component: JComponent) {
+    if (!shouldShowGotIt() || !isActive()) return
+
     val gotIt = GotItTooltip("colorful.instances", IdeBundle.message("colorfulInstances.gotIt.text"), this).apply {
       withHeader(IdeBundle.message("colorfulInstances.gotIt.title"))
       // withTimeout(5000) TODO: to discuss with designers: do we want autohide or do we want a button?
     }
+
+    gotIt.showCondition = { true }
 
     if (WindowManagerEx.getInstanceEx().getFrameHelper(project)?.frame?.isFocused == true) {
       gotIt.show(component, GotItTooltip.BOTTOM_MIDDLE)
@@ -135,36 +162,28 @@ class ProjectWindowCustomizerService : Disposable {
   /**
    * @return true if method painted something
    */
-  fun paint(project: Project, parent: JComponent, g: Graphics): Boolean {
+  fun paint(project: Project, parent: JComponent, g: Graphics2D): Boolean {
     if (!isActive()) return false
     val projectPath = getProjectNameForIcon(project)
 
-    val g2 = g as Graphics2D
-    g2.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY)
+    g.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY)
 
-    g2.color = parent.background
-    g2.fill(Rectangle2D.Double(0.0, 0.0, parent.width.toDouble(), parent.height.toDouble()))
+    g.color = parent.background
+    g.fillRect(0, 0, parent.width, parent.height)
 
     val color = computeOrGetColor(projectPath, project)
 
-    g2.paint = GradientPaint(parent.x.toFloat(), parent.y.toFloat(), color, 400f, parent.y.toFloat(), parent.background)
-    g2.fill(Rectangle2D.Double(0.0, 0.0, 400.0, parent.height.toDouble()))
+    g.paint = GradientPaint(parent.x.toFloat(), parent.y.toFloat(), color, 400f, parent.y.toFloat(), parent.background)
+    g.fillRect(0, 0, 400, parent.height)
 
     return true
   }
 
   private fun computeOrGetColor(projectPath: String, disposable: Disposable): Color {
-    val c = colorCache[projectPath]
-    if (c != null) {
-      return c
+    return colorCache.getOrPut(projectPath) {
+      Disposer.register(disposable) { colorCache.remove(projectPath) }
+      ColorPalette.select(colors, projectPath)
     }
-
-    val color = ColorPalette.select(colors, projectPath)
-    colorCache[projectPath] = color
-
-    Disposer.register(disposable) { colorCache.remove(projectPath) }
-
-    return color
   }
 
   override fun dispose() {}

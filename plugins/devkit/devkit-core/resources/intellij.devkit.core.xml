@@ -268,7 +268,7 @@
     <localInspection language="JVM" shortName="LightServiceMustBeFinal"
                      projectType="INTELLIJ_PLUGIN"
                      groupPathKey="inspections.group.path" groupKey="inspections.group.code"
-                     enabledByDefault="false" level="ERROR"
+                     enabledByDefault="true" level="ERROR"
                      implementationClass="org.jetbrains.idea.devkit.inspections.LightServiceMustBeFinalInspection"
                      key="inspection.light.service.must.be.final.display.name"/>
     <localInspection language="JVM" shortName="MismatchedLightServiceLevelAndCtor"
@@ -283,12 +283,12 @@
                      enabledByDefault="true" level="ERROR"
                      implementationClass="org.jetbrains.idea.devkit.inspections.RetrievingServiceInspection"
                      key="inspection.retrieving.service.display.name"/>
-    <localInspection language="JVM" shortName="ExtensionClassShouldBeFinalAndPackagePrivate"
+    <localInspection language="JVM" shortName="ExtensionClassShouldBeFinalAndNonPublic"
                      projectType="INTELLIJ_PLUGIN"
                      groupPathKey="inspections.group.path" groupKey="inspections.group.code"
                      enabledByDefault="false" level="WARNING"
-                     implementationClass="org.jetbrains.idea.devkit.inspections.ExtensionClassShouldBeFinalAndPackagePrivateInspection"
-                     key="inspection.extension.class.should.be.final.and.package.private.display.name"/>
+                     implementationClass="org.jetbrains.idea.devkit.inspections.ExtensionClassShouldBeFinalAndNonPublicInspection"
+                     key="inspection.extension.class.should.be.final.and.non.public.display.name"/>
     <localInspection language="XML" applyToDialects="false" shortName="LightServiceMigrationXML"
                      projectType="INTELLIJ_PLUGIN"
                      groupPathKey="inspections.group.path" groupKey="inspections.group.descriptor"
@@ -301,6 +301,12 @@
                      enabledByDefault="true" level="WARNING"
                      implementationClass="org.jetbrains.idea.devkit.inspections.LightServiceMigrationCodeInspection"
                      key="inspection.light.service.migration.display.name"/>
+    <localInspection language="UAST" shortName="AnActionInitializesTemplatePresentationInCtor"
+                     projectType="INTELLIJ_PLUGIN"
+                     groupPathKey="inspections.group.path" groupKey="inspections.group.code"
+                     enabledByDefault="false" level="WARNING"
+                     implementationClass="org.jetbrains.idea.devkit.inspections.AnActionInitializesTemplatePresentationInCtorInspection"
+                     key="inspection.an.action.initializes.template.presentation.in.ctor.display.name"/>
     <localInspection language="UAST" shortName="NonDefaultConstructor"
                      projectType="INTELLIJ_PLUGIN"
                      groupPathKey="inspections.group.path" groupKey="inspections.group.code"
@@ -511,10 +517,17 @@
     <cancellationCheckProvider language="JAVA" implementationClass="org.jetbrains.idea.devkit.inspections.JavaCancellationCheckProvider"/>
     <visitorProviderForRBCInspection language="JAVA"
       implementationClass="org.jetbrains.idea.devkit.inspections.CallingMethodShouldBeRequiresBlockingContextInspection$VisitorProviderForJava"/>
-    <extensionClassModifiersCheckerProvider language="JAVA"
-      implementationClass="org.jetbrains.idea.devkit.inspections.ExtensionClassShouldBeFinalAndPackagePrivateInspection$ExtensionClassModifiersCheckerProviderForJava"/>
+    <extensionClassShouldNotBePublicProvider language="JAVA"
+      implementationClass="org.jetbrains.idea.devkit.inspections.ExtensionClassShouldNotBePublicProviderForJava"/>
+    <extensionClassShouldBeFinalErrorMessageProvider language="JAVA"
+      implementationClass="org.jetbrains.idea.devkit.inspections.ExtensionClassShouldBeFinalErrorMessageProvider"/>
     <serviceLevelExtractor language="JAVA"
       implementationClass="org.jetbrains.idea.devkit.inspections.ServiceLevelExtractorForJava"/>
+    <lightServiceMustBeFinalErrorMessageProvider language="JAVA"
+      implementationClass="org.jetbrains.idea.devkit.inspections.LightServiceMustBeFinalErrorMessageProvider"/>
+    <appServiceAsStaticFinalFieldQuickFixProvider
+      language="JAVA"
+      implementationClass="org.jetbrains.idea.devkit.inspections.quickfix.JavaAppServiceAsStaticFinalFieldFixProvider"/>
   </extensions>
 
   <extensionPoints>
@@ -533,15 +546,30 @@
                     dynamic="true">
       <with attribute="implementationClass" implements=" org.jetbrains.idea.devkit.inspections.CallingMethodShouldBeRequiresBlockingContextInspection$VisitorProvider"/>
     </extensionPoint>
-    <extensionPoint qualifiedName="DevKit.lang.extensionClassModifiersCheckerProvider"
+    <extensionPoint qualifiedName="DevKit.lang.extensionClassShouldNotBePublicProvider"
                     beanClass="com.intellij.lang.LanguageExtensionPoint"
                     dynamic="true">
-      <with attribute="implementationClass" implements=" org.jetbrains.idea.devkit.inspections.ExtensionClassShouldBeFinalAndPackagePrivateInspection$ExtensionClassModifiersCheckerProvider"/>
+      <with attribute="implementationClass" implements="org.jetbrains.idea.devkit.inspections.ExtensionClassShouldNotBePublicProvider"/>
+    </extensionPoint>
+    <extensionPoint qualifiedName="DevKit.lang.extensionClassShouldBeFinalErrorMessageProvider"
+                    beanClass="com.intellij.lang.LanguageExtensionPoint"
+                    dynamic="true">
+      <with attribute="implementationClass" implements="org.jetbrains.idea.devkit.inspections.ErrorMessageProvider"/>
     </extensionPoint>
     <extensionPoint qualifiedName="DevKit.lang.serviceLevelExtractor"
                     beanClass="com.intellij.lang.LanguageExtensionPoint"
                     dynamic="true">
       <with attribute="implementationClass" implements="org.jetbrains.idea.devkit.inspections.ServiceLevelExtractor"/>
+    </extensionPoint>
+    <extensionPoint qualifiedName="DevKit.lang.lightServiceMustBeFinalErrorMessageProvider"
+                    beanClass="com.intellij.lang.LanguageExtensionPoint"
+                    dynamic="true">
+      <with attribute="implementationClass" implements="org.jetbrains.idea.devkit.inspections.ErrorMessageProvider"/>
+    </extensionPoint>
+    <extensionPoint qualifiedName="DevKit.lang.appServiceAsStaticFinalFieldQuickFixProvider"
+                    beanClass="com.intellij.lang.LanguageExtensionPoint"
+                    dynamic="true">
+      <with attribute="implementationClass" implements="org.jetbrains.idea.devkit.inspections.quickfix.AppServiceAsStaticFinalFieldFixProvider"/>
     </extensionPoint>
   </extensionPoints>
 

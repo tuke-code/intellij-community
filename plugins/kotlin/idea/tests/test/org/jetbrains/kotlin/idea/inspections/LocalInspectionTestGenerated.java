@@ -10427,6 +10427,11 @@ public abstract class LocalInspectionTestGenerated extends AbstractLocalInspecti
             runTest("testData/inspectionsLocal/redundantWith/emptyExpressionInReturn.kt");
         }
 
+        @TestMetadata("expressionBodyFunction.kt")
+        public void testExpressionBodyFunction() throws Exception {
+            runTest("testData/inspectionsLocal/redundantWith/expressionBodyFunction.kt");
+        }
+
         @TestMetadata("nested.kt")
         public void testNested() throws Exception {
             runTest("testData/inspectionsLocal/redundantWith/nested.kt");
@@ -13913,6 +13918,11 @@ public abstract class LocalInspectionTestGenerated extends AbstractLocalInspecti
         @TestMetadata("validSubtraction.kt")
         public void testValidSubtraction() throws Exception {
             runTest("testData/inspectionsLocal/replaceWithOperatorAssignment/validSubtraction.kt");
+        }
+
+        @TestMetadata("withReceiver.kt")
+        public void testWithReceiver() throws Exception {
+            runTest("testData/inspectionsLocal/replaceWithOperatorAssignment/withReceiver.kt");
         }
     }
 

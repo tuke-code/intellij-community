@@ -19,16 +19,14 @@ import com.intellij.openapi.vfs.newvfs.NewVirtualFileSystem;
 import com.intellij.openapi.vfs.newvfs.events.ChildInfo;
 import com.intellij.openapi.vfs.newvfs.persistent.dev.blobstorage.ByteBufferReader;
 import com.intellij.openapi.vfs.newvfs.persistent.dev.blobstorage.ByteBufferWriter;
-import com.intellij.openapi.vfs.newvfs.persistent.log.VfsLog;
+import com.intellij.openapi.vfs.newvfs.persistent.intercept.ConnectionInterceptor;
 import com.intellij.serviceContainer.AlreadyDisposedException;
 import com.intellij.util.ExceptionUtil;
 import com.intellij.util.Processor;
 import com.intellij.util.SystemProperties;
 import com.intellij.util.containers.ContainerUtil;
-import com.intellij.util.io.ClosedStorageException;
 import com.intellij.util.io.DataOutputStream;
-import com.intellij.util.io.IOUtil;
-import com.intellij.util.io.PersistentHashMapValueStorage;
+import com.intellij.util.io.*;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
 import org.jetbrains.annotations.*;
@@ -166,13 +164,17 @@ public final class FSRecordsImpl {
    *
    * @param storagesDirectoryPath directory there to put all FS-records files ('caches' directory)
    */
-  static FSRecordsImpl connect(@NotNull Path storagesDirectoryPath,
-                               @NotNull VfsLog vfsLog) {
-    return connect(storagesDirectoryPath, vfsLog, ON_ERROR_MARK_CORRUPTED_AND_SCHEDULE_REBUILD);
+  static FSRecordsImpl connect(@NotNull Path storagesDirectoryPath) throws UncheckedIOException {
+    return connect(storagesDirectoryPath, Collections.emptyList());
   }
 
   static FSRecordsImpl connect(@NotNull Path storagesDirectoryPath,
-                               @NotNull VfsLog vfsLog,
+                               @NotNull List<ConnectionInterceptor> connectionInterceptors) throws UncheckedIOException {
+    return connect(storagesDirectoryPath, connectionInterceptors, ON_ERROR_MARK_CORRUPTED_AND_SCHEDULE_REBUILD);
+  }
+
+  static FSRecordsImpl connect(@NotNull Path storagesDirectoryPath,
+                               @NotNull List<ConnectionInterceptor> connectionInterceptors,
                                @NotNull ErrorHandler errorHandler) throws UncheckedIOException {
     if (IOUtil.isSharedCachesEnabled()) {
       IOUtil.OVERRIDE_BYTE_BUFFERS_USE_NATIVE_BYTE_ORDER_PROP.set(false);
@@ -185,7 +187,7 @@ public final class FSRecordsImpl {
         currentVersion,
         USE_CONTENT_HASHES,
         invertedNameIndex,
-        vfsLog.getConnectionInterceptors()
+        connectionInterceptors
       );
       PersistentFSConnection connection = initializationResult.connection;
       PersistentFSContentAccessor contentAccessor = new PersistentFSContentAccessor(USE_CONTENT_HASHES, connection);
@@ -774,6 +776,16 @@ public final class FSRecordsImpl {
     }
   }
 
+  int getNameIdByFileId(int fileId) {
+    try {
+      checkNotDisposed();
+      return connection.getRecords().getNameId(fileId);
+    }
+    catch (IOException e) {
+      throw handleError(e);
+    }
+  }
+
   CharSequence getNameByNameId(int nameId) {
     assert nameId >= NULL_NAME_ID : "nameId(=" + nameId + ") must be positive";
     try {
@@ -860,9 +872,22 @@ public final class FSRecordsImpl {
     }
   }
 
-  int getContentId(int fileId) {
+  int getContentRecordId(int fileId) {
     try {
       return connection.getRecords().getContentRecordId(fileId);
+    }
+    catch (IOException e) {
+      throw handleError(e);
+    }
+  }
+
+  SimpleStringPersistentEnumerator getEnumeratedAttributes() {
+    return connection.getEnumeratedAttributes();
+  }
+
+  int getAttributeRecordId(int fileId) {
+    try {
+      return connection.getRecords().getAttributeRecordId(fileId);
     }
     catch (IOException e) {
       throw handleError(e);
@@ -967,7 +992,7 @@ public final class FSRecordsImpl {
     try {
       return contentAccessor.readContent(fileId);
     }
-    catch (InterruptedIOException ie){
+    catch (InterruptedIOException ie) {
       //RC: goal is to just bypass handleError(), which likely marks VFS corrupted,
       //    but thread interruption during _read_ doesn't corrupt anything
       throw new RuntimeException(ie);
@@ -993,7 +1018,7 @@ public final class FSRecordsImpl {
     try {
       return contentAccessor.readContentDirectly(contentId);
     }
-    catch (InterruptedIOException ie){
+    catch (InterruptedIOException ie) {
       //RC: goal is to just not go into handleError(), which likely marks VFS corrupted,
       //    but thread interruption during _read_ doesn't corrupt anything
       throw new RuntimeException(ie);
