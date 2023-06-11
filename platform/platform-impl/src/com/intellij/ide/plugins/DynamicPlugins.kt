@@ -51,8 +51,8 @@ import com.intellij.openapi.module.ModuleManager
 import com.intellij.openapi.progress.EmptyProgressIndicator
 import com.intellij.openapi.progress.ModalTaskOwner
 import com.intellij.openapi.progress.ProgressManager
-import com.intellij.openapi.progress.runBlockingModal
 import com.intellij.openapi.progress.util.PotemkinProgress
+import com.intellij.openapi.progress.withModalProgressBlocking
 import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.ProjectManager
@@ -386,7 +386,7 @@ object DynamicPlugins {
     if (options.save) {
       runInAutoSaveDisabledMode {
         FileDocumentManager.getInstance().saveAllDocuments()
-        runBlockingModal(project?.let { ModalTaskOwner.project(it) } ?: ModalTaskOwner.guess(), "") {
+        withModalProgressBlocking(project?.let { ModalTaskOwner.project(it) } ?: ModalTaskOwner.guess(), "") {
           saveProjectsAndApp(true)
         }
       }
@@ -414,27 +414,27 @@ object DynamicPlugins {
       this.isUpdate = isUpdate
     }
 
-    fun withWaitForClassloaderUnload(waitForClassloaderUnload: Boolean) = also {
+    fun withWaitForClassloaderUnload(waitForClassloaderUnload: Boolean): UnloadPluginOptions = also {
       this.waitForClassloaderUnload = waitForClassloaderUnload
     }
 
-    fun withDisable(disable: Boolean) = also {
+    fun withDisable(disable: Boolean): UnloadPluginOptions = also {
       this.disable = disable
     }
 
-    fun withRequireMemorySnapshot(requireMemorySnapshot: Boolean) = also {
+    fun withRequireMemorySnapshot(requireMemorySnapshot: Boolean): UnloadPluginOptions = also {
       this.requireMemorySnapshot = requireMemorySnapshot
     }
 
-    fun withUnloadWaitTimeout(unloadWaitTimeout: Int) = also {
+    fun withUnloadWaitTimeout(unloadWaitTimeout: Int): UnloadPluginOptions = also {
       this.unloadWaitTimeout = unloadWaitTimeout
     }
 
-    fun withSave(save: Boolean) = also {
+    fun withSave(save: Boolean): UnloadPluginOptions = also {
       this.save = save
     }
 
-    fun withCheckImplementationDetailDependencies(checkImplementationDetailDependencies: Boolean) = also {
+    fun withCheckImplementationDetailDependencies(checkImplementationDetailDependencies: Boolean): UnloadPluginOptions = also {
       this.checkImplementationDetailDependencies = checkImplementationDetailDependencies
     }
   }

@@ -1,4 +1,4 @@
-// Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.codeInsight.daemon.impl;
 
 import com.intellij.codeInsight.daemon.HighlightDisplayKey;
@@ -9,7 +9,6 @@ import com.intellij.codeInspection.ex.InspectionProfileWrapper;
 import com.intellij.diagnostic.PluginException;
 import com.intellij.lang.ExternalLanguageAnnotators;
 import com.intellij.lang.LangBundle;
-import com.intellij.lang.annotation.Annotation;
 import com.intellij.lang.annotation.AnnotationSession;
 import com.intellij.lang.annotation.ExternalAnnotator;
 import com.intellij.openapi.application.ApplicationManager;
@@ -48,16 +47,12 @@ public class ExternalToolPass extends ProgressableTextEditorHighlightingPass {
 
   private final AnnotationHolderImpl myAnnotationHolder;
   private final List<MyData<?,?>> myAnnotationData = new ArrayList<>();
-  @NotNull
-  private volatile List<? extends HighlightInfo> myHighlightInfos = Collections.emptyList();
+  private volatile @NotNull List<? extends HighlightInfo> myHighlightInfos = Collections.emptyList();
 
   private static class MyData<K,V> {
-    @NotNull
-    final ExternalAnnotator<K,V> annotator;
-    @NotNull
-    final PsiFile psiRoot;
-    @NotNull
-    final K collectedInfo;
+    final @NotNull ExternalAnnotator<K,V> annotator;
+    final @NotNull PsiFile psiRoot;
+    final @NotNull K collectedInfo;
     volatile V annotationResult;
 
     MyData(@NotNull ExternalAnnotator<K,V> annotator, @NotNull PsiFile psiRoot, @NotNull K collectedInfo) {
@@ -164,7 +159,7 @@ public class ExternalToolPass extends ProgressableTextEditorHighlightingPass {
         DaemonProgressIndicator indicator = new DaemonProgressIndicator();
         BackgroundTaskUtil.runUnderDisposeAwareIndicator(myProject, () -> {
           // run annotators outside the read action because they could start OSProcessHandler
-          runChangeAware(myDocument, ExternalToolPass.this::doAnnotate);
+          runChangeAware(myDocument, () -> doAnnotate());
           ReadAction.run(() -> {
             ProgressManager.checkCanceled();
             if (!documentChanged(modificationStampBefore)) {
@@ -178,9 +173,8 @@ public class ExternalToolPass extends ProgressableTextEditorHighlightingPass {
     ExternalAnnotatorManager.getInstance().queue(update);
   }
 
-  @NotNull
   @Override
-  public List<HighlightInfo> getInfos() {
+  public @NotNull List<HighlightInfo> getInfos() {
     try {
       ExternalAnnotatorManager.getInstance().waitForAllExecuted(1, TimeUnit.MINUTES);
     }
@@ -232,13 +226,8 @@ public class ExternalToolPass extends ProgressableTextEditorHighlightingPass {
     }
   }
 
-  @NotNull
-  private List<HighlightInfo> convertToHighlights() {
-    List<HighlightInfo> infos = new ArrayList<>(myAnnotationHolder.size());
-    for (Annotation annotation : myAnnotationHolder) {
-      infos.add(HighlightInfo.fromAnnotation(annotation));
-    }
-    return infos;
+  private @NotNull List<HighlightInfo> convertToHighlights() {
+    return ContainerUtil.map(myAnnotationHolder, annotation -> HighlightInfo.fromAnnotation(annotation));
   }
 
   private void doFinish(@NotNull List<? extends HighlightInfo> highlights) {

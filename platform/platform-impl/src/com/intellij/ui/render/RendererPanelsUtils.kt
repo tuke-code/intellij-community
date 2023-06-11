@@ -2,26 +2,23 @@
 package com.intellij.ui.render
 
 import com.intellij.ui.SimpleColoredComponent
-import com.intellij.ui.dsl.builder.DslComponentProperty
 import com.intellij.ui.dsl.gridLayout.Constraints
 import com.intellij.ui.dsl.gridLayout.GridLayout
 import com.intellij.ui.dsl.gridLayout.UnscaledGaps
 import com.intellij.ui.dsl.gridLayout.builders.RowsGridBuilder
+import com.intellij.ui.dsl.listCellRenderer.stripHorizontalInsets
 import com.intellij.ui.popup.list.SelectablePanel
-import com.intellij.util.ui.JBEmptyBorder
 import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.UIUtil
 import java.awt.BorderLayout
-import java.awt.Insets
 import javax.swing.Icon
 import javax.swing.JComponent
 import javax.swing.JLabel
 import javax.swing.JPanel
-import javax.swing.border.EmptyBorder
 import kotlin.math.max
 
 /**
- * RendererPanelsUtils and panels like [IconCompCompPanel], [IconCompOptionalCompPanel] etc are dedicated to build
+ * RendererPanelsUtils and panels like [IconCompOptionalCompPanel] etc are dedicated to build
  * standard simple renderers, which should cover most single-lined cases. Below are the reasons why use renderers from this file:
  *
  * 1. There are many similar renderers based on different layouts. It's hard to support them all and there are many duplicated code
@@ -44,7 +41,7 @@ import kotlin.math.max
 class RendererPanelsUtils {
 
   companion object {
-    internal const val iconTextUnscaledGap = 4
+    internal const val iconTextUnscaledGap: Int = 4
 
     /**
      * Gap between icon and related text. Can be extracted into a separate UI constant later if needed
@@ -60,21 +57,10 @@ class RendererPanelsUtils {
  */
 private const val CENTER_RIGHT_GAP = 4
 
-open class IconCompCompPanel<C1 : JComponent, C2 : JComponent>(val center: C1, val right: C2) : IconPanel() {
-
-  init {
-    resetHorizontalInsets(center, right)
-
-    createBuilder()
-      .cell(iconLabel, baselineAlign = false, gaps = UnscaledGaps(right = RendererPanelsUtils.iconTextUnscaledGap))
-      .cell(center, resizableColumn = true)
-      .cell(right, gaps = UnscaledGaps(left = CENTER_RIGHT_GAP))
-  }
-}
-
 /**
  * Should be used for in cases one label, label with icon, and other similar re
  */
+@Deprecated("Use com.intellij.ui.dsl.listCellRenderer.BuilderKt.listCellRenderer instead")
 open class IconCompOptionalCompPanel<C1 : JComponent>(
   val center: C1) : IconPanel() {
 
@@ -89,7 +75,7 @@ open class IconCompOptionalCompPanel<C1 : JComponent>(
       }
 
       if (value != null) {
-        resetHorizontalInsets(value)
+        stripHorizontalInsets(value)
         content.add(value, Constraints((content.layout as GridLayout).rootGrid, 2, 0, baselineAlign = true,
                                        gaps = UnscaledGaps(left = CENTER_RIGHT_GAP)))
       }
@@ -98,7 +84,7 @@ open class IconCompOptionalCompPanel<C1 : JComponent>(
     }
 
   init {
-    resetHorizontalInsets(center)
+    stripHorizontalInsets(center)
 
     createBuilder()
       .cell(iconLabel, baselineAlign = false, gaps = UnscaledGaps(right = RendererPanelsUtils.iconTextUnscaledGap))
@@ -106,16 +92,17 @@ open class IconCompOptionalCompPanel<C1 : JComponent>(
   }
 }
 
+@Deprecated("Use com.intellij.ui.dsl.listCellRenderer.BuilderKt.listCellRenderer instead")
 open class IconPanel : SelectablePanel() {
 
   /**
    * Content panel allows to trim components that could go outside of selection
    */
-  protected val content = JPanel(GridLayout())
-  protected val iconLabel = JLabel()
+  protected val content: JPanel = JPanel(GridLayout())
+  protected val iconLabel: JLabel = JLabel()
 
   init {
-    resetHorizontalInsets(iconLabel)
+    stripHorizontalInsets(iconLabel)
     content.isOpaque = false
     layout = BorderLayout()
 
@@ -168,26 +155,5 @@ open class IconPanel : SelectablePanel() {
     return RowsGridBuilder(content)
       .defaultBaselineAlign(true)
       .resizableRow()
-  }
-}
-
-/**
- * Resets any horizontal insets ([EmptyBorder], [JBEmptyBorder]) and ipads ([SimpleColoredComponent.getIpad])
- */
-fun resetHorizontalInsets(vararg components: JComponent) {
-  for (component in components) {
-    component.putClientProperty(DslComponentProperty.VISUAL_PADDINGS, UnscaledGaps.EMPTY)
-
-    val border = component.border
-    if (border != null && (border.javaClass === EmptyBorder::class.java || border.javaClass === JBEmptyBorder::class.java)) {
-      val insets = (border as EmptyBorder).borderInsets
-      @Suppress("UseDPIAwareBorders")
-      component.border = EmptyBorder(insets.top, 0, insets.bottom, 0)
-    }
-
-    if (component is SimpleColoredComponent) {
-      @Suppress("UseDPIAwareInsets")
-      component.ipad = Insets(component.ipad.top, 0, component.ipad.bottom, 0)
-    }
   }
 }

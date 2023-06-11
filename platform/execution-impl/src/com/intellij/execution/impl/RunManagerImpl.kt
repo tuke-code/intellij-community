@@ -7,7 +7,6 @@ import com.intellij.configurationStore.*
 import com.intellij.configurationStore.SettingsSavingComponent
 import com.intellij.execution.*
 import com.intellij.execution.actions.ChooseRunConfigurationPopup
-import com.intellij.execution.compound.CompoundRunConfiguration
 import com.intellij.execution.configurations.*
 import com.intellij.execution.runToolbar.RunToolbarSlotManager
 import com.intellij.execution.runners.ExecutionEnvironment
@@ -234,18 +233,7 @@ open class RunManagerImpl @NonInjectable constructor(val project: Project, share
     get() = project.messageBus.syncPublisher(RunManagerListener.TOPIC)
 
   init {
-    val messageBusConnection = project.messageBus.connect()
-    messageBusConnection.subscribe(WorkspaceModelTopics.CHANGED, object : WorkspaceModelChangeListener {
-      override fun changed(event: VersionedStorageChange) {
-        if (event.getChanges(ContentRootEntity::class.java).any() || event.getChanges(SourceRootEntity::class.java).any()) {
-          clearSelectedConfigurationIcon()
-
-          deleteRunConfigsFromArbitraryFilesNotWithinProjectContent()
-        }
-      }
-    })
-
-    messageBusConnection.subscribe(DynamicPluginListener.TOPIC, object : DynamicPluginListener {
+    project.messageBus.connect().subscribe(DynamicPluginListener.TOPIC, object : DynamicPluginListener {
       override fun beforePluginUnload(pluginDescriptor: IdeaPluginDescriptor, isUpdate: Boolean) {
         iconAndInvalidCache.clear()
       }
@@ -269,8 +257,8 @@ open class RunManagerImpl @NonInjectable constructor(val project: Project, share
   }
 
   private fun clearSelectedConfigurationIcon() {
-    selectedConfiguration?.let {
-      iconAndInvalidCache.remove(it.uniqueID)
+    selectedConfigurationId?.let {
+      iconAndInvalidCache.remove(it)
     }
   }
 
@@ -421,7 +409,7 @@ open class RunManagerImpl @NonInjectable constructor(val project: Project, share
             // Project is being loaded. Finally we can set the right RC as 'selected' in the RC combo box.
             // Need to set selectedConfiguration in EDT to avoid deadlock with ExecutionTargetManagerImpl or similar implementations of runConfigurationSelected()
             StartupManager.getInstance(project).runAfterOpened {
-              ModalityUiUtil.invokeLaterIfNeeded(ModalityState.NON_MODAL, project.disposed, Runnable {
+              ModalityUiUtil.invokeLaterIfNeeded(ModalityState.nonModal(), project.disposed, Runnable {
                 // Empty string means that there's no information about initially selected RC in workspace.xml
                 // => IDE should select any if still none selected (CLion could have set the selected RC itself).
                 if (selectedConfiguration == null || notYetAppliedInitialSelectedConfigurationId != "") {
@@ -774,6 +762,15 @@ open class RunManagerImpl @NonInjectable constructor(val project: Project, share
 
   @VisibleForTesting
   protected open fun onFirstLoadingFinished() {
+    project.messageBus.connect().subscribe(WorkspaceModelTopics.CHANGED, object : WorkspaceModelChangeListener {
+      override fun changed(event: VersionedStorageChange) {
+        if (event.getChanges(ContentRootEntity::class.java).any() || event.getChanges(SourceRootEntity::class.java).any()) {
+          clearSelectedConfigurationIcon()
+          deleteRunConfigsFromArbitraryFilesNotWithinProjectContent()
+        }
+      }
+    })
+
     @Suppress("TestOnlyProblems")
     if (ProjectManagerImpl.isLight(project)) {
       return
@@ -1425,25 +1422,8 @@ private fun getNameWeight(n1: String) = if (n1.startsWith("<template> of ") || n
 internal fun doGetBeforeRunTasks(configuration: RunConfiguration): List<BeforeRunTask<*>> {
   return when (configuration) {
     is WrappingRunConfiguration<*> -> doGetBeforeRunTasks(configuration.peer)
-    else -> configuration.beforeRunTasks.flatMap {
-      return@flatMap beforeRunTasks(it, configuration)
-    }
+    else -> configuration.beforeRunTasks
   }
-}
-
-private fun beforeRunTasks(it: BeforeRunTask<*>,
-                           configuration: RunConfiguration): List<BeforeRunTask<*>> {
-  val compound = (it as? RunConfigurationBeforeRunProvider.RunConfigurableBeforeRunTask)?.settings?.configuration as? CompoundRunConfiguration
-  if (compound != null) {
-    val provider = RunConfigurationBeforeRunProvider(configuration.project)
-    val runManager = RunManagerImpl.getInstanceImpl(configuration.project)
-    return compound.getConfigurationsWithTargets(runManager).map {
-      val task = provider.createTask(it.key)
-      task.setSettingsWithTarget(runManager.findSettings(it.key), it.value)
-      task
-    }
-  }
-  return listOf(it)
 }
 
 internal fun RunConfiguration.cloneBeforeRunTasks() {

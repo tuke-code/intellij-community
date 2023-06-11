@@ -36,7 +36,7 @@ import com.intellij.openapi.ui.popup.JBPopupListener;
 import com.intellij.openapi.ui.popup.LightweightWindowEvent;
 import com.intellij.openapi.updateSettings.impl.UpdateChecker;
 import com.intellij.openapi.updateSettings.impl.UpdateSettings;
-import com.intellij.openapi.updateSettings.impl.pluginsAdvertisement.PluginsAdvertiserStartupActivity;
+import com.intellij.openapi.updateSettings.impl.pluginsAdvertisement.PluginsAdvertiserStartupActivityKt;
 import com.intellij.openapi.util.NlsContexts;
 import com.intellij.openapi.util.NlsSafe;
 import com.intellij.openapi.util.SystemInfo;
@@ -724,7 +724,7 @@ public final class PluginManagerConfigurable
 
                 if (parser.suggested) {
                   if (project != null) {
-                    result.descriptors.addAll(PluginsAdvertiserStartupActivity.getSuggestedPlugins(project, customRepositoriesMap));
+                    result.descriptors.addAll(PluginsAdvertiserStartupActivityKt.findSuggestedPlugins(project, customRepositoriesMap));
                   }
                   return;
                 }
@@ -915,7 +915,7 @@ public final class PluginManagerConfigurable
           String defaultCategory = IdeBundle.message("plugins.configurable.other.bundled");
           visiblePlugins.get(Boolean.TRUE)
             .stream()
-            .collect(Collectors.groupingBy(descriptor -> StringUtil.defaultIfEmpty(descriptor.getCategory(), defaultCategory)))
+            .collect(Collectors.groupingBy(descriptor -> StringUtil.defaultIfEmpty(descriptor.getDisplayCategory(), defaultCategory)))
             .entrySet()
             .stream()
             .map(entry -> new ComparablePluginsGroup(entry.getKey(), entry.getValue()))
@@ -1214,7 +1214,7 @@ public final class PluginManagerConfigurable
                                  Map<String, @NotNull List<PluginNode>> customMap) {
     String groupName = IdeBundle.message("plugins.configurable.suggested");
     LOG.info("Marketplace tab: '" + groupName + "' group load started");
-    List<IdeaPluginDescriptor> plugins = PluginsAdvertiserStartupActivity.getSuggestedPlugins(project, customMap);
+    List<IdeaPluginDescriptor> plugins = PluginsAdvertiserStartupActivityKt.findSuggestedPlugins(project, customMap);
     addGroup(groups, groupName, PluginsGroupType.SUGGESTED, "", plugins, group -> false);
   }
 
@@ -1525,6 +1525,13 @@ public final class PluginManagerConfigurable
     ShowSettingsUtil.getInstance().editConfigurable(project,
                                                     configurable,
                                                     () -> configurable.select(pluginIds));
+  }
+
+  public static void showSuggestedPlugins(@Nullable Project project) {
+    PluginManagerConfigurable configurable = new PluginManagerConfigurable();
+    ShowSettingsUtil.getInstance().editConfigurable(project,
+                                                    configurable,
+                                                    () -> configurable.openMarketplaceTab("/suggested"));
   }
 
   public static void showPluginConfigurable(@Nullable Component parent,

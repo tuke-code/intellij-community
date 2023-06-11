@@ -31,10 +31,7 @@ import com.intellij.openapi.vfs.newvfs.persistent.FSRecords;
 import com.intellij.util.containers.FactoryMap;
 import com.intellij.util.io.DataExternalizer;
 import com.intellij.util.io.DataInputOutputUtil;
-import org.jetbrains.annotations.Contract;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
-import org.jetbrains.annotations.VisibleForTesting;
+import org.jetbrains.annotations.*;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -50,6 +47,11 @@ import static com.intellij.util.SystemProperties.getIntProperty;
 import static com.intellij.util.io.IOUtil.KiB;
 import static java.nio.file.StandardOpenOption.*;
 
+/**
+ * {@link VirtualFileGistOverGistStorage} is a replacement -- keep this class for a while
+ * TODO RC: remove as soon as {@link VirtualFileGistOverGistStorage} proves its worth
+ */
+@ApiStatus.Obsolete
 class VirtualFileGistImpl<Data> implements VirtualFileGist<Data> {
   private static final Logger LOG = Logger.getInstance(VirtualFileGist.class);
 
@@ -78,8 +80,6 @@ class VirtualFileGistImpl<Data> implements VirtualFileGist<Data> {
       throw new UncheckedIOException("Can't create gists directory [" + gistsDir.toAbsolutePath() + "]", e);
     }
   });
-
-  private static final int INTERNAL_VERSION = 2;
 
   private static final int VALUE_KIND_NULL = 0;
   private static final int VALUE_KIND_INLINE = 1;
@@ -216,7 +216,7 @@ class VirtualFileGistImpl<Data> implements VirtualFileGist<Data> {
         attributeStream.writeByte(VALUE_KIND_INLINE);
         attributeStream.write(outputStream.getInternalBuffer(), 0, outputStream.size());
 
-        if(wasStoredInDedicatedFileBefore){
+        if (wasStoredInDedicatedFileBefore) {
           Path gistPath = dedicatedGistFilePath(file);
           FileUtilRt.deleteRecursively(gistPath);
         }
@@ -238,9 +238,11 @@ class VirtualFileGistImpl<Data> implements VirtualFileGist<Data> {
     FactoryMap.create(key -> new FileAttribute(key.first, key.second, false));
 
   private FileAttribute getFileAttribute(@Nullable Project project) {
+    //TODO RC: we create a new VFS attribute for each project -- but never clean up
+    //         attributes for projects that are e.g. deleted. 
     synchronized (attributes) {
       return attributes.get(
-        Pair.create(id + (project == null ? "###noProject###" : project.getLocationHash()), version + INTERNAL_VERSION));
+        Pair.create(id + (project == null ? "###noProject###" : project.getLocationHash()), version));
     }
   }
 

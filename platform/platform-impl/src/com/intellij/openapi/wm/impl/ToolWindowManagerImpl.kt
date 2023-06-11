@@ -39,6 +39,7 @@ import com.intellij.openapi.keymap.Keymap
 import com.intellij.openapi.keymap.KeymapManager
 import com.intellij.openapi.keymap.KeymapManagerListener
 import com.intellij.openapi.options.advanced.AdvancedSettings
+import com.intellij.openapi.progress.ProcessCanceledException
 import com.intellij.openapi.project.DumbService
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.ProjectCloseListener
@@ -105,7 +106,7 @@ open class ToolWindowManagerImpl @NonInjectable @TestOnly internal constructor(
 
   private val state: ToolWindowManagerState by lazy(LazyThreadSafetyMode.NONE) { project.service() }
 
-  var layoutState
+  var layoutState: DesktopLayout
     get() = state.layout
     set(value) { state.layout = value }
 
@@ -183,9 +184,9 @@ open class ToolWindowManagerImpl @NonInjectable @TestOnly internal constructor(
     }
   }
 
-  fun isToolWindowRegistered(id: String) = idToEntry.containsKey(id)
+  fun isToolWindowRegistered(id: String): Boolean = idToEntry.containsKey(id)
 
-  internal fun getEntry(id: String) = idToEntry.get(id)
+  internal fun getEntry(id: String): ToolWindowEntry? = idToEntry.get(id)
 
   internal fun assertIsEdt() {
     if (isEdtRequired) {
@@ -294,6 +295,10 @@ open class ToolWindowManagerImpl @NonInjectable @TestOnly internal constructor(
             manager.saveFloatingOrWindowedState(entry, manager.layoutState.getInfo(entry.id) ?: continue)
           }
         }
+
+        override fun projectClosed(project: Project) {
+          (project.serviceIfCreated<ToolWindowManager>() as ToolWindowManagerImpl?)?.projectClosed()
+        }
       })
 
       connection.subscribe(KeymapManagerListener.TOPIC, object : KeymapManagerListener {
@@ -344,7 +349,7 @@ open class ToolWindowManagerImpl @NonInjectable @TestOnly internal constructor(
 
   private fun getDefaultToolWindowPane() = toolWindowPanes.get(WINDOW_INFO_DEFAULT_TOOL_WINDOW_PANE_ID)!!
 
-  internal fun getToolWindowPane(paneId: String) = toolWindowPanes.get(paneId) ?: getDefaultToolWindowPane()
+  internal fun getToolWindowPane(paneId: String): ToolWindowPane = toolWindowPanes.get(paneId) ?: getDefaultToolWindowPane()
 
   internal fun getToolWindowPane(toolWindow: ToolWindow): ToolWindowPane {
     val paneId = if (toolWindow is ToolWindowImpl) {
@@ -566,6 +571,30 @@ open class ToolWindowManagerImpl @NonInjectable @TestOnly internal constructor(
                                           "Rework code or use ToolWindowManager.invokeLater")
   }
 
+  internal fun projectClosed() {
+    // Hide everything outside the frame (floating and windowed) - frame contents are handled separately elsewhere.
+    for (entry in idToEntry.values) {
+      if (entry.toolWindow.windowInfo.type.isInternal) {
+        continue
+      }
+      try {
+        removeExternalDecorators(entry)
+      }
+      catch (e: CancellationException) {
+        throw e
+      }
+      catch (e: ProcessCanceledException) {
+        throw e
+      }
+      catch (e: Throwable) {
+        LOG.error(e)
+      }
+      finally {
+        Disposer.dispose(entry.disposable)
+      }
+    }
+  }
+
   private fun loadDefault() {
     toolWindowSetInitializer.scheduleSetLayout(ToolWindowDefaultLayoutManager.getInstance().getLayoutCopy())
   }
@@ -583,7 +612,7 @@ open class ToolWindowManagerImpl @NonInjectable @TestOnly internal constructor(
     ApplicationManager.getApplication().assertIsDispatchThread()
 
     val activity = UiActivity.Focus("toolWindow:$id")
-    UiActivityMonitor.getInstance().addActivity(project, activity, ModalityState.NON_MODAL)
+    UiActivityMonitor.getInstance().addActivity(project, activity, ModalityState.nonModal())
 
     activateToolWindow(idToEntry.get(id)!!, getRegisteredMutableInfoOrLogError(id), autoFocusContents, source)
 
@@ -746,7 +775,7 @@ open class ToolWindowManagerImpl @NonInjectable @TestOnly internal constructor(
    */
   private fun getWindowedDecorator(id: String) = idToEntry.get(id)?.windowedDecorator
 
-  override fun getIdsOn(anchor: ToolWindowAnchor) = getVisibleToolWindowsOn(WINDOW_INFO_DEFAULT_TOOL_WINDOW_PANE_ID, anchor).map { it.id }.toList()
+  override fun getIdsOn(anchor: ToolWindowAnchor): List<String> = getVisibleToolWindowsOn(WINDOW_INFO_DEFAULT_TOOL_WINDOW_PANE_ID, anchor).map { it.id }.toList()
 
   internal fun getToolWindowsOn(paneId: String, anchor: ToolWindowAnchor, excludedId: String): MutableList<ToolWindowEx> {
     return getVisibleToolWindowsOn(paneId, anchor)
@@ -1157,6 +1186,11 @@ open class ToolWindowManagerImpl @NonInjectable @TestOnly internal constructor(
   }
 
   private fun removeDecoratorWithoutUpdatingState(entry: ToolWindowEntry, state: WindowInfoImpl, dirtyMode: Boolean) {
+    removeExternalDecorators(entry)
+    removeInternalDecorator(entry, state, dirtyMode)
+  }
+
+  private fun removeExternalDecorators(entry: ToolWindowEntry) {
     entry.windowedDecorator?.let {
       entry.windowedDecorator = null
       Disposer.dispose(it)
@@ -1168,7 +1202,9 @@ open class ToolWindowManagerImpl @NonInjectable @TestOnly internal constructor(
       it.dispose()
       return
     }
+  }
 
+  private fun removeInternalDecorator(entry: ToolWindowEntry, state: WindowInfoImpl, dirtyMode: Boolean) {
     entry.toolWindow.decoratorComponent?.let {
       val toolWindowPane = getToolWindowPane(state.safeToolWindowPaneId)
       toolWindowPane.removeDecorator(state, it, dirtyMode, this)
@@ -1229,12 +1265,13 @@ open class ToolWindowManagerImpl @NonInjectable @TestOnly internal constructor(
 
     for (entry in idToEntry.values) {
       val old = layoutState.getInfo(entry.id) ?: entry.readOnlyWindowInfo as WindowInfoImpl
-      val new = newLayout.getInfo(entry.id)
-      // just copy if defined in the old layout but not in the new
+      var new = newLayout.getInfo(entry.id)
+      // If it wasn't present when the layout was saved, leave its state alone, but hide it.
       if (new == null) {
-        newLayout.addInfo(entry.id, old.copy())
+        new = old.copy().apply { isVisible = false }
+        newLayout.addInfo(entry.id, new)
       }
-      else if (old != new) {
+      if (old != new) {
         if (!entry.toolWindow.isAvailable) {
           new.isVisible = false // Preserve invariants: if it can't be shown, don't consider it visible.
         }
@@ -1347,7 +1384,7 @@ open class ToolWindowManagerImpl @NonInjectable @TestOnly internal constructor(
     checkInvariants(null)
   }
 
-  override fun getMoreButtonSide() = state.moreButton
+  override fun getMoreButtonSide(): ToolWindowAnchor = state.moreButton
 
   override fun setMoreButtonSide(side: ToolWindowAnchor) {
     state.moreButton = side
@@ -1364,7 +1401,9 @@ open class ToolWindowManagerImpl @NonInjectable @TestOnly internal constructor(
 
   override fun invokeLater(runnable: Runnable) {
     if (!toolWindowSetInitializer.addToPendingTasksIfNotInitialized(runnable)) {
-      ApplicationManager.getApplication().invokeLater(runnable, ModalityState.NON_MODAL, project.disposed)
+      coroutineScope.launch(Dispatchers.EDT + ModalityState.nonModal().asContextElement()) {
+        runnable.run()
+      }
     }
   }
 
@@ -1563,7 +1602,7 @@ open class ToolWindowManagerImpl @NonInjectable @TestOnly internal constructor(
     }
   }
 
-  override fun getToolWindowBalloon(id: String) = idToEntry.get(id)?.balloon
+  override fun getToolWindowBalloon(id: String): Balloon? = idToEntry.get(id)?.balloon
 
   override val isEditorComponentActive: Boolean
     get() = state.isEditorComponentActive
@@ -1846,7 +1885,7 @@ open class ToolWindowManagerImpl @NonInjectable @TestOnly internal constructor(
     getToolWindowPane(toolWindow).stretchWidth(toolWindow, value)
   }
 
-  override fun isMaximized(window: ToolWindow) = getToolWindowPane(window).isMaximized(window)
+  override fun isMaximized(window: ToolWindow): Boolean = getToolWindowPane(window).isMaximized(window)
 
   override fun setMaximized(window: ToolWindow, maximized: Boolean) {
     if (window.type == ToolWindowType.FLOATING && window is ToolWindowImpl) {

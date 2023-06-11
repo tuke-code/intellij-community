@@ -45,6 +45,11 @@
     <diff.actions.ShowStandaloneDiffAction.ExtensionProvider
       implementation="org.jetbrains.plugins.gitlab.mergerequest.diff.action.GitLabMergeRequestShowDiffActionProvider"/>
     <iconMapper mappingFile="GitlabIconMappings.json"/>
+
+    <statistics.applicationUsagesCollector
+      implementation="org.jetbrains.plugins.gitlab.util.GitLabStatistics$GitLabAccountsStatisticsCollector"/>
+    <statistics.counterUsagesCollector
+      implementationClass="org.jetbrains.plugins.gitlab.util.GitLabStatistics$GitLabCountersCollector"/>
   </extensions>
 
   <extensions defaultExtensionNs="Git4Idea">
@@ -53,13 +58,16 @@
   </extensions>
 
   <actions>
+    <action id="GitLab.Open.Settings.Page" class="org.jetbrains.plugins.gitlab.GitLabOpenSettingsPageAction"/>
+    
     <action id="GitLab.Merge.Request.List.Refresh"
             class="org.jetbrains.plugins.gitlab.mergerequest.action.GitLabMergeRequestListRefreshAction"
             use-shortcut-of="Refresh"
             icon="AllIcons.Actions.Refresh"/>
     <action id="GitLab.Merge.Request.Refresh"
             class="org.jetbrains.plugins.gitlab.mergerequest.action.GitLabMergeRequestRefreshAction"
-            use-shortcut-of="Refresh"/>
+            use-shortcut-of="Refresh"
+            icon="AllIcons.Actions.Refresh"/>
     <action id="GitLab.Merge.Request.Branch.Checkout.Remote"
             class="org.jetbrains.plugins.gitlab.mergerequest.action.GitLabMergeRequestCheckoutRemoteBranchAction"/>
     <action id="GitLab.Merge.Request.Show"
@@ -75,6 +83,10 @@
     </group>
 
     <group id="GitLab.Merge.Request.Details.Popup">
+      <reference id="GitLab.Merge.Request.Refresh"/>
+    </group>
+
+    <group id="GitLab.Merge.Request.Timeline.Popup">
       <reference id="GitLab.Merge.Request.Refresh"/>
     </group>
 

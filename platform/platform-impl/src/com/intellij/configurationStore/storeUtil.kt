@@ -18,7 +18,8 @@ import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.progress.ModalTaskOwner
 import com.intellij.openapi.progress.ProcessCanceledException
-import com.intellij.openapi.progress.runBlockingModal
+import com.intellij.openapi.progress.blockingContext
+import com.intellij.openapi.progress.withModalProgressBlocking
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.processOpenedProjects
 import com.intellij.openapi.util.SystemInfoRt
@@ -62,7 +63,7 @@ object StoreUtil {
   fun saveDocumentsAndProjectSettings(project: Project) {
     runInAutoSaveDisabledMode {
       FileDocumentManager.getInstance().saveAllDocuments()
-      runBlockingModal(project, CommonBundle.message("title.save.project")) {
+      withModalProgressBlocking(project, CommonBundle.message("title.save.project")) {
         com.intellij.configurationStore.saveSettings(project)
       }
     }
@@ -80,7 +81,7 @@ object StoreUtil {
   fun saveDocumentsAndProjectsAndApp(forceSavingAllSettings: Boolean) {
     runInAutoSaveDisabledMode {
       FileDocumentManager.getInstance().saveAllDocuments()
-      runBlockingModal(ModalTaskOwner.guess(), "") {
+      withModalProgressBlocking(ModalTaskOwner.guess(), "") {
         saveProjectsAndApp(forceSavingAllSettings)
       }
     }
@@ -129,7 +130,9 @@ suspend fun saveSettings(componentManager: ComponentManager, forceSavingAllSetti
                                IdeBundle.message("notification.content.plugin.failed.to.save.settings", pluginId.idString, messagePostfix),
                                NotificationType.ERROR)
     }
-    notification.notify(componentManager as? Project)
+    blockingContext {
+      notification.notify(componentManager as? Project)
+    }
   }
   finally {
     storeReloadManager?.unblockReloadingProjectOnExternalChanges()
@@ -255,7 +258,7 @@ inline fun runInAllowSaveMode(isSaveAllowed: Boolean = true, task: () -> Unit) {
 @Internal
 fun forPoorJavaClientOnlySaveProjectIndEdtDoNotUseThisMethod(project: Project, forceSavingAllSettings: Boolean = false) {
   runInAutoSaveDisabledMode {
-    runBlockingModal(project, CommonBundle.message("title.save.project")) {
+    withModalProgressBlocking(project, CommonBundle.message("title.save.project")) {
       saveSettings(project, forceSavingAllSettings = forceSavingAllSettings)
     }
   }

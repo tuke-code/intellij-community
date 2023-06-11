@@ -2704,6 +2704,11 @@ public abstract class K1IntentionTestGenerated extends AbstractK1IntentionTest {
                     runTest("testData/intentions/branched/ifWhen/ifToWhen/combinedIf.kt");
                 }
 
+                @TestMetadata("combinedIfWithEmptyLines.kt")
+                public void testCombinedIfWithEmptyLines() throws Exception {
+                    runTest("testData/intentions/branched/ifWhen/ifToWhen/combinedIfWithEmptyLines.kt");
+                }
+
                 @TestMetadata("comment.kt")
                 public void testComment() throws Exception {
                     runTest("testData/intentions/branched/ifWhen/ifToWhen/comment.kt");
@@ -2777,6 +2782,11 @@ public abstract class K1IntentionTestGenerated extends AbstractK1IntentionTest {
                 @TestMetadata("ifWithRangeTestsAndUnparenthesizedMultiConditions.kt")
                 public void testIfWithRangeTestsAndUnparenthesizedMultiConditions() throws Exception {
                     runTest("testData/intentions/branched/ifWhen/ifToWhen/ifWithRangeTestsAndUnparenthesizedMultiConditions.kt");
+                }
+
+                @TestMetadata("ifWithReturnsAndEmptyLines.kt")
+                public void testIfWithReturnsAndEmptyLines() throws Exception {
+                    runTest("testData/intentions/branched/ifWhen/ifToWhen/ifWithReturnsAndEmptyLines.kt");
                 }
 
                 @TestMetadata("ifWithoutElse.kt")
@@ -9606,6 +9616,11 @@ public abstract class K1IntentionTestGenerated extends AbstractK1IntentionTest {
         @TestMetadata("specialCharsInCharLiteral.kt")
         public void testSpecialCharsInCharLiteral() throws Exception {
             runTest("testData/intentions/convertToStringTemplate/specialCharsInCharLiteral.kt");
+        }
+
+        @TestMetadata("startsWithNullableVariable.kt")
+        public void testStartsWithNullableVariable() throws Exception {
+            runTest("testData/intentions/convertToStringTemplate/startsWithNullableVariable.kt");
         }
 
         @TestMetadata("stringPlusStringLiteral.kt")

@@ -1,4 +1,4 @@
-// Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.execution.ui
 
 import com.intellij.execution.*
@@ -19,6 +19,7 @@ import com.intellij.openapi.actionSystem.impl.PresentationFactory
 import com.intellij.openapi.components.*
 import com.intellij.openapi.fileEditor.ex.FileEditorManagerEx
 import com.intellij.openapi.options.advanced.AdvancedSettings
+import com.intellij.openapi.progress.blockingContext
 import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.project.DumbService
@@ -28,10 +29,12 @@ import com.intellij.openapi.ui.popup.*
 import com.intellij.openapi.ui.popup.util.PopupUtil
 import com.intellij.openapi.util.NlsActions
 import com.intellij.openapi.util.NlsSafe
+import com.intellij.openapi.util.text.StringUtil
 import com.intellij.openapi.vfs.findPsiFile
 import com.intellij.openapi.wm.ToolWindowId
 import com.intellij.psi.PsiFile
 import com.intellij.ui.ColorUtil
+import com.intellij.ui.GroupedElementsRenderer
 import com.intellij.ui.components.JBList
 import com.intellij.ui.popup.ActionPopupStep
 import com.intellij.ui.popup.KeepingPopupOpenAction
@@ -59,6 +62,9 @@ private const val RUN: String = DefaultRunExecutor.EXECUTOR_ID
 private const val DEBUG: String = ToolWindowId.DEBUG
 
 private val recentLimit: Int get() = AdvancedSettings.getInt("max.recent.run.configurations")
+
+@ApiStatus.Internal
+val RUN_CONFIGURATION_KEY = DataKey.create<RunnerAndConfigurationSettings>("sub.popup.parent.action")
 
 internal fun createRunConfigurationsActionGroup(project: Project, e: AnActionEvent): ActionGroup {
   val actions = DefaultActionGroup()
@@ -138,11 +144,19 @@ internal class RunConfigurationsActionGroupPopup(actionGroup: ActionGroup, dataC
   PopupFactoryImpl.ActionGroupPopup(null, actionGroup, dataContext, false, false, true, false,
                                     disposeCallback, 30, null, null, PresentationFactory(), false) {
 
-  private val dragRange: IntRange = 0 until RunConfigurationStartHistory.getInstance(project).pinned().size + 1
+  private val pinnedSize = RunConfigurationStartHistory.getInstance(project).pinned().size
 
   init {
     list.setExpandableItemsEnabled(false)
-    if (!dragRange.isEmpty()) {
+    (step as ActionPopupStep).setSubStepContextAdjuster { context, action ->
+      if (action is SelectConfigAction) {
+        CustomizedDataContext.create(context) { dataId ->
+          if (RUN_CONFIGURATION_KEY.`is`(dataId)) action.configuration else null
+        }
+      }
+      else context
+    }
+    if (pinnedSize != 0) {
       val dndManager = DnDManager.getInstance()
       dndManager.registerSource(MyDnDSource(), list, this)
       dndManager.registerTarget(MyDnDTarget(), list, this)
@@ -169,18 +183,26 @@ internal class RunConfigurationsActionGroupPopup(actionGroup: ActionGroup, dataC
     return super.getList() as JBList<*>
   }
 
-  private fun isPossibleToDragItem(index: Int): Boolean {
-    return dragRange.contains(index)
-  }
-
   private data class DraggedIndex(val from: Int)
+
+  private fun<E> offsetFromElementTopForDnD(list: JList<E>, dropTargetIndex: Int): Int {
+    if (dropTargetIndex == pinnedSize) {
+      return 0
+    }
+    val elementAt = list.model.getElementAt(dropTargetIndex)
+    val c: Component = list.cellRenderer.getListCellRendererComponent(list, elementAt, dropTargetIndex, false, false)
+    return if (c is GroupedElementsRenderer.MyComponent && StringUtil.isNotEmpty(c.separator.caption)) {
+      c.separator.preferredSize.height
+    }
+    else 0
+  }
 
   private inner class MyDnDTarget : DnDTarget {
     override fun update(aEvent: DnDEvent): Boolean {
       val from = (aEvent.attachedObject as? DraggedIndex)?.from
       if (from is Int) {
         val targetIndex: Int = list.locationToIndex(aEvent.point)
-        val possible: Boolean = isPossibleToDragItem(targetIndex)
+        val possible: Boolean = (0 until pinnedSize + 1).contains(targetIndex)
         list.setDropTargetIndex(if (possible && wouldActuallyMove(from, targetIndex)) targetIndex else -1)
         aEvent.isDropPossible = possible
       }
@@ -212,12 +234,13 @@ internal class RunConfigurationsActionGroupPopup(actionGroup: ActionGroup, dataC
 
   private inner class MyDnDSource : DnDSource {
     override fun canStartDragging(action: DnDAction, dragOrigin: Point): Boolean {
-      return isPossibleToDragItem(list.locationToIndex(dragOrigin))
+      return (0 until pinnedSize).contains(list.locationToIndex(dragOrigin))
     }
 
     override fun startDragging(action: DnDAction, dragOrigin: Point): DnDDragStartBean? {
       val index: Int = list.locationToIndex(dragOrigin)
       if (index < 0) return null
+      list.setOffsetFromElementTopForDnD { offsetFromElementTopForDnD(list, it) }
       return DnDDragStartBean(DraggedIndex(index))
     }
   }
@@ -521,7 +544,16 @@ class RunConfigurationStartHistory(private val project: Project) : PersistentSta
   }
 
   fun togglePin(setting: RunnerAndConfigurationSettings) {
-    val newPinned = (_state.pinned.toMutableList().also { it.add(0, Element(setting.uniqueID)) }).toMutableSet()
+    val element = Element(setting.uniqueID)
+    val wasPinned = _state.pinned.contains(element)
+    val newPinned = _state.pinned.toMutableList().also {
+      if (wasPinned) {
+        it.remove(element)
+      }
+      else {
+        it.add(element)
+      }
+    }.toMutableSet()
     _state = State(_state.history, newPinned, _state.allConfigurationsExpanded)
   }
 
@@ -553,7 +585,7 @@ class RunConfigurationStartHistory(private val project: Project) : PersistentSta
 }
 
 private class ExecutionReasonableHistoryManager : ProjectActivity {
-  override suspend fun execute(project: Project) {
+  override suspend fun execute(project: Project) : Unit = blockingContext {
     project.messageBus.connect(project).subscribe(ExecutionManager.EXECUTION_TOPIC, object : ExecutionListener {
       override fun processStartScheduled(executorId: String, env: ExecutionEnvironment) {
         onAnyChange(executorId, env, RunState.SCHEDULED)

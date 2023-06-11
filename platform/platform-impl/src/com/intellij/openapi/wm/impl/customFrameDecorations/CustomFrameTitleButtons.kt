@@ -64,7 +64,7 @@ internal open class CustomFrameTitleButtons(myCloseAction: Action) {
     }
   }
 
-  val closeStyleBuilder = ComponentStyle.ComponentStyleBuilder<JButton> {
+  val closeStyleBuilder: ComponentStyle.ComponentStyleBuilder<JButton> = ComponentStyle.ComponentStyleBuilder<JButton> {
     isOpaque = false
     border = Borders.empty()
     icon = closeIcon
@@ -83,7 +83,7 @@ internal open class CustomFrameTitleButtons(myCloseAction: Action) {
   private val activeCloseStyle = closeStyleBuilder.build()
 
   private val inactiveCloseStyle = closeStyleBuilder
-    .updateDefault() {
+    .updateDefault {
       icon = closeInactive
     }.build()
 
@@ -99,7 +99,7 @@ internal open class CustomFrameTitleButtons(myCloseAction: Action) {
       return panel.isCompactMode
     }
 
-  var isSelected = false
+  var isSelected: Boolean = false
     set(value) {
       if(field != value) {
         field = value

@@ -1,5 +1,5 @@
 // Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
-@file:Suppress("ReplaceGetOrSet")
+@file:Suppress("ReplaceGetOrSet", "CompanionObjectInExtension")
 
 package com.intellij.diagnostic
 
@@ -119,7 +119,8 @@ internal class IdeaFreezeReporter : PerformanceListener {
     val edtStack = dump.edtStackTrace
     if (edtStack != null) {
       stacktraceCommonPart = if (stacktraceCommonPart == null) {
-        edtStack.toList()
+        @Suppress("ReplaceJavaStaticMethodWithKotlinAnalog")
+        java.util.List.of(*edtStack)
       }
       else {
         getStacktraceCommonPart(stacktraceCommonPart!!, edtStack)
@@ -191,7 +192,7 @@ internal class IdeaFreezeReporter : PerformanceListener {
                           reportDir: Path?,
                           performanceWatcher: PerformanceWatcher,
                           finished: Boolean): IdeaLoggingEvent? {
-    var infos = dumpTask.threadInfos
+    var infos: List<Array<ThreadInfo>> = dumpTask.threadInfos
     val dumpInterval = (if (infos.isEmpty()) performanceWatcher.dumpInterval else dumpTask.dumpInterval).toLong()
     if (infos.isEmpty()) {
       infos = currentDumps.map { it.threadInfos }
@@ -371,7 +372,7 @@ private const val MESSAGE_FILE_NAME = ".message"
 private const val THROWABLE_FILE_NAME = ".throwable"
 
 @Suppress("SpellCheckingInspection")
-internal const val APP_INFO_FILE_NAME = ".appinfo"
+internal const val APP_INFO_FILE_NAME: String = ".appinfo"
 
 // common sub-stack contains more than the specified % samples
 private const val COMMON_SUB_STACK_WEIGHT = 0.25

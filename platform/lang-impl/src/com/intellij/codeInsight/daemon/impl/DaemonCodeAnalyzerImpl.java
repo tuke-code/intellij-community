@@ -1,4 +1,4 @@
-// Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.codeInsight.daemon.impl;
 
 import com.intellij.codeHighlighting.Pass;
@@ -52,6 +52,7 @@ import com.intellij.psi.PsiCompiledFile;
 import com.intellij.psi.PsiDocumentManager;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.impl.PsiManagerEx;
+import com.intellij.psi.impl.file.impl.FileManagerImpl;
 import com.intellij.psi.util.PsiModificationTracker;
 import com.intellij.psi.util.PsiUtilBase;
 import com.intellij.psi.util.PsiUtilCore;
@@ -175,7 +176,6 @@ public final class DaemonCodeAnalyzerImpl extends DaemonCodeAnalyzerEx implement
     return infos;
   }
 
-  @Override
   @TestOnly
   public @NotNull List<HighlightInfo> getFileLevelHighlights(@NotNull Project project, @NotNull PsiFile file) {
     assertMyFile(file.getProject(), file);
@@ -254,9 +254,7 @@ public final class DaemonCodeAnalyzerImpl extends DaemonCodeAnalyzerEx implement
   }
 
   @Override
-  public void addFileLevelHighlight(int group,
-                                    @NotNull HighlightInfo info,
-                                    @NotNull PsiFile psiFile) {
+  public void addFileLevelHighlight(int group, @NotNull HighlightInfo info, @NotNull PsiFile psiFile) {
     ApplicationManager.getApplication().assertIsDispatchThread();
     assertMyFile(psiFile.getProject(), psiFile);
     VirtualFile vFile = BackedVirtualFile.getOriginFileIfBacked(psiFile.getViewProvider().getVirtualFile());
@@ -274,7 +272,7 @@ public final class DaemonCodeAnalyzerImpl extends DaemonCodeAnalyzerEx implement
         fileEditorManager.addTopComponent(fileEditor, component);
         List<HighlightInfo> fileLevelInfos = fileEditor.getUserData(FILE_LEVEL_HIGHLIGHTS);
         if (fileLevelInfos == null) {
-          fileLevelInfos = new ArrayList<>();
+          fileLevelInfos = ContainerUtil.createConcurrentList(); // must be able to iterate in hasFileLevelHighlights() and concurrently modify in addFileLevelHighlight()
           fileEditor.putUserData(FILE_LEVEL_HIGHLIGHTS, fileLevelInfos);
         }
         info.addFileLeverComponent(fileEditor, component);
@@ -285,9 +283,7 @@ public final class DaemonCodeAnalyzerImpl extends DaemonCodeAnalyzerEx implement
   }
 
   @Override
-  public @NotNull List<HighlightInfo> runMainPasses(@NotNull PsiFile psiFile,
-                                                    @NotNull Document document,
-                                                    @NotNull ProgressIndicator progress) {
+  public @NotNull List<HighlightInfo> runMainPasses(@NotNull PsiFile psiFile, @NotNull Document document, @NotNull ProgressIndicator progress) {
     ApplicationManager.getApplication().assertIsNonDispatchThread();
     if (ApplicationManager.getApplication().isReadAccessAllowed()) {
       throw new IllegalStateException("Must run highlighting outside read action, external annotators do not support checkCanceled");
@@ -940,7 +936,7 @@ public final class DaemonCodeAnalyzerImpl extends DaemonCodeAnalyzerEx implement
     }
   }
 
-  private static void runUpdate(Project project, @NotNull UpdateRunnable updateRunnable) {
+  private static void runUpdate(@Nullable Project project, @NotNull UpdateRunnable updateRunnable) {
     ApplicationManager.getApplication().assertIsDispatchThread();
     DaemonCodeAnalyzerImpl dca;
     if (project == null ||
@@ -1062,7 +1058,8 @@ public final class DaemonCodeAnalyzerImpl extends DaemonCodeAnalyzerEx implement
   }
 
   private static PsiFile findFileToHighlight(@NotNull Project project, @Nullable VirtualFile virtualFile) {
-    PsiFile psiFile = virtualFile == null || !virtualFile.isValid() ? null : PsiManagerEx.getInstanceEx(project).getFileManager().getCachedPsiFile(virtualFile);
+    PsiFile psiFile = virtualFile == null || !virtualFile.isValid() ? null : ((FileManagerImpl)PsiManagerEx.getInstanceEx(project)
+      .getFileManager()).getFastCachedPsiFile(virtualFile);
     psiFile = psiFile instanceof PsiCompiledFile ? ((PsiCompiledFile)psiFile).getDecompiledPsiFile() : psiFile;
     return psiFile;
   }
@@ -1188,8 +1185,7 @@ public final class DaemonCodeAnalyzerImpl extends DaemonCodeAnalyzerEx implement
   }
 
   @TestOnly
-  @NotNull
-  synchronized Map<FileEditor, DaemonProgressIndicator> getUpdateProgress() {
+  synchronized @NotNull Map<FileEditor, DaemonProgressIndicator> getUpdateProgress() {
     return myUpdateProgress;
   }
 
@@ -1209,12 +1205,12 @@ public final class DaemonCodeAnalyzerImpl extends DaemonCodeAnalyzerEx implement
                                                        editor -> editor.isDisposed() ? null: textEditorProvider.getTextEditor(editor));
     }
 
-    if (application.getCurrentModalityState() != ModalityState.NON_MODAL) {
+    if (ModalityState.current() != ModalityState.nonModal()) {
       return activeTextEditors;
     }
 
     // tests usually care about just one explicitly configured editor
-    List<FileEditor> tabEditors = application.isUnitTestMode() ? Collections.emptyList() : Arrays.asList(getFileEditorManager().getSelectedEditorWithRemotes());
+    Collection<FileEditor> tabEditors = application.isUnitTestMode() ? Collections.emptyList() : getFileEditorManager().getSelectedEditorWithRemotes();
     return ContainerUtil.filter(ContainerUtil.union(activeTextEditors, tabEditors),
                          fileEditor -> fileEditor.isValid() && fileEditor.getFile() != null && fileEditor.getFile().isValid());
   }

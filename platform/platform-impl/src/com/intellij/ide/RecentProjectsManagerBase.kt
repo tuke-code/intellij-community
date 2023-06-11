@@ -20,6 +20,7 @@ import com.intellij.openapi.components.*
 import com.intellij.openapi.diagnostic.getOrLogException
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.options.advanced.AdvancedSettings
+import com.intellij.openapi.progress.blockingContext
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.ProjectCloseListener
 import com.intellij.openapi.project.ProjectManager
@@ -120,7 +121,7 @@ open class RecentProjectsManagerBase(coroutineScope: CoroutineScope) :
     }
   }
 
-  final override fun getState() = state
+  final override fun getState(): RecentProjectManagerState = state
 
   fun getProjectMetaInfo(projectStoreBaseDir: Path): RecentProjectMetaInfo? {
     val path = getProjectPath(projectStoreBaseDir) ?: return null
@@ -230,12 +231,6 @@ open class RecentProjectsManagerBase(coroutineScope: CoroutineScope) :
     return RecentProjectListActionProvider.getInstance().getActions(addClearListItem = addClearListItem).toTypedArray()
   }
 
-  @Suppress("OVERRIDE_DEPRECATION")
-  override fun getRecentProjectsActions(addClearListItem: Boolean, useGroups: Boolean): Array<AnAction> {
-    return RecentProjectListActionProvider.getInstance().getActions(addClearListItem = addClearListItem,
-                                                                    useGroups = useGroups).toTypedArray()
-  }
-
   fun markPathRecent(path: String, project: Project): RecentProjectMetaInfo {
     synchronized(stateLock) {
       for (group in state.groups) {
@@ -336,11 +331,11 @@ open class RecentProjectsManagerBase(coroutineScope: CoroutineScope) :
     modCounter.increment()
   }
 
-  fun getLastOpenedProject() = state.lastOpenedProject
+  fun getLastOpenedProject(): String? = state.lastOpenedProject
 
   @Internal
   class MyFrameStateListener : FrameStateListener {
-    override fun onFrameActivated(frame: IdeFrame) = frame.notifyProjectActivation()
+    override fun onFrameActivated(frame: IdeFrame): Unit = frame.notifyProjectActivation()
   }
 
   @Internal
@@ -349,7 +344,7 @@ open class RecentProjectsManagerBase(coroutineScope: CoroutineScope) :
   }
 
   internal suspend fun projectOpened(project: Project, openTimestamp: Long) {
-    if (LightEdit.owns(project)) {
+    if (disableUpdatingRecentInfo.get() || LightEdit.owns(project)) {
       return
     }
 
@@ -366,7 +361,9 @@ open class RecentProjectsManagerBase(coroutineScope: CoroutineScope) :
     }
 
     withContext(Dispatchers.EDT + ModalityState.any().asContextElement()) {
-      updateSystemDockMenu()
+      blockingContext {
+        updateSystemDockMenu()
+      }
     }
   }
 
@@ -502,7 +499,7 @@ open class RecentProjectsManagerBase(coroutineScope: CoroutineScope) :
     }
   }
 
-  override fun suggestNewProjectLocation() = ProjectUtil.getBaseDir()
+  override fun suggestNewProjectLocation(): String = ProjectUtil.getBaseDir()
 
   // open for Rider
   @Suppress("MemberVisibilityCanBePrivate")
@@ -664,6 +661,9 @@ open class RecentProjectsManagerBase(coroutineScope: CoroutineScope) :
       else {
         if (info.frame !== frameInfo) {
           info.frame = frameInfo
+          if (IDE_FRAME_EVENT_LOG.isDebugEnabled) { // avoid unnecessary concatenation
+            IDE_FRAME_EVENT_LOG.debug("Saved updated frame info ${info.frame} for project '${project.name}'")
+          }
         }
         info.displayName = getProjectDisplayName(project)
         info.projectWorkspaceId = workspaceId

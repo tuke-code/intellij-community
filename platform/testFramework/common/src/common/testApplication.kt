@@ -11,9 +11,13 @@ import com.intellij.concurrency.IdeaForkJoinWorkerThreadFactory
 import com.intellij.diagnostic.LoadingState
 import com.intellij.diagnostic.StartUpMeasurer
 import com.intellij.diagnostic.enableCoroutineDump
+import com.intellij.ide.bootstrap.callAppInitialized
+import com.intellij.ide.bootstrap.getAppInitializedListeners
+import com.intellij.ide.bootstrap.initConfigurationStore
+import com.intellij.ide.bootstrap.preloadCriticalServices
 import com.intellij.ide.plugins.PluginManagerCore
 import com.intellij.ide.plugins.PluginSet
-import com.intellij.idea.*
+import com.intellij.idea.AppMode
 import com.intellij.openapi.application.Application
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.EDT
@@ -31,7 +35,7 @@ import com.intellij.openapi.editor.impl.EditorFactoryImpl
 import com.intellij.openapi.fileTypes.FileTypeManager
 import com.intellij.openapi.fileTypes.impl.FileTypeManagerImpl
 import com.intellij.openapi.progress.ModalTaskOwner
-import com.intellij.openapi.progress.runBlockingModalWithRawProgressReporter
+import com.intellij.openapi.progress.withModalProgressBlocking
 import com.intellij.openapi.project.ex.ProjectManagerEx
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.util.RecursionManager
@@ -71,7 +75,7 @@ import java.time.Duration
 import java.util.concurrent.TimeUnit
 
 private var applicationInitializationResult: Result<Unit>? = null
-const val LEAKED_PROJECTS = "leakedProjects"
+const val LEAKED_PROJECTS: String = "leakedProjects"
 
 val isApplicationInitialized: Boolean
   get() = applicationInitializationResult?.isSuccess == true
@@ -119,13 +123,13 @@ fun loadApp(setupEventQueue: Runnable) {
 private fun loadAppInUnitTestMode(isHeadless: Boolean) {
   val loadedModuleFuture = PluginManagerCore.getInitPluginFuture()
 
-  val rwLockHolder = RwLockHolder()
   val awtBusyThread = AppScheduledExecutorService.getPeriodicTasksThread()
+  lateinit var rwLockHolder: RwLockHolder
   EdtInvocationManager.invokeAndWaitIfNeeded {
     // Instantiate `AppDelayQueue` which starts "periodic tasks thread" which we'll mark busy to prevent this EDT from dying.
     // That thread was chosen because we know for sure it's running. Needed for EDT not to exit suddenly
     AWTAutoShutdown.getInstance().notifyThreadBusy(awtBusyThread)
-    rwLockHolder.initialize(Thread.currentThread())
+    rwLockHolder = RwLockHolder(Thread.currentThread())
   }
 
   val app = ApplicationImpl(isHeadless, rwLockHolder)
@@ -149,19 +153,23 @@ private fun loadAppInUnitTestMode(isHeadless: Boolean) {
     val pluginSet = loadedModuleFuture.asCompletableFuture().get(40, TimeUnit.SECONDS)
     app.registerComponents(modules = pluginSet.getEnabledModules(), app = app, precomputedExtensionModel = null, listenerCallbacks = null)
 
-    initConfigurationStore(app)
+    val task = suspend {
+      initConfigurationStore(app)
 
-    addKeysFromPlugins()
-    Registry.markAsLoaded()
+      addKeysFromPlugins()
+      Registry.markAsLoaded()
+
+      preloadServicesAndCallAppInitializedListeners(app, pluginSet)
+    }
 
     if (EDT.isCurrentThreadEdt()) {
-      runBlockingModalWithRawProgressReporter(ModalTaskOwner.guess(), "") {
-        preloadServicesAndCallAppInitializedListeners(app, pluginSet)
+      withModalProgressBlocking(ModalTaskOwner.guess(), "") {
+        task()
       }
     }
     else {
       runBlocking(Dispatchers.Default) {
-        preloadServicesAndCallAppInitializedListeners(app, pluginSet)
+        task()
       }
     }
 
@@ -176,7 +184,7 @@ private fun loadAppInUnitTestMode(isHeadless: Boolean) {
 private suspend fun preloadServicesAndCallAppInitializedListeners(app: ApplicationImpl, pluginSet: PluginSet) {
   coroutineScope {
     withTimeout(Duration.ofSeconds(40).toMillis()) {
-      preloadCriticalServices(app, app.coroutineScope)
+      preloadCriticalServices(app = app, asyncScope = app.coroutineScope, appRegistered = CompletableDeferred(value = null))
       app.preloadServices(
         modules = pluginSet.getEnabledModules(),
         activityPrefix = "",

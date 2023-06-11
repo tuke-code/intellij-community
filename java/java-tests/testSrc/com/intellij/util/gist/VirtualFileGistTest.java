@@ -51,10 +51,10 @@ public class VirtualFileGistTest extends LightJavaCodeInsightFixtureTestCase {
   }
 
   public void testGistGetData_ReturnsDataAsPerGistCalculator_EvenForHugeDataSize() {
-    if(!assumeHugeGistsAreEnabledAndSafeToTest()){
+    if (!assumeHugeGistsAreEnabledAndSafeToTest()) {
       return;
     }
-    
+
     int hugeGistSize = MAX_GIST_SIZE_TO_STORE_IN_ATTRIBUTES + 10;
 
     VirtualFileGist<String> gist = gistOfFileContent();
@@ -76,7 +76,7 @@ public class VirtualFileGistTest extends LightJavaCodeInsightFixtureTestCase {
   }
 
   public void testGistGetData_CachesDataSuccessfully_ForTransitionsBetweenHugeAndRegularGistSize() throws IOException {
-    if(!assumeHugeGistsAreEnabledAndSafeToTest()){
+    if (!assumeHugeGistsAreEnabledAndSafeToTest()) {
       return;
     }
 
@@ -86,73 +86,74 @@ public class VirtualFileGistTest extends LightJavaCodeInsightFixtureTestCase {
     IntRef invocationCounter = new IntRef();
     VirtualFileGist<String> gistOfFileContent = gistOfFileContent(invocationCounter);
 
+    //File checking is implementation-specific detail => skip the test if different impl is used:
+    //TODO RC: better to find a way to check it for other implementations also
+    boolean checkFilePresense = gistOfFileContent instanceof VirtualFileGistImpl;
+
     String hugeFileContent = "a".repeat(hugeGistSize);
     String notHugeFileContent = "b".repeat(notHugeGistSize);
     VirtualFile file = fileWithContent("a.txt", hugeFileContent);
 
-    Path dedicatedGistFile = ((VirtualFileGistImpl<String>)gistOfFileContent).dedicatedGistFilePath(file);
+    Path dedicatedGistFile = checkFilePresense ?
+                             ((VirtualFileGistImpl<String>)gistOfFileContent).dedicatedGistFilePath(file) :
+                             null;
 
     final int enoughTries = 8;
     for (int i = 0; i < enoughTries; i++) {
-      {
+      {//Put 'huge' content into a file:
         WriteAction.run(() -> VfsUtil.saveText(file, hugeFileContent));
         assertEquals(
+          "First invocation returns (huge) file content",
           hugeFileContent,
           gistOfFileContent.getFileData(getProject(), file)
         );
         int invocationsBefore = invocationCounter.get();
         assertEquals(
-          "Second invocation returns same result",
+          "Second invocation returns _same_ result",
           hugeFileContent,
           gistOfFileContent.getFileData(getProject(), file)
         );
         assertEquals(
-          "Second invocation returns _cached_ result",
+          "...and second invocation returns _cached_ result",
           invocationsBefore,
           invocationCounter.get()
         );
 
-        assertTrue(
-          "Dedicated gist file [" + dedicatedGistFile + "] must exists since Gist now is huge",
-          Files.exists(dedicatedGistFile)
-        );
+        if (checkFilePresense) {
+          assertTrue(
+            "Dedicated gist file [" + dedicatedGistFile + "] must exists since Gist now is huge",
+            Files.exists(dedicatedGistFile)
+          );
+        }
       }
-      {
+
+      {//Now change file content to 'not huge':
         WriteAction.run(() -> VfsUtil.saveText(file, notHugeFileContent));
         assertEquals(
+          "First invocation returns (not huge) file content",
           notHugeFileContent,
           gistOfFileContent.getFileData(getProject(), file)
         );
         int invocationsBefore = invocationCounter.get();
         assertEquals(
-          "Second invocation returns same result",
+          "Second invocation returns _same_ result",
           notHugeFileContent,
           gistOfFileContent.getFileData(getProject(), file)
         );
         assertEquals(
-          "Second invocation returns _cached_ result",
+          "...and second invocation returns _cached_ result",
           invocationsBefore,
           invocationCounter.get()
         );
 
-        assertFalse(
-          "Dedicated gist file [" + dedicatedGistFile + "] must be deleted since Gist now is not huge",
-          Files.exists(dedicatedGistFile)
-        );
+        if (checkFilePresense) {
+          assertFalse(
+            "Dedicated gist file [" + dedicatedGistFile + "] must be deleted since Gist now is not huge",
+            Files.exists(dedicatedGistFile)
+          );
+        }
       }
     }
-  }
-
-  private static boolean assumeHugeGistsAreEnabledAndSafeToTest() {
-    if(MAX_GIST_SIZE_TO_STORE_IN_ATTRIBUTES <= 0){
-      //"Huge Gists saving to dedicated files is disabled -- skip the test"
-      return false;
-    }
-    if(MAX_GIST_SIZE_TO_STORE_IN_ATTRIBUTES >= 50 * IOUtil.MiB){
-      //"Max Gists size is too big to test (" + MAX_GIST_SIZE_TO_STORE_IN_ATTRIBUTES + ", risk of OoM) -- skip the test"
-      return false;
-    }
-    return true;
   }
 
   public void testGistData_IsNotReEvaluatedOnEachCall_ButCachedPerFile() {
@@ -286,6 +287,63 @@ public class VirtualFileGistTest extends LightJavaCodeInsightFixtureTestCase {
     assertEquals(3, invocations.get());
   }
 
+  public void testGistCalculatesData_PerProject_EvenForHugeData() {
+    if (!assumeHugeGistsAreEnabledAndSafeToTest()) {
+      return;
+    }
+
+    int hugeGistSize = MAX_GIST_SIZE_TO_STORE_IN_ATTRIBUTES + 10;
+    String hugeFileContent = "a".repeat(hugeGistSize);
+    VirtualFile file = fileWithContent("a.txt", hugeFileContent);
+
+    IntRef invocations = new IntRef(0);
+    VirtualFileGist.GistCalculator<String> fileContentPlusProjectNameCalculator = (p, f) -> {
+      final String content = LoadTextUtil.loadText(f).toString();
+      return content + "///" + (p == null ? null : p.getName());
+    };
+    VirtualFileGist<String> gistFileContentPlusProjectName = GistManager.getInstance().newVirtualFileGist(
+      getTestName(true), 0,
+      EnumeratorStringDescriptor.INSTANCE,
+      wrapWithCounter(
+        fileContentPlusProjectNameCalculator,
+        invocations
+      )
+    );
+
+    Project project1 = getProject();
+    Project project2 = ProjectManager.getInstance().getDefaultProject();
+
+    assertEquals(
+      "Gist calculated 1st time for project1",
+      fileContentPlusProjectNameCalculator.calcData(project1, file),
+      gistFileContentPlusProjectName.getFileData(project1, file)
+    );
+    assertEquals(1, invocations.get());
+
+    assertEquals(
+      "Gist calculated 1st time for project2",
+      fileContentPlusProjectNameCalculator.calcData(project2, file),
+      gistFileContentPlusProjectName.getFileData(project2, file)
+    );
+    assertEquals(2, invocations.get());
+
+    assertEquals(
+      "Gist must have same value for project1",
+      fileContentPlusProjectNameCalculator.calcData(project1, file),
+      gistFileContentPlusProjectName.getFileData(project1, file)
+    );
+    assertEquals("Gist must NOT be recalculated for project1",
+                 2, invocations.get());
+
+    assertEquals(
+      "Gist MUST be recalculated for null project",
+      fileContentPlusProjectNameCalculator.calcData(null, file),
+      gistFileContentPlusProjectName.getFileData(null, file)
+    );
+    assertEquals("Gist must NOT be recalculated for null project",
+                 3, invocations.get());
+  }
+
   public void testAttemptToCreateSecondGist_WithTheSameName_Fails() {
     gistOfFirst3CharsFromFile();
     try {
@@ -382,6 +440,21 @@ public class VirtualFileGistTest extends LightJavaCodeInsightFixtureTestCase {
 
 
   /* ========================= test infrastructure: ================================================== */
+
+  private static boolean assumeHugeGistsAreEnabledAndSafeToTest() {
+    //Normally, we should use Assume.assumeTrue(...) in the branches below.
+    // But junit3 doesn't support AssumptionFailedException yet, hence we're
+    // forced to do early-return in a test method
+    if (MAX_GIST_SIZE_TO_STORE_IN_ATTRIBUTES <= 0) {
+      //"Huge Gists saving to dedicated files is disabled -- skip the test"
+      return false;
+    }
+    if (MAX_GIST_SIZE_TO_STORE_IN_ATTRIBUTES >= 50 * IOUtil.MiB) {
+      //"Max Gists size is too big to test (" + MAX_GIST_SIZE_TO_STORE_IN_ATTRIBUTES + ", risk of OoM) -- skip the test"
+      return false;
+    }
+    return true;
+  }
 
   /** Gist returns first 3 letters from the file */
   private @NotNull VirtualFileGist<String> gistOfFirst3CharsFromFile() {

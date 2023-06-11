@@ -38,8 +38,8 @@ abstract class ClientSessionImpl(
   setExtensionsRootArea = false,
 ), ClientSession {
 
-  override val isLightServiceSupported = false
-  override val isMessageBusSupported = false
+  override val isLightServiceSupported: Boolean = false
+  override val isMessageBusSupported: Boolean = false
 
   init {
     @Suppress("LeakingThis")
@@ -63,9 +63,9 @@ abstract class ClientSessionImpl(
     assert(containerState.compareAndSet(ContainerState.PRE_INIT, ContainerState.COMPONENT_CREATED))
   }
 
-  override suspend fun preloadService(service: ServiceDescriptor) {
+  override suspend fun preloadService(service: ServiceDescriptor, serviceInterface: String) {
     return ClientId.withClientId(clientId) {
-      super.preloadService(service)
+      super.preloadService(service, serviceInterface)
     }
   }
 

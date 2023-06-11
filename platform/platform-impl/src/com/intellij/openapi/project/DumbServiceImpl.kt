@@ -130,7 +130,7 @@ open class DumbServiceImpl @NonInjectable @VisibleForTesting constructor(private
     myState = AtomicReference(if (myProject.isDefault) State.SMART else State.DUMB)
 
     // the first dumb mode should end in non-modal context
-    myCancellableLaterEdtInvoker.setDumbStartModality(ModalityState.NON_MODAL)
+    myCancellableLaterEdtInvoker.setDumbStartModality(ModalityState.nonModal())
   }
 
   fun queueStartupActivitiesRequiredForSmartMode() {
@@ -471,11 +471,11 @@ open class DumbServiceImpl @NonInjectable @VisibleForTesting constructor(private
 
   companion object {
     @JvmField
-    val REQUIRED_FOR_SMART_MODE_STARTUP_ACTIVITY = ExtensionPointName<RequiredForSmartMode>(
+    val REQUIRED_FOR_SMART_MODE_STARTUP_ACTIVITY: ExtensionPointName<RequiredForSmartMode> = ExtensionPointName(
       "com.intellij.requiredForSmartModeStartupActivity")
 
     @JvmField
-    val ALWAYS_SMART = SystemProperties.getBooleanProperty("idea.no.dumb.mode", false)
+    val ALWAYS_SMART: Boolean = SystemProperties.getBooleanProperty("idea.no.dumb.mode", false)
 
     private val LOG = Logger.getInstance(DumbServiceImpl::class.java)
 
@@ -504,7 +504,7 @@ open class DumbServiceImpl @NonInjectable @VisibleForTesting constructor(private
                !java.lang.Boolean.parseBoolean(System.getProperty(IDEA_FORCE_DUMB_QUEUE_TASKS, "false"))
       }
 
-    const val IDEA_FORCE_DUMB_QUEUE_TASKS = "idea.force.dumb.queue.tasks"
+    const val IDEA_FORCE_DUMB_QUEUE_TASKS: String = "idea.force.dumb.queue.tasks"
 
     private val isSynchronousHeadlessApplication: Boolean
       get() = application.isHeadlessEnvironment && !java.lang.Boolean.getBoolean("ide.async.headless.mode")

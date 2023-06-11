@@ -4,7 +4,10 @@ package com.intellij.vcs.log.impl
 import com.intellij.ide.caches.CachesInvalidator
 import com.intellij.ide.plugins.DynamicPluginListener
 import com.intellij.ide.plugins.IdeaPluginDescriptor
-import com.intellij.openapi.application.*
+import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.application.EDT
+import com.intellij.openapi.application.ModalityState
+import com.intellij.openapi.application.asContextElement
 import com.intellij.openapi.application.impl.RawSwingDispatcher
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
@@ -24,6 +27,7 @@ import com.intellij.openapi.vcs.ProjectLevelVcsManager
 import com.intellij.openapi.vcs.VcsMappingListener
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.util.awaitCancellationAndInvoke
+import com.intellij.util.childScope
 import com.intellij.util.concurrency.annotations.RequiresBackgroundThread
 import com.intellij.util.concurrency.annotations.RequiresEdt
 import com.intellij.util.messages.Topic
@@ -38,11 +42,7 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.jetbrains.annotations.ApiStatus
-import org.jetbrains.annotations.CalledInAny
 import java.util.concurrent.atomic.AtomicBoolean
-import kotlin.coroutines.CoroutineContext
-import kotlin.coroutines.EmptyCoroutineContext
-import kotlin.coroutines.coroutineContext
 import kotlin.time.Duration.Companion.seconds
 
 private val LOG: Logger
@@ -51,10 +51,10 @@ private val LOG: Logger
 private val CLOSE_LOG_TIMEOUT = 10.seconds
 
 @Service(Service.Level.PROJECT)
-class VcsProjectLog(private val project: Project, val coroutineScope: CoroutineScope) {
+class VcsProjectLog(private val project: Project, internal val coroutineScope: CoroutineScope) {
   private val uiProperties = project.service<VcsLogProjectTabsProperties>()
   internal val tabManager = VcsLogTabsManager(project, uiProperties, coroutineScope)
-  private val errorHandler = VcsProjectLogErrorHandler(this)
+  private val errorHandler = VcsProjectLogErrorHandler(this, coroutineScope)
 
   @Volatile
   private var cachedLogManager: VcsLogManager? = null
@@ -73,13 +73,13 @@ class VcsProjectLog(private val project: Project, val coroutineScope: CoroutineS
 
   /** The instance of the [MainVcsLogUi] or null if the log was not initialized yet. */
   val mainLogUi: VcsLogUiImpl?
-    get() = VcsLogContentProvider.getInstance(project)?.ui as VcsLogUiImpl?
+    get() = getVcsLogContentProvider(project)?.ui as VcsLogUiImpl?
 
   private val busConnection = project.messageBus.connect(coroutineScope)
 
   init {
     busConnection.subscribe(ProjectLevelVcsManager.VCS_CONFIGURATION_CHANGED, VcsMappingListener {
-      coroutineScope.launch { disposeLog(recreate = true) }
+      launchWithAnyModality { disposeLog(recreate = true) }
     })
     busConnection.subscribe(DynamicPluginListener.TOPIC, MyDynamicPluginUnloader())
 
@@ -163,17 +163,6 @@ class VcsProjectLog(private val project: Project, val coroutineScope: CoroutineS
     if (logManager != null) Disposer.dispose(logManager)
   }
 
-  /**
-   * Disposes log and performs the given `task` before recreating the log
-   */
-  @ApiStatus.Internal
-  @CalledInAny
-  fun runOnDisposedLog(task: (suspend () -> Unit)? = null): Job {
-    return coroutineScope.launch {
-      disposeLog(recreate = true, beforeCreateLog = task)
-    }
-  }
-
   fun createLogInBackground(forceInit: Boolean) {
     coroutineScope.async {
       createLog(forceInit) != null
@@ -196,7 +185,7 @@ class VcsProjectLog(private val project: Project, val coroutineScope: CoroutineS
     if (logProviders.isEmpty()) return null
 
     val logManager = getOrCreateLogManager(logProviders)
-    initialize(logManager = logManager, force = forceInit)
+    logManager.initialize(force = forceInit)
     return logManager
   }
 
@@ -211,7 +200,7 @@ class VcsProjectLog(private val project: Project, val coroutineScope: CoroutineS
     }
     cachedLogManager = result
     val publisher = project.messageBus.syncPublisher(VCS_PROJECT_LOG_CHANGED)
-    withContext(Dispatchers.EDT + modality()) {
+    withContext(Dispatchers.EDT) {
       publisher.logCreated(result)
     }
     return result
@@ -226,6 +215,16 @@ class VcsProjectLog(private val project: Project, val coroutineScope: CoroutineS
     project.messageBus.syncPublisher(VCS_PROJECT_LOG_CHANGED).logDisposed(oldValue)
     return oldValue
   }
+
+  /**
+   * Launches the coroutine with "any" modality in the context.
+   * Using "any" modality is required in order to create or dispose log when modal dialog (such as Settings dialog) is shown.
+   */
+  private fun launchWithAnyModality(block: suspend CoroutineScope.() -> Unit): Job {
+    return coroutineScope.launch(ModalityState.any().asContextElement(), block = block)
+  }
+
+  fun childScope(): CoroutineScope = coroutineScope.childScope()
 
   internal class InitLogStartupActivity : ProjectActivity {
     init {
@@ -245,9 +244,7 @@ class VcsProjectLog(private val project: Project, val coroutineScope: CoroutineS
 
     override fun pluginLoaded(pluginDescriptor: IdeaPluginDescriptor) {
       if (hasLogExtensions(pluginDescriptor)) {
-        coroutineScope.launch {
-          disposeLog(recreate = true)
-        }
+        launchWithAnyModality { disposeLog(recreate = true) }
       }
     }
 
@@ -255,9 +252,7 @@ class VcsProjectLog(private val project: Project, val coroutineScope: CoroutineS
       if (hasLogExtensions(pluginDescriptor)) {
         affectedPlugins.add(pluginDescriptor.pluginId)
         LOG.debug { "Disposing Vcs Log before unloading ${pluginDescriptor.pluginId}" }
-        coroutineScope.launch {
-          disposeLog(recreate = false)
-        }
+        launchWithAnyModality { disposeLog(recreate = false) }
       }
     }
 
@@ -266,9 +261,7 @@ class VcsProjectLog(private val project: Project, val coroutineScope: CoroutineS
         LOG.debug { "Recreating Vcs Log after unloading ${pluginDescriptor.pluginId}" }
         // createLog calls between beforePluginUnload and pluginUnloaded are technically not prohibited
         // so, just in case, recreating log here
-        coroutineScope.launch {
-          disposeLog(recreate = true)
-        }
+        launchWithAnyModality { disposeLog(recreate = true) }
       }
     }
 
@@ -307,6 +300,15 @@ class VcsProjectLog(private val project: Project, val coroutineScope: CoroutineS
 
     @JvmStatic
     fun getInstance(project: Project): VcsProjectLog = project.service<VcsProjectLog>()
+
+    /**
+     * Disposes log and performs the given `task` before recreating the log
+     */
+    @ApiStatus.Internal
+    @RequiresBackgroundThread
+    suspend fun VcsProjectLog.runOnDisposedLog(task: (suspend () -> Unit)?) {
+      disposeLog(recreate = true, beforeCreateLog = task)
+    }
 
     /**
      * Executes the given action if the VcsProjectLog has been initialized. If not, then schedules the log initialization,
@@ -352,31 +354,23 @@ class VcsProjectLog(private val project: Project, val coroutineScope: CoroutineS
   }
 }
 
-// Using "any" modality specifically is required in order to be able to wait for log initialization or disposal under modal progress.
-// Otherwise, methods such as "VcsProjectLog#runWhenLogIsReady" or "VcsProjectLog.shutDown" won't be able to work
-// when "disposeLog" is queued as "invokeAndWait"
-// (used there in order to ensure sequential execution) will the app freeze when modal progress is displayed.
-private suspend fun modality(): CoroutineContext {
-  return if (coroutineContext.contextModality() == null) ModalityState.any().asContextElement() else EmptyCoroutineContext
-}
-
-private suspend fun initialize(logManager: VcsLogManager, force: Boolean) {
+private suspend fun VcsLogManager.initialize(force: Boolean) {
   if (force) {
-    logManager.scheduleInitialization()
+    scheduleInitialization()
     return
   }
 
   if (PostponableLogRefresher.keepUpToDate()) {
     val invalidator = CachesInvalidator.EP_NAME.findExtensionOrFail(VcsLogCachesInvalidator::class.java)
     if (invalidator.isValid) {
-      logManager.scheduleInitialization()
+      scheduleInitialization()
       return
     }
   }
 
-  withContext(Dispatchers.EDT + modality()) {
-    if (logManager.isLogVisible) {
-      logManager.scheduleInitialization()
+  withContext(Dispatchers.EDT) {
+    if (isLogVisible) {
+      scheduleInitialization()
     }
   }
 }

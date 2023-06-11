@@ -9,6 +9,7 @@ import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.Application;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.components.*;
+import com.intellij.openapi.editor.EditorSettings;
 import com.intellij.openapi.editor.actions.CaretStopOptions;
 import com.intellij.openapi.editor.impl.softwrap.SoftWrapAppliancePlaces;
 import com.intellij.openapi.util.Disposer;
@@ -67,9 +68,10 @@ public class EditorSettingsExternalizable implements PersistentStateComponent<Ed
     public int CARET_BLINKING_PERIOD = BLINKING_RANGE.initial;
     public boolean IS_RIGHT_MARGIN_SHOWN = true;
     public boolean ARE_LINE_NUMBERS_SHOWN = true;
-    public @NotNull LineNumerationType LINE_NUMERATION = LineNumerationType.ABSOLUTE;
+    public @NotNull EditorSettings.LineNumerationType LINE_NUMERATION = EditorSettings.LineNumerationType.ABSOLUTE;
     public boolean ARE_GUTTER_ICONS_SHOWN = true;
     public boolean IS_FOLDING_OUTLINE_SHOWN = true;
+    public boolean IS_FOLDING_OUTLINE_SHOWN_ONLY_ON_HOVER = true;
     public boolean IS_FOLDING_ENDINGS_SHOWN = false; //is not used in old UI
     public boolean SHOW_BREADCRUMBS_ABOVE = false;
     public boolean SHOW_BREADCRUMBS = true;
@@ -264,11 +266,11 @@ public class EditorSettingsExternalizable implements PersistentStateComponent<Ed
     myOptions.ARE_LINE_NUMBERS_SHOWN = val;
   }
 
-  public LineNumerationType getLineNumeration() {
+  public EditorSettings.LineNumerationType getLineNumeration() {
     return myOptions.LINE_NUMERATION;
   }
 
-  public void setLineNumeration(LineNumerationType val) {
+  public void setLineNumeration(EditorSettings.LineNumerationType val) {
     myOptions.LINE_NUMERATION = val;
   }
 
@@ -286,6 +288,14 @@ public class EditorSettingsExternalizable implements PersistentStateComponent<Ed
 
   public void setFoldingOutlineShown(boolean val) {
     myOptions.IS_FOLDING_OUTLINE_SHOWN = val;
+  }
+
+  public boolean isFoldingOutlineShownOnlyOnHover() {
+    return myOptions.IS_FOLDING_OUTLINE_SHOWN_ONLY_ON_HOVER;
+  }
+
+  public void setFoldingOutlineShownOnlyOnHover(boolean val) {
+    myOptions.IS_FOLDING_OUTLINE_SHOWN_ONLY_ON_HOVER = val;
   }
 
   public boolean isFoldingEndingsShown() {
@@ -822,9 +832,4 @@ public class EditorSettingsExternalizable implements PersistentStateComponent<Ed
     myOptions.INSERT_PARENTHESES_AUTOMATICALLY = value;
   }
 
-  public enum LineNumerationType {
-    ABSOLUTE,
-    RELATIVE,
-    HYBRID,
-  }
 }

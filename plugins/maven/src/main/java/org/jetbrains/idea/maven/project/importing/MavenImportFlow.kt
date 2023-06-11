@@ -7,6 +7,7 @@ import com.intellij.openapi.externalSystem.model.ExternalSystemDataKeys
 import com.intellij.openapi.externalSystem.service.project.ProjectDataManager
 import com.intellij.openapi.module.Module
 import com.intellij.openapi.module.ModuleManager
+import com.intellij.openapi.progress.runBlockingMaybeCancellable
 import com.intellij.openapi.project.ExternalStorageConfigurationManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.guessProjectDir
@@ -122,8 +123,6 @@ class MavenImportFlow {
 
         errorsSet.addAll(toResolve.filter { it.hasReadingProblems() })
         toResolve.removeIf { it.hasReadingProblems() }
-
-        runLegacyListeners(context) { projectsScheduled() }
       }
     }, d)
 
@@ -198,14 +197,16 @@ class MavenImportFlow {
     }, d)
 
     val resolver = MavenProjectResolver.getInstance(context.project)
+    val mavenProgressIndicator = context.initialContext.indicator
     val resolutionResult = resolver.resolve(context.toResolve,
                                             context.projectsTree,
                                             context.initialContext.generalSettings,
                                             embeddersManager,
                                             consoleToBeRemoved,
-                                            context.initialContext.indicator)
+                                            mavenProgressIndicator.indicator,
+                                            mavenProgressIndicator.syncConsole)
     Disposer.dispose(d)
-    val projectsWithUnresolvedPlugins = resolutionResult.projectsWithUnresolvedPlugins.values.flatten()
+    val projectsWithUnresolvedPlugins = resolutionResult.mavenProjectMap.values.flatten()
     return MavenResolvedContext(context.project, projectsToImport.toList(), projectsWithUnresolvedPlugins, context)
   }
 
@@ -232,11 +233,13 @@ class MavenImportFlow {
     if (!(sources || javadocs)) return MavenArtifactDownloader.DownloadResult()
     val projectManager = MavenProjectsManager.getInstance(context.project)
     val embeddersManager = projectManager.embeddersManager
+    val mavenProgressIndicator = context.initialContext.indicator
     val downloader = MavenArtifactDownloader(
       context.project,
       context.readContext.projectsTree,
       null,
-      context.initialContext.indicator)
+      mavenProgressIndicator.indicator,
+      mavenProgressIndicator.syncConsole)
     val consoleToBeRemoved = BTWMavenConsole(context.project, context.initialContext.generalSettings.outputLevel,
                                              context.initialContext.generalSettings.isPrintErrorStackTraces)
     return downloader.downloadSourcesAndJavadocs(context.projectsToImport,sources, javadocs, embeddersManager, consoleToBeRemoved)
@@ -254,7 +257,7 @@ class MavenImportFlow {
     if (!(sources || javadocs)) return MavenArtifactDownloader.DownloadResult()
     val projectManager = MavenProjectsManager.getInstance(project)
     val embeddersManager = projectManager.embeddersManager
-    val downloader = MavenArtifactDownloader(project, projectsTree, mavenArtifacts, indicator)
+    val downloader = MavenArtifactDownloader(project, projectsTree, mavenArtifacts, indicator.indicator, indicator.syncConsole)
     val settings = MavenWorkspaceSettingsComponent.getInstance(project).settings.getGeneralSettings()
     val consoleToBeRemoved = BTWMavenConsole(project, settings.outputLevel, settings.isPrintErrorStackTraces)
     return downloader.downloadSourcesAndJavadocs(mavenProjects, sources, javadocs, embeddersManager, consoleToBeRemoved)
@@ -267,15 +270,15 @@ class MavenImportFlow {
     val d = Disposer.newDisposable("MavenImportFlow:resolveFolders:treeListener")
     val projectsFoldersResolved = Collections.synchronizedList(ArrayList<MavenProject>())
     Disposer.register(MavenDisposable.getInstance(project), d)
-    projectTree.addListener(object : MavenProjectsTree.Listener {
-      override fun foldersResolved(projectWithChanges: Pair<MavenProject, MavenProjectChanges>) {
-        if (projectWithChanges.second.hasChanges()) {
-          projectsFoldersResolved.add(projectWithChanges.first)
-        }
-      }
-    }, d)
     val folderResolver = MavenFolderResolver(project)
-    folderResolver.resolveFoldersBlocking(projects)
+    val projectsWithChanges = runBlockingMaybeCancellable {
+      return@runBlockingMaybeCancellable folderResolver.resolveFolders(projects)
+    }
+    for (projectWithChanges in projectsWithChanges) {
+      if (projectWithChanges.value.hasChanges()) {
+        projectsFoldersResolved.add(projectWithChanges.key)
+      }
+    }
 
     Disposer.dispose(d)
     return projectsFoldersResolved

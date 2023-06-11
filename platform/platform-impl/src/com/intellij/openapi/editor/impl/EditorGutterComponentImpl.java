@@ -85,6 +85,7 @@ import com.intellij.ui.scale.ScaleContext;
 import com.intellij.util.*;
 import com.intellij.util.animation.AlphaAnimationContext;
 import com.intellij.util.concurrency.EdtScheduledExecutorService;
+import com.intellij.util.concurrency.annotations.RequiresEdt;
 import com.intellij.util.containers.ContainerUtil;
 import com.intellij.util.ui.*;
 import com.intellij.util.ui.JBValue.JBValueGroup;
@@ -199,6 +200,7 @@ final class EditorGutterComponentImpl extends EditorGutterComponentEx implements
   private final AlphaAnimationContext myAlphaContext = new AlphaAnimationContext(composite -> {
     if (isShowing()) repaint();
   });
+  private boolean myHovered = false;
   @NotNull private final EventDispatcher<EditorGutterListener> myEditorGutterListeners = EventDispatcher.create(EditorGutterListener.class);
   private int myHoveredFreeMarkersLine = -1;
   @Nullable private GutterIconRenderer myCurrentHoveringGutterRenderer;
@@ -342,8 +344,17 @@ final class EditorGutterComponentImpl extends EditorGutterComponentEx implements
   }
 
   public void reinitSettings(boolean updateGutterSize) {
+    updateFoldingOutlineVisibility();
     updateSize(false, updateGutterSize);
     repaint();
+  }
+
+  private void updateFoldingOutlineVisibility() {
+    myAlphaContext.setVisible(
+      !ExperimentalUI.isNewUI() ||
+      myHovered ||
+      !EditorSettingsExternalizable.getInstance().isFoldingOutlineShownOnlyOnHover()
+    );
   }
 
   @Override
@@ -913,6 +924,7 @@ final class EditorGutterComponentImpl extends EditorGutterComponentEx implements
     updateSize(false, false);
   }
 
+  @RequiresEdt
   void updateSize(boolean onLayout, boolean canShrink) {
     int prevHash = sizeHash();
 
@@ -1707,7 +1719,7 @@ final class EditorGutterComponentImpl extends EditorGutterComponentEx implements
   @NotNull LineNumberConverter getPrimaryLineNumberConverter() {
     if (myLineNumberConverter != null) return myLineNumberConverter;
 
-    EditorSettingsExternalizable.LineNumerationType numeration = EditorSettingsExternalizable.getInstance().getLineNumeration();
+    EditorSettings.LineNumerationType numeration = myEditor.getSettings().getLineNumerationType();
     switch (numeration) {
       case RELATIVE -> {
         return RelativeLineNumberConverter.INSTANCE;
@@ -2789,7 +2801,8 @@ final class EditorGutterComponentImpl extends EditorGutterComponentEx implements
     @Override
     protected void hoverChanged(@NotNull Component component, boolean hovered) {
       if (component instanceof EditorGutterComponentImpl gutter && ExperimentalUI.isNewUI()) {
-        gutter.myAlphaContext.setVisible(hovered);
+        gutter.myHovered = hovered;
+        gutter.updateFoldingOutlineVisibility();
       }
     }
   };
@@ -2847,7 +2860,9 @@ final class EditorGutterComponentImpl extends EditorGutterComponentEx implements
   private class LineNumbersRepainter implements CaretListener {
     @Override
     public void caretPositionChanged(@NotNull CaretEvent event) {
-      if (getPrimaryLineNumberConverter().shouldRepaintOnCaretMovement()) {
+      if (event.getOldPosition().line != event.getNewPosition().line &&
+          event.getCaret() == event.getEditor().getCaretModel().getPrimaryCaret() &&
+          getPrimaryLineNumberConverter().shouldRepaintOnCaretMovement()) {
         repaint();
       }
     }

@@ -24,15 +24,12 @@ import com.intellij.featureStatistics.FeatureUsageTracker;
 import com.intellij.featureStatistics.FeatureUsageTrackerImpl;
 import com.intellij.ide.lightEdit.LightEdit;
 import com.intellij.injected.editor.EditorWindow;
-import com.intellij.internal.statistic.IntentionsCollector;
+import com.intellij.internal.statistic.IntentionFUSCollector;
 import com.intellij.lang.LangBundle;
 import com.intellij.lang.injection.InjectedLanguageManager;
 import com.intellij.modcommand.ModCommand;
 import com.intellij.modcommand.ModCommandAction;
-import com.intellij.openapi.application.ApplicationManager;
-import com.intellij.openapi.application.ModalityState;
-import com.intellij.openapi.application.ReadAction;
-import com.intellij.openapi.application.WriteAction;
+import com.intellij.openapi.application.*;
 import com.intellij.openapi.application.ex.ApplicationManagerEx;
 import com.intellij.openapi.command.CommandProcessor;
 import com.intellij.openapi.diagnostic.Logger;
@@ -71,6 +68,7 @@ public class ShowIntentionActionsHandler implements CodeInsightActionHandler {
   }
 
   public void invoke(@NotNull Project project, @NotNull Editor editor, @NotNull PsiFile file, boolean showFeedbackOnEmptyMenu) {
+    long start = System.currentTimeMillis();
     PsiDocumentManager.getInstance(project).commitAllDocuments();
     if (editor instanceof EditorWindow) {
       editor = ((EditorWindow)editor).getDelegate();
@@ -102,6 +100,8 @@ public class ShowIntentionActionsHandler implements CodeInsightActionHandler {
 
     editor.getScrollingModel().scrollToCaret(ScrollType.MAKE_VISIBLE);
     showIntentionHint(project, editor, file, calcIntentions(project, editor, file), showFeedbackOnEmptyMenu);
+    long elapsed = System.currentTimeMillis() - start;
+    IntentionFUSCollector.reportPopupDelay(project, elapsed, file.getFileType());
   }
 
   protected void showIntentionHint(@NotNull Project project,
@@ -109,7 +109,10 @@ public class ShowIntentionActionsHandler implements CodeInsightActionHandler {
                                    @NotNull PsiFile file,
                                    @NotNull ShowIntentionsPass.IntentionsInfo intentions,
                                    boolean showFeedbackOnEmptyMenu) {
-    if (!intentions.isEmpty()) {
+    if (intentions.isEmpty()) {
+      showEmptyMenuFeedback(editor, showFeedbackOnEmptyMenu);
+    }
+    else {
       editor.getScrollingModel().runActionOnScrollingFinished(() -> {
         CachedIntentions cachedIntentions = CachedIntentions.createAndUpdateActions(project, file, editor, intentions);
         cachedIntentions.wrapAndUpdateGutters();
@@ -120,9 +123,6 @@ public class ShowIntentionActionsHandler implements CodeInsightActionHandler {
           IntentionHintComponent.showIntentionHint(project, file, editor, true, cachedIntentions);
         }
       });
-    }
-    else {
-      showEmptyMenuFeedback(editor, showFeedbackOnEmptyMenu);
     }
   }
 
@@ -256,7 +256,7 @@ public class ShowIntentionActionsHandler implements CodeInsightActionHandler {
     Project project = hostFile.getProject();
     ((FeatureUsageTrackerImpl)FeatureUsageTracker.getInstance()).getFixesStats().registerInvocation();
 
-    try (var ignored = SlowOperations.startSection(SlowOperations.ACTION_PERFORM)) {
+    try (AccessToken __ = SlowOperations.startSection(SlowOperations.ACTION_PERFORM)) {
       PsiDocumentManager.getInstance(project).commitAllDocuments();
       ModCommandAction commandAction = ModCommandAction.unwrap(action);
       if (commandAction != null) {
@@ -285,7 +285,7 @@ public class ShowIntentionActionsHandler implements CodeInsightActionHandler {
         if (contextAndCommand == null) return;
         ModCommandAction.ActionContext context = contextAndCommand.context();
         Project project = context.project();
-        IntentionsCollector.record(project, commandAction, context.file().getLanguage());
+        IntentionFUSCollector.record(project, commandAction, context.file().getLanguage());
         CommandProcessor.getInstance().executeCommand(project, () -> {
           contextAndCommand.command().execute(project);
         }, commandName, null);
@@ -331,7 +331,7 @@ public class ShowIntentionActionsHandler implements CodeInsightActionHandler {
   }
 
   private static void invokeIntention(@NotNull IntentionAction action, @Nullable Editor editor, @NotNull PsiFile file) {
-    IntentionsCollector.record(file.getProject(), action, file.getLanguage());
+    IntentionFUSCollector.record(file.getProject(), action, file.getLanguage());
     PsiElement elementToMakeWritable = action.getElementToMakeWritable(file);
     if (elementToMakeWritable != null && !FileModificationService.getInstance().preparePsiElementsForWrite(elementToMakeWritable)) {
       return;

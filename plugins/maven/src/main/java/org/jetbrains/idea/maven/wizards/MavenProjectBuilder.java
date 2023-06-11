@@ -32,7 +32,6 @@ import com.intellij.projectImport.ProjectOpenProcessor;
 import com.intellij.util.containers.ContainerUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.jetbrains.concurrency.Promise;
 import org.jetbrains.idea.maven.buildtool.MavenImportSpec;
 import org.jetbrains.idea.maven.importing.MavenImportUtil;
 import org.jetbrains.idea.maven.model.MavenExplicitProfiles;
@@ -49,8 +48,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeoutException;
 
 import static icons.OpenapiIcons.RepositoryLibraryLogo;
 import static org.jetbrains.idea.maven.server.MavenServerManager.WRAPPED_MAVEN;
@@ -237,31 +234,28 @@ public final class MavenProjectBuilder extends ProjectImportBuilder<MavenProject
       manager.addManagedFilesWithProfiles(MavenUtil.collectFiles(selectedProjects), selectedProfiles, null);
     }
 
-    manager.waitForReadingCompletion();
     //noinspection UnresolvedPluginConfigReference
     if (ApplicationManager.getApplication().isHeadlessEnvironment() &&
         !CoreProgressManager.shouldKeepTasksAsynchronousInHeadlessMode() &&
         (!MavenUtil.isMavenUnitTestModeEnabled() ||
          Registry.is("ide.force.maven.import", false)) // workaround for inspection integration test
     ) {
-      Promise<List<Module>> promise = manager.scheduleImportAndResolve();
-      manager.waitForResolvingCompletion();
-      try {
-        return promise.blockingGet(0);
-      }
-      catch (TimeoutException | ExecutionException e) {
-        throw new RuntimeException(e);
-      }
+      return manager.resolveAndImportMavenProjectsSync(MavenImportSpec.EXPLICIT_IMPORT);
     }
 
+    var projectsToImport = new HashMap<MavenProject, MavenProjectChanges>();
+    for (var selectedProject : selectedProjects) {
+      var projectToImport = manager.getProjectsTree().findProject(selectedProject.getFile());
+      projectsToImport.put(projectToImport, MavenProjectChanges.ALL);
+    }
     boolean isFromUI = model != null;
     List<Module> createdModules;
     if (isFromUI) {
       var modelsProvider = new IdeUIModifiableModelsProvider(project, model, (ModulesConfigurator)modulesProvider, artifactModel);
-      createdModules = manager.importMavenProjectsSync(modelsProvider);
+      createdModules = manager.importMavenProjectsSync(modelsProvider, projectsToImport);
     }
     else {
-      createdModules = manager.importMavenProjectsSync();
+      createdModules = manager.importMavenProjectsSync(projectsToImport);
     }
     return createdModules;
   }

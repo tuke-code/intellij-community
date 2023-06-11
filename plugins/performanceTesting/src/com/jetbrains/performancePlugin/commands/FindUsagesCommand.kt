@@ -1,7 +1,6 @@
 package com.jetbrains.performancePlugin.commands
 
 import com.intellij.codeInsight.navigation.actions.GotoDeclarationAction
-import com.intellij.find.FindSettings
 import com.intellij.find.actions.ShowUsagesAction
 import com.intellij.find.findUsages.FindUsagesOptions
 import com.intellij.openapi.application.EDT
@@ -39,13 +38,14 @@ class FindUsagesCommand(text: String, line: Int) : PerformanceCommandCoroutineAd
     val elementName = options.expectedName
     if (position != null) {
       val result = GoToNamedElementCommand(GoToNamedElementCommand.PREFIX + " $position $elementName", -1).execute(context)
-      result.onError {
-        throw Exception("fail to go to element $elementName")
+      result.exceptionally { e ->
+        throw Exception("fail to go to element $elementName", e)
       }
     }
 
     val currentOTContext = Context.current()
     var findUsagesFuture: Future<Collection<Usage>>
+    val storedPageSize = AdvancedSettings.getInt("ide.usages.page.size")
     withContext(Dispatchers.EDT) {
       currentOTContext.makeCurrent().use {
         val editor = FileEditorManager.getInstance(context.project).selectedTextEditor
@@ -73,13 +73,14 @@ class FindUsagesCommand(text: String, line: Int) : PerformanceCommandCoroutineAd
         val popupPosition = JBPopupFactory.getInstance().guessBestPopupLocation(editor)
 
         //configuration for find usages
-        AdvancedSettings.setInt("ide.usages.page.size", Int.MAX_VALUE) //by default, it's 100, we need to find all usages to compare
+        AdvancedSettings.setInt("ide.usages.page.size", Int.MAX_VALUE) //by default, it's 100; we need to find all usages to compare
         val scope = FindUsagesOptions.findScopeByName(context.project, null, options.scope)
         findUsagesFuture = ShowUsagesAction.startFindUsagesWithResult(element, popupPosition, editor, scope)
       }
 
     }
     val results = findUsagesFuture.get()
+    AdvancedSettings.setInt("ide.usages.page.size", storedPageSize)
     FindUsagesDumper.storeMetricsDumpFoundUsages(results.toMutableList(), context.project)
   }
 
