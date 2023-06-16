@@ -49,7 +49,7 @@ var totalCreatedProjectsCount = 0
 @TestOnly
 open class TestProjectManager : ProjectManagerImpl() {
   companion object {
-
+    @ApiStatus.ScheduledForRemoval
     @Deprecated(
       message = "moved to LeakHunter",
       replaceWith = ReplaceWith("LeakHunter.getCreationPlace(project)", "com.intellij.testFramework.LeakHunter")
@@ -60,10 +60,10 @@ open class TestProjectManager : ProjectManagerImpl() {
     }
 
     suspend fun loadAndOpenProject(path: Path, parent: Disposable): Project {
-      ApplicationManager.getApplication().assertIsNonDispatchThread();
+      ApplicationManager.getApplication().assertIsNonDispatchThread()
       val project = getInstanceEx().openProjectAsync(path, OpenProjectTask {})!!
       Disposer.register(parent) {
-        ApplicationManager.getApplication().assertIsNonDispatchThread();
+        ApplicationManager.getApplication().assertIsNonDispatchThread()
         runBlocking {
           getInstanceEx().forceCloseProjectAsync(project)
         }

@@ -68,6 +68,7 @@ object CommunityRepositoryModules {
     plugin("intellij.vcs.svn") { spec ->
       spec.withProjectLibrary("sqlite")
     },
+    plugin("intellij.jsonpath"),
     plugin("intellij.xpath") { spec ->
       spec.withModule("intellij.xpath.rt", "rt/xslt-rt.jar")
     },
@@ -101,8 +102,6 @@ object CommunityRepositoryModules {
       spec.withModule("intellij.maven.server.m40", "maven40-server.jar")
       spec.withModule("intellij.maven.errorProne.compiler")
       spec.withModule("intellij.maven.server.indexer", "maven-server-indexer.jar")
-      spec.withModuleLibrary(libraryName = "apache.maven.indexer.core:6.2.2", moduleName = "intellij.maven.server.indexer",
-                             relativeOutputPath = "intellij.maven.server.indexer/lib")
       spec.withModuleLibrary(libraryName = "apache.maven.core:3.8.3", moduleName = "intellij.maven.server.indexer",
                              relativeOutputPath = "intellij.maven.server.indexer/lib")
       spec.withModuleLibrary(libraryName = "apache.maven.wagon.provider.api:3.5.2", moduleName = "intellij.maven.server.indexer",
@@ -116,7 +115,8 @@ object CommunityRepositoryModules {
       spec.withModule("intellij.maven.artifactResolver.m31", "artifact-resolver-m31.jar")
       spec.withModule("intellij.maven.artifactResolver.common", "artifact-resolver-m31.jar")
 
-      spec.withArtifact("maven-event-listener", "")
+      spec.withModule("intellij.maven.server.eventListener", relativeJarPath = "maven-event-listener.jar")
+
       spec.doNotCopyModuleLibrariesAutomatically(listOf(
         "intellij.maven.artifactResolver.common",
         "intellij.maven.artifactResolver.m3",

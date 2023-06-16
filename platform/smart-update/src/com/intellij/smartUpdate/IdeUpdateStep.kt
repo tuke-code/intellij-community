@@ -1,14 +1,23 @@
 package com.intellij.smartUpdate
 
 import com.intellij.ide.RecentProjectsManagerBase
+import com.intellij.ide.actions.SettingsEntryPointAction
 import com.intellij.ide.util.PropertiesComponent
 import com.intellij.openapi.actionSystem.AnActionEvent
+import com.intellij.openapi.actionSystem.impl.SimpleDataContext
 import com.intellij.openapi.components.service
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.updateSettings.impl.ExternalUpdateManager
+import com.intellij.openapi.updateSettings.impl.restartOrNotify
 import org.jetbrains.annotations.Nls
 import org.jetbrains.ide.ToolboxSettingsActionRegistry
 
+const val IDE_UPDATE = "ide.update"
+
 class IdeUpdateStep: SmartUpdateStep {
+  override val id = IDE_UPDATE
+  override val stepName: String = SmartUpdateBundle.message("checkbox.update.ide")
+
   override fun performUpdateStep(project: Project, e: AnActionEvent?, onSuccess: () -> Unit) {
     val updateAction = getUpdateAction()
     if (updateAction != null && e != null) {
@@ -18,11 +27,9 @@ class IdeUpdateStep: SmartUpdateStep {
     else onSuccess()
   }
 
-  override fun isRequested(options: SmartUpdate.Options) = options.updateIde
+  override fun isAvailable(project: Project) = ExternalUpdateManager.ACTUAL != null
 
-  override fun isAvailable(): Boolean {
-    return getUpdateAction() != null
-  }
+  override fun isEnabled(project: Project) = getUpdateAction() != null
 
   @Nls
   fun getDescription(): String {
@@ -34,16 +41,15 @@ class IdeUpdateStep: SmartUpdateStep {
 
 private fun getUpdateAction() = service<ToolboxSettingsActionRegistry>().getActions().find { it.isIdeUpdate }
 
-class IdeRestartStep: SmartUpdateStep {
-  override fun performUpdateStep(project: Project, e: AnActionEvent?, onSuccess: () -> Unit) {
-    val updateAction = getUpdateAction()
-    if (updateAction != null && e != null && updateAction.isRestartRequired) {
-      RecentProjectsManagerBase.getInstanceEx().forceReopenProjects()
-      PropertiesComponent.getInstance().setValue(IDE_RESTARTED_KEY, true)
-      updateAction.actionPerformed(e)
+fun restartIde(project: Project, updateAction: SettingsEntryPointAction.UpdateAction) {
+    restartOrNotify(project, true) {
+      beforeRestart()
+      val event = AnActionEvent.createFromDataContext("", null, SimpleDataContext.getProjectContext(project))
+      updateAction.actionPerformed(event)
     }
-    else onSuccess()
-  }
+}
 
-  override fun isRequested(options: SmartUpdate.Options): Boolean = options.restartIde
+fun beforeRestart() {
+  RecentProjectsManagerBase.getInstanceEx().forceReopenProjects()
+  PropertiesComponent.getInstance().setValue(IDE_RESTARTED_KEY, true)
 }
