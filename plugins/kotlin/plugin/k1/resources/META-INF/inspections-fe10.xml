@@ -1031,20 +1031,6 @@
 
     <intentionAction>
       <language>kotlin</language>
-      <className>org.jetbrains.kotlin.idea.intentions.branchedTransformations.intentions.FoldIfToFunctionCallIntention</className>
-      <bundleName>messages.KotlinBundle</bundleName>
-      <categoryKey>group.names.kotlin</categoryKey>
-    </intentionAction>
-
-    <intentionAction>
-      <language>kotlin</language>
-      <className>org.jetbrains.kotlin.idea.intentions.branchedTransformations.intentions.UnfoldFunctionCallToIfIntention</className>
-      <bundleName>messages.KotlinBundle</bundleName>
-      <categoryKey>group.names.kotlin</categoryKey>
-    </intentionAction>
-
-    <intentionAction>
-      <language>kotlin</language>
       <className>org.jetbrains.kotlin.idea.intentions.AddNamesInCommentToJavaCallArgumentsIntention</className>
       <bundleName>messages.KotlinBundle</bundleName>
       <categoryKey>group.names.kotlin</categoryKey>
@@ -1784,7 +1770,7 @@
                      groupPath="Kotlin"
                      groupBundle="messages.KotlinBundle" groupKey="group.names.style.issues"
                      enabledByDefault="true"
-                     level="WARNING"
+                     level="WEAK WARNING"
                      language="kotlin"
                      key="inspection.lift.return.or.assignment.display.name" bundle="messages.KotlinBundle"/>
 
@@ -1792,7 +1778,7 @@
                      groupPath="Kotlin"
                      groupBundle="messages.KotlinBundle" groupKey="group.names.style.issues"
                      enabledByDefault="true"
-                     level="WARNING"
+                     level="WEAK WARNING"
                      language="kotlin"
                      key="inspection.cascade.if.display.name" bundle="messages.KotlinBundle"/>
 
@@ -2168,6 +2154,7 @@
                      enabledByDefault="true"
                      level="WEAK WARNING"
                      language="kotlin"
+                     cleanupTool="true"
                      key="inspection.move.variable.declaration.into.when.display.name" bundle="messages.KotlinBundle"/>
 
     <localInspection implementationClass="org.jetbrains.kotlin.idea.inspections.MainFunctionReturnUnitInspection"
@@ -2224,6 +2211,7 @@
                      enabledByDefault="false"
                      level="WEAK WARNING"
                      language="kotlin"
+                     cleanupTool="true"
                      key="inspection.from.closed.range.migration.display.name" bundle="messages.KotlinBundle"/>
 
     <localInspection implementationClass="org.jetbrains.kotlin.idea.inspections.migration.ProhibitTypeParametersForLocalVariablesMigrationInspection"
@@ -2462,6 +2450,7 @@
                      groupBundle="messages.KotlinBundle" groupKey="group.names.probable.bugs"
                      enabledByDefault="true"
                      level="WARNING"
+                     cleanupTool="true"
                      language="kotlin"
                      key="inspection.setter.backing.field.assignment.display.name" bundle="messages.KotlinBundle"/>
 

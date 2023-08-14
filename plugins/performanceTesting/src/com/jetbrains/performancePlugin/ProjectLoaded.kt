@@ -5,7 +5,7 @@ package com.jetbrains.performancePlugin
 import com.intellij.diagnostic.AbstractMessage
 import com.intellij.diagnostic.MessagePool
 import com.intellij.diagnostic.ThreadDumper
-import com.intellij.diagnostic.startUpPerformanceReporter.StartUpPerformanceReporter.Companion.logStats
+import com.intellij.driver.impl.InvokerMBean
 import com.intellij.ide.AppLifecycleListener
 import com.intellij.ide.ApplicationInitializedListener
 import com.intellij.ide.lightEdit.LightEditService
@@ -19,7 +19,9 @@ import com.intellij.openapi.application.ex.ApplicationManagerEx
 import com.intellij.openapi.diagnostic.Attachment
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.extensions.ExtensionNotApplicableException
+import com.intellij.openapi.progress.ModalTaskOwner
 import com.intellij.openapi.progress.impl.CoreProgressManager
+import com.intellij.openapi.progress.runWithModalProgressBlocking
 import com.intellij.openapi.project.DumbService
 import com.intellij.openapi.project.DumbService.Companion.isDumb
 import com.intellij.openapi.project.Project
@@ -28,6 +30,9 @@ import com.intellij.openapi.ui.playback.PlaybackRunner
 import com.intellij.openapi.util.Pair
 import com.intellij.openapi.util.io.FileUtil
 import com.intellij.openapi.util.io.FileUtilRt
+import com.intellij.openapi.wm.WindowManager
+import com.intellij.openapi.wm.ex.StatusBarEx
+import com.intellij.platform.diagnostic.startUpPerformanceReporter.StartUpPerformanceReporter.Companion.logStats
 import com.intellij.util.Alarm
 import com.intellij.util.SystemProperties
 import com.jetbrains.performancePlugin.commands.OpenProjectCommand.Companion.shouldOpenInSmartMode
@@ -119,10 +124,16 @@ class ProjectLoaded : InitProjectActivityJavaShim(), ApplicationInitializedListe
   }
 
   override suspend fun execute(asyncScope: CoroutineScope) {
+    if (System.getProperty("com.sun.management.jmxremote") == "true") {
+      InvokerMBean.register(PerformanceTestSpan.TRACER) { PerformanceTestSpan.getContext() }
+    }
+
     if (ApplicationManagerEx.getApplicationEx().isLightEditMode) {
       LightEditService.getInstance().editorManager.addListener(object : LightEditorListener {
         override fun afterSelect(editorInfo: LightEditorInfo?) {
-          logStats("LightEditor")
+          runWithModalProgressBlocking(ModalTaskOwner.guess(), "") {
+            logStats("LightEditor")
+          }
           runActivity(LightEditService.getInstance().project!!)
         }
       })
@@ -134,7 +145,9 @@ class ProjectLoaded : InitProjectActivityJavaShim(), ApplicationInitializedListe
       Runnable {
         alarm.addRequest(Context.current().wrap(
           Runnable {
-            if (isDumb(project) || !CoreProgressManager.getCurrentIndicators().isEmpty() ||
+            val statusBar = WindowManager.getInstance().getIdeFrame(project)?.statusBar as? StatusBarEx
+            val hasUserVisibleIndicators = statusBar != null && statusBar.backgroundProcesses.isNotEmpty()
+            if (isDumb(project) || hasUserVisibleIndicators ||
                 !ProjectInitializationDiagnosticService.getInstance(project).isProjectInitializationAndIndexingFinished) {
               runScriptWhenInitializedAndIndexed(project)
             }
@@ -375,31 +388,33 @@ private fun reportTeamCityFailedTestAndBuildProblem(testName: String, failureMes
 
 @Suppress("RAW_RUN_BLOCKING")
 private fun registerOnFinishRunnables(future: CompletableFuture<*>, mustExitOnFailure: Boolean) {
-  future
-    .thenRun { LOG.info("Execution of the script has been finished successfully") }
-    .exceptionally(Function { e ->
-      val message = "IDE will be terminated because some errors are detected while running the startup script: $e"
-      if (MUST_REPORT_TEAMCITY_TEST_FAILURE_ON_IDE_ERROR) {
-        val testName = teamCityFailedTestName
-        reportTeamCityFailedTestAndBuildProblem(testName, message, "")
-      }
-      if (SystemProperties.getBooleanProperty("startup.performance.framework", false)) {
-        storeFailureToFile(e.message)
-      }
-      LOG.error(message)
-      runBlocking {
-        takeScreenshotOfAllWindows("onFailure")
-      }
-      val threadDump = """
+    future
+      .thenRun { LOG.info("Execution of the script has been finished successfully") }
+      .exceptionally(Function { e ->
+        ApplicationManager.getApplication().executeOnPooledThread {
+          val message = "IDE will be terminated because some errors are detected while running the startup script: $e"
+          if (MUST_REPORT_TEAMCITY_TEST_FAILURE_ON_IDE_ERROR) {
+            val testName = teamCityFailedTestName
+            reportTeamCityFailedTestAndBuildProblem(testName, message, "")
+          }
+          if (SystemProperties.getBooleanProperty("startup.performance.framework", false)) {
+            storeFailureToFile(e.message)
+          }
+          LOG.error(message)
+          runBlocking {
+            takeScreenshotOfAllWindows("onFailure")
+          }
+          val threadDump = """
             Thread dump before IDE termination:
             ${ThreadDumper.dumpThreadsToString()}
             """.trimIndent()
-      LOG.info(threadDump)
-      if (mustExitOnFailure) {
-        ApplicationManagerEx.getApplicationEx().exit(true, true, 1)
-      }
-      null
-    })
+          LOG.info(threadDump)
+          if (mustExitOnFailure) {
+            ApplicationManagerEx.getApplicationEx().exit(true, true, 1)
+          }
+        }
+        null
+      })
 }
 
 private fun storeFailureToFile(errorMessage: String?) {

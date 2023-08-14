@@ -2,6 +2,7 @@
 package com.intellij.openapi.progress.impl;
 
 import com.intellij.codeWithMe.ClientId;
+import com.intellij.concurrency.ContextAwareRunnable;
 import com.intellij.diagnostic.ThreadDumper;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.Application;
@@ -387,7 +388,7 @@ public class CoreProgressManager extends ProgressManager implements Disposable {
   // from any: bg
   private void runAsynchronously(@NotNull Task.Backgroundable task) {
     if (LOG.isDebugEnabled()) LOG.debug("CoreProgressManager#runAsynchronously, " + task, new Throwable());
-    if (ApplicationManager.getApplication().isDispatchThread()) {
+    if (EDT.isCurrentThreadEdt()) {
       runProcessWithProgressAsynchronously(task);
     }
     else {
@@ -859,8 +860,9 @@ public class CoreProgressManager extends ProgressManager implements Disposable {
       return false;
     }
 
-    if (ApplicationManager.getApplication().isDispatchThread()) {
-      return false; // EDT always has high priority
+    if (EDT.isCurrentThreadEdt()) {
+      // EDT always has high priority
+      return false;
     }
 
     if (time > MAX_PRIORITIZATION_NANOS) {
@@ -884,7 +886,7 @@ public class CoreProgressManager extends ProgressManager implements Disposable {
 
   private void checkLaterThreadsAreUnblocked() {
     try {
-      AppExecutorUtil.getAppScheduledExecutorService().schedule(() -> {
+      AppExecutorUtil.getAppScheduledExecutorService().schedule((ContextAwareRunnable)() -> {
         if (isAnyPrioritizedThreadBlocked()) {
           checkLaterThreadsAreUnblocked();
         }
@@ -956,13 +958,18 @@ public class CoreProgressManager extends ProgressManager implements Disposable {
   @Override
   public <X> X silenceGlobalIndicator(@NotNull Supplier<? extends X> computable) {
     long id = Thread.currentThread().getId();
-    ProgressIndicator indicator = currentIndicators.get(id);
-    setCurrentIndicator(id, null);
+    ProgressIndicator topLevelIndicator = threadTopLevelIndicators.remove(id);
+    ProgressIndicator currentIndicator = currentIndicators.remove(id);
     try {
       return computable.get();
     }
     finally {
-      setCurrentIndicator(id, indicator);
+      if (currentIndicator != null) {
+        currentIndicators.put(id, currentIndicator);
+      }
+      if (topLevelIndicator != null) {
+        threadTopLevelIndicators.put(id, topLevelIndicator);
+      }
     }
   }
 

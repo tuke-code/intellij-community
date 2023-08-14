@@ -97,7 +97,7 @@ public final class XDebuggerManagerImpl extends XDebuggerManager implements Pers
 
   private XDebuggerState myState = new XDebuggerState();
 
-  public XDebuggerManagerImpl(@NotNull Project project, @NotNull CoroutineScope coroutineScope) {
+  XDebuggerManagerImpl(@NotNull Project project, @NotNull CoroutineScope coroutineScope) {
     myProject = project;
 
     MessageBusConnection messageBusConnection = project.getMessageBus().connect(this);
@@ -406,8 +406,8 @@ public final class XDebuggerManagerImpl extends XDebuggerManager implements Pers
     private final XDebuggerLineChangeHandler lineChangeHandler;
 
     BreakpointPromoterEditorListener(CoroutineScope coroutineScope) {
-      lineChangeHandler = new XDebuggerLineChangeHandler(coroutineScope, (gutter, position, types) -> {
-        myLastIcon = ObjectUtils.doIfNotNull(ContainerUtil.getFirstItem(types), XBreakpointType::getEnabledIcon);
+      lineChangeHandler = new XDebuggerLineChangeHandler(coroutineScope, (gutter, position, icon) -> {
+        myLastIcon = icon;
         if (myLastIcon != null) {
           updateActiveLineNumberIcon(gutter, myLastIcon, position.getLine());
         }

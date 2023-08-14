@@ -1,22 +1,18 @@
 // Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.idea
 
-import com.intellij.diagnostic.Activity
+import com.intellij.diagnostic.LoadingState
 import com.intellij.diagnostic.StartUpMeasurer
 import com.intellij.openapi.application.PathManager
 import com.intellij.openapi.application.ex.ApplicationInfoEx
 import com.intellij.openapi.application.impl.RawSwingDispatcher
-import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.util.SystemInfoRt
 import com.intellij.openapi.wm.impl.FrameBoundsConverter
 import com.intellij.openapi.wm.impl.IdeFrameImpl
+import com.intellij.platform.diagnostic.telemetry.impl.span
 import com.intellij.ui.Splash
 import com.intellij.ui.loadSplashImage
-import com.intellij.util.ui.StartupUiUtil
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Deferred
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.*
 import java.awt.Color
 import java.awt.Dimension
 import java.awt.Rectangle
@@ -27,79 +23,128 @@ import java.nio.ByteBuffer
 import java.nio.file.Files
 import java.nio.file.NoSuchFileException
 import java.nio.file.Path
+import java.util.concurrent.atomic.AtomicReference
 import javax.swing.JFrame
 import javax.swing.WindowConstants
 
 @Volatile
 private var PROJECT_FRAME: JFrame? = null
+
 @Volatile
 private var SPLASH_WINDOW: Splash? = null
 
-internal suspend fun showSplashIfNeeded(initUiDeferred: Job, appInfoDeferred: Deferred<ApplicationInfoEx>) {
-  // A splash instance must not be created before base LaF is created.
-  // It is important on Linux, where GTK LaF must be initialized (to properly set up the scale factor).
-  // https://youtrack.jetbrains.com/issue/IDEA-286544
-  initUiDeferred.join()
+// if hideSplash requested before we show splash, we should not try to show splash
+private val splashJob = AtomicReference<Job>(CompletableDeferred<Unit>())
 
-  val appInfo = appInfoDeferred.await()
-  try {
-    val prepareActivity = StartUpMeasurer.startActivity("splash preparation")
-    if (showLastProjectFrameIfAvailable(prepareActivity)) {
-      return
+internal fun CoroutineScope.showSplashIfNeeded(initUiDeferred: Job, appInfoDeferred: Deferred<ApplicationInfoEx>) {
+  val oldJob = splashJob.get()
+  if (oldJob.isCancelled) {
+    return
+  }
+
+  val newJob = launch(start = CoroutineStart.LAZY) {
+    if (showLastProjectFrameIfAvailable(initUiDeferred)) {
+      return@launch
     }
 
-    assert(SPLASH_WINDOW == null)
-    val image = loadSplashImage(appInfo = appInfo)
-    val activity = prepareActivity.endAndStart("splash initialization")
-    val queueActivity = activity.startChild("splash initialization (in queue)")
-    withContext(RawSwingDispatcher) {
-      queueActivity.end()
-      SPLASH_WINDOW = Splash(image)
-      activity.end()
+    // A splash instance must not be created before base LaF is created.
+    // It is important on Linux, where GTK LaF must be initialized (to properly set up the scale factor).
+    // https://youtrack.jetbrains.com/issue/IDEA-286544
+    initUiDeferred.join()
+
+    val appInfo = appInfoDeferred.await()
+
+    val image = span("splash preparation") {
+      assert(SPLASH_WINDOW == null)
+      loadSplashImage(appInfo = appInfo)
+    }
+
+    if (!isActive || LoadingState.COMPONENTS_LOADED.isOccurred) {
+      return@launch
+    }
+
+    span("splash initialization", RawSwingDispatcher) {
+      if (LoadingState.COMPONENTS_LOADED.isOccurred) {
+        return@span
+      }
+
+      val splash = Splash(image)
+      StartUpMeasurer.addInstantEvent("splash shown")
+      try {
+        SPLASH_WINDOW = splash
+
+        ensureActive()
+
+        span("splash set visible") {
+          splash.isVisible = true
+        }
+        splash.toFront()
+      }
+      catch (ignore: CancellationException) {
+        SPLASH_WINDOW = null
+        launch(NonCancellable + RawSwingDispatcher) {
+          splash.isVisible = false
+          splash.dispose()
+        }
+      }
     }
   }
-  catch (e: CancellationException) {
-    throw e
+
+  // not a real case - showSplashIfNeeded is called only once
+  if (!splashJob.compareAndSet(oldJob, newJob)) {
+    return
   }
-  catch (e: Throwable) {
-    logger<StartupUiUtil>().warn("Cannot show splash", e)
+
+  if (oldJob.isCancelled) {
+    newJob.cancel()
+  }
+  else {
+    newJob.start()
   }
 }
 
-private suspend fun showLastProjectFrameIfAvailable(prepareActivity: Activity): Boolean {
-  val activity = StartUpMeasurer.startActivity("splash as project frame initialization")
-  val infoFile = Path.of(PathManager.getSystemPath(), "lastProjectFrameInfo")
-  var buffer: ByteBuffer
-  try {
-    Files.newByteChannel(infoFile).use { channel ->
-      buffer = ByteBuffer.allocate(channel.size().toInt())
-      do {
-        channel.read(buffer)
-      }
-      while (buffer.hasRemaining())
-      buffer.flip()
-      if (buffer.getShort().toInt() != 0) {
-        return false
-      }
+private suspend fun showLastProjectFrameIfAvailable(initUiDeferred: Job): Boolean {
+  lateinit var backgroundColor: Color
+  var extendedState = 0
+  val savedBounds: Rectangle = span("splash as project frame initialization") {
+    val infoFile = Path.of(PathManager.getSystemPath(), "lastProjectFrameInfo")
+    val buffer = try {
+      withContext(Dispatchers.IO) {
+        Files.newByteChannel(infoFile).use { channel ->
+          val buffer = ByteBuffer.allocate(channel.size().toInt())
+          do {
+            channel.read(buffer)
+          }
+          while (buffer.hasRemaining())
+          buffer.flip()
+          if (buffer.getShort().toInt() != 0) {
+            return@withContext null
+          }
+
+          buffer
+        }
+      } ?: return@span null
     }
-  }
-  catch (ignore: NoSuchFileException) {
-    return false
-  }
+    catch (ignore: NoSuchFileException) {
+      return@span null
+    }
 
-  val savedBounds = Rectangle(buffer.getInt(), buffer.getInt(), buffer.getInt(), buffer.getInt())
+    val savedBounds = Rectangle(buffer.getInt(), buffer.getInt(), buffer.getInt(), buffer.getInt())
 
-  @Suppress("UseJBColor")
-  val backgroundColor = Color(buffer.getInt(), true)
+    @Suppress("UseJBColor")
+    backgroundColor = Color(buffer.getInt(), true)
 
-  @Suppress("UNUSED_VARIABLE")
-  val isFullScreen = buffer.get().toInt() == 1
-  val extendedState = buffer.getInt()
+    @Suppress("UNUSED_VARIABLE")
+    val isFullScreen = buffer.get().toInt() == 1
+    extendedState = buffer.getInt()
+    savedBounds
+  } ?: return false
 
-  activity.end()
-  prepareActivity.end()
-  withContext(RawSwingDispatcher) {
-    PROJECT_FRAME = doShowFrame(savedBounds = savedBounds, backgroundColor = backgroundColor, extendedState = extendedState)
+  initUiDeferred.join()
+  span("splash as project frame creation") {
+    withContext(RawSwingDispatcher) {
+      PROJECT_FRAME = doShowFrame(savedBounds = savedBounds, backgroundColor = backgroundColor, extendedState = extendedState)
+    }
   }
   return true
 }
@@ -111,6 +156,7 @@ internal fun getAndUnsetSplashProjectFrame(): JFrame? {
 }
 
 fun hideSplashBeforeShow(window: Window) {
+  splashJob.get().cancel()
   if (SPLASH_WINDOW != null || PROJECT_FRAME != null) {
     window.addWindowListener(object : WindowAdapter() {
       override fun windowOpened(e: WindowEvent) {
@@ -122,6 +168,8 @@ fun hideSplashBeforeShow(window: Window) {
 }
 
 fun hideSplash() {
+  splashJob.get().cancel()
+
   var window: Window? = SPLASH_WINDOW
   if (window == null) {
     window = PROJECT_FRAME ?: return

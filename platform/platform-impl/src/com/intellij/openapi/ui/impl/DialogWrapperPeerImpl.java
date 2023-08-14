@@ -30,11 +30,9 @@ import com.intellij.openapi.util.WindowStateService;
 import com.intellij.openapi.util.registry.Registry;
 import com.intellij.openapi.util.registry.RegistryManager;
 import com.intellij.openapi.wm.IdeFocusManager;
+import com.intellij.openapi.wm.WindowManager;
 import com.intellij.openapi.wm.ex.WindowManagerEx;
-import com.intellij.openapi.wm.impl.IdeFrameDecorator;
-import com.intellij.openapi.wm.impl.IdeFrameImpl;
-import com.intellij.openapi.wm.impl.IdeGlassPaneImpl;
-import com.intellij.openapi.wm.impl.ProjectFrameHelper;
+import com.intellij.openapi.wm.impl.*;
 import com.intellij.openapi.wm.impl.customFrameDecorations.header.CustomFrameDialogContent;
 import com.intellij.openapi.wm.impl.customFrameDecorations.header.CustomHeader;
 import com.intellij.reference.SoftReference;
@@ -44,14 +42,12 @@ import com.intellij.ui.mac.foundation.Foundation;
 import com.intellij.ui.mac.foundation.ID;
 import com.intellij.ui.mac.foundation.MacUtil;
 import com.intellij.ui.mac.touchbar.TouchbarSupport;
+import com.intellij.ui.scale.JBUIScale;
 import com.intellij.util.IJSwingUtilities;
 import com.intellij.util.SlowOperations;
 import com.intellij.util.containers.JBIterable;
-import com.intellij.util.ui.EdtInvocationManager;
-import com.intellij.util.ui.JBInsets;
-import com.intellij.util.ui.OwnerOptional;
-import com.intellij.util.ui.UIUtil;
-import com.jetbrains.JBR;
+import com.intellij.util.ui.*;
+import kotlin.Unit;
 import org.jetbrains.annotations.NonNls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -392,11 +388,14 @@ public class DialogWrapperPeerImpl extends DialogWrapperPeer {
 
     AnCancelAction anCancelAction = new AnCancelAction();
     JRootPane rootPane = getRootPane();
-    UIUtil.decorateWindowHeader(rootPane);
+    ComponentUtil.decorateWindowHeader(rootPane);
 
     Window window = getWindow();
     if (window instanceof JDialog && !((JDialog)window).isUndecorated() && rootPane != null && LoadingState.COMPONENTS_LOADED.isOccurred()) {
-      ToolbarUtil.setTransparentTitleBar(window, rootPane, runnable -> Disposer.register(myWrapper.getDisposable(), () -> runnable.run()));
+      ToolbarService.Companion.getInstance().setTransparentTitleBar(window, rootPane, runnable -> {
+        Disposer.register(myWrapper.getDisposable(), () -> runnable.run());
+        return Unit.INSTANCE;
+      });
     }
 
     Container contentPane = getContentPane();
@@ -444,8 +443,6 @@ public class DialogWrapperPeerImpl extends DialogWrapperPeer {
     if (appStarted) {
       hidePopupsIfNeeded();
     }
-
-    myDialog.getWindow().setAutoRequestFocus((getOwner() != null && getOwner().isActive()) || !isDisableAutoRequestFocus());
 
     if (SystemInfo.isMac) {
       final Disposable tb = TouchbarSupport.showWindowActions(myDialog.getContentPane());
@@ -578,7 +575,6 @@ public class DialogWrapperPeerImpl extends DialogWrapperPeer {
       myWindowListener = new MyWindowListener();
       addWindowListener(myWindowListener);
       addWindowFocusListener(myWindowListener);
-      UIUtil.setAutoRequestFocus(this, (owner != null && owner.isActive()) || !isDisableAutoRequestFocus());
     }
 
     @Override
@@ -629,19 +625,41 @@ public class DialogWrapperPeerImpl extends DialogWrapperPeer {
     }
 
     private void _setSizeForLocation(int width, int height, @Nullable Point initial) {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Setting the size (" + width + "," + height + ") for location " + initial);
+      }
       Point location = initial != null ? initial : getLocation();
+      if (initial == null && LOG.isDebugEnabled()) {
+        LOG.debug("Falling back to the actual location because the specified one is null: " + location);
+      }
       Rectangle rect = new Rectangle(location.x, location.y, width, height);
+      Rectangle before = null;
+      if (LOG.isDebugEnabled()) {
+        before = new Rectangle(rect);
+      }
       fitToScreen(rect);
+      if (LOG.isDebugEnabled() && !Objects.equals(before, rect)) {
+        LOG.debug("Fitted these bounds to the screen: " + before + " -> " + rect);
+      }
       if (initial != null || location.x != rect.x || location.y != rect.y) {
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Setting the location to (" + rect.x + "," + rect.y + ")");
+        }
         setLocation(rect.x, rect.y);
       }
 
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Setting the size to (" + rect.width + "," + rect.height + ")");
+      }
       super.setSize(rect.width, rect.height);
     }
 
     @Override
     public void setBounds(int x, int y, int width, int height) {
       Rectangle rect = new Rectangle(x, y, width, height);
+      if (LOG.isTraceEnabled()) {
+        LOG.trace(new Throwable("DialogWrapperPeerImpl.MyDialog.setBounds(title='" + getTitle() + "'): " + rect));
+      }
       fitToScreen(rect);
       super.setBounds(rect.x, rect.y, rect.width, rect.height);
     }
@@ -659,8 +677,8 @@ public class DialogWrapperPeerImpl extends DialogWrapperPeer {
 
     @Override
     public void addNotify() {
-      if (IdeFrameDecorator.isCustomDecorationActive()) {
-        CustomHeader.enableCustomHeader(this);
+      if (IdeFrameDecorator.Companion.isCustomDecorationActive()) {
+        CustomHeader.Companion.enableCustomHeader(this);
       }
       super.addNotify();
       if (SystemInfo.isMacOSVentura && Registry.is("ide.mac.stage.manager.support", false)) {
@@ -678,31 +696,66 @@ public class DialogWrapperPeerImpl extends DialogWrapperPeer {
       final DialogWrapper dialogWrapper = getDialogWrapper();
       boolean isAutoAdjustable = dialogWrapper.isAutoAdjustable();
       Point location = null;
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("START preparing to show a dialog titled '" + getTitle() + "', isAutoAdjustable=" + isAutoAdjustable + ", the monitor configuration is:");
+        logMonitorConfiguration();
+      }
       if (isAutoAdjustable) {
         pack();
 
         Dimension initial = dialogWrapper.getInitialSize();
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("The initial size of the dialog as set/overridden by the API user: " + initial);
+        }
         if (initial == null) initial = new Dimension();
         if (initial.width <= 0 || initial.height <= 0) {
-          maximize(initial, getSize()); // cannot be less than packed size
+          Dimension packedSize = getSize();
+          if (LOG.isDebugEnabled()) {
+            LOG.debug("The size of the dialog after packing: " + packedSize);
+          }
+          maximize(initial, packedSize); // cannot be less than packed size
+          if (LOG.isDebugEnabled()) {
+            LOG.debug("The initial size after coercing it to be at least the packed size: " + initial);
+          }
           if (!SystemInfo.isLinux && Registry.is("ide.dialog.wrapper.resize.by.tables", false)) {
             // [kb] temporary workaround for IDEA-253643
             maximize(initial, getSizeForTableContainer(getContentPane()));
           }
         }
-        maximize(initial, getMinimumSize()); // cannot be less than minimum size
-        initial.width *= dialogWrapper.getHorizontalStretch();
-        initial.height *= dialogWrapper.getVerticalStretch();
+        Dimension minimumSize = getMinimumSize();
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("The minimum size of the dialog: " + minimumSize);
+        }
+        maximize(initial, minimumSize); // cannot be less than minimum size
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("The initial size after coercing it to be at least the minimum size: " + initial);
+        }
+        float hs = dialogWrapper.getHorizontalStretch();
+        initial.width *= hs;
+        float vs = dialogWrapper.getVerticalStretch();
+        initial.height *= vs;
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Setting the initial size after stretching it by (" + hs + "," + vs + "): " + initial);
+        }
         setSize(initial);
 
         // Restore dialog's size and location
 
         myDimensionServiceKey = dialogWrapper.getDimensionKey();
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("The dimension service key is '" + myDimensionServiceKey + "'");
+        }
 
         if (myDimensionServiceKey != null) {
           final Project projectGuess = guessProjectDependingOnKey(myDimensionServiceKey);
+          if (LOG.isDebugEnabled()) {
+            LOG.debug("The project is " + projectGuess);
+          }
           location = getWindowStateService(projectGuess).getLocation(myDimensionServiceKey);
           Dimension size = getWindowStateService(projectGuess).getSize(myDimensionServiceKey);
+          if (LOG.isDebugEnabled()) {
+            LOG.debug("The stored location and size are " + location + " and " + size + (size != null ? ", using them to set the initial bounds" : ""));
+          }
           if (size != null) {
             myInitialSize = new Dimension(size);
             _setSizeForLocation(myInitialSize.width, myInitialSize.height, location);
@@ -717,18 +770,34 @@ public class DialogWrapperPeerImpl extends DialogWrapperPeer {
 
       if (location == null) {
         location = dialogWrapper.getInitialLocation();
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("The initial location is " + location);
+        }
       }
 
       if (location != null) {
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Setting the location to " + location);
+        }
         setLocation(location);
       }
       else {
-        setLocationRelativeTo(getOwner());
+        Window owner = getOwner();
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Setting the location relative to " + owner);
+        }
+        setLocationRelativeTo(owner);
       }
 
       if (isAutoAdjustable) {
         final Rectangle bounds = getBounds();
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Performing auto-adjustment for the resulting bounds: " + bounds);
+        }
         fitToScreen(bounds);
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("The bounds after fitting to screen: " + bounds);
+        }
         setBounds(bounds);
       }
 
@@ -740,7 +809,26 @@ public class DialogWrapperPeerImpl extends DialogWrapperPeer {
       if (!SystemInfo.isMac || !WindowRoundedCornersManager.isAvailable()) {
         setBackground(UIUtil.getPanelBackground());
       }
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("END preparing to show the dialog, the resulting bounds: " + getBounds());
+      }
       super.show();
+    }
+
+    private void logMonitorConfiguration() {
+      var ideFrame = WindowManager.getInstance().getFrame(CommonDataKeys.PROJECT.getData(DataManager.getInstance().getDataContext(this)));
+      GraphicsEnvironment ge = GraphicsEnvironment.getLocalGraphicsEnvironment();
+      for (GraphicsDevice device : ge.getScreenDevices()) {
+        DisplayMode displayMode = device.getDisplayMode();
+        GraphicsConfiguration gc = device.getDefaultConfiguration();
+        float scale = JBUIScale.sysScale(gc);
+        Rectangle bounds = ScreenUtil.getScreenRectangle(gc);
+        LOG.debug(String.format("%s (%dx%d scaled at %.02f with insets %s)%s%s",
+                                bounds, displayMode.getWidth(), displayMode.getHeight(), scale, ScreenUtil.getScreenInsets(gc),
+                                (device == ge.getDefaultScreenDevice() ? ", default" : ""),
+                                (ideFrame != null && device == ideFrame.getGraphicsConfiguration().getDevice() ? ", IDE frame" : "")
+        ));
+      }
     }
 
     private @Nullable Project guessProjectDependingOnKey(String key) {
@@ -863,14 +951,27 @@ public class DialogWrapperPeerImpl extends DialogWrapperPeer {
         if (myDimensionServiceKey != null &&
             myInitialSize != null &&
             myOpened) { // myInitialSize can be null only if dialog is disposed before first showing
+          if (LOG.isDebugEnabled()) {
+            LOG.debug("Saving the bounds of a dialog titled '" + getTitle() + "', the monitor configuration is:");
+            logMonitorConfiguration();
+          }
           final Project projectGuess = guessProjectDependingOnKey(myDimensionServiceKey);
           // Save location
           Point location = getLocation();
           getWindowStateService(projectGuess).putLocation(myDimensionServiceKey, location);
+          if (LOG.isDebugEnabled()) {
+            LOG.debug("Saved location: " + location);
+          }
           // Save size
           Dimension size = getSize();
           if (!myInitialSize.equals(size)) {
             getWindowStateService(projectGuess).putSize(myDimensionServiceKey, size);
+            if (LOG.isDebugEnabled()) {
+              LOG.debug("Saved size: " + size + " (the initial size was " + myInitialSize + ")");
+            }
+          }
+          else if (LOG.isDebugEnabled()) {
+            LOG.debug("Didn't save size because it's the same as the initial size: " + size);
           }
           myOpened = false;
         }
@@ -918,7 +1019,7 @@ public class DialogWrapperPeerImpl extends DialogWrapperPeer {
         setGlassPane(new IdeGlassPaneImpl(this));
         myGlassPaneIsSet = true;
         putClientProperty("DIALOG_ROOT_PANE", true);
-        setBorder(UIManager.getBorder("Window.border"));
+        setBorder(JBUI.CurrentTheme.Window.getBorder(isUndecorated()));
       }
 
       @Override
@@ -1009,7 +1110,7 @@ public class DialogWrapperPeerImpl extends DialogWrapperPeer {
 
   @Override
   public void setContentPane(JComponent content) {
-    myDialog.setContentPane(IdeFrameDecorator.isCustomDecorationActive() && !isHeadlessEnv()
+    myDialog.setContentPane(IdeFrameDecorator.Companion.isCustomDecorationActive() && !isHeadlessEnv()
                                 ? CustomFrameDialogContent.Companion.getCustomContentHolder(getWindow(), content, false)
                                 : content);
   }
@@ -1030,12 +1131,6 @@ public class DialogWrapperPeerImpl extends DialogWrapperPeer {
 
     RegistryManager registryManager = getRegistryManager();
     return registryManager != null && registryManager.is("ide.perProjectModality");
-  }
-
-  public static boolean isDisableAutoRequestFocus() {
-    RegistryManager registryManager = getRegistryManager();
-    return (registryManager == null || registryManager.is("suppress.focus.stealing.disable.auto.request.focus"))
-           && !(SystemInfo.isXfce || SystemInfo.isI3);
   }
 
   private static @Nullable RegistryManager getRegistryManager() {

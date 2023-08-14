@@ -132,6 +132,11 @@ impl DefaultLaunchConfiguration {
 
         info!("{human_readable_name}: {result_string}");
 
+        if human_readable_name == "IDE config directory" && !specific_dir.exists(){
+            info!("Config folder does not exist, considering this the first launch. Will launch with New UI as default");
+            env::set_var("REMOTE_DEV_NEW_UI_ENABLED", "1");
+        }
+
         fs::create_dir_all(&specific_dir)?;
 
         Ok(specific_dir)
@@ -321,6 +326,8 @@ impl RemoteDevLaunchConfiguration {
                 match remote_dev_new_ui_enabled.as_str() {
                     "1" | "true" => {
                         info!("Force enable new UI");
+                        self.init_eap_registry_file_if_needed()?.write_all("\nide.experimental.ui\ntrue\n".as_bytes())
+                            .with_context(|| "Failed to write in 'early-access-registry.txt'")?;
                         remote_dev_properties.push(("ide.experimental.ui", "true"));
                     },
                     _ => {
@@ -330,6 +337,33 @@ impl RemoteDevLaunchConfiguration {
             }
             Err(_) => {
                 info!("Using ui config with default values");
+            }
+        }
+
+        let remote_dev_server_jcef_enabled = env::var("REMOTE_DEV_SERVER_JCEF_ENABLED").unwrap_or_default();
+
+        match remote_dev_server_jcef_enabled.to_lowercase().as_str() {
+            "1" | "true" => {
+                // todo: platform depended function which setup jcef
+                let _ = self.setup_jcef();
+
+                remote_dev_properties.push(("ide.browser.jcef.gpu.disable", "true"));
+                remote_dev_properties.push(("ide.browser.jcef.log.level", "warning"));
+                remote_dev_properties.push(("idea.suppress.statistics.report", "true"));
+            }
+            "0" | "false" | "" => {
+                if let Ok(trace_var) = env::var("REMOTE_DEV_SERVER_TRACE") {
+                    if !trace_var.is_empty() {
+                        info!("JCEF support is disabled. Set REMOTE_DEV_SERVER_JCEF_ENABLED=true to enable");
+                    }
+                }
+
+                // Disable JCEF support for now since it does not work in headless environment now
+                // Also see IDEA-241709
+                remote_dev_properties.push(("ide.browser.jcef.enabled", "false"));
+            }
+            _ => {
+                bail!("Unsupported value for 'REMOTE_DEV_SERVER_JCEF_ENABLED' variable: '{remote_dev_server_jcef_enabled:?}'")
             }
         }
 
@@ -448,6 +482,31 @@ impl RemoteDevLaunchConfiguration {
         Ok(trust_file_path)
     }
 
+    fn init_eap_registry_file_if_needed(&self) -> Result<File> {
+        let ij_host_config_dir = &self.config_dir;
+        let eap_registry_file_path = &ij_host_config_dir.join("early-access-registry.txt");
+
+        if eap_registry_file_path.exists() {
+            debug!("{eap_registry_file_path:?} exists");
+            return Ok(File::open(&eap_registry_file_path)?);
+        }
+
+        let eap_registry_file = File::create(eap_registry_file_path).with_context(|| format!("Failed to create {eap_registry_file_path:?}"))?;
+        debug!("File '{eap_registry_file:?}' has been created");
+
+        Ok(eap_registry_file)
+    }
+
+    #[cfg(target_os = "linux")]
+    fn setup_jcef(&self) -> Result<()> {
+        bail!("XVFB workarounds from linux are not ported yet");
+    }
+
+    #[cfg(not(target_os = "linux"))]
+    fn setup_jcef(&self) -> Result<()> {
+        bail!("jcef support not yet implemented");
+    }
+
     #[cfg(not(target_os = "linux"))]
     fn setup_font_config() -> Result<()> {
         Ok(())
@@ -478,8 +537,8 @@ impl std::fmt::Display for IjStarterCommand {
 
 fn get_known_intellij_commands() -> HashMap<&'static str, IjStarterCommand> {
     std::collections::HashMap::from([
-        ("run", IjStarterCommand {ij_command: "cwmHostNoLobby".to_string(), is_project_path_required: true, is_arguments_required: true}),
-        ("status", IjStarterCommand {ij_command: "cwmHostStatus".to_string(), is_project_path_required: false, is_arguments_required: false}),
+        ("run", IjStarterCommand {ij_command: "remoteDevHost".to_string(), is_project_path_required: true, is_arguments_required: true}),
+        ("status", IjStarterCommand {ij_command: "remoteDevStatus".to_string(), is_project_path_required: false, is_arguments_required: false}),
         ("cwmHostStatus", IjStarterCommand {ij_command: "cwmHostStatus".to_string(), is_project_path_required: false, is_arguments_required: false}),
         ("remoteDevStatus", IjStarterCommand {ij_command: "remoteDevStatus".to_string(), is_project_path_required: false, is_arguments_required: false}),
         ("dumpLaunchParameters", IjStarterCommand {ij_command: "dump-launch-parameters".to_string(), is_project_path_required: false, is_arguments_required: false}),
@@ -527,6 +586,7 @@ fn get_remote_dev_env_vars() -> RemoteDevEnvVars {
         RemoteDevEnvVar {name: "REMOTE_DEV_SERVER_USE_SELF_CONTAINED_LIBS".to_string(), description: "set to '0' to skip using bundled X11 and other linux libraries from plugins/remote-dev-server/selfcontained. Use everything from the system. by default bundled libraries are used".to_string()},
         RemoteDevEnvVar {name: "REMOTE_DEV_LAUNCHER_NAME_FOR_USAGE".to_string(), description: "set to any value to use as the script name in this output".to_string()},
         RemoteDevEnvVar {name: "REMOTE_DEV_TRUST_PROJECTS".to_string(), description: "set to any value to skip project trust warning (will execute build scripts automatically)".to_string()},
+        RemoteDevEnvVar {name: "REMOTE_DEV_NEW_UI_ENABLED".to_string(), description: "set to '1' to start with forced enabled new UI".to_string()},
         RemoteDevEnvVar {name: "REMOTE_DEV_NON_INTERACTIVE".to_string(), description: "set to any value to skip all interactive shell prompts (set automatically if running without TTY)".to_string()},
     ])
 }

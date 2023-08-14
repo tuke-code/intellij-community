@@ -136,17 +136,6 @@ interface KotlinUastResolveProviderService : BaseKotlinUastResolveProviderServic
         return baseKotlinConverter.createVarargsHolder(arguments, parent)
     }
 
-    override fun getImplicitReturn(ktLambdaExpression: KtLambdaExpression, parent: UElement): KotlinUImplicitReturnExpression? {
-        val lastExpression = ktLambdaExpression.bodyExpression?.statements?.lastOrNull() ?: return null
-        val context = lastExpression.analyze()
-        if (context[BindingContext.USED_AS_RESULT_OF_LAMBDA, lastExpression] == true) {
-            return KotlinUImplicitReturnExpression(parent).apply {
-                returnExpression = baseKotlinConverter.convertOrEmpty(lastExpression, this)
-            }
-        }
-        return null
-    }
-
     override fun getImplicitParameters(
         ktLambdaExpression: KtLambdaExpression,
         parent: UElement,
@@ -345,7 +334,7 @@ interface KotlinUastResolveProviderService : BaseKotlinUastResolveProviderServic
 
     override fun getReceiverType(ktCallElement: KtCallElement, source: UElement): PsiType? {
         val resolvedCall = ktCallElement.getResolvedCall(ktCallElement.analyze()) ?: return null
-        val receiver = resolvedCall.dispatchReceiver ?: resolvedCall.extensionReceiver ?: return null
+        val receiver = resolvedCall.extensionReceiver ?: resolvedCall.dispatchReceiver ?: return null
         return receiver.type.toPsiType(source, ktCallElement, PsiTypeConversionConfiguration.create(ktCallElement, isBoxed = true))
     }
 

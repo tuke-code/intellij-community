@@ -6,34 +6,41 @@ package org.jetbrains.sqlite
 import org.intellij.lang.annotations.Language
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.concurrent.CancellationException
+import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
 
+private val BEGIN_TRANSACTION = "begin transaction".encodeToByteArray()
 private val COMMIT = "commit".encodeToByteArray()
+private val ROLLBACK = "rollback".encodeToByteArray()
 
-class SqliteConnection(file: Path?, config: SQLiteConfig = SQLiteConfig()) : AutoCloseable {
+private val savepointNameGenerator = AtomicLong()
+
+class SqliteConnection(file: Path?, readOnly: Boolean = false) : AutoCloseable {
   private val dbRef = AtomicReference<NativeDB?>()
   private val lock = ReentrantLock()
 
   val isClosed: Boolean
     get() = dbRef.get() == null
 
-  private var currentBusyTimeout: Int
+  private val statementPoolList = mutableListOf<SqlStatementPool<*>>()
 
   init {
     file?.parent?.let { Files.createDirectories(it) }
     loadNativeDb()
     val db = NativeDB()
+    val filePath = file?.toAbsolutePath()?.normalize()?.toString()
     @Suppress("IfThenToElvis")
-    val status = db.open(if (file == null) ":memory:" else file.toAbsolutePath().normalize().toString(), config.openModeFlag) and 0xff
+    val status = db.open(if (filePath == null) ":memory:" else filePath,
+                         if (readOnly) SQLiteOpenMode.READONLY.flag else (SQLiteOpenMode.READWRITE.flag or SQLiteOpenMode.CREATE.flag)) and 0xff
     if (status != SqliteCodes.SQLITE_OK) {
-      throw SqliteDb.newException(status, "", null)
+      throw newException(status, filePath.orEmpty(), null)
     }
 
     try {
-      config.apply(db)
-      currentBusyTimeout = config.busyTimeout
+      SQLiteConfig().apply(db)
     }
     catch (e: Throwable) {
       try {
@@ -48,14 +55,54 @@ class SqliteConnection(file: Path?, config: SQLiteConfig = SQLiteConfig()) : Aut
     dbRef.set(db)
   }
 
+  fun <T : Binder> statementPool(@Language("SQLite") sql: String, binderProducer: () -> T): SqlStatementPool<T> {
+    return lock.withLock {
+      val pool = SqlStatementPool(sql = sql, connection = this, binderProducer = binderProducer)
+      statementPoolList.add(pool)
+      pool
+    }
+  }
+
   internal inline fun <T> useDb(task: (db: NativeDB) -> T): T {
+    if (dbRef.get() == null) {
+      throw AlreadyClosedException()
+    }
+
     lock.withLock {
       return task(getDb())
     }
   }
 
+  private fun getDb(): NativeDB {
+    return dbRef.get() ?: throw AlreadyClosedException()
+  }
+
+  // https://www.sqlite.org/lang_savepoint.html
+  fun <T> withSavePoint(task: () -> T): T {
+    // incremental prefix for easier debug
+    // use prefix `p` as name cannot start with a number
+    val name = "p" + savepointNameGenerator.getAndIncrement().toString() +
+               "_" +
+               java.lang.Long.toUnsignedString(System.currentTimeMillis(), Character.MAX_RADIX)
+    useDb { it.exec("savepoint $name".toByteArray()) }
+    var ok = false
+    try {
+      val result = task()
+      ok = true
+      return result
+    }
+    finally {
+      if (ok) {
+        useDb { it.exec("release savepoint $name".toByteArray()) }
+      }
+      else {
+        useDb { it.exec("rollback transaction to savepoint $name".toByteArray()) }
+      }
+    }
+  }
+
   fun <T : Binder> prepareStatement(@Language("SQLite") sql: String, binder: T): SqlitePreparedStatement<T> {
-    return SqlitePreparedStatement(connection = this, sql = sql.encodeToByteArray(), binder = binder)
+    return prepareStatement(sqlUtf8 = sql.encodeToByteArray(), binder = binder)
   }
 
   fun <T : Binder> prepareStatement(sqlUtf8: ByteArray, binder: T): SqlitePreparedStatement<T> {
@@ -97,33 +144,73 @@ class SqliteConnection(file: Path?, config: SQLiteConfig = SQLiteConfig()) : Aut
   }
 
   fun execute(@Language("SQLite") sql: String) {
-    getDb().exec(sql.encodeToByteArray())
+    useDb { it.exec(sql.encodeToByteArray()) }
   }
 
   fun execute(@Language("SQLite") sql: String, values: Any) {
     executeLifecycle<Unit>(sql.encodeToByteArray(), values) { _, _, _ -> }
   }
 
-  override fun close() {
+  fun interruptAndClose() {
+    val db = dbRef.getAndSet(null) ?: return
+    // not under lock - as we currently may hold the lock in another thread
+    db.interrupt()
     lock.withLock {
-      dbRef.getAndSet(null)?.close()
+      doClose(db)
     }
   }
 
-  private fun getDb(): NativeDB {
-    return requireNotNull(dbRef.get()) { "database connection closed" }
+  override fun close() {
+    val db = dbRef.getAndSet(null) ?: return
+    lock.withLock {
+      doClose(db)
+    }
+  }
+
+  private fun doClose(db: NativeDB) {
+    val pool = statementPoolList.toList()
+    statementPoolList.clear()
+
+    var error: Throwable? = null
+    for (item in pool) {
+      try {
+        item.close(db)
+      }
+      catch (e: Throwable) {
+        if (error == null) {
+          error = e
+        }
+        else {
+          error.addSuppressed(e)
+        }
+      }
+    }
+
+    try {
+      db.close()
+    }
+    catch (e: Throwable) {
+      if (error == null) {
+        error = e
+      }
+      else {
+        error.addSuppressed(e)
+      }
+    }
+
+    error?.let { throw it }
   }
 
   fun beginTransaction() {
-    execute("begin transaction")
+    useDb { it.exec(BEGIN_TRANSACTION) }
   }
 
   fun commit() {
-    getDb().exec(COMMIT)
+    useDb { it.exec(COMMIT) }
   }
 
   fun rollback() {
-    getDb().exec("rollback".encodeToByteArray())
+    useDb { it.exec(ROLLBACK) }
   }
 }
 
@@ -131,7 +218,7 @@ internal fun step(statementPointer: Long, sql: ByteArray, db: NativeDB): Boolean
   return when (val status = db.step(statementPointer) and 0xFF) {
     SqliteCodes.SQLITE_DONE -> true
     SqliteCodes.SQLITE_ROW -> false
-    else -> throw SqliteDb.newException(status, db.errmsg()!!, sql)
+    else -> throw newException(status, db.errmsg()!!, sql)
   }
 }
 
@@ -174,7 +261,7 @@ internal fun sqlBind(pointer: Long, index: Int, v: Any?, db: SqliteDb) {
   }
 }
 
-internal fun stepInBatch(statementPointer: Long, db: SqliteDb, batchIndex: Int) {
+internal fun stepInBatch(statementPointer: Long, db: NativeDB, batchIndex: Int) {
   val status = db.step(statementPointer)
   if (status != SqliteCodes.SQLITE_DONE) {
     db.reset(statementPointer)
@@ -186,3 +273,6 @@ internal fun stepInBatch(statementPointer: Long, db: SqliteDb, batchIndex: Int) 
     }
   }
 }
+
+class AlreadyClosedException : CancellationException()
+

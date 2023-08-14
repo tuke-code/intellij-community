@@ -65,13 +65,12 @@ public class LocalInspectionsPass extends ProgressableTextEditorHighlightingPass
 
   LocalInspectionsPass(@NotNull PsiFile file,
                        @NotNull Document document,
-                       int startOffset,
-                       int endOffset,
+                       @NotNull TextRange restrictRange,
                        @NotNull TextRange priorityRange,
                        boolean ignoreSuppressed,
                        @NotNull HighlightInfoProcessor highlightInfoProcessor,
                        boolean inspectInjectedPsi) {
-    super(file.getProject(), document, DaemonBundle.message("pass.inspection"), file, null, new TextRange(startOffset, endOffset), true, highlightInfoProcessor);
+    super(file.getProject(), document, DaemonBundle.message("pass.inspection"), file, null, restrictRange, true, highlightInfoProcessor);
     assert file.isPhysical() : "can't inspect non-physical file: " + file + "; " + file.getVirtualFile();
     myPriorityRange = priorityRange;
     myIgnoreSuppressed = ignoreSuppressed;
@@ -110,18 +109,20 @@ public class LocalInspectionsPass extends ProgressableTextEditorHighlightingPass
       InspectionRunner runner =
         new InspectionRunner(getFile(), myRestrictRange, myPriorityRange, myInspectInjectedPsi, true, progress, myIgnoreSuppressed,
                              myProfileWrapper, mySuppressedElements);
-      List<? extends InspectionRunner.InspectionContext> contexts = runner.inspect(toolWrappers, true,
+      List<? extends InspectionRunner.InspectionContext> contexts = runner.inspect(toolWrappers,
+                                                                                   myHighlightingSession.getMinimumSeverity(),
+                                                                                   true,
                                                                                    applyIncrementallyCallback,
                                                                                    afterInsideProcessedCallback,
                                                                                    afterOutsideProcessedCallback,
-                                                                                   wrapper -> !wrapper.getTool().isSuppressedFor(myFile));
+                                                                                         wrapper -> !wrapper.getTool().isSuppressedFor(myFile));
       ProgressManager.checkCanceled();
       myInfos = createHighlightsFromContexts(contexts);
     }
     BackgroundUpdateHighlightersUtil.setHighlightersToEditor(myProject, getFile(), myDocument, myRestrictRange.getStartOffset(), myRestrictRange.getEndOffset(), myInfos, getId());
   }
 
-  private static final TextAttributes NONEMPTY_TEXT_ATTRIBUTES = new UnmodifiableTextAttributes() {
+  private static final TextAttributes NONEMPTY_TEXT_ATTRIBUTES = new UnmodifiableTextAttributes(){
     @Override
     public boolean isEmpty() {
       return false;
@@ -185,7 +186,7 @@ public class LocalInspectionsPass extends ProgressableTextEditorHighlightingPass
         String reportingToolName = ((ProblemDescriptorWithReporterName)descriptor).getReportingToolName();
         toolWrapper = (LocalInspectionToolWrapper)myProfileWrapper.getInspectionTool(reportingToolName, psiElement);
       }
-      if (toolWrapper != null && psiElement != null && toolWrapper.getTool().isSuppressedFor(psiElement)) {
+      if (toolWrapper.getTool().isSuppressedFor(psiElement)) {
         registerSuppressedElements(psiElement, toolWrapper.getID(), toolWrapper.getAlternativeID(), mySuppressedElements);
         return;
       }
@@ -381,9 +382,8 @@ public class LocalInspectionsPass extends ProgressableTextEditorHighlightingPass
                                          @NotNull List<? extends IntentionAction> quickFixes,
                                          @NotNull String shortName) {
     HighlightDisplayKey key = HighlightDisplayKey.find(shortName);
-    String displayName = HighlightDisplayKey.getDisplayNameByKey(key);
     for (IntentionAction quickFix : quickFixes) {
-      builder.registerFix(quickFix, null, displayName, null, key);
+      builder.registerFix(quickFix, null, HighlightDisplayKey.getDisplayNameByKey(key), null, key);
     }
   }
 

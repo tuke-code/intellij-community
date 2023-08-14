@@ -19,8 +19,9 @@ object RemoveArgumentNamesUtils {
      * Returns arguments that are not named or can be unnamed, placed on their correct positions.
      * No arguments following vararg argument are returned.
      */
-    fun KtAnalysisSession.collectSortedArgumentsThatCanBeUnnamed(callElement: KtCallElement): ArgumentsData? {
-        val resolvedCall = callElement.resolveCall().singleFunctionCallOrNull() ?: return null
+    context(KtAnalysisSession)
+    fun collectSortedArgumentsThatCanBeUnnamed(callElement: KtCallElement): ArgumentsData? {
+        val resolvedCall = callElement.resolveCall()?.singleFunctionCallOrNull() ?: return null
         val valueArguments = callElement.valueArgumentList?.arguments ?: return null
 
         val argumentToParameterIndex = CallParameterInfoProvider.mapArgumentsToParameterIndices(

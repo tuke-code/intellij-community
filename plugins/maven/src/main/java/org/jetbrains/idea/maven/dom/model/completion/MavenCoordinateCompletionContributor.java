@@ -3,6 +3,7 @@ package org.jetbrains.idea.maven.dom.model.completion;
 
 import com.intellij.codeInsight.completion.*;
 import com.intellij.codeInsight.lookup.LookupElement;
+import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Key;
 import com.intellij.openapi.util.text.StringUtil;
@@ -21,6 +22,7 @@ import org.jetbrains.idea.maven.dom.model.completion.insert.MavenDependencyInser
 import org.jetbrains.idea.maven.onlinecompletion.model.MavenRepositoryArtifactInfo;
 import org.jetbrains.idea.maven.utils.MavenUtil;
 import org.jetbrains.idea.reposearch.DependencySearchService;
+import org.jetbrains.idea.reposearch.PoisonedRepositoryArtifactData;
 import org.jetbrains.idea.reposearch.RepositoryArtifactData;
 import org.jetbrains.idea.reposearch.SearchParameters;
 
@@ -70,11 +72,12 @@ public abstract class MavenCoordinateCompletionContributor extends CompletionCon
                              @NotNull Promise<Integer> promise,
                              @NotNull String completionPrefix) {
     while (promise.getState() == PENDING || !cld.isEmpty()) {
-      //ProgressManager.checkCanceled();
+      ProgressManager.checkCanceled();
       RepositoryArtifactData item = cld.poll();
       if (item instanceof MavenRepositoryArtifactInfo) {
         fillResult(coordinates, result, (MavenRepositoryArtifactInfo)item, completionPrefix);
       }
+      if (item == PoisonedRepositoryArtifactData.INSTANCE) break;
     }
   }
 

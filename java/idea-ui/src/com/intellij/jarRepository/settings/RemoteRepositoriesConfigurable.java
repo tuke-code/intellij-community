@@ -23,8 +23,8 @@ import com.intellij.ui.components.JBList;
 import com.intellij.ui.dsl.listCellRenderer.BuilderKt;
 import com.intellij.util.containers.ContainerUtil;
 import com.intellij.util.ui.JBUI;
-import com.intellij.workspaceModel.ide.WorkspaceModel;
-import com.intellij.workspaceModel.storage.MutableEntityStorage;
+import com.intellij.platform.backend.workspace.WorkspaceModel;
+import com.intellij.platform.workspace.storage.MutableEntityStorage;
 import org.jetbrains.annotations.Nls;
 import org.jetbrains.annotations.NonNls;
 import org.jetbrains.annotations.NotNull;
@@ -210,7 +210,7 @@ public class RemoteRepositoriesConfigurable implements SearchableConfigurable, C
                                                   final @NlsContexts.StatusText String emptyListHint, DataAdapter<T, String> adapter) {
     list.setModel(model);
     list.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-    list.setCellRenderer(BuilderKt.simpleListCellRenderer(adapter::toPresentation));
+    list.setCellRenderer(BuilderKt.textListCellRenderer(adapter::toPresentation));
     addButton.addActionListener(new ActionListener() {
       @Override
       public void actionPerformed(ActionEvent e) {

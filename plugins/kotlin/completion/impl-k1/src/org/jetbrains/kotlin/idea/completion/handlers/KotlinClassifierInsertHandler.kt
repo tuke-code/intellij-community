@@ -4,14 +4,13 @@ package org.jetbrains.kotlin.idea.completion.handlers
 
 import com.intellij.codeInsight.completion.InsertionContext
 import com.intellij.codeInsight.lookup.LookupElement
+import com.intellij.lang.jvm.JvmModifier
 import com.intellij.openapi.editor.Editor
+import com.intellij.openapi.util.registry.Registry
 import com.intellij.psi.PsiClass
 import com.intellij.psi.PsiDocumentManager
 import com.intellij.psi.util.parentOfType
-import org.jetbrains.kotlin.descriptors.ClassDescriptor
-import org.jetbrains.kotlin.descriptors.ClassKind
-import org.jetbrains.kotlin.descriptors.ClassifierDescriptor
-import org.jetbrains.kotlin.descriptors.DeclarationDescriptor
+import org.jetbrains.kotlin.descriptors.*
 import org.jetbrains.kotlin.idea.base.analysis.canAddRootPrefix
 import org.jetbrains.kotlin.idea.caches.resolve.allowResolveInDispatchThread
 import org.jetbrains.kotlin.idea.caches.resolve.analyze
@@ -23,14 +22,10 @@ import org.jetbrains.kotlin.idea.completion.smart.SMART_COMPLETION_ITEM_PRIORITY
 import org.jetbrains.kotlin.idea.completion.smart.SmartCompletionItemPriority
 import org.jetbrains.kotlin.idea.core.completion.DescriptorBasedDeclarationLookupObject
 import org.jetbrains.kotlin.idea.util.*
+import org.jetbrains.kotlin.idea.util.application.isUnitTestMode
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.name.FqNameUnsafe
-import org.jetbrains.kotlin.psi.KtElement
-import org.jetbrains.kotlin.psi.KtFile
-import org.jetbrains.kotlin.psi.KtNameReferenceExpression
-import org.jetbrains.kotlin.psi.KtSimpleNameExpression
-import org.jetbrains.kotlin.psi.KtSuperTypeEntry
-import org.jetbrains.kotlin.psi.KtTypeArgumentList
+import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.psi.psiUtil.getParentOfType
 import org.jetbrains.kotlin.renderer.render
 import org.jetbrains.kotlin.resolve.BindingContext
@@ -39,6 +34,7 @@ import org.jetbrains.kotlin.resolve.QualifiedExpressionResolver.Companion.ROOT_P
 import org.jetbrains.kotlin.resolve.lazy.BodyResolveMode
 import org.jetbrains.kotlin.util.unwrapIfTypeAlias
 import org.jetbrains.kotlin.utils.addToStdlib.safeAs
+import java.util.concurrent.ConcurrentHashMap
 
 object KotlinClassifierInsertHandler : BaseDeclarationInsertHandler() {
     override fun handleInsert(context: InsertionContext, item: LookupElement) {
@@ -126,9 +122,15 @@ object KotlinClassifierInsertHandler : BaseDeclarationInsertHandler() {
             position = file.findElementAt(context.startOffset)?.getParentOfType<KtElement>(strict = false) ?: file
         }
 
-        val expression = position as? KtSimpleNameExpression
-        if (expression != null) {
-            insertParentheses(item, expression, context)
+        if (isUnitTestMode() || Registry.`is`("kotlin.auto.completion.insert.constructor.parenthesis")) {
+            val expression = position as? KtSimpleNameExpression
+            if (expression != null) {
+                (expression.parent as? KtExpression)?.let {
+                    // avoid incomplete expressions like `super<Type` or `this<Type`
+                    if (it is KtBinaryExpression && (it.left is KtSuperExpression || it.left is KtThisExpression)) return
+                }
+                insertParentheses(item, expression, context)
+            }
         }
     }
 
@@ -156,47 +158,83 @@ object KotlinClassifierInsertHandler : BaseDeclarationInsertHandler() {
         ) return
 
         val lookupObject = item.`object` as DescriptorBasedDeclarationLookupObject
-        val descriptor: DeclarationDescriptor? = lookupObject.descriptor
 
-        if (descriptor != null) {
-            insertParenthesis(descriptor, editor, context)
+        val parenthesisConfig: ParenthesisConfig =
+            kotlinParenthesis(lookupObject) ?: javaParenthesis(lookupObject) ?: return
+
+        var parenthesesOffset: Int
+        val parenthesesText = buildString {
+            // add `<>` and put caret within then if ctor with some generics
+            if (parenthesisConfig.needInsertDiamonds) {
+                append("<>")
+                parenthesesOffset = 1
+            } else {
+                // otherwise put a caret within `()` if there is at least one non-empty ctor
+                // or, put a caret right after `()`
+                parenthesesOffset =
+                    if (parenthesisConfig.emptyParametersConstructor) {
+                        2
+                    } else {
+                        1
+                    }
+            }
+            append("()")
         }
+        val offset = editor.caretModel.offset
+        context.document.insertString(offset, parenthesesText)
+        editor.caretModel.moveToOffset(offset + parenthesesOffset)
+        PsiDocumentManager.getInstance(context.project).commitDocument(context.document)
     }
 
-    private fun insertParenthesis(
-        descriptor: DeclarationDescriptor,
-        editor: Editor,
-        context: InsertionContext
-    ) {
-        val classDescriptor = (descriptor.unwrapIfTypeAlias() as? ClassDescriptor)?.takeIf { it.kind == ClassKind.CLASS }
+    private data class ParenthesisConfig(
+        val needInsertDiamonds: Boolean,
+        val emptyParametersConstructor: Boolean
+    )
+
+    private fun kotlinParenthesis(lookupObject: DescriptorBasedDeclarationLookupObject): ParenthesisConfig? {
+        val descriptor: DeclarationDescriptor? = lookupObject.descriptor
+        val classDescriptor = (descriptor?.unwrapIfTypeAlias() as? ClassDescriptor)
+            ?.takeIf { it.kind == ClassKind.CLASS && it.modality != Modality.ABSTRACT } ?: return null
+        val constructors = classDescriptor.constructors
+        val publicVisibleConstructors = constructors.filter { it.visibility == DescriptorVisibilities.PUBLIC }
+        if (publicVisibleConstructors.isEmpty() && constructors.isNotEmpty()) return null
+
         val constructorsWithMinValueParams =
-            classDescriptor?.constructors?.minByOrNull { it.valueParameters.size }
+            constructors.minByOrNull { it.valueParameters.size }
+
+        var needInsertDiamonds = false
+        var emptyParametersConstructor = true
         if (constructorsWithMinValueParams != null) {
-            var parenthesesOffset = 0
-            val parenthesesText = buildString {
-                // add `<>` and put caret within then if ctor with some generics
-                if (constructorsWithMinValueParams.typeParameters.isNotEmpty()) {
-                    append("<>")
-                    parenthesesOffset = 1
-                } else {
-                    // otherwise put a caret within `()` if there is at least one non-empty ctor
-                    // or, put a caret right after `()`
-                    parenthesesOffset =
-                        if (constructorsWithMinValueParams.valueParameters.isNotEmpty() ||
-                            classDescriptor.constructors.any { it.valueParameters.isNotEmpty() }
-                        ) {
-                            1
-                        } else {
-                            2
-                        }
-                }
-                append("()")
+            if (constructorsWithMinValueParams.typeParameters.isNotEmpty()) {
+                needInsertDiamonds = true
+            } else if (constructorsWithMinValueParams.valueParameters.isNotEmpty() ||
+                constructors.any { it.valueParameters.isNotEmpty() }
+            ) {
+                emptyParametersConstructor = false
             }
-            val offset = editor.caretModel.offset
-            context.document.insertString(offset, parenthesesText)
-            editor.caretModel.moveToOffset(offset + parenthesesOffset)
-            PsiDocumentManager.getInstance(context.project).commitDocument(context.document)
         }
+
+        return ParenthesisConfig(needInsertDiamonds, emptyParametersConstructor)
+    }
+
+    private fun javaParenthesis(lookupObject: DescriptorBasedDeclarationLookupObject): ParenthesisConfig? {
+        val psiClass = lookupObject.psiElement as? PsiClass
+        if (psiClass == null || psiClass.isEnum || psiClass.isInterface) return null
+        val constructors = psiClass.constructors
+
+        val publicVisibleConstructors = constructors.filter { it.hasModifier(JvmModifier.PUBLIC) }
+        if (publicVisibleConstructors.isEmpty() && constructors.isNotEmpty()) return null
+
+        val constructorsWithMinValueParams = publicVisibleConstructors.minByOrNull { it.parameters.size }
+        var needInsertDiamonds = false
+        var emptyParametersConstructor = true
+        if (psiClass.typeParameters.isNotEmpty()) {
+            needInsertDiamonds = true
+        } else if (constructorsWithMinValueParams?.parameters?.isNotEmpty() == true || publicVisibleConstructors.any { it.parameters.isNotEmpty() }) {
+            emptyParametersConstructor = false
+        }
+
+        return ParenthesisConfig(needInsertDiamonds, emptyParametersConstructor)
     }
 
     private fun qualifiedName(lookupObject: DescriptorBasedDeclarationLookupObject): String {

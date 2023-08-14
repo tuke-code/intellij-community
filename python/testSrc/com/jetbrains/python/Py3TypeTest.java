@@ -19,7 +19,7 @@ public class Py3TypeTest extends PyTestCase {
 
   // PY-6702
   public void testYieldFromType() {
-    doTest("str | int | float",
+    doTest("LiteralString | int | float",
            """
              def subgen():
                  for i in [1, 2, 3]:
@@ -49,7 +49,7 @@ public class Py3TypeTest extends PyTestCase {
                  expr = yield from y
                  return expr
              """);
-    doTest("str",
+    doTest("LiteralString",
            """
              def a():
                  yield 1
@@ -611,7 +611,7 @@ public class Py3TypeTest extends PyTestCase {
 
   // PY-22513
   public void testGenericKwargs() {
-    doTest("dict[str, int | str]",
+    doTest("dict[str, int | LiteralString]",
            """
              from typing import Any, Dict, TypeVar
 
@@ -1132,13 +1132,13 @@ public class Py3TypeTest extends PyTestCase {
   }
 
   public void testFStringLiteralType() {
-    doTest("str",
+    doTest("LiteralString",
            "expr = f'foo'");
   }
 
   // PY-35885
   public void testFunctionDunderDoc() {
-    doTest("str",
+    doTest("LiteralString",
            """
              def example():
                  ""\"Example Docstring""\"
@@ -1575,9 +1575,9 @@ public class Py3TypeTest extends PyTestCase {
       """;
     myFixture.configureByText(PythonFileType.INSTANCE, text);
     PyExpression dict = myFixture.findElementByText("{'foo': self.foo}", PyExpression.class);
-    assertExpressionType("dict[str, Any]", dict);
+    assertExpressionType("dict[LiteralString, Any]", dict);
     final PyExpression expr = myFixture.findElementByText("expr", PyExpression.class);
-    assertExpressionType("dict[str, Any]", expr);
+    assertExpressionType("dict[LiteralString, Any]", expr);
   }
 
   public void testRecursiveDictTopDown() {
@@ -1590,9 +1590,9 @@ public class Py3TypeTest extends PyTestCase {
       """;
     myFixture.configureByText(PythonFileType.INSTANCE, text);
     final PyExpression expr = myFixture.findElementByText("expr", PyExpression.class);
-    assertExpressionType("dict[str, Any]", expr);
+    assertExpressionType("dict[LiteralString, Any]", expr);
     PyExpression dict = myFixture.findElementByText("{'foo': self.foo}", PyExpression.class);
-    assertExpressionType("dict[str, Any]", dict);
+    assertExpressionType("dict[LiteralString, Any]", dict);
   }
 
   // PY-52656
@@ -1621,7 +1621,7 @@ public class Py3TypeTest extends PyTestCase {
 
   // PY-16622
   public void testVariableEnumValueType() {
-    doTest("str",
+    doTest("LiteralString",
            """
              from enum import Enum
 
@@ -1719,7 +1719,7 @@ public class Py3TypeTest extends PyTestCase {
   public void testLiteralStringValidLocations() {
     runWithLanguageLevel(
       LanguageLevel.getLatest(),
-      () -> doTest("str",
+      () -> doTest("LiteralString",
                    """
                      from typing_extensions import LiteralString
                      def my_function(literal_string: LiteralString) -> LiteralString: ...
@@ -1729,7 +1729,7 @@ public class Py3TypeTest extends PyTestCase {
 
   // PY-59795
   public void testDictTypeFromValueModificationsConsidersOnlyRelevantAssignments() {
-    doTest("dict[str, int]",
+    doTest("dict[LiteralString, int]",
            """
              d = {}
              d['foo'] = 1
@@ -1765,6 +1765,406 @@ public class Py3TypeTest extends PyTestCase {
 
     assertProjectFilesNotParsed(expr.getContainingFile());
   }
+
+  // PY-53612
+  public void testLiteralStringConcatenation() {
+    doTest("LiteralString",
+           """
+             from typing_extensions import LiteralString
+             x: LiteralString
+             y: LiteralString
+             expr = x + y""");
+    doTest("str",
+           """
+             from typing_extensions import LiteralString
+             x: LiteralString
+             y: str
+             expr = x + y""");
+    doTest("str",
+           """
+             from typing_extensions import LiteralString
+             x: str
+             y: LiteralString
+             expr = x + y""");
+  }
+
+  // PY-53612
+  public void testLiteralStringJoin() {
+    doTest("LiteralString",
+           """
+             from typing_extensions import LiteralString
+             x: LiteralString
+             xs: list[LiteralString]
+             expr = x.join(xs)""");
+    doTest("str",
+           """
+             from typing_extensions import LiteralString
+             x: str
+             xs: list[LiteralString]
+             expr = x.join(xs)""");
+    doTest("str",
+           """
+             from typing_extensions import LiteralString
+             x: LiteralString
+             xs: list[str]
+             expr = x.join(xs)""");
+  }
+
+  // PY-53612
+  public void testLiteralStringInFString() {
+    doTest("LiteralString",
+           """
+             from typing_extensions import LiteralString
+             name = "foo"
+             age: LiteralString = "42"
+             expr = f"Hello, {name.capitalize()}. You are {age}."\s""");
+    doTest("str",
+           """
+             from typing_extensions import LiteralString
+             name = "foo"
+             age: str = str(42)
+             expr = f"Hello, {name.capitalize()}. You are {age}."\s""");
+  }
+
+  // PY-53612
+  public void testLiteralStringInStringFormat() {
+    doTest("LiteralString",
+           """
+             from typing_extensions import LiteralString
+             name: LiteralString = "foo"
+             age: LiteralString = "42"
+             string: LiteralString = "Hello, {name}. You are {age}"
+             expr = string.format(name=name.capitalize(), age=age)""");
+    doTest("str",
+           """
+             from typing_extensions import LiteralString
+             name: LiteralString = "foo"
+             age = str(42)
+             string: LiteralString = "Hello, {name}. You are {age}"
+             expr = string.format(name=name.capitalize(), age=age)""");
+  }
+
+  // PY-53612
+  public void testBinaryExprTypeWithLiteralString() {
+    doTest("int",
+           "expr = 1 + 2");
+    doTest("LiteralString",
+           "expr = '1' + '2'");
+    doTest("LiteralString",
+           "expr = '%s' % ('a')");
+    doTest("list[int]",
+           "expr = [1] + [2]");
+  }
+
+  // PY-53612
+  public void testDictTypeByModificationsWithLiteralString() {
+    doTest("dict[LiteralString, int | LiteralString]",
+           """
+             def f():
+                 expr = {'a': 3}
+                 expr['b'] = "s"
+                 """
+    );
+
+    doTest("dict[LiteralString, int | LiteralString]",
+           """
+             def f():
+                 expr = {'a': 3}
+                 expr['b'] = "s"
+                 """
+    );
+
+    doTest("dict[LiteralString, int | list[int]]",
+           """
+             def f():
+                 expr = {}
+                 expr['a'] = 0
+                 expr['c'] = [1, 2]"""
+    );
+
+    doTest("dict[LiteralString, int | Any]",
+           """
+             def f():
+                 expr = {'b': D()}
+                 expr['a'] = 2
+             """
+    );
+
+    doTest("dict[LiteralString, int | LiteralString]",
+           """
+             def f():
+                 expr = {'a': 3}
+                 expr['b'], t = "s", 12"""
+    );
+
+    doTest("dict[LiteralString, int | Any]",
+           """
+             def f():
+                 expr = {'a': 3}
+                 expr['a'] = var
+             """
+    );
+
+    doTest("dict[LiteralString, int]",
+           """
+             def f():
+                 expr = {'a': 3, 'b': 4}
+             """
+    );
+
+    doTest("dict[LiteralString, int | LiteralString]",
+           """
+             def f():
+                 expr = {'a': 3}
+                 expr.update({'a': 'str'})
+             """
+    );
+
+    doTest("dict[LiteralString, int | Any]",
+           """
+             def f():
+                 expr = {'a': 3}
+                 expr.update({'b': var})
+             """
+    );
+
+    doTest("dict[LiteralString, int]",
+           """
+             def f():
+                 expr = {}
+                 expr.update(a=1, b=2)"""
+    );
+
+    doTest("dict[int | LiteralString, int | LiteralString]",
+           """
+             def f():
+                 expr = {1: '3'}
+                 expr.update(a=1, b=2)"""
+    );
+
+    doTest("dict[LiteralString, int | LiteralString]",
+           """
+             def f():
+                 expr = {}
+                 expr['a'] = 23
+                 expr.update(a='m', b='n')"""
+    );
+
+    doTest("dict[LiteralString, int | LiteralString]",
+           """
+             def f():
+                 b, expr = 23, {'a': 3}
+                 expr['b'] = 'l'"""
+    );
+
+    doTest("dict[LiteralString, int]",
+           """
+             def f():    expr = {'a': 1}
+                 def inner():
+                     expr['b'] = 'a'
+             """
+    );
+  }
+
+  public void testTypeGuardList() {
+    doTest("list[str]",
+           """
+             from typing import List
+             from typing import TypeGuard
+                          
+                          
+             def is_str_list(val: List[object]) -> TypeGuard[List[str]]:
+                 return all(isinstance(x, str) for x in val)
+                          
+                          
+             def func1(val: List[object]):
+                 if is_str_list(val):
+                     expr = val
+             """);
+  }
+
+  public void testTypeGuardListInStringLiteral() {
+    doTest("list[str]",
+           """
+             from typing import List
+             from typing import TypeGuard
+                          
+                          
+             def is_str_list(val: List[object]) -> "TypeGuard[List[str]]":
+                 return all(isinstance(x, str) for x in val)
+                          
+                          
+             def func1(val: List[object]):
+                 if is_str_list(val):
+                     expr = val
+             """);
+  }
+
+
+  public void testTypeGuardListTypeIsNotChanged() {
+    doTest("list[object]",
+           """
+             from typing import List
+             from typing import TypeGuard
+                          
+                          
+             def is_str_list(val: List[object]) -> TypeGuard[List[str]]:
+                 return all(isinstance(x, str) for x in val)
+                          
+                          
+             def func1(val: List[object]):
+                 if is_str_list(val):
+                     pass
+                 else:
+                     expr = val
+             """);
+  }
+
+  public void testTypeGuardListNegation() {
+    doTest("list[str]",
+           """
+             from typing import List
+             from typing import TypeGuard
+                          
+                          
+             def is_str_list(val: List[object]) -> TypeGuard[List[str]]:
+                 return all(isinstance(x, str) for x in val)
+                          
+                          
+             def func1(val: List[object]):
+                 if not is_str_list(val):
+                     pass
+                 else:
+                     expr = val
+             """);
+  }
+
+  // PY-62078
+  public void ignoreTestTypeGuardAnnotation() {
+    doTest("list[str]",
+           """
+             from typing import List
+             from typing import TypeGuard
+                          
+                          
+             def is_str_list(val):
+                 # type: (List[object]) -> TypeGuard[List[str]]
+                 return all(isinstance(x, str) for x in val)
+                          
+                          
+             def func1(val: List[object]):
+                 if not is_str_list(val):
+                     pass
+                 else:
+                     expr = val
+             """);
+  }
+
+  public void testTypeGuardDidntChanged() {
+    doTest("list[object]",
+           """
+             from typing import List
+             from typing import TypeGuard
+                          
+                          
+             def is_str_list(val: List[object]) -> TypeGuard[List[str]]:
+                 return all(isinstance(x, str) for x in val)
+                          
+                          
+             def func1(val: List[object]):
+                 if not is_str_list(val):
+                     expr = val
+                 else:
+                     pass
+             """);
+  }
+
+  public void testTypeGuardDoubleCheck() {
+    doTest("Person",
+           """
+             from typing import TypeGuard
+             class Person(TypedDict):
+                 name: str
+                 age: int
+                                
+                                
+             def is_person(val: dict) -> TypeGuard[Person]:
+                 try:
+                     return isinstance(val["name"], str) and isinstance(val["age"], int)
+                 except KeyError:
+                     return False
+                                
+                                
+             def print_age(val: dict, val2: dict):
+                 if is_person(val) and is_person(val2):
+                     expr = val
+                 else:
+                     print("Not a person!")""");
+  }
+
+  public void testTypeGuardDoubleCheckNegation() {
+    doTest("Person",
+           """
+             from typing import TypeGuard
+             class Person(TypedDict):
+                 name: str
+                 age: int
+                                
+                                
+             def is_person(val: dict) -> TypeGuard[Person]:
+                 try:
+                     return isinstance(val["name"], str) and isinstance(val["age"], int)
+                 except KeyError:
+                     return False
+                                
+                                
+             def print_age(val: dict, val2: dict):
+                 if not is_person(val) or not is_person(val2):
+                     print("Not a person!");
+                 else:
+                     expr = val
+                     """);
+  }
+
+  public void testDictCallOnDictLiteralResult() {
+    doTest("dict[LiteralString, int]",
+           "expr = dict({'a': 1})");
+  }
+
+  // PY-27708
+  public void testDictCompExpressionWithGenerics() {
+    doTest("dict[str, (Any) -> Any]",
+           """
+              from typing import Callable, Dict, Any
+
+              def test(x: Dict[str, Callable[[Any], Any]]):
+                  y = {k: v for k, v in x.items()}
+                  expr = y
+                    
+             """);
+  }
+
+  public void testDictFromKWArgs() {
+    doTest("dict[str, Any]",
+           """
+             def test(**kwargs):
+                 expr = {k: v for k, v in kwargs.items()}
+             """);
+  }
+
+
+  // PY-27708
+  public void testSetCompExpressionWithGenerics() {
+    doTest("set[(Any) -> Any]",
+           """
+             from typing import Callable, Any, Set
+                                
+             def test(x: Set[Callable[[Any], Any]]):
+                 y = {k for k in x}
+                 expr = y
+             """);
+  }
+  
 
   private void doTest(final String expectedType, final String text) {
     myFixture.configureByText(PythonFileType.INSTANCE, text);

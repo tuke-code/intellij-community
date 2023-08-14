@@ -7,12 +7,6 @@
       <sourceFolder url="file://$MODULE_DIR$/testSrc" isTestSource="true" />
       <excludeFolder url="file://$MODULE_DIR$/testSrc/com/intellij/java/codeInspection/bytecodeAnalysis/precompiledData" />
     </content>
-    <content url="file://$MODULE_DIR$/../../plugins/InspectionGadgets/testsrc">
-      <sourceFolder url="file://$MODULE_DIR$/../../plugins/InspectionGadgets/testsrc" isTestSource="true" />
-    </content>
-    <content url="file://$MODULE_DIR$/../../plugins/IntentionPowerPak/testSrc">
-      <sourceFolder url="file://$MODULE_DIR$/../../plugins/IntentionPowerPak/testSrc" isTestSource="true" />
-    </content>
     <content url="file://$MODULE_DIR$/../../plugins/generate-tostring/testSrc">
       <sourceFolder url="file://$MODULE_DIR$/../../plugins/generate-tostring/testSrc" isTestSource="true" />
     </content>
@@ -64,7 +58,7 @@
     <orderEntry type="module" module-name="intellij.jvm.analysis.java.tests" scope="TEST" />
     <orderEntry type="module" module-name="intellij.platform.lvcs.impl" scope="TEST" />
     <orderEntry type="module" module-name="intellij.java.coverage" exported="" />
-    <orderEntry type="module" module-name="intellij.platform.workspaceModel.jps" scope="TEST" />
+    <orderEntry type="module" module-name="intellij.platform.workspace.jps" scope="TEST" />
     <orderEntry type="library" scope="TEST" name="jackson" level="project" />
     <orderEntry type="library" scope="TEST" name="jackson-databind" level="project" />
     <orderEntry type="library" scope="TEST" name="jackson-module-kotlin" level="project" />
@@ -87,5 +81,6 @@
     <orderEntry type="module" module-name="intellij.platform.testFramework.junit5" scope="TEST" />
     <orderEntry type="module" module-name="intellij.platform.ml" scope="TEST" />
     <orderEntry type="module" module-name="intellij.java.ide.customization" scope="TEST" />
+    <orderEntry type="module" module-name="intellij.platform.backend.workspace" scope="TEST" />
   </component>
 </module>

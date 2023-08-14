@@ -21,7 +21,7 @@ import com.intellij.openapi.util.Pair;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.openapi.vfs.LocalFileSystem;
 import com.intellij.openapi.vfs.VirtualFile;
-import com.intellij.platform.workspaceModel.jps.serialization.impl.ModulePath;
+import com.intellij.platform.workspace.jps.serialization.impl.ModulePath;
 import com.intellij.util.ArrayUtil;
 import com.intellij.util.ArrayUtilRt;
 import com.intellij.util.containers.ContainerUtil;
@@ -96,7 +96,9 @@ public class MavenProjectLegacyImporter extends MavenProjectImporterLegacyBase {
       hasChanges = true;
       StructuredIdeActivity createModulesPhase = MavenImportCollector.LEGACY_CREATE_MODULES_PHASE.startedWithParent(myProject, activity);
       extensionImporters.addAll(importModules());
-      scheduleRefreshResolvedArtifacts(postTasks, myProjectsToImportWithChanges.keySet());
+      if (!MavenUtil.isMavenUnitTestModeEnabled()) {
+        scheduleRefreshResolvedArtifacts(postTasks, myProjectsToImportWithChanges.keySet());
+      }
       createModulesPhase.finished();
     }
 

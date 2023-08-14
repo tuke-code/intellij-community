@@ -1,4 +1,4 @@
-// Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.openapi.wm.ex;
 
 import com.intellij.openapi.wm.ToolWindow;
@@ -6,14 +6,14 @@ import com.intellij.openapi.wm.ToolWindowManager;
 import com.intellij.util.messages.Topic;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
 import java.util.EventListener;
 import java.util.List;
 
 public interface ToolWindowManagerListener extends EventListener {
   @Topic.ProjectLevel
-  Topic<ToolWindowManagerListener> TOPIC = new Topic<>("tool window events", ToolWindowManagerListener.class, Topic.BroadcastDirection.NONE);
+  Topic<ToolWindowManagerListener> TOPIC =
+    new Topic<>("tool window events", ToolWindowManagerListener.class, Topic.BroadcastDirection.NONE);
 
   /**
    * @deprecated Use {@link #toolWindowsRegistered}
@@ -22,6 +22,9 @@ public interface ToolWindowManagerListener extends EventListener {
   default void toolWindowRegistered(@SuppressWarnings("unused") @NotNull String id) {
   }
 
+  /**
+   * WARNING: The listener MIGHT be called NOT ON EDT.
+   */
   default void toolWindowsRegistered(@NotNull List<String> ids, @NotNull ToolWindowManager toolWindowManager) {
     ids.forEach(this::toolWindowRegistered);
   }
@@ -39,7 +42,8 @@ public interface ToolWindowManagerListener extends EventListener {
     stateChanged();
   }
 
-  default void stateChanged(@NotNull ToolWindowManager toolWindowManager, @NotNull ToolWindowManagerListener.ToolWindowManagerEventType changeType) {
+  default void stateChanged(@NotNull ToolWindowManager toolWindowManager,
+                            @NotNull ToolWindowManagerListener.ToolWindowManagerEventType changeType) {
     stateChanged(toolWindowManager);
   }
 
@@ -78,6 +82,7 @@ public interface ToolWindowManagerListener extends EventListener {
   enum ToolWindowManagerEventType {
     ActivateToolWindow, HideToolWindow, RegisterToolWindow, SetContentUiType, SetLayout, SetShowStripeButton,
     SetSideTool, SetSideToolAndAnchor, SetToolWindowAnchor, SetToolWindowAutoHide, SetToolWindowType, SetVisibleOnLargeStripe,
-    ShowToolWindow, UnregisterToolWindow, ToolWindowAvailable, ToolWindowUnavailable, MovedOrResized
+    ShowToolWindow, UnregisterToolWindow, ToolWindowAvailable, ToolWindowUnavailable, MovedOrResized,
+    MoreButtonUpdated
   }
 }

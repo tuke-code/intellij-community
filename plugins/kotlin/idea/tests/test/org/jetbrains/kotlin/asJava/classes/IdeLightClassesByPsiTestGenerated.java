@@ -83,6 +83,11 @@ public abstract class IdeLightClassesByPsiTestGenerated extends AbstractIdeLight
             runTest(compilerTestData("compiler/testData/asJava/lightClasses/lightClassByPsi/facades/properties.kt"));
         }
 
+        @TestMetadata("reifiedInlineReturnsObject.kt")
+        public void testReifiedInlineReturnsObject() throws Exception {
+            runTest(compilerTestData("compiler/testData/asJava/lightClasses/lightClassByPsi/facades/reifiedInlineReturnsObject.kt"));
+        }
+
         @TestMetadata("simpleFunctions.kt")
         public void testSimpleFunctions() throws Exception {
             runTest(compilerTestData("compiler/testData/asJava/lightClasses/lightClassByPsi/facades/simpleFunctions.kt"));
@@ -204,6 +209,11 @@ public abstract class IdeLightClassesByPsiTestGenerated extends AbstractIdeLight
         @TestMetadata("defaultMethodInKotlinWithSettingAllCompatibility.kt")
         public void testDefaultMethodInKotlinWithSettingAllCompatibility() throws Exception {
             runTest(compilerTestData("compiler/testData/asJava/lightClasses/lightClassByPsi/defaultMethodInKotlinWithSettingAllCompatibility.kt"));
+        }
+
+        @TestMetadata("defaultParameterValue.kt")
+        public void testDefaultParameterValue() throws Exception {
+            runTest(compilerTestData("compiler/testData/asJava/lightClasses/lightClassByPsi/defaultParameterValue.kt"));
         }
 
         @TestMetadata("DelegatedProperty.kt")

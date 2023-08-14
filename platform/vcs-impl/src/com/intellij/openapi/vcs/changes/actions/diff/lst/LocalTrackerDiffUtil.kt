@@ -24,12 +24,13 @@ import com.intellij.openapi.editor.Document
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.editor.colors.EditorColors
 import com.intellij.openapi.editor.ex.EditorEx
-import com.intellij.openapi.editor.markup.HighlighterLayer
-import com.intellij.openapi.editor.markup.HighlighterTargetArea
-import com.intellij.openapi.editor.markup.LineMarkerRenderer
-import com.intellij.openapi.editor.markup.RangeHighlighter
+import com.intellij.openapi.editor.ex.MarkupModelEx
+import com.intellij.openapi.editor.impl.DocumentMarkupModel
+import com.intellij.openapi.editor.markup.*
 import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.project.DumbAwareAction
+import com.intellij.openapi.project.Project
+import com.intellij.openapi.util.NlsContexts
 import com.intellij.openapi.util.text.StringUtil
 import com.intellij.openapi.vcs.VcsBundle
 import com.intellij.openapi.vcs.changes.ChangeListManager
@@ -38,12 +39,14 @@ import com.intellij.openapi.vcs.impl.LineStatusTrackerManager
 import com.intellij.ui.DirtyUI
 import com.intellij.ui.InplaceButton
 import com.intellij.ui.scale.JBUIScale
+import com.intellij.util.CommonProcessors.FindProcessor
 import com.intellij.util.concurrency.annotations.RequiresWriteLock
 import com.intellij.util.ui.JBUI
 import org.jetbrains.annotations.Nls
 import java.awt.*
 import java.awt.event.ComponentAdapter
 import java.awt.event.ComponentEvent
+import java.awt.event.MouseEvent
 import java.util.*
 import javax.swing.Icon
 import javax.swing.JPanel
@@ -56,6 +59,7 @@ object LocalTrackerDiffUtil {
                          document1: Document,
                          document2: Document,
                          activeChangelistId: String,
+                         allowExcludeChangesFromCommit: Boolean,
                          textDiffProvider: TwosideTextDiffProvider,
                          indicator: ProgressIndicator,
                          handler: LocalTrackerDiffHandler): Runnable {
@@ -131,7 +135,7 @@ object LocalTrackerDiffUtil {
       val lineRange = linesRanges[i]
 
       val rangesFragmentData = LineFragmentData(activeChangelistId, localRange.changelistId, localRange.exclusionState)
-      if (rangesFragmentData.isPartiallyExcluded()) {
+      if (rangesFragmentData.isPartiallyExcluded() && allowExcludeChangesFromCommit) {
         val fragment = ComparisonManagerImpl.createLineFragment(lineRange.start1, lineRange.end1,
                                                                 lineRange.start2, lineRange.end2,
                                                                 lineOffsets1, lineOffsets2)
@@ -228,12 +232,18 @@ object LocalTrackerDiffUtil {
                                                                      HighlighterLayer.ADDITIONAL_SYNTAX,
                                                                      HighlighterTargetArea.LINES_IN_RANGE)
     val message = DiffBundle.message("action.presentation.diff.include.into.commit.text")
-    checkboxHighlighter.gutterIconRenderer = object : DiffGutterRenderer(icon, message) {
-      override fun handleMouseClick() {
-        onClick.run()
-      }
-    }
+    checkboxHighlighter.gutterIconRenderer = CheckboxDiffGutterRenderer(icon, message, onClick)
     return checkboxHighlighter
+  }
+
+  private class CheckboxDiffGutterRenderer(
+    icon: Icon,
+    tooltip: @NlsContexts.Tooltip String?,
+    val onClick: Runnable
+  ) : DiffGutterRenderer(icon, tooltip) {
+    override fun handleMouseClick() {
+      onClick.run()
+    }
   }
 
   @JvmStatic
@@ -284,22 +294,63 @@ object LocalTrackerDiffUtil {
   }
 
   @JvmStatic
-  fun createToggleAreaThumb(editor: EditorEx, line1: Int, line2: Int): RangeHighlighter {
+  fun createToggleAreaThumb(editor: EditorEx, line1: Int, line2: Int, onClick: Runnable): RangeHighlighter {
     val range = DiffUtil.getLinesRange(editor.document, line1, line2)
     val checkboxHighlighter = editor.markupModel.addRangeHighlighter(null, range.startOffset, range.endOffset,
                                                                      DiffDrawUtil.LST_LINE_MARKER_LAYER,
                                                                      HighlighterTargetArea.LINES_IN_RANGE)
-    checkboxHighlighter.lineMarkerRenderer = ToggleAreaThumbRenderer()
+    checkboxHighlighter.lineMarkerRenderer = ToggleAreaThumbRenderer(onClick)
     return checkboxHighlighter
   }
 
-  private class ToggleAreaThumbRenderer : LineMarkerRenderer {
-    override fun paint(editor: Editor, g: Graphics, r: Rectangle) {
+  @JvmStatic
+  fun hasIconHighlighters(project: Project?, editor: EditorEx, line: Int): Boolean {
+    if (hasIconHighlighters(editor, line, editor.markupModel)) return true
+
+    val documentModel = DocumentMarkupModel.forDocument(editor.document, project, false) as MarkupModelEx
+    return hasIconHighlighters(editor, line, documentModel)
+  }
+
+  private fun hasIconHighlighters(editor: EditorEx, line: Int, markupModelEx: MarkupModelEx): Boolean {
+    val processor = object : FindProcessor<RangeHighlighter>() {
+      override fun accept(it: RangeHighlighter): Boolean {
+        return it.getGutterIconRenderer() != null &&
+               it.editorFilter.avaliableIn(editor)
+      }
+    }
+
+    val document = editor.getDocument()
+    val start = document.getLineStartOffset(line)
+    val end = document.getLineEndOffset(line)
+    markupModelEx.processRangeHighlightersOverlappingWith(start, end, processor)
+    return processor.isFound
+  }
+
+  private class ToggleAreaThumbRenderer(val onClick: Runnable) : LineMarkerRenderer, ActiveGutterRenderer {
+    private fun getDrawArea(editor: Editor): Pair<Int, Int> {
       val gutter = (editor as EditorEx).gutterComponentEx
       val width = JBUIScale.scale(3)
       val x = gutter.whitespaceSeparatorOffset - width
+      return Pair(x, x + width)
+    }
+
+    override fun paint(editor: Editor, g: Graphics, r: Rectangle) {
+      val (x1, x2) = getDrawArea(editor)
       g.color = editor.colorsScheme.getColor(EditorColors.DIFF_BLOCK_AREA_HIGHLIGHT_MARKER) ?: return
-      g.fillRect(x, r.y, width, r.height)
+      g.fillRect(x1, r.y, x2 - x1, r.height)
+    }
+
+    override fun getTooltipText(): String {
+      return DiffBundle.message("action.presentation.diff.include.into.commit.area.marker.text")
+    }
+
+    override fun canDoAction(editor: Editor, e: MouseEvent): Boolean {
+      val (x1, x2) = getDrawArea(editor)
+      return e.x in x1 until x2
+    }
+
+    override fun doAction(editor: Editor, e: MouseEvent) {
+      onClick.run()
     }
   }
 
@@ -436,12 +487,22 @@ object LocalTrackerDiffUtil {
       }
 
       val affectedRanges = getAffectedRanges(selectedLines)
-      val isPartialBlockSelection = affectedRanges.isEmpty() || affectedRanges.any { isPartiallySelected(it, selectedLines) }
+      val isPartialBlockSelection = affectedRanges.any { isPartiallySelected(it, selectedLines) }
 
-      if (isPartialBlockSelection) {
+      if (affectedRanges.isEmpty()) {
         e.presentation.text = when {
           isExclude -> ActionsBundle.message("action.Vcs.Diff.ExcludeChangedLinesFromCommit.text")
           else -> ActionsBundle.message("action.Vcs.Diff.IncludeChangedLinesIntoCommit.text")
+        }
+        e.presentation.isEnabled = false
+      }
+      else if (isPartialBlockSelection) {
+        val willSplit = affectedRanges.any { it.exclusionState !is RangeExclusionState.Partial }
+        val rangesCount = if (willSplit) affectedRanges.size else 0
+        val selectionSize = (selectedLines.localLines?.cardinality() ?: 0) + (selectedLines.vcsLines?.cardinality() ?: 0)
+        e.presentation.text = when {
+          isExclude -> ActionsBundle.message("action.Vcs.Diff.ExcludeChangedLinesFromCommit.template.text", rangesCount, selectionSize)
+          else -> ActionsBundle.message("action.Vcs.Diff.IncludeChangedLinesIntoCommit.template.text", rangesCount, selectionSize)
         }
 
         e.presentation.isEnabled = affectedRanges.any {

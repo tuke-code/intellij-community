@@ -201,6 +201,16 @@ public class AttributesStorageOld implements AbstractAttributesStorage {
     return modCount.get();
   }
 
+  @Override
+  public boolean isEmpty() throws IOException {
+    lock.readLock().lock();
+    try{
+      return attributesBlobStorage.getLiveRecordsCount() == 0;
+    }finally {
+      lock.readLock().unlock();
+    }
+  }
+
 
   @Override
   public void checkAttributesStorageSanity(final @NotNull PersistentFSConnection connection,
@@ -507,11 +517,11 @@ public class AttributesStorageOld implements AbstractAttributesStorage {
         DataInputOutputUtil.writeINT(appender, encodedAttrId);
         int attrAddress = attributesBlobStorage.createNewRecord();
         DataInputOutputUtil.writeINT(appender, inlineAttributes ? attrAddress + INLINE_ATTRIBUTE_SMALLER_THAN : attrAddress);
-        PersistentFSConnection.REASONABLY_SMALL.myAttrPageRequested = true;
+        PersistentFSConnection.REASONABLY_SMALL.attrPageRequested = true;
         return attrAddress;
       }
       finally {
-        PersistentFSConnection.REASONABLY_SMALL.myAttrPageRequested = false;
+        PersistentFSConnection.REASONABLY_SMALL.attrPageRequested = false;
       }
     }
 

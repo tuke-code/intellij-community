@@ -1,4 +1,4 @@
-// Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.ide.customize.transferSettings.providers
 
 import com.intellij.ide.IdeBundle
@@ -9,7 +9,7 @@ import com.intellij.openapi.progress.Task
 import com.intellij.openapi.project.Project
 import com.intellij.util.application
 
-open class TransferSettingsPerformImportTask(project: Project,
+open class TransferSettingsPerformImportTask(project: Project?,
                                              private val performer: ImportPerformer,
                                              private var settings: Settings,
                                              private val shouldInstallPlugins: Boolean) : Task.Backgroundable(project,
@@ -26,7 +26,7 @@ open class TransferSettingsPerformImportTask(project: Project,
       performer.installPlugins(project, requiredPlugins, indicator)
     }
 
-    settings = performer.patchSettingsAfterPluginInstallation(settings, PluginManagerCore.getPlugins().map { it.pluginId.idString }.toSet())
+    settings = performer.patchSettingsAfterPluginInstallation(settings, PluginManagerCore.plugins.map { it.pluginId.idString }.toSet())
 
     performer.perform(project, settings, indicator)
     indicator.isIndeterminate = true

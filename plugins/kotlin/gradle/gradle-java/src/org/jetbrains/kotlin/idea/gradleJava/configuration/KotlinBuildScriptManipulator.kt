@@ -17,9 +17,11 @@ import org.jetbrains.kotlin.idea.base.util.module
 import org.jetbrains.kotlin.idea.compiler.configuration.IdeKotlinVersion
 import org.jetbrains.kotlin.idea.configuration.*
 import org.jetbrains.kotlin.idea.gradleCodeInsightCommon.*
+import org.jetbrains.kotlin.idea.gradleTooling.capitalize
 import org.jetbrains.kotlin.idea.projectConfiguration.RepositoryDescription
 import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.psi.psiUtil.getChildrenOfType
+import org.jetbrains.kotlin.psi.psiUtil.startOffset
 import org.jetbrains.kotlin.resolve.ImportPath
 import org.jetbrains.kotlin.tools.projectWizard.Versions
 import org.jetbrains.kotlin.utils.addToStdlib.cast
@@ -60,8 +62,74 @@ class KotlinBuildScriptManipulator(
         return originalText != scriptFile.text
     }
 
-    override fun isKotlinConfiguredInBuildScript(): Boolean {
-        return scriptFile.getKotlinVersion() != null
+    override fun configureSettingsFile(pluginName: String, version: IdeKotlinVersion): Boolean {
+        val originalText = scriptFile.text
+        scriptFile.getOrCreatePluginManagementBlock()?.findOrCreateBlock("plugins")?.let {
+            if (it.findPluginInPluginsGroup(pluginName) == null) {
+                it.addExpressionIfMissing(
+                    "$pluginName version \"${version.artifactVersion}\""
+                ) as? KtCallExpression
+            }
+        }
+        return originalText != scriptFile.text
+    }
+
+    override fun getKotlinVersionFromBuildScript(): IdeKotlinVersion? {
+        return scriptFile.getKotlinVersion()
+    }
+
+    override fun findAndRemoveKotlinVersionFromBuildScript(): Boolean {
+        val pluginsBlock = scriptFile.findScriptInitializer("plugins")?.getBlock() ?: return false
+        val pluginExpression = pluginsBlock.findPluginExpressions {
+            it.isKotlinPluginIdentifier()
+        }
+        if (pluginExpression?.versionExpression != null) {
+            pluginExpression.entireExpression.replace(pluginExpression.callExpression)
+            return true
+        }
+        return false
+    }
+
+    override fun PsiElement.findParentBlock(name: String): PsiElement? {
+        val parent = PsiTreeUtil.findFirstParent(this) { elem ->
+            (elem is KtCallExpression && elem.calleeExpression?.text?.contains(name) == true) ||
+                    (elem is KtDotQualifiedExpression && elem.text?.contains(name) == true)
+        }
+        when (parent) {
+            is KtCallExpression -> {
+                return parent.getBlock()
+            }
+
+            is KtDotQualifiedExpression -> {
+                return parent
+            }
+
+            else -> {
+                return null
+            }
+        }
+    }
+
+    override fun PsiElement.getAllVariableStatements(variableName: String): List<PsiElement> {
+        val assignments = PsiTreeUtil.findChildrenOfType(this, KtBinaryExpression::class.java)
+            .filter { it.left?.text?.contains(variableName) == true && it.operationReference.text == "=" }
+
+        val setterName = "set${variableName.capitalize()}"
+        val setterCalls = PsiTreeUtil.findChildrenOfType(this, KtCallExpression::class.java)
+            .filter { it.calleeExpression?.text == setterName && it.valueArguments.size == 1 }
+
+        val propertyCalls = PsiTreeUtil.findChildrenOfType(this, KtDotQualifiedExpression::class.java)
+            .mapNotNull { stmt ->
+                if (!stmt.receiverExpression.text.contains(variableName)) return@mapNotNull null
+                val callExpression = stmt.selectorExpression as? KtCallExpression ?: return@mapNotNull null
+                if (callExpression.calleeExpression?.text?.contains("set") == true && callExpression.valueArguments.size == 1) {
+                    stmt
+                } else {
+                    null
+                }
+            }
+
+        return (assignments + setterCalls + propertyCalls).sortedBy { it.startOffset }
     }
 
     override fun configureBuildScripts(
@@ -70,11 +138,11 @@ class KotlinBuildScriptManipulator(
         stdlibArtifactName: String,
         addVersion: Boolean,
         version: IdeKotlinVersion,
-        jvmTarget: String?
-    ): ChangedFiles {
-        val originalText = scriptFile.text
+        jvmTarget: String?,
+        changedFiles: ChangedConfiguratorFiles
+    ) {
+        changedFiles.storeOriginalFileContent(scriptFile)
         val useNewSyntax = useNewSyntax(kotlinPluginName, gradleVersion)
-        val changedFiles = HashSet<PsiFile>()
         scriptFile.apply {
             if (useNewSyntax) {
                 createPluginInPluginsGroupIfMissing(kotlinPluginExpression, addVersion, version)
@@ -83,14 +151,11 @@ class KotlinBuildScriptManipulator(
                     val repository = getRepositoryForVersion(version)
                     if (repository != null) {
                         scriptFile.module?.getBuildScriptSettingsPsiFile()?.let {
-                            val originalSettingsText = it.text
+                            changedFiles.storeOriginalFileContent(it)
                             with(GradleBuildScriptSupport.getManipulator(it)) {
                                 addPluginRepository(repository)
                                 addMavenCentralPluginRepository()
                                 addPluginRepository(DEFAULT_GRADLE_PLUGIN_REPOSITORY)
-                            }
-                            if (originalSettingsText != it.text) {
-                                changedFiles.add(it)
                             }
                         }
                     }
@@ -104,23 +169,16 @@ class KotlinBuildScriptManipulator(
                 addRepositoryIfMissing(version)
                 addMavenCentralIfMissing()
             }
-            jvmTarget?.let {
-                configureJvmTarget(it, version)?.let { settingsFile -> changedFiles.add(settingsFile) }
-            }
-        }
 
-        if (originalText != scriptFile.text) {
-            changedFiles.add(scriptFile)
+            configureToolchainOrKotlinOptions(jvmTarget, version, gradleVersion, changedFiles)
         }
-        return changedFiles
     }
 
     override fun changeLanguageFeatureConfiguration(
         feature: LanguageFeature,
         state: LanguageFeature.State,
         forTests: Boolean
-    ): PsiElement? =
-        scriptFile.changeLanguageFeatureConfiguration(feature, state, forTests)
+    ): PsiElement? = scriptFile.changeLanguageFeatureConfiguration(feature, state, forTests)
 
     override fun changeLanguageVersion(version: String, forTests: Boolean): PsiElement? =
         scriptFile.changeKotlinTaskParameter("languageVersion", version, forTests)
@@ -176,20 +234,21 @@ class KotlinBuildScriptManipulator(
 
     override fun getKotlinStdlibVersion(): String? = scriptFile.getKotlinStdlibVersion()
 
-    override fun addFoojayPlugin(): ChangedSettingsFile {
+    override fun addFoojayPlugin(changedFiles: ChangedConfiguratorFiles) {
         val settingsFile = scriptFile.module?.let {
             it.getTopLevelBuildScriptSettingsPsiFile() as? KtFile
-        } ?: return null
+        } ?: return
+        changedFiles.storeOriginalFileContent(settingsFile)
 
-        val originalText = settingsFile.text
+        if (!settingsFile.canBeConfigured()) {
+            return
+        }
 
-        val pluginBlock = settingsFile.getPluginsBlock() ?: return null
-        if (pluginBlock.findPluginInPluginsGroup("id(\"$FOOJAY_RESOLVER_NAME\")") != null) return null
-        if (pluginBlock.findPluginInPluginsGroup("id(\"$FOOJAY_RESOLVER_CONVENTION_NAME\")") != null) return null
+        val pluginBlock = settingsFile.getSettingsPluginsBlock() ?: return
+        if (pluginBlock.findPluginInPluginsGroup("id(\"$FOOJAY_RESOLVER_NAME\")") != null) return
+        if (pluginBlock.findPluginInPluginsGroup("id(\"$FOOJAY_RESOLVER_CONVENTION_NAME\")") != null) return
         val foojayVersion = Versions.GRADLE_PLUGINS.FOOJAY_VERSION
         pluginBlock.addExpressionIfMissing("id(\"$FOOJAY_RESOLVER_CONVENTION_NAME\") version \"$foojayVersion\"")
-
-        return if (originalText != settingsFile.text) settingsFile else null
     }
 
     private fun KtBlockExpression.addCompileStdlibIfMissing(stdlibArtifactName: String): KtCallExpression? =
@@ -203,7 +262,7 @@ class KotlinBuildScriptManipulator(
             ) as? KtCallExpression
 
     private fun addPluginRepositoryExpression(expression: String) {
-        scriptFile.getPluginManagementBlock()?.findOrCreateBlock("repositories")?.addExpressionIfMissing(expression)
+        scriptFile.getOrCreatePluginManagementBlock()?.findOrCreateBlock("repositories")?.addExpressionIfMissing(expression)
     }
 
     override fun addMavenCentralPluginRepository() {
@@ -216,7 +275,7 @@ class KotlinBuildScriptManipulator(
 
     override fun addResolutionStrategy(pluginId: String) {
         scriptFile
-            .getPluginManagementBlock()
+            .getOrCreatePluginManagementBlock()
             ?.findOrCreateBlock("resolutionStrategy")
             ?.findOrCreateBlock("eachPlugin")
             ?.addExpressionIfMissing(
@@ -228,36 +287,27 @@ class KotlinBuildScriptManipulator(
             )
     }
 
-    override fun configureJvmTarget(jvmTarget: String, version: IdeKotlinVersion): ChangedSettingsFile {
-        var changedSettingsFile: ChangedSettingsFile = null
-        addJdkSpec(jvmTarget, version, gradleVersion) { useToolchain, useToolchainHelper, targetVersionNumber ->
-            when {
-                useToolchainHelper -> {
-                    scriptFile.getKotlinBlock()?.addExpressionIfMissing("jvmToolchain($targetVersionNumber)")
-                    changedSettingsFile = addFoojayPlugin()
-                }
+    override fun addKotlinToolchain(targetVersionNumber: String) {
+        scriptFile.getKotlinBlock()?.addExpressionIfMissing("jvmToolchain($targetVersionNumber)")
+    }
 
-                useToolchain -> {
-                    scriptFile.getKotlinBlock()?.findOrCreateBlock("jvmToolchain")
-                        ?.addExpressionIfMissing("(this as JavaToolchainSpec).languageVersion.set(JavaLanguageVersion.of($targetVersionNumber))")
-                    changedSettingsFile = addFoojayPlugin()
-                }
+    override fun addKotlinExtendedDslToolchain(targetVersionNumber: String) {
+        scriptFile.getKotlinBlock()?.findOrCreateBlock("jvmToolchain")
+            ?.addExpressionIfMissing("(this as JavaToolchainSpec).languageVersion.set(JavaLanguageVersion.of($targetVersionNumber))")
+    }
 
-                else -> {
-                    scriptFile.changeKotlinTaskParameter("jvmTarget", targetVersionNumber, forTests = false)
-                    scriptFile.changeKotlinTaskParameter("jvmTarget", targetVersionNumber, forTests = true)
-                }
-            }
-        }
-        return changedSettingsFile
+    override fun changeKotlinTaskParameter(parameterName: String, parameterValue: String, forTests: Boolean): PsiElement? {
+        return scriptFile.changeKotlinTaskParameter(parameterName, parameterValue, forTests)
     }
 
     private fun KtBlockExpression.addNoVersionCompileStdlibIfMissing(stdlibArtifactName: String): KtCallExpression? =
         findStdLibDependency() ?: addExpressionIfMissing(
-            "implementation(${getKotlinModuleDependencySnippet(
-                stdlibArtifactName,
-                null
-            )})"
+            "implementation(${
+                getKotlinModuleDependencySnippet(
+                    stdlibArtifactName,
+                    null
+                )
+            })"
         ) as? KtCallExpression
 
     private fun KtFile.containsCompileStdLib(): Boolean =
@@ -278,7 +328,7 @@ class KotlinBuildScriptManipulator(
     private fun KtBlockExpression.findClassPathDependencyVersion(pluginName: String): String? {
         return PsiTreeUtil.getChildrenOfAnyType(this, KtCallExpression::class.java).mapNotNull {
             if (it?.calleeExpression?.text == "classpath") {
-                val dependencyName = it.valueArguments.firstOrNull()?.text?.removeSurrounding("\"")
+                val dependencyName = it.valueArguments.firstOrNull()?.text?.extractStringValue()
                 if (dependencyName?.startsWith(pluginName) == true) dependencyName.substringAfter("$pluginName:") else null
             } else null
         }.singleOrNull()
@@ -292,11 +342,12 @@ class KotlinBuildScriptManipulator(
         val receiverCalleeExpressionText = receiverCalleeExpression?.calleeExpression?.text?.trim()
         val receivedPluginName = when {
             receiverCalleeExpressionText == "id" ->
-                receiverCalleeExpression.valueArguments.firstOrNull()?.text?.trim()?.removeSurrounding("\"")
+                receiverCalleeExpression.valueArguments.firstOrNull()?.text?.trim()?.extractStringValue()
+
             operatorName == "version" -> receiverCalleeExpressionText
             else -> null
         }
-        val pluginVersionText = pluginVersion?.text?.trim()?.removeSurrounding("\"") ?: return null
+        val pluginVersionText = pluginVersion?.text?.trim()?.extractStringValue() ?: return null
 
         return receivedPluginName?.to(pluginVersionText)
     }
@@ -310,6 +361,7 @@ class KotlinBuildScriptManipulator(
                         it.right,
                         it.left as? KtCallExpression
                     )
+
                     is KtDotQualifiedExpression ->
                         (it.selectorExpression as? KtCallExpression)?.run {
                             getPluginInfoFromBuildScript(
@@ -318,34 +370,82 @@ class KotlinBuildScriptManipulator(
                                 it.receiverExpression as? KtCallExpression
                             )
                         }
+
                     else -> null
                 }
             }.toMap()
         return versionsToPluginNames.getOrDefault(pluginName, null)
     }
 
-    private fun KtBlockExpression.findPluginInPluginsGroup(pluginName: String): KtCallExpression? {
-        return PsiTreeUtil.getChildrenOfAnyType(
+    private fun String.extractStringValue(): String {
+        // Two steps because we want to keep parenthesis inside the string
+        return trim('(', ')', ' ', '\t').trim('"')
+    }
+
+    private fun KtBlockExpression.findPluginInPluginsGroup(pluginName: String): PluginExpression? {
+        return findPluginExpressions {
+            "${it.calleeExpression?.text?.trim() ?: ""}(${it.valueArguments.firstOrNull()?.text ?: ""})" == pluginName
+        }
+    }
+
+    private class PluginExpression(
+        val entireExpression: KtExpression,
+        val callExpression: KtCallExpression,
+        val versionExpression: KtExpression?
+    )
+
+    private fun KtBlockExpression.findPluginExpressions(pluginSelector: (KtCallExpression) -> Boolean): PluginExpression? {
+        PsiTreeUtil.getChildrenOfAnyType(
             this,
             KtCallExpression::class.java,
             KtBinaryExpression::class.java,
             KtDotQualifiedExpression::class.java
-        ).mapNotNull {
+        ).forEach {
             when (it) {
-                is KtCallExpression -> it
                 is KtBinaryExpression -> {
-                    if (it.operationReference.text == "version") it.left as? KtCallExpression else null
+                    val callExpression = it.left as? KtCallExpression ?: return@forEach
+                    if (it.operationReference.text != "version" || !callExpression.let(pluginSelector)) return@forEach
+                    return PluginExpression(it, callExpression, it.right)
                 }
+
                 is KtDotQualifiedExpression -> {
-                    if ((it.selectorExpression as? KtCallExpression)?.calleeExpression?.text == "version") {
-                        it.receiverExpression as? KtCallExpression
-                    } else null
+                    val selectorExpression = it.selectorExpression as? KtCallExpression ?: return@forEach
+                    if (selectorExpression.calleeExpression?.text != "version") return@forEach
+                    val callExpression = it.receiverExpression as? KtCallExpression ?: return@forEach
+                    if (!callExpression.let(pluginSelector)) return@forEach
+                    val versionExpression = selectorExpression.valueArguments.singleOrNull()?.getArgumentExpression() ?: return@forEach
+                    return PluginExpression(it, callExpression, versionExpression)
                 }
-                else -> null
+
+                is KtCallExpression -> {
+                    if (pluginSelector(it)) {
+                        return PluginExpression(it, it, null)
+                    }
+                }
             }
-        }.find {
-            "${it.calleeExpression?.text?.trim() ?: ""}(${it.valueArguments.firstOrNull()?.text ?: ""})" == pluginName
         }
+        return null
+    }
+
+    private fun KtCallExpression.isKotlinPluginIdentifier(): Boolean {
+        val valueArguments = valueArguments
+        if (valueArguments.size != 1) return false
+        val firstArgumentText = valueArguments.first().text.extractStringValue()
+        if (calleeExpression?.text == "id") {
+            return firstArgumentText == "org.jetbrains.kotlin.jvm"
+        } else if (calleeExpression?.text == "kotlin") {
+            return firstArgumentText == "jvm"
+        }
+        return false
+    }
+
+    override fun findKotlinPluginManagementVersion(): IdeKotlinVersion? {
+        val versionExpression = scriptFile.getPluginManagementBlock()
+            ?.findBlock("plugins")
+            ?.findPluginExpressions {
+                it.isKotlinPluginIdentifier()
+            }?.versionExpression ?: return null
+        return IdeKotlinVersion.opt(versionExpression.text.extractStringValue())
     }
 
     private fun KtFile.findScriptInitializer(startsWith: String): KtScriptInitializer? =
@@ -389,11 +489,14 @@ class KotlinBuildScriptManipulator(
             (calleeText == "kotlinModule" || calleeText == "kotlin") &&
                     valueArguments.firstOrNull()?.getArgumentExpression()?.text?.startsWith("\"stdlib") ?: false
         }
+
         is KtStringTemplateExpression -> text.startsWith("\"$STDLIB_ARTIFACT_PREFIX")
         else -> false
     }
 
-    private fun KtFile.getPluginManagementBlock(): KtBlockExpression? = findOrCreateScriptInitializer("pluginManagement", true)
+    private fun KtFile.getOrCreatePluginManagementBlock(): KtBlockExpression? = findOrCreateScriptInitializer("pluginManagement", true)
+
+    private fun KtFile.getPluginManagementBlock(): KtBlockExpression? = findScriptInitializer("pluginManagement")?.getBlock()
 
     private fun KtFile.getKotlinBlock(): KtBlockExpression? = findOrCreateScriptInitializer("kotlin")
 
@@ -405,13 +508,29 @@ class KotlinBuildScriptManipulator(
 
     private fun KtFile.getPluginsBlock(): KtBlockExpression? = findOrCreateScriptInitializer("plugins", true)
 
+    private fun KtFile.getSettingsPluginsBlock(): KtBlockExpression? {
+        val pluginsInitializer = findScriptInitializer("plugins")?.getBlock()
+        if (pluginsInitializer != null) {
+            return pluginsInitializer
+        } else {
+            val pluginManagementScriptInitializer = findScriptInitializer("pluginManagement")
+            return if (pluginManagementScriptInitializer != null) {
+                val pluginsScriptInitializer = psiFactory.createScriptInitializer("plugins {\n}")
+                val addedElement =
+                    script?.blockExpression?.addAfter(pluginsScriptInitializer, pluginManagementScriptInitializer) as? KtScriptInitializer
+                addedElement?.addNewLinesIfNeeded()
+                addedElement?.getBlock()
+            } else findOrCreateScriptInitializer("plugins", true)
+        }
+    }
+
     private fun KtFile.createPluginInPluginsGroupIfMissing(
         pluginName: String,
         addVersion: Boolean,
         version: IdeKotlinVersion
     ): KtCallExpression? =
         getPluginsBlock()?.let {
-            it.findPluginInPluginsGroup(pluginName)
+            it.findPluginInPluginsGroup(pluginName)?.callExpression
                 ?: it.addExpressionIfMissing(
                     if (addVersion) {
                         "$pluginName version \"${version.artifactVersion}\""

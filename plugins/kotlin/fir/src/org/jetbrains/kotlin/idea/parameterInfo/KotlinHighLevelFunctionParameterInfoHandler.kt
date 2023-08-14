@@ -242,7 +242,8 @@ abstract class KotlinHighLevelParameterInfoWithCallHandlerBase<TArgumentList : K
             .count { it.node.elementType == KtTokens.COMMA }
     }
 
-    private fun KtAnalysisSession.renderParameter(
+    context(KtAnalysisSession)
+    private fun renderParameter(
         parameter: KtVariableLikeSignature<KtValueParameterSymbol>,
         includeName: Boolean
     ): String {
@@ -481,11 +482,7 @@ abstract class KotlinHighLevelParameterInfoWithCallHandlerBase<TArgumentList : K
                     append(CodeInsightBundle.message("parameter.info.no.parameters"))
                 } else if (argumentIndex > SINGLE_LINE_PARAMETERS_COUNT) {
                     parameterDelimiterIndexes.forEach { offset ->
-                        val start = offset - 1
-                        val end = offset
-                        replace(start, end, "\n")
-                        if (start < highlightStartOffset) highlightStartOffset--
-                        if (start < highlightEndOffset) highlightEndOffset--
+                        replace(offset - 1, offset, "\n")
                     }
                 }
             }

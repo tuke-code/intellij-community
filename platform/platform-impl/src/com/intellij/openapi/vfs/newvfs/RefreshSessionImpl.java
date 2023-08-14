@@ -8,6 +8,7 @@ import com.intellij.openapi.application.*;
 import com.intellij.openapi.application.ex.ApplicationEx;
 import com.intellij.openapi.application.ex.ApplicationManagerEx;
 import com.intellij.openapi.diagnostic.Logger;
+import com.intellij.openapi.progress.util.ProgressIndicatorUtils;
 import com.intellij.openapi.progress.util.ProgressIndicatorWithDelayedPresentation;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.openapi.vfs.AsyncFileListener;
@@ -21,6 +22,7 @@ import com.intellij.openapi.vfs.newvfs.monitoring.VfsUsageCollector;
 import com.intellij.util.SystemProperties;
 import com.intellij.util.concurrency.Semaphore;
 import com.intellij.util.containers.ContainerUtil;
+import com.intellij.util.progress.CancellationUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -121,7 +123,7 @@ final class RefreshSessionImpl extends RefreshSession {
     if (myWorkQueue.isEmpty()) return;
     var workQueue = myWorkQueue;
     myWorkQueue = new ArrayList<>();
-    var forceRefresh = !myIsRecursive && !myIsAsync;  // shallow sync refresh (e.g. project config files on open)
+    var forceRefresh = !myIsRecursive && !myIsAsync;  // shallow sync refresh (e.g., project config files on open)
 
     var fs = LocalFileSystem.getInstance();
     if (!forceRefresh && fs instanceof LocalFileSystemImpl) {
@@ -249,7 +251,7 @@ final class RefreshSessionImpl extends RefreshSession {
   }
 
   void waitFor() {
-    mySemaphore.waitFor();
+    CancellationUtil.waitForMaybeCancellable(mySemaphore);
   }
 
   Semaphore getSemaphore() {

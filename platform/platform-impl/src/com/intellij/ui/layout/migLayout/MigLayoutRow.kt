@@ -3,17 +3,14 @@ package com.intellij.ui.layout.migLayout
 
 import com.intellij.icons.AllIcons
 import com.intellij.openapi.observable.properties.GraphProperty
-import com.intellij.openapi.ui.DialogPanel
 import com.intellij.openapi.ui.OnePixelDivider
 import com.intellij.openapi.ui.TextFieldWithBrowseButton
 import com.intellij.openapi.ui.ValidationInfo
 import com.intellij.openapi.ui.panel.ComponentPanelBuilder
 import com.intellij.openapi.util.NlsContexts
-import com.intellij.ui.HideableTitledSeparator
 import com.intellij.ui.SeparatorComponent
 import com.intellij.ui.TitledSeparator
 import com.intellij.ui.UIBundle
-import com.intellij.ui.components.DialogPanel
 import com.intellij.ui.components.JBRadioButton
 import com.intellij.ui.layout.*
 import com.intellij.util.SmartList
@@ -98,24 +95,6 @@ internal class MigLayoutRow(private val parent: MigLayoutRow?,
 
   private var isTrailingSeparator = false
   private var isComment = false
-
-  @ApiStatus.ScheduledForRemoval
-  @Deprecated("Use Kotlin UI DSL Version 2")
-  override fun withButtonGroup(title: String?, buttonGroup: ButtonGroup, body: () -> Unit) {
-    if (title != null) {
-      label(title)
-      gapAfter = "${spacing.radioGroupTitleVerticalGap}px!"
-    }
-    builder.withButtonGroup(buttonGroup, body)
-  }
-
-  override fun checkBoxGroup(title: String?, body: () -> Unit) {
-    if (title != null) {
-      label(title)
-      gapAfter = "${spacing.radioGroupTitleVerticalGap}px!"
-    }
-    body()
-  }
 
   override var enabled: Boolean = true
     set(value) {
@@ -274,10 +253,6 @@ internal class MigLayoutRow(private val parent: MigLayoutRow?,
     return createBlockRow(title, true, init)
   }
 
-  override fun blockRow(init: Row.() -> Unit): Row {
-    return createBlockRow(null, false, init)
-  }
-
   private fun createBlockRow(@NlsContexts.Separator title: String?, isSeparated: Boolean, init: Row.() -> Unit): Row {
     val parentRow = createChildRow(indent = indent, title = title, isSeparated = isSeparated, incrementsIndent = isSeparated)
     parentRow.init()
@@ -285,50 +260,6 @@ internal class MigLayoutRow(private val parent: MigLayoutRow?,
     result.internalPlaceholder()
     result.largeGapAfter()
     return result
-  }
-
-  override fun hideableRow(title: String, incrementsIndent: Boolean, init: Row.() -> Unit): Row {
-    val titledSeparator = HideableTitledSeparator(title)
-    val separatorRow = createChildRow()
-    separatorRow.addTitleComponent(titledSeparator, isEmpty = false)
-    builder.hideableRowNestingLevel++
-    try {
-      val panelRow = createChildRow(indent, incrementsIndent = incrementsIndent)
-      panelRow.init()
-      titledSeparator.row = panelRow
-      titledSeparator.collapse()
-      return panelRow
-    }
-    finally {
-      builder.hideableRowNestingLevel--
-    }
-  }
-
-  override fun nestedPanel(title: String?, init: LayoutBuilder.() -> Unit): CellBuilder<DialogPanel> {
-    val nestedBuilder = createLayoutBuilder()
-    nestedBuilder.init()
-
-    val panel = DialogPanel(title, layout = null)
-    nestedBuilder.builder.build(panel, arrayOf())
-
-    builder.validateCallbacks.addAll(nestedBuilder.builder.validateCallbacks)
-    builder.componentValidateCallbacks.putAll(nestedBuilder.builder.componentValidateCallbacks)
-    mergeCallbacks(builder.customValidationRequestors, nestedBuilder.builder.customValidationRequestors)
-    mergeCallbacks(builder.applyCallbacks, nestedBuilder.builder.applyCallbacks)
-    mergeCallbacks(builder.resetCallbacks, nestedBuilder.builder.resetCallbacks)
-    mergeCallbacks(builder.isModifiedCallbacks, nestedBuilder.builder.isModifiedCallbacks)
-
-    lateinit var panelBuilder: CellBuilder<DialogPanel>
-    row {
-      panelBuilder = panel(CCFlags.growX)
-    }
-    return panelBuilder
-  }
-
-  private fun <K, V> mergeCallbacks(map: MutableMap<K, MutableList<V>>, nestedMap: Map<K, List<V>>) {
-    for ((requestor, callbacks) in nestedMap) {
-      map.getOrPut(requestor) { mutableListOf() }.addAll(callbacks)
-    }
   }
 
   private fun getOrCreateSubRowsList(): MutableList<MigLayoutRow> {
@@ -403,10 +334,6 @@ internal class MigLayoutRow(private val parent: MigLayoutRow?,
       builder.componentConstraints.get(components.first())?.vertical?.gapBefore = builder.defaultComponentConstraintCreator.vertical1pxGap
     }
 
-    if (component is JRadioButton) {
-      builder.topButtonGroup?.add(component)
-    }
-
     builder.defaultComponentConstraintCreator.addGrowIfNeeded(cc, component, spacing)
 
     if (!noGrid && indent > 0 && components.size == 1) {
@@ -447,10 +374,6 @@ internal class MigLayoutRow(private val parent: MigLayoutRow?,
 
   private val JComponent.constraints: CC
     get() = builder.componentConstraints.getOrPut(this) { CC() }
-
-  fun addCommentRow(@Nls comment: String, maxLineLength: Int, forComponent: Boolean) {
-    addCommentRow(comment, maxLineLength, forComponent, null)
-  }
 
   // not using @JvmOverloads to maintain binary compatibility
   fun addCommentRow(@Nls comment: String, maxLineLength: Int, forComponent: Boolean, anchorComponent: JComponent?) {
@@ -670,13 +593,6 @@ private class CellBuilderImpl<T : JComponent>(
   override fun withLeftGap(): CellBuilder<T> {
     builder.updateComponentConstraints(viewComponent) {
       horizontal.gapBefore = gapToBoundSize(builder.spacing.horizontalGap, true)
-    }
-    return this
-  }
-
-  override fun withLeftGap(gapLeft: Int): CellBuilder<T> {
-    builder.updateComponentConstraints(viewComponent) {
-      horizontal.gapBefore = gapToBoundSize(gapLeft, true)
     }
     return this
   }

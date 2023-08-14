@@ -1,6 +1,7 @@
 // Copyright 2000-2021 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.diff.tools.simple;
 
+import com.intellij.codeWithMe.ClientId;
 import com.intellij.diff.DiffContext;
 import com.intellij.diff.actions.AllLinesIterator;
 import com.intellij.diff.actions.BufferedLineIterator;
@@ -24,6 +25,7 @@ import com.intellij.openapi.diff.DiffBundle;
 import com.intellij.openapi.diff.DiffNavigationContext;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
+import com.intellij.openapi.editor.ScrollType;
 import com.intellij.openapi.editor.event.DocumentEvent;
 import com.intellij.openapi.editor.ex.EditorEx;
 import com.intellij.openapi.progress.ProcessCanceledException;
@@ -164,8 +166,10 @@ public class SimpleDiffViewer extends TwosideTextDiffViewer implements Differenc
 
   @ApiStatus.Internal
   public boolean needAlignChanges() {
-    return Boolean.TRUE.equals(myRequest.getUserData(DiffUserDataKeys.ALIGNED_TWO_SIDED_DIFF))
-           || getTextSettings().isEnableAligningChangesMode();
+    Boolean forcedValue = myRequest.getUserData(DiffUserDataKeys.ALIGNED_TWO_SIDED_DIFF);
+    if (forcedValue != null) return Boolean.TRUE.equals(forcedValue);
+
+    return getTextSettings().isEnableAligningChangesMode();
   }
 
   @NotNull
@@ -309,7 +313,12 @@ public class SimpleDiffViewer extends TwosideTextDiffViewer implements Differenc
     DiffUtil.moveCaret(getEditor1(), line1);
     DiffUtil.moveCaret(getEditor2(), line2);
 
-    getSyncScrollSupport().makeVisible(getCurrentSide(), line1, endLine1, line2, endLine2, animated);
+    if (ClientId.isCurrentlyUnderLocalId()) {
+      getSyncScrollSupport().makeVisible(getCurrentSide(), line1, endLine1, line2, endLine2, animated);
+    }
+    else {
+      getCurrentEditor().getScrollingModel().scrollToCaret(ScrollType.CENTER);
+    }
   }
 
   protected boolean doScrollToContext(@NotNull DiffNavigationContext context) {

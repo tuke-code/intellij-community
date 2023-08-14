@@ -10,7 +10,7 @@ import com.intellij.openapi.application.contextModality
 import com.intellij.openapi.application.impl.LaterInvocator
 import com.intellij.openapi.application.impl.ModalCoroutineTest
 import com.intellij.openapi.application.impl.processApplicationQueue
-import com.intellij.util.timeoutRunBlocking
+import com.intellij.testFramework.common.timeoutRunBlocking
 import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Semaphore
 import org.junit.jupiter.api.Assertions.*
@@ -19,7 +19,7 @@ import org.junit.jupiter.api.assertThrows
 import kotlin.coroutines.ContinuationInterceptor
 
 /**
- * @see WithModalProgressBlockingTest
+ * @see RunWithModalProgressBlockingTest
  */
 class WithModalProgressTest : ModalCoroutineTest() {
 

@@ -1,4 +1,4 @@
-// Copyright 2000-2021 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
+// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.find.actions;
 
 import com.intellij.find.FindBundle;
@@ -21,7 +21,9 @@ import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import javax.accessibility.*;
+import javax.accessibility.Accessible;
+import javax.accessibility.AccessibleContext;
+import javax.accessibility.AccessibleTable;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import javax.swing.table.TableCellRenderer;
@@ -29,6 +31,7 @@ import javax.swing.table.TableColumnModel;
 import java.awt.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Predicate;
+
 
 @ApiStatus.Internal
 final class ShowUsagesTableCellRenderer implements TableCellRenderer {
@@ -53,7 +56,6 @@ final class ShowUsagesTableCellRenderer implements TableCellRenderer {
   private static final int FILE_GROUP_COL = 1;
   private static final int LINE_NUMBER_COL = 2;
   private static final int USAGE_TEXT_COL = 3;
-
   @MagicConstant(intValues = {CURRENT_ASTERISK_COL, FILE_GROUP_COL, LINE_NUMBER_COL, USAGE_TEXT_COL})
   private @interface UsageTableColumn {
   }
@@ -111,17 +113,11 @@ final class ShowUsagesTableCellRenderer implements TableCellRenderer {
     }
 
     // want to be able to right-align the "current" word
-    LayoutManager layout = column == USAGE_TEXT_COL
-                           ? new BorderLayout() : new FlowLayout(column == LINE_NUMBER_COL ? FlowLayout.RIGHT : FlowLayout.LEFT, 0, 0) {
-      @Override
-      public void layoutContainer(Container container) {
-        super.layoutContainer(container);
-        for (Component component : container.getComponents()) { // align inner components
-          Rectangle b = component.getBounds();
-          Insets insets = container.getInsets();
-          component.setBounds(b.x, b.y, b.width, container.getSize().height - insets.top - insets.bottom);
-        }
-      }
+    LayoutManager layout = switch (column) {
+      case USAGE_TEXT_COL -> new BorderLayout();
+      case LINE_NUMBER_COL -> new MyFlowLayout(FlowLayout.RIGHT, 0, 0);
+      case FILE_GROUP_COL -> new ClippingLayoutWrapper(new MyFlowLayout(FlowLayout.LEFT, 0, 0));
+      default -> new MyFlowLayout(FlowLayout.LEFT, 0, 0);
     };
 
     UsagePresentation presentation = usage.getPresentation();
@@ -134,7 +130,7 @@ final class ShowUsagesTableCellRenderer implements TableCellRenderer {
 
     SelectablePanel panel = new SelectablePanel() {
       @Override
-      public AccessibleContext getAccessibleContext() {
+      public @NotNull AccessibleContext getAccessibleContext() {
         AccessibleContext acc = super.getAccessibleContext();
         if (column == CURRENT_ASTERISK_COL) {
           acc.setAccessibleName(getAccessibleNameForRow(list, row, isOriginUsage));
@@ -163,7 +159,9 @@ final class ShowUsagesTableCellRenderer implements TableCellRenderer {
           panel.add(new JLabel(isSelected ? AllIcons.General.ModifiedSelected : AllIcons.General.Modified));
         }
       }
-      case FILE_GROUP_COL -> appendGroupText(list, (GroupNode)usageNode.getParent(), panel, fileBgColor, isSelected);
+      case FILE_GROUP_COL -> {
+        appendGroupText(list, (GroupNode)usageNode.getParent(), panel, fileBgColor, isSelected);
+      }
       case LINE_NUMBER_COL -> {
         SimpleColoredComponent textChunks = new SimpleColoredComponent();
         textChunks.setOpaque(false);
@@ -393,7 +391,12 @@ final class ShowUsagesTableCellRenderer implements TableCellRenderer {
       panel.setSelectionColor(rowSelectionBackground);
     }
     else {
-      panel.setBorder(JBUI.Borders.empty(MARGIN, MARGIN, MARGIN, 0));
+      if (column == CURRENT_ASTERISK_COL) {
+        panel.setBorder(JBUI.Borders.empty(MARGIN, MARGIN, MARGIN, 0));
+      }
+      else {
+        panel.setBorder(JBUI.Borders.empty(MARGIN, 0));
+      }
       panel.setBackground(rowSelectionBackground == null ? rowBackground : rowSelectionBackground);
     }
   }
@@ -442,5 +445,22 @@ final class ShowUsagesTableCellRenderer implements TableCellRenderer {
     private static JBInsets rectInsets() {
       return JBUI.insets(1, 6);
     }
+  }
+
+  private static class MyFlowLayout extends FlowLayout {
+    public MyFlowLayout(int align, int hgap, int vgap) {
+      super(align, hgap, vgap);
+    }
+
+    @Override
+    public void layoutContainer(Container container) {
+      super.layoutContainer(container);
+      for (Component component : container.getComponents()) { // align inner components
+        Rectangle b = component.getBounds();
+        Insets insets = container.getInsets();
+        component.setBounds(b.x, b.y, b.width, container.getSize().height - insets.top - insets.bottom);
+      }
+    }
+
   }
 }

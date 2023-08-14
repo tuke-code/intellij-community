@@ -14,6 +14,7 @@ import com.intellij.execution.configuration.PersistentAwareRunConfiguration
 import com.intellij.execution.configurations.*
 import com.intellij.execution.executors.DefaultRunExecutor
 import com.intellij.execution.runners.ProgramRunner
+import com.intellij.ide.DataManager
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.ReadAction
 import com.intellij.openapi.components.PathMacroManager
@@ -21,12 +22,15 @@ import com.intellij.openapi.components.PersistentStateComponent
 import com.intellij.openapi.components.impl.ProjectPathMacroManager
 import com.intellij.openapi.options.Scheme
 import com.intellij.openapi.options.SchemeState
+import com.intellij.openapi.progress.util.ProgressIndicatorUtils
 import com.intellij.openapi.util.*
 import com.intellij.openapi.util.text.StringUtil
 import com.intellij.util.PathUtilRt
 import com.intellij.util.SmartList
 import com.intellij.util.text.nullize
 import org.jdom.Element
+import org.jetbrains.annotations.TestOnly
+import org.jetbrains.concurrency.asCompletableFuture
 import org.jetbrains.jps.model.serialization.PathMacroUtil
 
 private const val RUNNER_ID = "RunnerId"
@@ -339,9 +343,14 @@ class RunnerAndConfigurationSettingsImpl @JvmOverloads constructor(
     val configuration = configuration
     var warning: RuntimeConfigurationException? = null
 
-    ReadAction.nonBlocking {
+     ReadAction.nonBlocking {
       try {
-        configuration.checkConfiguration()
+        val dataContextFromFocusAsync = DataManager.getInstance().dataContextFromFocusAsync
+        val dataContext = ProgressIndicatorUtils.awaitWithCheckCanceled(dataContextFromFocusAsync.asCompletableFuture())
+
+        ExecutionManagerImpl.withEnvironmentDataContext(dataContext).use {
+          configuration.checkConfiguration()
+        }
       }
       catch (e: RuntimeConfigurationException) {
         warning = e
@@ -600,7 +609,10 @@ class RunnerAndConfigurationSettingsImpl @JvmOverloads constructor(
 
 // always write method element for shared settings for now due to preserve backward compatibility
 private val RunnerAndConfigurationSettings.isNewSerializationAllowed: Boolean
-  get() = ApplicationManager.getApplication().isUnitTestMode || isStoredInLocalWorkspace
+  get() = ApplicationManager.getApplication().isUnitTestMode && writeDefaultAttributeWithFalseValueInTests || isStoredInLocalWorkspace
+
+@set:TestOnly
+var writeDefaultAttributeWithFalseValueInTests: Boolean = true
 
 fun serializeConfigurationInto(configuration: RunConfiguration, element: Element) {
   when (configuration) {

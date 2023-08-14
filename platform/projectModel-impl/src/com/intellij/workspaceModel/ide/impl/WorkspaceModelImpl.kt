@@ -1,4 +1,4 @@
-// Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.workspaceModel.ide.impl
 
 import com.intellij.diagnostic.StartUpMeasurer
@@ -6,29 +6,21 @@ import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.writeAction
 import com.intellij.openapi.components.serviceIfCreated
-import com.intellij.openapi.components.serviceOrNull
 import com.intellij.openapi.diagnostic.debug
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.extensions.ExtensionPointName
-import com.intellij.openapi.module.ModuleManager
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.roots.impl.libraries.ProjectLibraryTable
 import com.intellij.openapi.util.registry.Registry
+import com.intellij.platform.backend.workspace.*
 import com.intellij.platform.diagnostic.telemetry.helpers.addElapsedTimeMs
 import com.intellij.platform.diagnostic.telemetry.helpers.addMeasuredTimeMs
-import com.intellij.platform.jps.model.diagnostic.JpsMetrics
+import com.intellij.platform.workspace.storage.*
+import com.intellij.platform.workspace.storage.impl.VersionedEntityStorageImpl
+import com.intellij.platform.workspace.storage.impl.assertConsistency
 import com.intellij.serviceContainer.AlreadyDisposedException
 import com.intellij.workspaceModel.core.fileIndex.EntityStorageKind
 import com.intellij.workspaceModel.core.fileIndex.WorkspaceFileIndex
 import com.intellij.workspaceModel.core.fileIndex.impl.WorkspaceFileIndexImpl
-import com.intellij.workspaceModel.ide.*
-import com.intellij.workspaceModel.ide.impl.legacyBridge.library.GlobalLibraryTableBridgeImpl
-import com.intellij.workspaceModel.ide.impl.legacyBridge.library.ProjectLibraryTableBridgeImpl
-import com.intellij.workspaceModel.ide.impl.legacyBridge.module.ModuleManagerBridgeImpl
-import com.intellij.workspaceModel.ide.legacyBridge.GlobalLibraryTableBridge
-import com.intellij.workspaceModel.storage.*
-import com.intellij.workspaceModel.storage.impl.VersionedEntityStorageImpl
-import com.intellij.workspaceModel.storage.impl.assertConsistency
 import io.opentelemetry.api.metrics.Meter
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
@@ -40,8 +32,6 @@ import org.jetbrains.annotations.NonNls
 import org.jetbrains.annotations.TestOnly
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.system.measureTimeMillis
-
-val jpsMetrics: JpsMetrics by lazy { JpsMetrics.getInstance() }
 
 open class WorkspaceModelImpl(private val project: Project, private val cs: CoroutineScope) : WorkspaceModel, Disposable {
   @Volatile
@@ -131,6 +121,7 @@ open class WorkspaceModelImpl(private val project: Project, private val cs: Coro
     loadedFromCache = false
   }
 
+  @Synchronized
   final override fun updateProjectModel(description: @NonNls String, updater: (MutableEntityStorage) -> Unit) {
     ApplicationManager.getApplication().assertWriteAccessAllowed()
     checkRecursiveUpdate()
@@ -207,6 +198,8 @@ open class WorkspaceModelImpl(private val project: Project, private val cs: Coro
    *
    * This method runs without write action, so it causes different issues. We're going to deprecate this method, so it's better to avoid
    *   the use of this function.
+   *
+   * **N.B** For more information on why this and other methods were marked by Synchronized see IDEA-313151
    */
   @ApiStatus.Obsolete
   @Synchronized
@@ -294,6 +287,7 @@ open class WorkspaceModelImpl(private val project: Project, private val cs: Coro
     return BuilderSnapshot(current.version, current.storage)
   }
 
+  @Synchronized
   final override fun replaceProjectModel(replacement: StorageReplacement): Boolean {
     ApplicationManager.getApplication().assertWriteAccessAllowed()
 
@@ -315,16 +309,12 @@ open class WorkspaceModelImpl(private val project: Project, private val cs: Coro
     if (project.isDisposed) return
 
     initializeBridgesTimeMs.addMeasuredTimeMs {
-      logErrorOnEventHandling {
-        if (!GlobalLibraryTableBridge.isEnabled()) return@logErrorOnEventHandling
-        // To handle changes made directly in project level workspace model
-        (GlobalLibraryTableBridge.getInstance() as GlobalLibraryTableBridgeImpl).initializeLibraryBridges(change, builder)
-      }
-      logErrorOnEventHandling {
-        (project.serviceOrNull<ProjectLibraryTable>() as? ProjectLibraryTableBridgeImpl)?.initializeLibraryBridges(change, builder)
-      }
-      logErrorOnEventHandling {
-        (project.serviceOrNull<ModuleManager>() as? ModuleManagerBridgeImpl)?.initializeBridges(change, builder)
+      BridgeInitializer.EP_NAME.extensionList.forEach { bridgeInitializer ->
+        logErrorOnEventHandling {
+          if (bridgeInitializer.isEnabled()) {
+            bridgeInitializer.initializeBridges(project, change, builder)
+          }
+        }
       }
     }
   }
@@ -437,11 +427,11 @@ open class WorkspaceModelImpl(private val project: Project, private val cs: Coro
     private val initializeBridgesTimeMs: AtomicLong = AtomicLong()
 
     /**
-     * This setup is in static part because meters will not be collected if the same instrument (gauge, counter ...) are registered more then once.
+     * This setup is in static part because meters will not be collected if the same instrument (gauge, counter ...) are registered more than once.
      * In that case WARN by OpenTelemetry will be logged 'Instrument XYZ has recorded multiple values for the same attributes.'
      * https://github.com/airbytehq/airbyte-platform/pull/213/files
      */
-    private fun setupOpenTelemetryReporting(meter: Meter): Unit {
+    private fun setupOpenTelemetryReporting(meter: Meter) {
       val loadingTotalGauge = meter.gaugeBuilder("workspaceModel.loading.total.ms")
         .ofLongs().setDescription("Total time spent in method").buildObserver()
 
@@ -508,7 +498,7 @@ open class WorkspaceModelImpl(private val project: Project, private val cs: Coro
     }
 
     init {
-      setupOpenTelemetryReporting(jpsMetrics.meter)
+      setupOpenTelemetryReporting(workspaceMetrics.meter)
     }
   }
 }

@@ -3,6 +3,7 @@ package com.intellij.ide.ui
 
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.*
+import com.intellij.ui.scale.JBUIScale
 import com.intellij.util.FontUtil
 import com.intellij.util.xmlb.annotations.OptionTag
 import com.intellij.util.xmlb.annotations.Property
@@ -11,6 +12,8 @@ import java.awt.Font
 @Service(Service.Level.APP)
 @State(name = "NotRoamableUiSettings", storages = [(Storage(StoragePathMacros.NON_ROAMABLE_FILE))])
 class NotRoamableUiSettings : SerializablePersistentStateComponent<NotRoamableUiOptions>(NotRoamableUiOptions()) {
+  private var initialConfigurationLoaded = false
+  
   companion object {
     fun getInstance(): NotRoamableUiSettings = ApplicationManager.getApplication().service<NotRoamableUiSettings>()
   }
@@ -28,7 +31,7 @@ class NotRoamableUiSettings : SerializablePersistentStateComponent<NotRoamableUi
     }
 
   var fontFace: String?
-    get() = state.fontFace
+    get() = state.fontFace ?: JBUIScale.getSystemFontDataIfInitialized()?.first
     set(value) {
       updateState { it.copy(fontFace = value) }
     }
@@ -63,14 +66,20 @@ class NotRoamableUiSettings : SerializablePersistentStateComponent<NotRoamableUi
       updateState { it.copy(overrideLafFonts = value) }
     }
 
+  var experimentalSingleStripe: Boolean
+    get() = state.experimentalSingleStripe
+    set(value) {
+      updateState { it.copy(experimentalSingleStripe = value) }
+    }
+
   override fun loadState(state: NotRoamableUiOptions) {
     var fontSize = UISettings.restoreFontSize(state.fontSize, state.fontScale)
     if (fontSize <= 0) {
-      fontSize = UISettingsState.defFontSize
+      fontSize = getDefaultFontSize()
     }
     var ideScale = state.ideScale
     if (ideScale <= 0) {
-      ideScale = UISettingsState.defFontSize
+      ideScale = getDefaultFontSize()
     }
 
     super.loadState(state.copy(
@@ -79,33 +88,14 @@ class NotRoamableUiSettings : SerializablePersistentStateComponent<NotRoamableUi
     ))
 
     fixFontSettings()
+    if (initialConfigurationLoaded) {
+      UISettings.getInstance().fireUISettingsChanged()
+    }
+    initialConfigurationLoaded = true
   }
 
-  internal fun migratePresentationModeFontSize(presentationModeFontSize: Int) {
-    if (state.presentationModeIdeScale != 0f) {
-      return
-    }
-
-    if (presentationModeFontSize == 24) {
-      updateState {
-        it.copy(presentationModeIdeScale = UISettingsUtils.defaultScale(true))
-      }
-    }
-    else {
-      updateState {
-        it.copy(presentationModeIdeScale = presentationModeFontSize.toFloat() / it.fontSize)
-      }
-    }
-  }
-
-  internal fun migrateOverrideLafFonts(overrideLafFonts: Boolean) {
-    if (state.overrideLafFontsWasMigrated) {
-      return
-    }
-
-    updateState {
-      it.copy(overrideLafFontsWasMigrated = true, overrideLafFonts = overrideLafFonts)
-    }
+  override fun noStateLoaded() {
+    initialConfigurationLoaded = true
   }
 
   internal fun fixFontSettings() {
@@ -169,4 +159,14 @@ data class NotRoamableUiOptions(
   @JvmField
   @OptionTag
   val overrideLafFontsWasMigrated: Boolean = false,
+  @JvmField
+  @OptionTag
+  val experimentalSingleStripe: Boolean = false,
 )
+
+/**
+ * Returns the default font size scaled by #defFontScale
+ *
+ * @return the default scaled font size
+ */
+internal fun getDefaultFontSize(): Float = JBUIScale.DEF_SYSTEM_FONT_SIZE * UISettings.defFontScale

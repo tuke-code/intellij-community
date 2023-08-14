@@ -47,7 +47,6 @@ object KotlinPluginBuilder {
     "kotlin.base.scripting",
     "kotlin.base.analysis-api-providers",
     "kotlin.base.analysis",
-    "kotlin.base.highlighting",
     "kotlin.base.code-insight",
     "kotlin.base.jps",
     "kotlin.base.analysis-api.utils",
@@ -62,6 +61,7 @@ object KotlinPluginBuilder {
     "kotlin.base.fe10.highlighting",
     "kotlin.base.fe10.code-insight",
     "kotlin.base.fe10.obsolete-compat",
+    "kotlin.base.fe10.project-structure",
     "kotlin.core",
     "kotlin.idea",
     "kotlin.fir.frontend-independent",
@@ -122,7 +122,6 @@ object KotlinPluginBuilder {
     "kotlin.copyright",
     "kotlin.spellchecker",
     "kotlin.jvm-decompiler",
-    "kotlin.properties",
     "kotlin.j2k.post-processing",
     "kotlin.j2k.idea",
     "kotlin.j2k.old",
@@ -157,6 +156,7 @@ object KotlinPluginBuilder {
     "kotlin.features-trainer",
     "kotlin.base.fir.analysis-api-providers",
     "kotlin.base.fir.code-insight",
+    "kotlin.base.fir.project-structure",
     "kotlin.code-insight.api",
     "kotlin.code-insight.utils",
     "kotlin.code-insight.intentions-shared",
@@ -176,17 +176,21 @@ object KotlinPluginBuilder {
     "kotlin.code-insight.postfix-templates-k1",
     "kotlin.code-insight.postfix-templates-k2",
     "kotlin.code-insight.structural-search-k1",
+    "kotlin.code-insight.structural-search-k2",
     "kotlin.code-insight.line-markers-shared",
     "kotlin.code-insight.line-markers-k2",
     "kotlin.fir",
     "kotlin.searching.k2",
     "kotlin.searching.base",
-    "kotlin.highlighting",
+    "kotlin.highlighting.shared",
+    "kotlin.highlighting.k1",
+    "kotlin.highlighting.k2",
     "kotlin.uast.uast-kotlin-fir",
     "kotlin.uast.uast-kotlin-idea-fir",
     "kotlin.fir.fir-low-level-api-ide-impl",
     "kotlin.navigation",
     "kotlin.refactorings.common",
+    "kotlin.refactorings.introduce.k2",
     "kotlin.refactorings.k2",
     "kotlin.refactorings.move.k2",
     "kotlin.refactorings.rename.k2",
@@ -268,16 +272,27 @@ object KotlinPluginBuilder {
         spec.withProjectLibrary(library, LibraryPackMode.STANDALONE_MERGED)
       }
 
-      if (ultimateSources == KotlinUltimateSources.WITH_ULTIMATE_MODULES && kind == KotlinPluginKind.IJ) {
-        spec.withModules(persistentListOf(
-          "kotlin-ultimate.common-native",
-          //noinspection SpellCheckingInspection
-          "kotlin-ultimate.javascript.debugger",
-          "kotlin-ultimate.javascript.nodeJs",
-          "kotlin-ultimate.ultimate-plugin",
-          "kotlin-ultimate.ultimate-native",
-          "kotlin-ultimate.profiler",
-        ))
+      if (ultimateSources == KotlinUltimateSources.WITH_ULTIMATE_MODULES) {
+        val ultimateModules = when (kind) {
+          KotlinPluginKind.IJ -> persistentListOf(
+            "kotlin-ultimate.common-native",
+            "kotlin-ultimate.javascript.debugger",
+            "kotlin-ultimate.javascript.nodeJs",
+            "kotlin-ultimate.ultimate-plugin",
+            "kotlin-ultimate.ultimate-native",
+            "kotlin-ultimate.profiler",
+          )
+          KotlinPluginKind.Fleet -> persistentListOf(
+            "kotlin-ultimate.common-native",
+            "kotlin-ultimate.javascript.debugger",
+            "kotlin-ultimate.javascript.nodeJs",
+            "kotlin-ultimate.ultimate-fleet-plugin",
+            "kotlin-ultimate.ultimate-native",
+            //"kotlin-ultimate.profiler", FIXME: Causes perf problems in Fleet
+          )
+          else -> persistentListOf()
+        }
+        spec.withModules(ultimateModules)
       }
 
       val kotlincKotlinCompilerCommon = "kotlinc.kotlin-compiler-common"
@@ -318,7 +333,7 @@ object KotlinPluginBuilder {
 
       spec.withCustomVersion(object : PluginLayout.VersionEvaluator {
         override fun evaluate(pluginXml: Path, ideBuildVersion: String, context: BuildContext): String {
-          val ijBuildNumber = Pattern.compile("^(\\d+)\\.([\\d.]+|SNAPSHOT.*)\$").matcher(ideBuildVersion)
+          val ijBuildNumber = Pattern.compile("^(\\d+)\\.([\\d.]+|\\d+\\.SNAPSHOT.*)\$").matcher(ideBuildVersion)
           if (ijBuildNumber.matches()) {
             val major = ijBuildNumber.group(1)
             val minor = ijBuildNumber.group(2)
@@ -358,7 +373,7 @@ object KotlinPluginBuilder {
         }
 
         when (kind) {
-          KotlinPluginKind.IJ ->
+          KotlinPluginKind.IJ, KotlinPluginKind.Fleet ->
             //noinspection SpellCheckingInspection
             replace(
               text,
@@ -376,18 +391,23 @@ object KotlinPluginBuilder {
         }
       }
 
-      if (kind == KotlinPluginKind.IJ && ultimateSources == KotlinUltimateSources.WITH_ULTIMATE_MODULES) {
-        // TODO KTIJ-11539 change to `System.getenv("TEAMCITY_VERSION") == null` later but make sure
-        //  that `IdeaUltimateBuildTest.testBuild` passes on TeamCity
-        val skipIfDoesntExist = true
+      if (ultimateSources == KotlinUltimateSources.WITH_ULTIMATE_MODULES) {
+        when (kind) {
+          KotlinPluginKind.IJ, KotlinPluginKind.Fleet -> {
+            // TODO KTIJ-11539 change to `System.getenv("TEAMCITY_VERSION") == null` later but make sure
+            //  that `IdeaUltimateBuildTest.testBuild` passes on TeamCity
+            val skipIfDoesntExist = true
 
-        // Use 'DownloadAppCodeDependencies' run configuration to download LLDBFrontend
-        spec.withBin("../CIDR/cidr-debugger/bin/lldb/linux/bin/LLDBFrontend", "bin/linux", skipIfDoesntExist)
-        spec.withBin("../CIDR/cidr-debugger/bin/lldb/mac/LLDBFrontend", "bin/macos", skipIfDoesntExist)
-        spec.withBin("../CIDR/cidr-debugger/bin/lldb/win/x64/bin/LLDBFrontend.exe", "bin/windows", skipIfDoesntExist)
-        spec.withBin("../CIDR/cidr-debugger/bin/lldb/renderers", "bin/lldb/renderers")
+            // Use 'DownloadAppCodeDependencies' run configuration to download LLDBFrontend
+            spec.withBin("../CIDR/cidr-debugger/bin/lldb/linux/bin/LLDBFrontend", "bin/linux", skipIfDoesntExist)
+            spec.withBin("../CIDR/cidr-debugger/bin/lldb/mac/LLDBFrontend", "bin/macos", skipIfDoesntExist)
+            spec.withBin("../CIDR/cidr-debugger/bin/lldb/win/x64/bin/LLDBFrontend.exe", "bin/windows", skipIfDoesntExist)
+            spec.withBin("../CIDR/cidr-debugger/bin/lldb/renderers", "bin/lldb/renderers")
 
-        spec.withBin("../mobile-ide/common-native/scripts", "scripts")
+            spec.withBin("../mobile-ide/common-native/scripts", "scripts")
+          }
+          else -> {}
+        }
       }
     }
   }
@@ -416,6 +436,6 @@ object KotlinPluginBuilder {
   }
 
   enum class KotlinPluginKind {
-    IJ, AS, MI,
+    IJ, AS, MI, Fleet,
   }
 }

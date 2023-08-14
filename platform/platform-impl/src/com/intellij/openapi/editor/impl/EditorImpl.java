@@ -195,6 +195,7 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
   private boolean isReleased;
 
   private boolean mySuppressPainting;
+  private boolean mySuppressDisposedPainting;
 
   private @Nullable MouseEvent myMousePressedEvent;
   private @Nullable MouseEvent myMouseMovedEvent;
@@ -324,6 +325,9 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
   private CaretImpl myPrimaryCaret;
 
   public final boolean myDisableRtl = Registry.is("editor.disable.rtl");
+
+  public final boolean myUseInputMethodInlay = Registry.is("editor.input.method.inlay", false);
+
   /**
    * @deprecated use UISettings#getEditorFractionalMetricsHint instead
    */
@@ -829,6 +833,11 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
   @Override
   public void installPopupHandler(@NotNull EditorPopupHandler popupHandler) {
     myPopupHandlers.add(popupHandler);
+  }
+
+  @ApiStatus.Internal
+  public @NotNull List<EditorPopupHandler> getPopupHandlers() {
+    return myPopupHandlers;
   }
 
   @Override
@@ -1945,24 +1954,36 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
     mySuppressPainting = suppress;
   }
 
+  @ApiStatus.Internal
+  public void suppressDisposedPainting(boolean suppress) {
+    mySuppressDisposedPainting = suppress;
+  }
+
+  private boolean shouldPaint() {
+    return !isReleased && !mySuppressPainting;
+  }
+
+  private void fillPlaceholder(@NotNull Graphics2D g) {
+    Rectangle clip = g.getClipBounds();
+    if (clip == null) {
+      return;
+    }
+    Color bg = isReleased ? getDisposedBackground() : getBackgroundColor();
+    g.setColor(bg);
+    g.fillRect(clip.x, clip.y, clip.width, clip.height);
+  }
+
   void paint(@NotNull Graphics2D g) {
     ReadAction.run(() -> {
-      Rectangle clip = g.getClipBounds();
-
-      if (clip == null) {
-        return;
-      }
-
+      if (g.getClipBounds() == null) return;
       BufferedImage buffer = Registry.is("editor.dumb.mode.available") ? getUserData(BUFFER) : null;
       if (buffer != null) {
         Rectangle rect = getContentComponent().getVisibleRect();
         StartupUiUtil.drawImage(g, buffer, null, rect.x, rect.y);
         return;
       }
-
-      if (isReleased || mySuppressPainting) {
-        g.setColor(getDisposedBackground());
-        g.fillRect(clip.x, clip.y, clip.width, clip.height);
+      if (!shouldPaint()) {
+        fillPlaceholder(g);
         return;
       }
       if (myUpdateCursor && !myPurePaintingMode) {
@@ -1982,7 +2003,8 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
     });
   }
 
-  static @NotNull Color getDisposedBackground() {
+  @NotNull Color getDisposedBackground() {
+    if (mySuppressDisposedPainting) return getBackgroundColor();
     return new JBColor(new Color(128, 255, 128), new Color(128, 255, 128));
   }
 
@@ -1993,6 +2015,7 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
 
   @Override
   public void setHeaderComponent(JComponent header) {
+    JComponent oldComponent = getHeaderComponent();
     myHeaderPanel.removeAll();
     JComponent permanentHeader = getPermanentHeaderComponent();
     if (header == null) {
@@ -2005,6 +2028,7 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
       header = headerPanel;
     }
     if (header != null) {
+      myPropertyChangeSupport.firePropertyChange(PROP_HEADER_COMPONENT, oldComponent, header);
       myHeaderPanel.add(header);
     }
 
@@ -2113,7 +2137,9 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
 
   private boolean composedTextExists() {
     return myInputMethodRequestsHandler != null &&
-           myInputMethodRequestsHandler.composedRangeMarker != null;
+           (myInputMethodRequestsHandler.composedRangeMarker != null ||
+            myInputMethodRequestsHandler.inlayLeft != null ||
+            myInputMethodRequestsHandler.inlayRight != null);
   }
 
   @Override
@@ -2514,6 +2540,14 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
                                   ? myDocument.getLineStartOffset(myDragOnGutterSelectionStartLine) : myDocument.getTextLength());
       }
       myDragOnGutterSelectionStartLine = -1;
+    }
+
+    if (eventArea == EditorMouseEventArea.LINE_NUMBERS_AREA &&
+        NewUI.isEnabled() && EditorUtil.isBreakPointsOnLineNumbers() &&
+        getMouseSelectionState() != MOUSE_SELECTION_STATE_LINE_SELECTED) {
+      //IDEA-305975
+      selectLineAtCaret(true);
+      getGutterComponentEx().putClientProperty("active.line.number", null); //clear hovered breakpoint
     }
 
     boolean columnSelectionDragEvent = isColumnSelectionDragEvent(e);
@@ -3636,9 +3670,10 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
 
   private class MyInputMethodHandler implements InputMethodRequests {
     private RangeMarker composedRangeMarker;
+    private Inlay<?> inlayLeft, inlayRight;
 
     private @Nullable ProperTextRange getRange() {
-      if (composedRangeMarker == null) return null;
+      if (myUseInputMethodInlay || composedRangeMarker == null) return null;
       return new ProperTextRange(composedRangeMarker.getStartOffset(), composedRangeMarker.getEndOffset());
     }
 
@@ -3743,7 +3778,7 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
     @Override
     public int getCommittedTextLength() {
       int length = getDocument().getTextLength();
-      if (composedRangeMarker != null) {
+      if (!myUseInputMethodInlay && composedRangeMarker != null) {
         length -= composedRangeMarker.getEndOffset() - composedRangeMarker.getStartOffset();
       }
       return length;
@@ -3775,7 +3810,7 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
     }
 
     private void setInputMethodCaretPosition(@NotNull InputMethodEvent e) {
-      if (composedRangeMarker != null) {
+      if (!myUseInputMethodInlay && composedRangeMarker != null) {
         int dot = composedRangeMarker.getStartOffset();
 
         TextHitInfo caretPos = e.getCaret();
@@ -3826,8 +3861,16 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
       // old composed text deletion
       final Document doc = getDocument();
 
+      if (inlayLeft != null) {
+        Disposer.dispose(inlayLeft);
+        inlayLeft = null;
+      }
+      if (inlayRight != null) {
+        Disposer.dispose(inlayRight);
+        inlayRight = null;
+      }
       if (composedRangeMarker != null) {
-        if (!isViewer() && doc.isWritable()) {
+        if (!myUseInputMethodInlay && !isViewer() && doc.isWritable()) {
           int composedStartIndex = composedRangeMarker.getStartOffset();
           runUndoTransparent(() -> {
             if (composedRangeMarker.isValid()) {
@@ -3865,11 +3908,22 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
           int composedTextIndex = text.getIndex();
           if (composedTextIndex < text.getEndIndex()) {
             String composedString = createComposedString(composedTextIndex, text);
-
-            runUndoTransparent(() -> EditorModificationUtilEx.insertStringAtCaret(EditorImpl.this, composedString, false, false));
-
-            composedRangeMarker =
-              myDocument.createRangeMarker(getCaretModel().getOffset(), getCaretModel().getOffset() + composedString.length(), true);
+            if (myUseInputMethodInlay) {
+              var offset = getCaretModel().getPrimaryCaret().getOffset();
+              var caret = e.getCaret();
+              var leftLength = caret != null ? caret.getInsertionIndex() : 0;
+              if (leftLength > 0) {
+                inlayLeft = getInlayModel().addInlineElement(offset, false,
+                                                             new InputMethodInlayRenderer(composedString.substring(0, leftLength)));
+              }
+              if (leftLength < composedString.length()) {
+                inlayRight = getInlayModel().addInlineElement(offset, true,
+                                                              new InputMethodInlayRenderer(composedString.substring(leftLength)));
+              }
+            } else {
+              runUndoTransparent(() -> EditorModificationUtilEx.insertStringAtCaret(EditorImpl.this, composedString, false, false));
+              composedRangeMarker = myDocument.createRangeMarker(getCaretModel().getOffset(), getCaretModel().getOffset() + composedString.length(), true);
+            }
           }
         }
       }
@@ -4965,8 +5019,10 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
     private static final MouseEvent mouseEventStub = new MouseEvent(new Component() {}, 0, 0L, 0, 0, 0, 0, false, 0);
 
     private static EditorImpl getEditor(@NotNull JComponent comp) {
-      EditorComponentImpl editorComponent = (EditorComponentImpl)comp;
-      return editorComponent.getEditor();
+      if (comp instanceof EditorComponentImpl editorComponent) {
+        return editorComponent.getEditor();
+      }
+      return ((EditorGutterComponentImpl)comp).getEditor();
     }
 
     @Override

@@ -7,12 +7,14 @@ import com.intellij.notification.BrowseNotificationAction
 import com.intellij.notification.Notification
 import com.intellij.notification.NotificationGroupManager
 import com.intellij.notification.NotificationType
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.PersistentStateComponent
 import com.intellij.openapi.components.State
 import com.intellij.openapi.components.Storage
 import com.intellij.openapi.components.StoragePathMacros
 import com.intellij.openapi.externalSystem.service.project.IdeModifiableModelsProvider
 import com.intellij.openapi.module.Module
+import com.intellij.openapi.progress.runBlockingMaybeCancellable
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.roots.CompilerModuleExtension
 import com.intellij.openapi.roots.ModifiableRootModel
@@ -87,7 +89,8 @@ class KotlinMavenImporter : MavenImporter(KOTLIN_PLUGIN_GROUP_ID, KOTLIN_PLUGIN_
         changes: MavenProjectChanges,
         modifiableModelsProvider: IdeModifiableModelsProvider
     ) {
-        KotlinJpsPluginSettings.getInstance(module.project)?.dropExplicitVersion()
+        KotlinJpsPluginSettings.getInstance(module.project).dropExplicitVersion()
+
         module.project.putUserData(KOTLIN_JVM_TARGET_6_NOTIFICATION_DISPLAYED, null)
         module.project.putUserData(KOTLIN_JPS_VERSION_ACCUMULATOR, null)
     }
@@ -104,7 +107,9 @@ class KotlinMavenImporter : MavenImporter(KOTLIN_PLUGIN_GROUP_ID, KOTLIN_PLUGIN_
     ) {
 
         if (changes.hasPluginsChanges()) {
-            contributeSourceDirectories(mavenProject, module, rootModel)
+            if (module.name == mavenProjectToModuleName[mavenProject]) {
+                contributeSourceDirectories(mavenProject, module, rootModel)
+            }
         }
 
         val mavenPlugin = mavenProject.findKotlinMavenPlugin() ?: return
@@ -181,8 +186,12 @@ class KotlinMavenImporter : MavenImporter(KOTLIN_PLUGIN_GROUP_ID, KOTLIN_PLUGIN_
         val toBeDownloaded = artifacts.filter { it.libraryName in libraryNames }
 
         if (toBeDownloaded.isNotEmpty()) {
-            MavenProjectsManager.getInstance(module.project)
-                .downloadArtifactsSync(listOf(mavenProject), toBeDownloaded, true, false)
+            val manager = MavenProjectsManager.getInstance(module.project)
+            ApplicationManager.getApplication().executeOnPooledThread {
+                runBlockingMaybeCancellable {
+                    manager.downloadArtifacts(listOf(mavenProject), toBeDownloaded, true, false)
+                }
+            }
         }
     }
 

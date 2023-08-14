@@ -5,7 +5,6 @@ import com.intellij.CommonBundle;
 import com.intellij.diagnostic.LoadingState;
 import com.intellij.ide.HelpTooltip;
 import com.intellij.ide.actions.ActionsCollector;
-import com.intellij.ide.ui.UISettings;
 import com.intellij.idea.ActionsBundle;
 import com.intellij.internal.statistic.eventLog.FeatureUsageUiEventsKt;
 import com.intellij.openapi.Disposable;
@@ -93,6 +92,9 @@ public abstract class DialogWrapper {
   @ApiStatus.Internal
   public static final @NotNull String IS_VISUAL_PADDING_COMPENSATED_ON_COMPONENT_LEVEL_KEY = "isVisualPaddingCompensatedOnComponentLevel";
 
+  @ApiStatus.Internal
+  public static final @NotNull Key<Boolean> KEEP_POPUPS_OPEN = Key.create("KEEP_POPUPS_OPEN");
+
   /**
    * The default exit code for "OK" action.
    */
@@ -158,7 +160,6 @@ public abstract class DialogWrapper {
   private final List<JBOptionButton> myOptionsButtons = new ArrayList<>();
   private final Alarm myValidationAlarm = new Alarm(getValidationThreadToUse(), myDisposable);
 
-  private JComponent centerPanel;
   private boolean myClosed;
   private boolean myDisposed;
   private int myExitCode = CANCEL_EXIT_CODE;
@@ -183,6 +184,7 @@ public abstract class DialogWrapper {
   private ErrorText myErrorText;
   private int myValidationDelay = 300;
   private boolean myValidationStarted;
+  private boolean myKeepPopupsOpen;
 
   protected Action myOKAction;
   protected Action myCancelAction;
@@ -221,14 +223,18 @@ public abstract class DialogWrapper {
                           boolean canBeParent,
                           @NotNull IdeModalityType ideModalityType,
                           boolean createSouth) {
-    myPeer = parentComponent == null ? createPeer(project, canBeParent, project == null ? IdeModalityType.IDE : ideModalityType)
-                                     : createPeer(parentComponent, canBeParent);
+    myPeer = parentComponent == null
+             ? createPeer(project, canBeParent, project == null ? IdeModalityType.IDE : ideModalityType)
+             : createPeer(parentComponent, canBeParent);
     myCreateSouthSection = createSouth;
     initResizeListener();
     createDefaultActions();
-    if(myPeer.getWindow() != null && LoadingState.COMPONENTS_LOADED.isOccurred()) {
-      ToolbarUtil.setTransparentTitleBar(myPeer.getWindow(), myPeer.getRootPane(),
-                                         runnable -> Disposer.register(myDisposable, () -> runnable.run()));
+    if (myPeer.getWindow() != null && LoadingState.COMPONENTS_LOADED.isOccurred()) {
+      ToolbarService.Companion.getInstance().setTransparentTitleBar(myPeer.getWindow(), myPeer.getRootPane(),
+                                                                    runnable -> {
+                                                                      Disposer.register(myDisposable, () -> runnable.run());
+                                                                      return Unit.INSTANCE;
+                                                                    });
     }
   }
 
@@ -354,7 +360,7 @@ public abstract class DialogWrapper {
    * @return {@code false} to disable continuous validation
    */
   protected boolean continuousValidation() {
-    return true;
+    return myDialogPanel == null;
   }
 
   /**
@@ -387,7 +393,7 @@ public abstract class DialogWrapper {
     if (vi != null) {
       result.add(vi);
     }
-    var dialogPanel = getDialogPanel();
+    var dialogPanel = myDialogPanel;
     if (dialogPanel != null) {
       result.addAll(dialogPanel.validateAll());
     }
@@ -535,7 +541,7 @@ public abstract class DialogWrapper {
       }
     }
 
-    if (!UISettings.getShadowInstance().getAllowMergeButtons()) {
+    if (!Registry.is("ide.allow.merge.buttons", true)) {
       actions = flattenOptionsActions(actions);
       leftSideActions = flattenOptionsActions(leftSideActions);
     }
@@ -769,7 +775,7 @@ public abstract class DialogWrapper {
 
   public static @NotNull JButton createJButtonForAction(@NotNull Action action, @Nullable JRootPane rootPane) {
     JButton button;
-    if (action instanceof OptionAction optionAction && UISettings.getShadowInstance().getAllowMergeButtons()) {
+    if (action instanceof OptionAction optionAction && Registry.is("ide.allow.merge.buttons", true)) {
       JBOptionButton optionButton = new JBOptionButton(optionAction, optionAction.getOptions());
       optionButton.setOptionTooltipText(getDefaultTooltip());
       button = optionButton;
@@ -778,7 +784,7 @@ public abstract class DialogWrapper {
       button = action instanceof DialogWrapperAction ? new JButton(action) : new JButton(action) {
         @Override
         protected void fireActionPerformed(ActionEvent event) {
-          Window window = UIUtil.getWindow(this);
+          Window window = ComponentUtil.getWindow(this);
           DialogWrapper wrapper = window instanceof DialogWrapperDialog dwd ? dwd.getDialogWrapper() : null;
           if (wrapper != null && (wrapper.myClosed || wrapper.myPerformAction)) return;
           if (wrapper != null) wrapper.myPerformAction = true;
@@ -1310,7 +1316,7 @@ public abstract class DialogWrapper {
       centerSection.add(n, BorderLayout.NORTH);
     }
 
-    centerPanel = createCenterPanel();
+    JComponent centerPanel = createCenterPanel();
     if (centerPanel != null) {
       centerPanel.putClientProperty(DIALOG_CONTENT_PANEL_PROPERTY, true);
       centerSection.add(centerPanel, BorderLayout.CENTER);
@@ -1481,6 +1487,33 @@ public abstract class DialogWrapper {
     return myPeer.isModal();
   }
 
+  /**
+   * Checks if this dialog will keep previously opened popup open while it's showing.
+   *
+   * @see #setKeepPopupsOpen(boolean)
+   * @return the current value of the "keep popups open" flag
+   */
+  @ApiStatus.Experimental
+  public boolean isKeepPopupsOpen() {
+    return myKeepPopupsOpen;
+  }
+
+  /**
+   * Sets whether this dialog will keep previously opened popup open while it's showing.
+   *
+   * Some dialogs (e.g. Paste from History) can be invoked from a popup to perform
+   * a certain task and then get back to working with the popup. However, as popups
+   * normally disappear on losing focus, this doesn't work by default. Calling this
+   * method with the parameter set to {@code true} will override this behavior
+   * and keep all previously opened popups while the dialog is displayed.
+   *
+   * @param keepPopupsOpen whether to keep previously opened popups open
+   */
+  @ApiStatus.Experimental
+  public void setKeepPopupsOpen(boolean keepPopupsOpen) {
+    myKeepPopupsOpen = keepPopupsOpen;
+  }
+
   public void setOnDeactivationAction(@NotNull Runnable action) {
     myPeer.setOnDeactivationAction(myDisposable, action);
   }
@@ -1623,7 +1656,14 @@ public abstract class DialogWrapper {
    */
   @ApiStatus.Internal
   public void fitToScreen(Rectangle rect) {
+    Rectangle before = null;
+    if (LOG.isDebugEnabled()) {
+      before = new Rectangle(rect);
+    }
     ScreenUtil.fitToScreen(rect);
+    if (LOG.isDebugEnabled() && !Objects.equals(before, rect)) {
+      LOG.debug("Fitted these bounds to the screen: " + before + " -> " + rect);
+    }
   }
 
   @SuppressWarnings("unused")
@@ -1683,6 +1723,10 @@ public abstract class DialogWrapper {
       Disposer.register(uiParent, myDisposable); // ensure everything is disposed on app quit
     }
 
+    Window window = myPeer.getWindow();
+    if (window != null) {
+      ClientProperty.put(window, KEEP_POPUPS_OPEN, myKeepPopupsOpen);
+    }
     myPeer.show();
   }
 
@@ -1691,6 +1735,15 @@ public abstract class DialogWrapper {
    * Can return null. In that case dialog will be centered relative to its owner.
    */
   public @Nullable Point getInitialLocation() {
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Using " + (
+        myInitialLocationCallback != null
+        ? "the callback (" + myInitialLocationCallback + ")"
+        : myUserLocationSet
+        ? "the set bounds (" + myUserBounds + ")"
+        : "null"
+        ) + " to get the initial location");
+    }
     return myInitialLocationCallback != null
            ? myInitialLocationCallback.compute()
            : myUserLocationSet
@@ -2151,9 +2204,5 @@ public abstract class DialogWrapper {
   @Deprecated(forRemoval = true)
   public interface DoNotAskOption extends com.intellij.openapi.ui.DoNotAskOption {
     abstract class Adapter extends com.intellij.openapi.ui.DoNotAskOption.Adapter implements DoNotAskOption {}
-  }
-
-  private @Nullable DialogPanel getDialogPanel() {
-    return centerPanel instanceof DialogPanel ? ((DialogPanel)centerPanel) : null;
   }
 }

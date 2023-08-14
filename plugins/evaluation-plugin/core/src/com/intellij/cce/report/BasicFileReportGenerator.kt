@@ -1,7 +1,7 @@
+// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.cce.report
 
 import com.intellij.cce.core.Session
-import com.intellij.cce.metric.SuggestionsComparator
 import com.intellij.cce.workspace.info.FileEvaluationInfo
 import com.intellij.cce.workspace.storages.FeaturesStorage
 import kotlinx.html.*
@@ -9,7 +9,6 @@ import kotlinx.html.stream.createHTML
 import org.apache.commons.lang.StringEscapeUtils
 
 class BasicFileReportGenerator(
-  private val suggestionsComparators: List<SuggestionsComparator>,
   filterName: String,
   comparisonFilterName: String,
   featuresStorages: List<FeaturesStorage>,
@@ -69,11 +68,11 @@ class BasicFileReportGenerator(
         var shift = 0
         for (j in 0 until sessionGroup.lastIndex) {
           val subToken = if (center == 0) session.expectedText else session.expectedText.substring(shift, shift + center)
-          append(getSpan(sessionGroup[j], subToken, lookupOrder, suggestionsComparators[j]))
+          append(getSpan(sessionGroup[j], subToken, lookupOrder))
           append(delimiter)
           shift += center
         }
-        append(getSpan(sessionGroup.last(), session.expectedText.substring(shift), lookupOrder, suggestionsComparators.last()))
+        append(getSpan(sessionGroup.last(), session.expectedText.substring(shift), lookupOrder))
         offset = session.offset + session.expectedText.length
       }
       append(StringEscapeUtils.escapeHtml(text.substring(offset)))
@@ -81,13 +80,12 @@ class BasicFileReportGenerator(
     }
   }
 
-  private fun getSpan(session: Session?, text: String, lookupOrder: Int, suggestionsComparator: SuggestionsComparator): String =
+  private fun getSpan(session: Session?, text: String, lookupOrder: Int): String =
     createHTML().span("completion ${
       ReportColors.getColor(
         session,
         HtmlColorClasses,
-        lookupOrder,
-        suggestionsComparator
+        lookupOrder
       )
     }") {
       id = "${session?.id} $lookupOrder"

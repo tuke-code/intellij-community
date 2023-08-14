@@ -8,7 +8,6 @@ import com.intellij.idea.hideSplashBeforeShow
 import com.intellij.internal.statistic.eventLog.getUiEventLogger
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.MnemonicHelper
-import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.CommonShortcuts
 import com.intellij.openapi.actionSystem.ex.ActionUtil
 import com.intellij.openapi.application.*
@@ -24,8 +23,8 @@ import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.util.SystemInfoRt
 import com.intellij.openapi.wm.*
 import com.intellij.openapi.wm.impl.IdeGlassPaneImpl
-import com.intellij.openapi.wm.impl.IdeMenuBar
 import com.intellij.openapi.wm.impl.WindowManagerImpl
+import com.intellij.openapi.wm.impl.installAppMenuIfNeeded
 import com.intellij.openapi.wm.impl.status.IdeStatusBarImpl
 import com.intellij.openapi.wm.impl.welcomeScreen.cloneableProjects.CloneableProjectsService
 import com.intellij.ui.BalloonLayout
@@ -143,28 +142,17 @@ class WelcomeFrame : JFrame(), IdeFrame, AccessibleContextAccessor {
 
     @JvmStatic
     fun showNow() {
-      prepareToShow()?.run()
+      prepareToShow()?.invoke()
     }
 
-    fun prepareToShow(): Runnable? {
+    fun prepareToShow(): (() -> Unit)? {
       if (instance != null) {
         return null
       }
 
-      // ActionManager is used on Welcome Frame, but should be initialized in a pooled thread and not in EDT.
-      @Suppress("DEPRECATION")
-      ApplicationManager.getApplication().coroutineScope.launch {
-        blockingContext {
-          ActionManager.getInstance()
-          if (SystemInfoRt.isMac) {
-            TouchbarSupport.initialize()
-          }
-        }
-      }
-
-      return Runnable {
+      return task@{
         if (instance != null) {
-          return@Runnable
+          return@task
         }
 
         val frame = EP.lazySequence().mapNotNull { it.createFrame() }.firstOrNull()
@@ -173,7 +161,7 @@ class WelcomeFrame : JFrame(), IdeFrame, AccessibleContextAccessor {
         registerKeyboardShortcuts(jFrame.rootPane)
         hideSplashBeforeShow(jFrame)
         jFrame.isVisible = true
-        IdeMenuBar.installAppMenuIfNeeded(jFrame)
+        installAppMenuIfNeeded(jFrame)
         instance = frame
         if (SystemInfoRt.isMac) {
           touchbar = TouchbarSupport.showWindowActions(frame.component)
@@ -205,7 +193,7 @@ class WelcomeFrame : JFrame(), IdeFrame, AccessibleContextAccessor {
           val windowManager = WindowManager.getInstance() as WindowManagerImpl
           windowManager.disposeRootFrame()
           if (windowManager.projectFrameHelpers.isEmpty()) {
-            show.run()
+            show()
             lifecyclePublisher?.welcomeScreenDisplayed()
           }
         }

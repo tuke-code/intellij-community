@@ -7,23 +7,22 @@ import com.intellij.openapi.module.Module;
 import com.intellij.openapi.projectRoots.Sdk;
 import com.intellij.openapi.roots.ModuleRootManager;
 import com.intellij.openapi.vfs.VirtualFile;
-import com.intellij.platform.workspaceModel.jps.JpsProjectFileEntitySource;
+import com.intellij.platform.backend.workspace.WorkspaceModel;
+import com.intellij.platform.workspace.jps.JpsProjectFileEntitySource;
+import com.intellij.platform.workspace.jps.entities.ModuleEntity;
+import com.intellij.platform.workspace.jps.entities.ModuleId;
+import com.intellij.platform.workspace.storage.EntitySource;
 import com.intellij.testFramework.PsiTestUtil;
-import com.intellij.testFramework.RunAll;
-import com.intellij.workspaceModel.ide.WorkspaceModel;
-import com.intellij.workspaceModel.storage.EntitySource;
-import com.intellij.workspaceModel.storage.bridgeEntities.ModuleEntity;
-import com.intellij.workspaceModel.storage.bridgeEntities.ModuleId;
 import org.jetbrains.idea.maven.project.MavenGeneralSettings;
 import org.jetbrains.idea.maven.project.MavenProject;
-import org.jetbrains.idea.maven.utils.MavenUtil;
-import org.junit.Assume;
 import org.junit.Test;
 
 import java.io.File;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
+
+import static org.junit.Assume.assumeTrue;
 
 public class StructureImportingTest extends MavenMultiVersionImportingTestCase {
 
@@ -178,7 +177,7 @@ public class StructureImportingTest extends MavenMultiVersionImportingTestCase {
    */
   @Test
   public void testImportWithAlreadyExistingModuleWithDifferentNameButSameContentRoot() throws IOException {
-    Assume.assumeTrue(isWorkspaceImport());
+    assumeTrue(isWorkspaceImport());
 
     Module userModuleWithConflictingRoot = createModule("userModuleWithConflictingRoot");
     PsiTestUtil.removeAllRoots(userModuleWithConflictingRoot, null);
@@ -201,7 +200,7 @@ public class StructureImportingTest extends MavenMultiVersionImportingTestCase {
 
   @Test
   public void testImportWithAlreadyExistingModuleWithPartiallySameContentRoots() {
-    Assume.assumeTrue(isWorkspaceImport());
+    assumeTrue(isWorkspaceImport());
 
     Module userModuleWithConflictingRoot = createModule("userModuleWithConflictingRoot");
     PsiTestUtil.removeAllRoots(userModuleWithConflictingRoot, null);
@@ -530,6 +529,7 @@ public class StructureImportingTest extends MavenMultiVersionImportingTestCase {
 
   @Test
   public void testRecursiveParent() {
+    assumeTrue(isWorkspaceImport());
     createProjectPom("""
                        <parent>
                          <groupId>org.apache.maven.archetype.test</groupId>
@@ -950,7 +950,7 @@ public class StructureImportingTest extends MavenMultiVersionImportingTestCase {
 
   @Test
   public void testReleaseCompilerPropertyInPerSourceTypeModules() {
-    Assume.assumeTrue(isWorkspaceImport());
+    assumeTrue(isWorkspaceImport());
 
     importProject("""
                     <groupId>test</groupId>

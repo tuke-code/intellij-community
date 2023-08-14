@@ -1,4 +1,4 @@
-// Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.openapi.extensions.impl;
 
 import com.intellij.ReviseWhenPortedToJDK;
@@ -288,7 +288,7 @@ public abstract class ExtensionPointImpl<T extends @NotNull Object> implements E
 
   public final void processWithPluginDescriptor(boolean shouldBeSorted, @NotNull BiConsumer<? super T, ? super PluginDescriptor> consumer) {
     if (isInReadOnlyMode()) {
-      for (T extension : cachedExtensionsAsArray) {
+      for (T extension : Objects.requireNonNull(cachedExtensionsAsArray)) {
         consumer.accept(extension, pluginDescriptor /* doesn't matter for tests */);
       }
       return;
@@ -304,7 +304,7 @@ public abstract class ExtensionPointImpl<T extends @NotNull Object> implements E
 
   public final void processImplementations(boolean shouldBeSorted, @NotNull BiConsumer<? super Supplier<? extends @Nullable T>, ? super PluginDescriptor> consumer) {
     if (isInReadOnlyMode()) {
-      for (T extension : cachedExtensionsAsArray) {
+      for (T extension : Objects.requireNonNull(cachedExtensionsAsArray)) {
         consumer.accept((Supplier<T>)() -> extension, pluginDescriptor /* doesn't matter for tests */);
       }
       return;
@@ -320,15 +320,6 @@ public abstract class ExtensionPointImpl<T extends @NotNull Object> implements E
   public final void checkImplementations(@NotNull Consumer<? super ExtensionComponentAdapter> consumer) {
     for (ExtensionComponentAdapter adapter : getSortedAdapters()) {
       consumer.accept(adapter);
-    }
-  }
-
-  // null id means that instance was created and an extension element cleared
-  public final void processIdentifiableImplementations(@NotNull BiConsumer<? super @NotNull Supplier<? extends @Nullable T>, ? super @Nullable String> consumer) {
-    // do not use getThreadSafeAdapterList - no need to check that no listeners, because processImplementations is not a generic-purpose method
-    for (ExtensionComponentAdapter adapter : getSortedAdapters()) {
-      Supplier<@Nullable T> supplier = () -> adapter.createInstance(componentManager);
-      consumer.accept(supplier, adapter.getOrderId());
     }
   }
 
@@ -402,10 +393,10 @@ public abstract class ExtensionPointImpl<T extends @NotNull Object> implements E
   private T @NotNull [] processAdapters() {
     assertNotReadOnlyMode();
 
-    // check before to avoid any "restore" work if already cancelled
+    // check before to avoid any "restore" work if already canceled
     CHECK_CANCELED.run();
 
-    long startTime = StartUpMeasurer.getCurrentTime();
+    long startTime = System.nanoTime();
 
     List<ExtensionComponentAdapter> adapters = getSortedAdapters();
     int totalSize = adapters.size();
@@ -480,7 +471,13 @@ public abstract class ExtensionPointImpl<T extends @NotNull Object> implements E
       }
 
       if (duplicates != null && !duplicates.add(extension)) {
-        T duplicate = ContainerUtil.find(duplicates, d -> d.equals(extension));
+        @Nullable T duplicate = null;
+        for (T value : duplicates) {
+          if (value.equals(extension)) {
+            duplicate = value;
+            break;
+          }
+        }
         assert result != null;
 
         LOG.error("Duplicate extension found:\n" +
@@ -1007,8 +1004,8 @@ public abstract class ExtensionPointImpl<T extends @NotNull Object> implements E
   }
 
   public final <V> @NotNull List<@NotNull T> findExtensions(@NotNull Class<V> aClass) {
-    T[] extensionsCache = cachedExtensionsAsArray;
-    if (extensionsCache == null) {
+    T[] extensionCache = cachedExtensionsAsArray;
+    if (extensionCache == null) {
       List<T> suitableInstances = new ArrayList<>();
       for (ExtensionComponentAdapter adapter : getSortedAdapters()) {
         try {
@@ -1027,7 +1024,13 @@ public abstract class ExtensionPointImpl<T extends @NotNull Object> implements E
       return suitableInstances;
     }
     else {
-      return ContainerUtil.filter(extensionsCache, aClass::isInstance);
+      List<T> result = new ArrayList<>();
+      for (T t : extensionCache) {
+        if (aClass.isInstance(t)) {
+          result.add(t);
+        }
+      }
+      return result;
     }
   }
 
@@ -1097,7 +1100,12 @@ public abstract class ExtensionPointImpl<T extends @NotNull Object> implements E
   }
 
   private static boolean isInsideClassInitializer(StackTraceElement @NotNull [] trace) {
-    //noinspection SpellCheckingInspection
-    return ContainerUtil.exists(trace, s -> "<clinit>".equals(s.getMethodName()));
+    for (StackTraceElement t : trace) {
+      //noinspection SpellCheckingInspection
+      if ("<clinit>".equals(t.getMethodName())) {
+        return true;
+      }
+    }
+    return false;
   }
 }

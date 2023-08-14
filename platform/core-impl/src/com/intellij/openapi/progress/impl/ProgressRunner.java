@@ -24,10 +24,7 @@ import kotlin.Unit;
 import kotlin.coroutines.CoroutineContext;
 import kotlin.coroutines.EmptyCoroutineContext;
 import kotlinx.coroutines.CompletableJob;
-import org.jetbrains.annotations.Contract;
-import org.jetbrains.annotations.NonNls;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.*;
 
 import java.util.concurrent.*;
 import java.util.function.Function;
@@ -454,33 +451,21 @@ public final class ProgressRunner<R> {
         }
         return Unit.INSTANCE;
       });
-      // completion of the future completes the Job
-      resultFuture.whenComplete((result, throwable) -> {
-        if (throwable == null) {
-          childJob.complete();
-        }
-        else {
-          childJob.completeExceptionally(throwable);
-        }
-      });
     }
     progressIndicatorFuture.whenComplete((progressIndicator, throwable) -> {
       if (throwable != null) {
         resultFuture.completeExceptionally(throwable);
         return;
       }
-      Runnable runnable = () -> {
-        try {
-          resultFuture.complete(task.apply(progressIndicator));
-        }
-        catch (Throwable e) {
-          resultFuture.completeExceptionally(e);
-        }
-      };
+      Runnable runnable = new ProgressRunnable<>(resultFuture, task, progressIndicator);
       Runnable contextRunnable = childContext.equals(EmptyCoroutineContext.INSTANCE) ? runnable : (ContextAwareRunnable)() -> {
         CoroutineContext effectiveContext = childContext.plus(asContextElement(progressIndicator.getModalityState()));
         try (AccessToken ignored = ThreadContext.installThreadContext(effectiveContext, false)) {
-          runnable.run();
+          if (childJob != null) {
+            Propagation.runAsCoroutine(childJob, runnable);
+          } else {
+            runnable.run();
+          }
         }
       };
       switch (myThreadToUse) {
@@ -496,5 +481,29 @@ public final class ProgressRunner<R> {
       }
     });
     return resultFuture;
+  }
+
+  static class ProgressRunnable<R> implements Runnable {
+    private final CompletableFuture<R> resultFuture;
+    private final Function<@NotNull ProgressIndicator, R> task;
+    private final ProgressIndicator progressIndicator;
+
+    @Async.Schedule
+    ProgressRunnable(CompletableFuture<R> future, Function<@NotNull ProgressIndicator, R> task, ProgressIndicator indicator) {
+      resultFuture = future;
+      this.task = task;
+      progressIndicator = indicator;
+    }
+
+    @Async.Execute
+    @Override
+    public void run() {
+      try {
+        resultFuture.complete(task.apply(progressIndicator));
+      }
+      catch (Throwable e) {
+        resultFuture.completeExceptionally(e);
+      }
+    }
   }
 }

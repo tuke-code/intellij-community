@@ -88,7 +88,7 @@
     <localInspection language="XML" applyToDialects="false"
                      projectType="INTELLIJ_PLUGIN"
                      groupPathKey="inspections.group.path" groupKey="inspections.group.descriptor"
-                     enabledByDefault="false" level="WARNING"
+                     enabledByDefault="true" level="WARNING"
                      implementationClass="org.jetbrains.idea.devkit.inspections.PluginXmlDynamicPluginInspection"
                      key="inspection.plugin.xml.dynamic.plugin.display.name"/>
     <localInspection language="XML" applyToDialects="false"
@@ -295,7 +295,7 @@
                      enabledByDefault="true" level="WARNING"
                      implementationClass="org.jetbrains.idea.devkit.inspections.LightServiceMigrationXMLInspection"
                      key="inspection.light.service.migration.display.name"/>
-    <localInspection language="JVM" shortName="LightServiceMigrationCode"
+    <localInspection language="UAST" shortName="LightServiceMigrationCode"
                      projectType="INTELLIJ_PLUGIN"
                      groupPathKey="inspections.group.path" groupKey="inspections.group.code"
                      enabledByDefault="true" level="WARNING"
@@ -305,8 +305,8 @@
                      projectType="INTELLIJ_PLUGIN"
                      groupPathKey="inspections.group.path" groupKey="inspections.group.code"
                      enabledByDefault="false" level="WARNING"
-                     implementationClass="org.jetbrains.idea.devkit.inspections.ActionPresentationInitializedInCtorInspection"
-                     key="inspection.an.action.initializes.template.presentation.in.ctor.display.name"/>
+                     implementationClass="org.jetbrains.idea.devkit.inspections.ActionPresentationInstantiatedInCtorInspection"
+                     key="inspection.action.presentation.instantiated.in.ctor.display.name"/>
     <localInspection language="UAST" shortName="NonDefaultConstructor"
                      projectType="INTELLIJ_PLUGIN"
                      groupPathKey="inspections.group.path" groupKey="inspections.group.code"
@@ -520,6 +520,8 @@
     <smartUpdateStep implementation="org.jetbrains.idea.devkit.actions.updateFromSources.UpdateFromSourcesStep" order="first"/>
     <registryKey key="intellij.commit.message.validation.enabled" defaultValue="false"
                  description="Enables commit messages validation for intellij project"/>
+
+    <iconMapper mappingFile="DevkitIconMappings.json"/>
   </extensions>
 
   <extensions defaultExtensionNs="DevKit.lang">
@@ -532,9 +534,9 @@
       implementationClass="org.jetbrains.idea.devkit.inspections.ExtensionClassShouldNotBePublicProviderForJVM"/>
     <extensionClassShouldBeFinalErrorMessageProvider language="JVM"
       implementationClass="org.jetbrains.idea.devkit.inspections.ExtensionClassShouldBeFinalErrorMessageProvider"/>
-    <serviceLevelExtractor language="JAVA"
-      implementationClass="org.jetbrains.idea.devkit.inspections.ServiceLevelExtractorForJava"/>
-    <lightServiceMustBeFinalErrorMessageProvider language="JAVA"
+    <serviceLevelExtractor language="JVM"
+      implementationClass="org.jetbrains.idea.devkit.inspections.ServiceLevelExtractorForJVM"/>
+    <lightServiceMustBeFinalErrorMessageProvider language="JVM"
       implementationClass="org.jetbrains.idea.devkit.inspections.LightServiceMustBeFinalErrorMessageProvider"/>
     <appServiceAsStaticFinalFieldQuickFixProvider
       language="JAVA"
@@ -586,6 +588,11 @@
                     beanClass="com.intellij.lang.LanguageExtensionPoint"
                     dynamic="true">
       <with attribute="implementationClass" implements="org.jetbrains.idea.devkit.inspections.quickfix.AppServiceAsStaticFinalFieldFixProvider"/>
+    </extensionPoint>
+    <extensionPoint qualifiedName="DevKit.lang.uElementAsPsiCheckProvider"
+                    beanClass="com.intellij.lang.LanguageExtensionPoint"
+                    dynamic="true">
+      <with attribute="implementationClass" implements="org.jetbrains.idea.devkit.inspections.UElementAsPsiCheckProvider"/>
     </extensionPoint>
   </extensionPoints>
 

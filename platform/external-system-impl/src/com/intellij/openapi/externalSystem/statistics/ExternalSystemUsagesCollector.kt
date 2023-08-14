@@ -11,9 +11,9 @@ import com.intellij.openapi.externalSystem.ExternalSystemModulePropertyManager
 import com.intellij.openapi.externalSystem.model.ProjectSystemId
 import com.intellij.openapi.externalSystem.service.execution.ExternalSystemJdkUtil
 import com.intellij.openapi.externalSystem.service.execution.TargetEnvironmentConfigurationProvider
-import com.intellij.openapi.externalSystem.statistics.ExternalSystemTaskCollector.Companion.EXTERNAL_TASK_ACTIVITY
-import com.intellij.openapi.externalSystem.statistics.ExternalSystemTaskCollector.Companion.TARGET_FIELD
-import com.intellij.openapi.externalSystem.statistics.ExternalSystemTaskCollector.Companion.TASK_ID_FIELD
+import com.intellij.openapi.externalSystem.statistics.ExternalSystemTaskCollector.EXTERNAL_TASK_ACTIVITY
+import com.intellij.openapi.externalSystem.statistics.ExternalSystemTaskCollector.TARGET_FIELD
+import com.intellij.openapi.externalSystem.statistics.ExternalSystemTaskCollector.TASK_ID_FIELD
 import com.intellij.openapi.externalSystem.util.ExternalSystemApiUtil
 import com.intellij.openapi.module.ModuleManager
 import com.intellij.openapi.project.Project
@@ -54,8 +54,8 @@ class ExternalSystemUsagesCollector : ProjectUsagesCollector() {
 
 
   companion object {
-    private val GROUP = EventLogGroup("build.tools", 3)
-    private val EXTERNAL_SYSTEM_ID = GROUP.registerEvent("externalSystemId", EventFields.StringValidatedByEnum("value", "build_tools"))
+    private val GROUP = EventLogGroup("build.tools", 4)
+    private val EXTERNAL_SYSTEM_ID = GROUP.registerEvent("externalSystemId", EventFields.StringValidatedByCustomRule<SystemIdValidationRule>("value"))
     val JRE_TYPE_FIELD = EventFields.Enum("value", JreType::class.java) { it.description }
 
     fun getJreType(jreName: String?): JreType {

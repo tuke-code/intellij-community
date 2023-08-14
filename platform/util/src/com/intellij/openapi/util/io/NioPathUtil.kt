@@ -24,6 +24,32 @@ fun Path.getResolvedPath(relativePath: String): Path {
 }
 
 /**
+ * Returns normalised base and relative paths. Result of this function should satisfy for condition:
+ * `resultBasePath.resolve(resultRelativePath) == basePath.resolve(relativePath).normalize()` where
+ * resultBasePath is path with maximum length of all possible.
+ *
+ * For example:
+ *  * for [this] = `/1/2/3/4/5` and [relativePath] = `../../a/b`,
+ *    returns pair with base path = `/1/2/3` and relative path = `a/b`;
+ *  * for [this] = `/1/2/3/4/5` and [relativePath] = `../..`,
+ *    returns pair with base path = `/1/2/3` and empty relative path;
+ *  * for [this] = `/1/2/3/4/5` and [relativePath] = `a/b`,
+ *    returns pair with base path = `/1/2/3/4/5` and relative path = `a/b`.
+ */
+fun Path.relativizeToClosestAncestor(relativePath: String): Pair<Path, Path> {
+  val normalizedPath = getResolvedPath(relativePath)
+  val normalizedBasePath = checkNotNull(FileUtil.findAncestor(this, normalizedPath)) {
+    """
+      |Cannot resolve normalized base path for: $normalizedPath
+      |  basePath = $this
+      |  relativePath = $relativePath
+    """.trimMargin()
+  }
+  val normalizedRelativePath = normalizedBasePath.relativize(normalizedPath)
+  return normalizedBasePath to normalizedRelativePath
+}
+
+/**
  * Checks that [this] is an ancestor of [path].
  *
  * @param strict if `false` then this method returns `true` if [this] equals to [file].

@@ -1,5 +1,5 @@
 
-// Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.ui.plaf.beg;
 
 import com.intellij.ide.ui.UISettings;
@@ -516,7 +516,7 @@ public final class BegMenuItemUI extends BasicMenuItemUI {
     }
     ActionMenuItem item = (ActionMenuItem)menuItem;
     AnAction action = item.getAnAction();
-    if (ActionPlaces.MAIN_MENU.equals(item.getPlace()) && ApplicationManager.getApplication() != null) {
+    if (ActionPlaces.MAIN_MENU.equals(item.place) && ApplicationManager.getApplication() != null) {
       MainMenuCollector.getInstance().record(action);
     }
     if (!item.isKeepMenuOpen()) {
@@ -549,14 +549,17 @@ public final class BegMenuItemUI extends BasicMenuItemUI {
     return new MyMouseInputHandler();
   }
 
-  private class MyMouseInputHandler extends MouseInputHandler{
+  private final class MyMouseInputHandler extends MouseInputHandler {
     @Override
     public void mouseReleased(MouseEvent e){
       MenuSelectionManager manager=MenuSelectionManager.defaultManager();
-      Point p=e.getPoint();
-      if(p.x>=0&&p.x<menuItem.getWidth()&&p.y>=0&&p.y<menuItem.getHeight()){
-        doClick(manager,e);
-      } else{
+      Point p = e.getPoint();
+      if (p.x >= 0 && p.x < menuItem.getWidth() && p.y >= 0 && p.y < menuItem.getHeight()) {
+        if (e.getButton() == MouseEvent.BUTTON1) {
+          doClick(manager, e);
+        }
+      }
+      else {
         manager.processMouseEvent(e);
       }
     }

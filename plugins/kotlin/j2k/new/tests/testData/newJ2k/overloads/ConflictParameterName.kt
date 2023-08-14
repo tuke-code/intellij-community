@@ -7,19 +7,19 @@ class Test {
     }
 
     private val isD: Boolean
-        private get() = true
+        get() = true
     private val e = E()
 
     class E {
-        var ee = true
+        var ee: Boolean = true
     }
 
     class F {
-        var f = true
+        var f: Boolean = true
     }
 
     private val g: Int
-        private get() = 1
+        get() = 1
 
     @JvmOverloads
     fun foo(

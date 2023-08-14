@@ -23,6 +23,11 @@ public class RenameTestGenerated extends AbstractRenameTest {
         KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
     }
 
+    @TestMetadata("abstractFunction/abstractFunction.test")
+    public void testAbstractFunction_AbstractFunction() throws Exception {
+        runTest("testData/refactoring/rename/abstractFunction/abstractFunction.test");
+    }
+
     @TestMetadata("ambiguousClassFunImportRenameClass/ambiguousClassFunImportRenameClass.test")
     public void testAmbiguousClassFunImportRenameClass_AmbiguousClassFunImportRenameClass() throws Exception {
         runTest("testData/refactoring/rename/ambiguousClassFunImportRenameClass/ambiguousClassFunImportRenameClass.test");
@@ -111,6 +116,11 @@ public class RenameTestGenerated extends AbstractRenameTest {
     @TestMetadata("automaticVariableRenamerWithQuotation/automaticVariableRenamerWithQuotation.test")
     public void testAutomaticVariableRenamerWithQuotation_AutomaticVariableRenamerWithQuotation() throws Exception {
         runTest("testData/refactoring/rename/automaticVariableRenamerWithQuotation/automaticVariableRenamerWithQuotation.test");
+    }
+
+    @TestMetadata("backingField/backingField.test")
+    public void testBackingField_BackingField() throws Exception {
+        runTest("testData/refactoring/rename/backingField/backingField.test");
     }
 
     @TestMetadata("clashOfNestedWithOuterClass/clashOfNestedWithOuterClass.test")
@@ -741,6 +751,11 @@ public class RenameTestGenerated extends AbstractRenameTest {
     @TestMetadata("renameKotlinClassByConstructorRef/kotlinClass.test")
     public void testRenameKotlinClassByConstructorRef_KotlinClass() throws Exception {
         runTest("testData/refactoring/rename/renameKotlinClassByConstructorRef/kotlinClass.test");
+    }
+
+    @TestMetadata("renameKotlinClassByImplicitConstructorRef/kotlinClass.test")
+    public void testRenameKotlinClassByImplicitConstructorRef_KotlinClass() throws Exception {
+        runTest("testData/refactoring/rename/renameKotlinClassByImplicitConstructorRef/kotlinClass.test");
     }
 
     @TestMetadata("renameKotlinClassConstructor/renameKotlinConstructor.test")

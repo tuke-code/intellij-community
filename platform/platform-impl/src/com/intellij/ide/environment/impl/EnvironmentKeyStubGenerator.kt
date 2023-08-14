@@ -12,7 +12,7 @@ import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.progress.blockingContext
 import com.intellij.platform.util.ArgsParser
-import com.intellij.util.io.createFile
+import com.intellij.util.io.createParentDirectories
 import com.intellij.util.io.write
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -21,6 +21,7 @@ import java.nio.file.FileAlreadyExistsException
 import java.nio.file.Path
 import kotlin.io.path.Path
 import kotlin.io.path.absolute
+import kotlin.io.path.createFile
 import kotlin.system.exitProcess
 
 class EnvironmentKeyStubGenerator : ModernApplicationStarter() {
@@ -46,7 +47,7 @@ class EnvironmentKeyStubGenerator : ModernApplicationStarter() {
           println(config.toString(Charsets.UTF_8))
         } else {
           val path = parsedArgs.outputFileName ?: Path(DEFAULT_FILE_NAME)
-          path.createFile().write(config)
+          path.createParentDirectories().createFile().write(config)
           thisLogger().info("Configuration keys are successfully written to ${path.absolute()}")
         }
       }
@@ -63,8 +64,11 @@ class EnvironmentKeyStubGenerator : ModernApplicationStarter() {
 
 private suspend fun generateKeyConfig(generateDescriptions: Boolean, configuration: EnvironmentConfiguration): ByteArray {
   val environmentKeys = blockingContext {
-    EnvironmentKeyProvider.EP_NAME.extensionList.flatMap { it.getKnownKeys().toList() }
+    EnvironmentKeyProvider.EP_NAME.extensionList.flatMap { it.knownKeys.toList() }
   }.sortedBy { it.first.id }
+
+  val registeredKeys = environmentKeys.mapTo(HashSet()) { it.first }
+  val unregisteredValues = configuration.map.entries.filter { it.key !in registeredKeys }
 
   val byteStream = ByteArrayOutputStream()
   val generator = JsonFactory().createGenerator(byteStream).setPrettyPrinter(KeyConfigPrettyPrinter())
@@ -81,6 +85,12 @@ private suspend fun generateKeyConfig(generateDescriptions: Boolean, configurati
       }
       writeStringField("key", key.id)
       writeStringField("value", configuration.get(key) ?: "")
+      writeEndObject()
+    }
+    for ((key, value) in unregisteredValues) {
+      writeStartObject()
+      writeStringField("key", key.id)
+      writeStringField("value", value)
       writeEndObject()
     }
     writeEndArray()
@@ -143,4 +153,3 @@ private const val DEFAULT_FILE_NAME : String = "environmentKeys.json"
 private const val FILE_ARGUMENT_NAME : String = "file"
 private const val STDOUT_ARGUMENT_NAME : String = "stdout"
 private const val NO_DESCRIPTIONS_ARGUMENT_NAME : String = "no-descriptions"
-

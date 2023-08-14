@@ -1,6 +1,7 @@
 // Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
 package com.intellij.openapi.rd.util
 
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.application.asContextElement
 import com.jetbrains.rd.framework.util.*
@@ -10,6 +11,8 @@ import kotlinx.coroutines.*
 import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.concurrency.Promise
 import java.util.concurrent.CompletableFuture
+import kotlin.coroutines.CoroutineContext
+import kotlin.coroutines.EmptyCoroutineContext
 
 private val applicationThreadPool get() = RdCoroutineHost.applicationThreadPool
 private val processIODispatcher get() = RdCoroutineHost.processIODispatcher
@@ -19,38 +22,51 @@ private val uiDispatcherWithInlining get() = RdCoroutineHost.instance.uiDispatch
 private val uiDispatcherAnyModality get() = RdCoroutineHost.instance.uiDispatcherAnyModality
 
 fun Lifetime.launchOnUi(
+  context: CoroutineContext = EmptyCoroutineContext,
   start: CoroutineStart = CoroutineStart.DEFAULT,
   action: suspend CoroutineScope.() -> Unit
 ): Job {
-  return launch(uiDispatcher + ModalityState.defaultModalityState().asContextElement(), start, action)
+  return launch(uiDispatcher + ModalityState.defaultModalityState().asContextElement() + context, start, action)
 }
 
 fun Lifetime.launchOnUiNonModal(
+  context: CoroutineContext = EmptyCoroutineContext,
   start: CoroutineStart = CoroutineStart.DEFAULT,
   action: suspend CoroutineScope.() -> Unit
-): Job = launch(uiDispatcher, start, action)
+): Job = launch(uiDispatcher + context, start, action)
 
 fun Lifetime.launchOnUiAllowInlining(
+  context: CoroutineContext = EmptyCoroutineContext,
   start: CoroutineStart = CoroutineStart.DEFAULT,
   action: suspend CoroutineScope.() -> Unit
-): Job = launch(uiDispatcherWithInlining, start, action)
+): Job = launch(uiDispatcherWithInlining + context, start, action)
 
+@Deprecated("Please use launch with an explicit modality statement")
 fun Lifetime.launchOnUiAnyModality(
+  context: CoroutineContext = EmptyCoroutineContext,
   start: CoroutineStart = CoroutineStart.DEFAULT,
   action: suspend CoroutineScope.() -> Unit
-): Job = launch(uiDispatcherAnyModality, start, action)
+): Job {
+  if (ApplicationManager.getApplication().isDispatchThread && start == CoroutineStart.DEFAULT)
+    // for backward compatibility
+    return launch(uiDispatcherAnyModality + context, CoroutineStart.UNDISPATCHED, action)
+
+  return launch(uiDispatcherAnyModality + context, start, action)
+}
 
 @ApiStatus.ScheduledForRemoval
 @Deprecated("Use launchSyncIOBackground or launchBackground")
 fun Lifetime.launchIOBackground(
+  context: CoroutineContext = EmptyCoroutineContext,
   start: CoroutineStart = CoroutineStart.DEFAULT,
   action: suspend CoroutineScope.() -> Unit
-): Job = launch(processIODispatcher, start, action)
+): Job = launch(processIODispatcher + context, start, action)
 
 fun Lifetime.launchBackground(
+  context: CoroutineContext = EmptyCoroutineContext,
   start: CoroutineStart = CoroutineStart.DEFAULT,
   action: suspend CoroutineScope.() -> Unit
-): Job = launch(applicationThreadPool, start, action)
+): Job = launch(applicationThreadPool + ModalityState.defaultModalityState().asContextElement() + context, start, action)
 
 fun Lifetime.launchSyncIOBackground(
   start: CoroutineStart = CoroutineStart.DEFAULT,
@@ -59,61 +75,79 @@ fun Lifetime.launchSyncIOBackground(
 
 @Deprecated("Use launchBackground", ReplaceWith("launchBackground(start, action)"))
 fun Lifetime.launchLongBackground(
+  context: CoroutineContext = EmptyCoroutineContext,
   start: CoroutineStart = CoroutineStart.DEFAULT,
   action: suspend CoroutineScope.() -> Unit
-) = launchBackground(start, action)
+) = launchBackground(context, start, action)
 
 fun Lifetime.launchNonUrgentBackground(
+  context: CoroutineContext = EmptyCoroutineContext,
   start: CoroutineStart = CoroutineStart.DEFAULT,
   action: suspend CoroutineScope.() -> Unit
-): Job = launch(nonUrgentDispatcher, start, action)
+): Job = launch(nonUrgentDispatcher + context, start, action)
 
 fun <T> Lifetime.startOnUiAsync(
+  context: CoroutineContext = EmptyCoroutineContext,
   start: CoroutineStart = CoroutineStart.DEFAULT,
   action: suspend CoroutineScope.() -> T
-): Deferred<T> = startAsync(uiDispatcher + ModalityState.defaultModalityState().asContextElement(), start, action)
+): Deferred<T> = startAsync(uiDispatcher + ModalityState.defaultModalityState().asContextElement() + context, start, action)
 
 fun <T> Lifetime.startOnUiNonModalAsync(
+  context: CoroutineContext = EmptyCoroutineContext,
   start: CoroutineStart = CoroutineStart.DEFAULT,
   action: suspend CoroutineScope.() -> T
-): Deferred<T> = startAsync(uiDispatcher, start, action)
+): Deferred<T> = startAsync(uiDispatcher + context, start, action)
 
 fun <T> Lifetime.startOnUiAllowInliningAsync(
+  context: CoroutineContext = EmptyCoroutineContext,
   start: CoroutineStart = CoroutineStart.DEFAULT,
   action: suspend CoroutineScope.() -> T
-): Deferred<T> = startAsync(uiDispatcherWithInlining, start, action)
+): Deferred<T> = startAsync(uiDispatcherWithInlining + context, start, action)
 
+@Deprecated("Please use async with modality specified explicitly")
 fun <T> Lifetime.startOnUiAnyModalityAsync(
+  context: CoroutineContext = EmptyCoroutineContext,
   start: CoroutineStart = CoroutineStart.DEFAULT,
   action: suspend CoroutineScope.() -> T
-): Deferred<T> = startAsync(uiDispatcherAnyModality, start, action)
+): Deferred<T> {
+  if (ApplicationManager.getApplication().isDispatchThread && start == CoroutineStart.DEFAULT)
+    // for backward compatibility
+    return startAsync(uiDispatcherAnyModality + context, CoroutineStart.UNDISPATCHED, action)
+
+  return startAsync(uiDispatcherAnyModality + context, start, action)
+}
 
 @Deprecated("Use startSyncIOBackgroundAsync or startBackgroundAsync")
 fun <T> Lifetime.startIOBackgroundAsync(
+  context: CoroutineContext = EmptyCoroutineContext,
   start: CoroutineStart = CoroutineStart.DEFAULT,
   action: suspend CoroutineScope.() -> T
-): Deferred<T> = startAsync(processIODispatcher, start, action)
+): Deferred<T> = startAsync(processIODispatcher + context, start, action)
 
 @Deprecated("Use startBackgroundAsync", ReplaceWith("startBackgroundAsync(start, action)"))
 fun <T> Lifetime.startLongBackgroundAsync(
+  context: CoroutineContext = EmptyCoroutineContext,
   start: CoroutineStart = CoroutineStart.DEFAULT,
   action: suspend CoroutineScope.() -> T
-) = startBackgroundAsync(start, action)
+) = startBackgroundAsync(context, start, action)
 
 fun <T> Lifetime.startBackgroundAsync(
+  context: CoroutineContext = EmptyCoroutineContext,
   start: CoroutineStart = CoroutineStart.DEFAULT,
   action: suspend CoroutineScope.() -> T
-): Deferred<T> = startAsync(applicationThreadPool, start, action)
+): Deferred<T> = startAsync(applicationThreadPool + ModalityState.defaultModalityState().asContextElement() + context, start, action)
 
 fun <T> Lifetime.startSyncIOBackgroundAsync(
+  context: CoroutineContext = EmptyCoroutineContext,
   start: CoroutineStart = CoroutineStart.DEFAULT,
   action: () -> T
-): Deferred<T> = startAsync(processIODispatcher, start) { action() }
+): Deferred<T> = startAsync(processIODispatcher + context, start) { action() }
 
 fun <T> Lifetime.startNonUrgentBackgroundAsync(
+  context: CoroutineContext = EmptyCoroutineContext,
   start: CoroutineStart = CoroutineStart.DEFAULT,
   action: suspend CoroutineScope.() -> T
-): Deferred<T> = startAsync(nonUrgentDispatcher, start, action)
+): Deferred<T> = startAsync(nonUrgentDispatcher + context, start, action)
 
 @ApiStatus.ScheduledForRemoval
 @Deprecated("Use launchChildOnUi without lifetime or use lifetimedCoroutineScope", ReplaceWith("launchChildOnUi(start, action)"))
@@ -227,6 +261,7 @@ suspend fun <T> withUiContext(lifetime: Lifetime = Lifetime.Eternal, action: sus
 suspend fun <T> withUiAllowInliningContext(lifetime: Lifetime = Lifetime.Eternal, action: suspend CoroutineScope.() -> T): T =
   withContext(lifetime, uiDispatcherWithInlining, action)
 
+@Deprecated("Please use withContext with modality specified explicitly")
 suspend fun <T> withUiAnyModalityContext(lifetime: Lifetime = Lifetime.Eternal, action: suspend CoroutineScope.() -> T): T =
   withContext(lifetime, uiDispatcherAnyModality, action)
 

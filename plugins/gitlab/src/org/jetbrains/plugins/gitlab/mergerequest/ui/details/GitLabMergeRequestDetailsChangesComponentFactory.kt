@@ -3,98 +3,47 @@ package org.jetbrains.plugins.gitlab.mergerequest.ui.details
 
 import com.intellij.collaboration.ui.LoadingLabel
 import com.intellij.collaboration.ui.SimpleHtmlPane
-import com.intellij.collaboration.ui.SingleValueModel
 import com.intellij.collaboration.ui.TransparentScrollPane
-import com.intellij.collaboration.ui.codereview.changes.CodeReviewChangesTreeFactory
+import com.intellij.collaboration.ui.codereview.changes.CodeReviewChangeListComponentFactory
+import com.intellij.collaboration.ui.util.bindContentIn
 import com.intellij.openapi.actionSystem.ActionGroup
 import com.intellij.openapi.actionSystem.ActionManager
-import com.intellij.openapi.project.Project
-import com.intellij.openapi.vcs.changes.Change
-import com.intellij.openapi.vcs.changes.ui.AsyncChangesTree
-import com.intellij.openapi.vcs.changes.ui.ChangesTree
-import com.intellij.openapi.vcs.changes.ui.VcsTreeModelData
 import com.intellij.ui.ScrollableContentBorder
 import com.intellij.ui.Side
 import com.intellij.ui.components.panels.Wrapper
-import com.intellij.util.EditSourceOnDoubleClickHandler
-import com.intellij.util.Processor
-import kotlinx.coroutines.*
-import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.mapLatest
+import kotlinx.coroutines.CoroutineScope
+import org.jetbrains.plugins.gitlab.mergerequest.ui.details.model.GitLabMergeRequestChangeListViewModel
 import org.jetbrains.plugins.gitlab.mergerequest.ui.details.model.GitLabMergeRequestChangesViewModel
 import org.jetbrains.plugins.gitlab.util.GitLabBundle
 import javax.swing.JComponent
 import javax.swing.ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER
 import javax.swing.ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED
 
-internal class GitLabMergeRequestDetailsChangesComponentFactory(private val project: Project) {
+internal object GitLabMergeRequestDetailsChangesComponentFactory {
 
-  @OptIn(ExperimentalCoroutinesApi::class)
   fun create(cs: CoroutineScope, vm: GitLabMergeRequestChangesViewModel): JComponent {
-    val wrapper = Wrapper(LoadingLabel())
-    cs.launch(start = CoroutineStart.UNDISPATCHED) {
-      val changesModel = SingleValueModel<Collection<Change>>(emptyList())
-      vm.changesResult.mapLatest {
-        it.map {
-          changesModel.apply { value = it }
-        }
-      }.distinctUntilChanged { old, new ->
-        old.getOrNull() === new.getOrNull()
-      }.collectLatest { res ->
-        coroutineScope {
-          res.onFailure {
-            wrapper.setContent(SimpleHtmlPane(it.localizedMessage))
-            wrapper.repaint()
-          }.onSuccess {
-            if (wrapper.targetComponent !is ChangesTree) {
-              wrapper.setContent(createChangesTree(vm, it))
-              wrapper.repaint()
-            }
-          }
-          awaitCancellation()
-        }
+    val wrapper = Wrapper(LoadingLabel()).apply {
+      bindContentIn(cs, vm.changeListVm) { res ->
+        res.fold(onSuccess = {
+          createChangesTree(vm, it)
+        }, onFailure = {
+          SimpleHtmlPane(it.localizedMessage)
+        })
       }
     }
     return TransparentScrollPane(wrapper).apply {
       horizontalScrollBarPolicy = HORIZONTAL_SCROLLBAR_NEVER
       verticalScrollBarPolicy = VERTICAL_SCROLLBAR_AS_NEEDED
-      ScrollableContentBorder.setup(scrollPane = this, sides = Side.TOP_AND_BOTTOM, targetComponent = wrapper)
+      ScrollableContentBorder.setup(scrollPane = this, sides = Side.TOP_AND_BOTTOM, targetComponent = this)
     }
   }
 
-  private fun CoroutineScope.createChangesTree(vm: GitLabMergeRequestChangesViewModel,
-                                               changesModel: SingleValueModel<Collection<Change>>): JComponent =
-    CodeReviewChangesTreeFactory(project, changesModel)
-      .create(GitLabBundle.message("merge.request.details.changes.empty")).also { tree ->
-        launch(start = CoroutineStart.UNDISPATCHED) {
-          vm.changeSelectionRequests.collect {
-            tree.setSelectedChanges(listOf(it))
-          }
-        }
-
-        tree.addTreeSelectionListener {
-          updateUserChangesSelection(vm, tree)
-        }
-        updateUserChangesSelection(vm, tree)
-
-        tree.doubleClickHandler = Processor { e ->
-          if (EditSourceOnDoubleClickHandler.isToggleEvent(tree, e)) return@Processor false
-          updateUserChangesSelection(vm, tree)
-          vm.showDiff()
-          true
-        }
-
-        tree.enterKeyHandler = Processor {
-          updateUserChangesSelection(vm, tree)
-          vm.showDiff()
-          true
-        }
-
-        tree.installPopupHandler(ActionManager.getInstance().getAction("GitLab.Merge.Request.Changes.Popup") as ActionGroup)
-      }
-
-  private fun updateUserChangesSelection(vm: GitLabMergeRequestChangesViewModel, tree: AsyncChangesTree) {
-    vm.updatesSelectedChanges(VcsTreeModelData.getListSelectionOrAll(tree).map { it as? Change })
+  private fun CoroutineScope.createChangesTree(changesVm: GitLabMergeRequestChangesViewModel,
+                                               vm: GitLabMergeRequestChangeListViewModel): JComponent {
+    val progressModel = GitLabMergeRequestProgressTreeModel(this, changesVm)
+    return CodeReviewChangeListComponentFactory.createIn(this, vm, progressModel,
+                                                         GitLabBundle.message("merge.request.details.changes.empty")).apply {
+      installPopupHandler(ActionManager.getInstance().getAction("GitLab.Merge.Request.Changes.Popup") as ActionGroup)
+    }
   }
 }

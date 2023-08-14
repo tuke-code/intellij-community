@@ -17,7 +17,7 @@ import org.jetbrains.kotlin.psi.KtPsiFactory
 import org.jetbrains.kotlin.psi.KtTypeArgumentList
 import org.jetbrains.kotlin.types.Variance
 
-class InsertExplicitTypeArgumentsIntention :
+internal class InsertExplicitTypeArgumentsIntention :
     AbstractKotlinApplicableIntentionWithContext<KtCallExpression, String>(KtCallExpression::class) {
 
     override fun getApplicabilityRange(): KotlinApplicabilityRange<KtCallExpression> = applicabilityTarget { it.calleeExpression }
@@ -30,7 +30,7 @@ class InsertExplicitTypeArgumentsIntention :
 
     context(KtAnalysisSession)
     override fun prepareContext(element: KtCallExpression): String? {
-        val resolvedCall = element.resolveCall().singleFunctionCallOrNull() ?: return null
+        val resolvedCall = element.resolveCall()?.singleFunctionCallOrNull() ?: return null
         val typeParameterSymbols = resolvedCall.partiallyAppliedSymbol.symbol.typeParameters
         if (typeParameterSymbols.isEmpty()) return null
         val renderedTypeParameters = buildList {

@@ -7,26 +7,23 @@ import com.intellij.openapi.application.invokeAndWaitIfNeeded
 import com.intellij.openapi.components.RoamingType
 import com.intellij.openapi.diagnostic.Attachment
 import com.intellij.openapi.diagnostic.logger
+import com.intellij.openapi.editor.colors.impl.EditorColorsManagerImpl
+import com.intellij.openapi.util.registry.Registry
 import com.intellij.settingsSync.SettingsSnapshot.MetaInfo
+import com.intellij.settingsSync.notification.NotificationService
 import com.intellij.settingsSync.plugins.SettingsSyncPluginManager
-import com.intellij.util.SystemProperties
-import com.intellij.util.io.*
+import com.intellij.util.io.systemIndependentPath
+import com.intellij.util.io.write
+import org.jetbrains.annotations.VisibleForTesting
 import java.io.InputStream
-import java.nio.file.FileVisitResult
-import java.nio.file.Files
-import java.nio.file.Path
-import java.nio.file.SimpleFileVisitor
+import java.nio.file.*
 import java.nio.file.attribute.BasicFileAttributes
 import java.time.Instant
 import java.util.concurrent.locks.ReadWriteLock
 import java.util.concurrent.locks.ReentrantReadWriteLock
-import java.util.function.Consumer
 import java.util.function.Predicate
 import kotlin.concurrent.withLock
-import kotlin.io.path.exists
-import kotlin.io.path.name
-import kotlin.io.path.pathString
-import kotlin.random.Random
+import kotlin.io.path.*
 
 internal class SettingsSyncIdeMediatorImpl(private val componentStore: ComponentStoreImpl,
                                            private val rootConfig: Path,
@@ -35,26 +32,39 @@ internal class SettingsSyncIdeMediatorImpl(private val componentStore: Component
   private val appConfig: Path get() = rootConfig.resolve(OPTIONS_DIRECTORY)
   private val fileSpecsToLocks = ConcurrentCollectionFactory.createConcurrentMap<String, ReadWriteLock>()
 
+  @VisibleForTesting
+  internal val files2applyLast = mutableListOf(EditorColorsManagerImpl.STORAGE_NAME)
+
   override val isExclusive: Boolean
     get() = true
 
   override val enabled: Boolean
     get() = enabledCondition()
 
-  override fun isApplicable(fileSpec: String, roamingType: RoamingType): Boolean {
-    return true
+  private val restartRequiredReasons = mutableListOf<RestartReason>()
+
+  init {
+    SettingsSyncEvents.getInstance().addListener(object : SettingsSyncEventListener {
+      override fun restartRequired(reason: RestartReason) {
+        restartRequiredReasons.add(reason)
+      }
+    })
   }
 
-  override fun applyToIde(snapshot: SettingsSnapshot) {
+  override fun isApplicable(fileSpec: String, roamingType: RoamingType): Boolean {
+    return roamingType != RoamingType.DISABLED
+  }
+
+  override fun applyToIde(snapshot: SettingsSnapshot, settings: SettingsSyncState?) {
     // 1. update SettingsSyncSettings first to apply changes in categories
     val settingsSyncFileState = snapshot.fileStates.find { it.file == "$OPTIONS_DIRECTORY/${SettingsSyncSettings.FILE_SPEC}" }
-    if (settingsSyncFileState != null) {
-      writeStatesToAppConfig(listOf(settingsSyncFileState))
+    if (settings != null) {
+      LOG.info("applying sync settings from SettingsSyncState")
+      SettingsSyncSettings.getInstance().applyFromState(settings)
     }
-
-    if (SystemProperties.getBooleanProperty("settings.sync.test.fail.on.settings.apply", false)) {
-      if (Random.nextBoolean()) {
-        throw IllegalStateException("Applying settings failed")
+    else {
+      if (settingsSyncFileState != null) {
+        writeStatesToAppConfig(listOf(settingsSyncFileState))
       }
     }
 
@@ -78,6 +88,12 @@ internal class SettingsSyncIdeMediatorImpl(private val componentStore: Component
         LOG.warn("Couldn't find provider for id '$id' and state '${state.javaClass}'")
       }
     }
+    notifyRestartNeeded()
+  }
+
+  private fun notifyRestartNeeded() {
+    if (restartRequiredReasons.isEmpty()) return
+    NotificationService.getInstance().notifyRestartNeeded(restartRequiredReasons)
   }
 
   override fun activateStreamProvider() {
@@ -101,7 +117,7 @@ internal class SettingsSyncIdeMediatorImpl(private val componentStore: Component
     LOG.debug("Collected following plugin state: $pluginsState")
 
     val settingsFromProviders = mutableMapOf<String, Any>()
-    SettingsProvider.SETTINGS_PROVIDER_EP.forEachExtensionSafe(Consumer {
+    SettingsProvider.SETTINGS_PROVIDER_EP.forEachExtensionSafe(java.util.function.Consumer {
       val currentSettings = it.collectCurrentSettings()
       if (currentSettings != null) {
         settingsFromProviders[it.id] = currentSettings
@@ -130,11 +146,17 @@ internal class SettingsSyncIdeMediatorImpl(private val componentStore: Component
   }
 
   override fun read(fileSpec: String, roamingType: RoamingType, consumer: (InputStream?) -> Unit): Boolean {
+    if (!isApplicable(fileSpec, roamingType)) return false
+
     val path = appConfig.resolve(fileSpec)
     val adjustedSpec = getFileRelativeToRootConfig(fileSpec)
     return readUnderLock(adjustedSpec) {
       try {
-        consumer(path.inputStreamIfExists())
+        consumer(path.inputStream())
+        true
+      }
+      catch (e: NoSuchFileException) {
+        consumer(null)
         true
       }
       catch (e: Throwable) {
@@ -161,7 +183,7 @@ internal class SettingsSyncIdeMediatorImpl(private val componentStore: Component
     Files.walkFileTree(folder, object : SimpleFileVisitor<Path>() {
       override fun visitFile(file: Path, attrs: BasicFileAttributes?): FileVisitResult {
         if (!filter(file.name)) return FileVisitResult.CONTINUE
-        if (!file.isFile()) return FileVisitResult.CONTINUE
+        if (!file.isRegularFile()) return FileVisitResult.CONTINUE
 
         val shouldProceed = file.inputStream().use { inputStream ->
           val fileSpec = rootConfig.relativize(file).systemIndependentPath
@@ -177,7 +199,7 @@ internal class SettingsSyncIdeMediatorImpl(private val componentStore: Component
   }
 
   override fun delete(fileSpec: String, roamingType: RoamingType): Boolean {
-    if (roamingType == RoamingType.DISABLED) {
+    if (!isApplicable(fileSpec, roamingType)) {
       return false
     }
 
@@ -201,12 +223,23 @@ internal class SettingsSyncIdeMediatorImpl(private val componentStore: Component
 
   private fun deleteOrLogError(file: Path): Boolean {
     try {
-      file.delete()
+      file.deleteExisting()
       return true
     }
     catch (e: Exception) {
       LOG.error("Couldn't delete ${file.pathString}", e)
       return false
+    }
+  }
+
+  private fun getFileRelativeToRootConfig(fileSpecPassedToProvider: String): String {
+    // For PersistentStateComponents the fileSpec is passed without the 'options' folder, e.g. 'editor.xml' or 'mac/keymaps.xml'
+    // OTOH for schemas it is passed together with the containing folder, e.g. 'keymaps/mykeymap.xml'
+    return if (!fileSpecPassedToProvider.contains("/") || fileSpecPassedToProvider.startsWith(getPerOsSettingsStorageFolderName() + "/")) {
+      "$OPTIONS_DIRECTORY/$fileSpecPassedToProvider"
+    }
+    else {
+      fileSpecPassedToProvider
     }
   }
 
@@ -227,7 +260,7 @@ internal class SettingsSyncIdeMediatorImpl(private val componentStore: Component
           }
           is FileState.Deleted -> {
             writeUnderLock(fileSpec) {
-              file.delete()
+              file.deleteExisting()
             }
             deletedFileSpecs.add(fileSpec)
           }
@@ -235,7 +268,16 @@ internal class SettingsSyncIdeMediatorImpl(private val componentStore: Component
       }
     }
 
-    invokeAndWaitIfNeeded { componentStore.reloadComponents(changedFileSpecs, deletedFileSpecs) }
+    invokeAndWaitIfNeeded {
+      val (normalChanged, lastChanged) = changedFileSpecs.partition { !(files2applyLast.contains(it)) }
+      componentStore.reloadComponents(normalChanged, deletedFileSpecs)
+      if (lastChanged.isNotEmpty()) {
+        componentStore.reloadComponents(lastChanged, emptyList())
+      }
+      if (Registry.getInstance().isRestartNeeded) {
+        SettingsSyncEvents.getInstance().fireRestartRequired(RestartForNewUI)
+      }
+    }
   }
 
   private fun <R> writeUnderLock(fileSpec: String, writingProcedure: () -> R): R {
@@ -253,7 +295,7 @@ internal class SettingsSyncIdeMediatorImpl(private val componentStore: Component
   private fun getOrCreateLock(fileSpec: String) = fileSpecsToLocks.computeIfAbsent(fileSpec) { ReentrantReadWriteLock() }
 
   companion object {
-    val LOG = logger<SettingsSyncIdeMediatorImpl>()
+    private val LOG = logger<SettingsSyncIdeMediatorImpl>()
 
     internal fun <T: Any> findProviderById(id: String, state: T): SettingsProvider<T>? {
       val provider = SettingsProvider.SETTINGS_PROVIDER_EP.findFirstSafe(Predicate { it.id == id })

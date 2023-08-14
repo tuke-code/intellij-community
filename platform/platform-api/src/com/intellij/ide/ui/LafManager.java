@@ -47,6 +47,9 @@ public abstract class LafManager {
 
   public abstract void repaintUI();
 
+  /**
+   * @return if autodetect is supported and enabled
+   */
   public abstract boolean getAutodetect();
 
   public abstract void setAutodetect(boolean value);
@@ -59,6 +62,12 @@ public abstract class LafManager {
 
   @ApiStatus.Internal
   public abstract @Nullable EditorColorsScheme getPreviousSchemeForLaf(@NotNull UIManager.LookAndFeelInfo lookAndFeelInfo);
+
+  @ApiStatus.Internal
+  public abstract void setRememberSchemeForLaf(boolean rememberSchemeForLaf);
+
+  @ApiStatus.Internal
+  public abstract void rememberSchemeForLaf(@NotNull EditorColorsScheme scheme);
 
   @ApiStatus.Internal
   public void applyDensity() { }

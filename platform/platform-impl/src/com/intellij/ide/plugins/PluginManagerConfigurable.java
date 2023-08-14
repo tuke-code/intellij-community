@@ -14,12 +14,11 @@ import com.intellij.ide.plugins.marketplace.MarketplaceRequests;
 import com.intellij.ide.plugins.newui.*;
 import com.intellij.ide.util.PropertiesComponent;
 import com.intellij.openapi.actionSystem.*;
-import com.intellij.openapi.application.ApplicationInfo;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ApplicationNamesInfo;
 import com.intellij.openapi.application.ModalityState;
+import com.intellij.openapi.application.ex.ApplicationInfoEx;
 import com.intellij.openapi.application.ex.ApplicationManagerEx;
-import com.intellij.openapi.application.impl.ApplicationInfoImpl;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.extensions.PluginId;
 import com.intellij.openapi.ide.CopyPasteManager;
@@ -36,6 +35,7 @@ import com.intellij.openapi.ui.popup.JBPopupListener;
 import com.intellij.openapi.ui.popup.LightweightWindowEvent;
 import com.intellij.openapi.updateSettings.impl.UpdateChecker;
 import com.intellij.openapi.updateSettings.impl.UpdateSettings;
+import com.intellij.openapi.updateSettings.impl.pluginsAdvertisement.FUSEventSource;
 import com.intellij.openapi.updateSettings.impl.pluginsAdvertisement.PluginsAdvertiserStartupActivityKt;
 import com.intellij.openapi.util.NlsContexts;
 import com.intellij.openapi.util.NlsSafe;
@@ -1527,11 +1527,19 @@ public final class PluginManagerConfigurable
                                                     () -> configurable.select(pluginIds));
   }
 
-  public static void showSuggestedPlugins(@Nullable Project project) {
+  public static void showSuggestedPlugins(@Nullable Project project, @Nullable FUSEventSource source) {
     PluginManagerConfigurable configurable = new PluginManagerConfigurable();
     ShowSettingsUtil.getInstance().editConfigurable(project,
                                                     configurable,
-                                                    () -> configurable.openMarketplaceTab("/suggested"));
+                                                    () -> {
+                                                      configurable.setInstallSource(source);
+                                                      configurable.openMarketplaceTab("/suggested");
+                                                    });
+  }
+
+  @SuppressWarnings("SameParameterValue")
+  private void setInstallSource(@Nullable FUSEventSource source) {
+    this.myPluginModel.setInstallSource(source);
   }
 
   public static void showPluginConfigurable(@Nullable Component parent,
@@ -1704,7 +1712,7 @@ public final class PluginManagerConfigurable
       PluginsGroup group = myPluginModel.getDownloadedGroup();
 
       if (group == null || group.ui == null) {
-        ApplicationInfoImpl appInfo = (ApplicationInfoImpl)ApplicationInfo.getInstance();
+        ApplicationInfoEx appInfo = ApplicationInfoEx.getInstanceEx();
 
         for (IdeaPluginDescriptor descriptor : PluginManagerCore.getPlugins()) {
           if (!appInfo.isEssentialPlugin(descriptor.getPluginId()) &&

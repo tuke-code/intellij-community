@@ -16,6 +16,7 @@ import com.intellij.util.Processor
 import com.intellij.util.ThrowableRunnable
 import kotlinx.coroutines.ThreadContextElement
 import org.jetbrains.annotations.ApiStatus
+import org.jetbrains.annotations.ApiStatus.Internal
 import org.jetbrains.annotations.TestOnly
 import java.util.concurrent.Callable
 import java.util.function.BiConsumer
@@ -40,11 +41,6 @@ data class ClientId(val value: String) {
     RETURN_LOCAL,
 
     /**
-     * Throw an exception if ClientId is not set
-     */
-    THROW,
-
-    /**
      * Write error to logger and return localId
      */
     LOG_ERROR,
@@ -62,7 +58,7 @@ data class ClientId(val value: String) {
     /**
      * Specifies behavior for [ClientId.current]
      */
-    private val absenceBehaviorValue: AbsenceBehavior get() {
+    val absenceBehaviorValue: AbsenceBehavior get() {
       if (!LoadingState.COMPONENTS_LOADED.isOccurred)
         return AbsenceBehavior.RETURN_LOCAL
       if (!Registry.getInstance().isLoaded) {
@@ -112,7 +108,7 @@ data class ClientId(val value: String) {
     @JvmStatic
     val isCurrentlyUnderLocalId: Boolean
       get() {
-        val clientIdValue = getCachedService()?.clientIdValue
+        val clientIdValue = currentClientIdString
         return clientIdValue == null || clientIdValue == localId.value
       }
 
@@ -123,7 +119,6 @@ data class ClientId(val value: String) {
     val current: ClientId
       get() = when (absenceBehaviorValue) {
         AbsenceBehavior.RETURN_LOCAL -> currentOrNull ?: localId
-        AbsenceBehavior.THROW -> currentOrNull ?: throw NullPointerException("ClientId not set")
         AbsenceBehavior.LOG_ERROR -> {
           val currentId = currentOrNull
           if (currentId == null) {
@@ -141,7 +136,7 @@ data class ClientId(val value: String) {
     // optimization method for avoiding allocating ClientId in the hot path
     fun getCurrentValue(): String {
       val service = getCachedService()
-      return if (service == null) localId.value else service.clientIdValue ?: localId.value
+      return if (service == null) localId.value else currentClientIdString ?: localId.value
     }
 
     /**
@@ -149,7 +144,7 @@ data class ClientId(val value: String) {
      */
     @JvmStatic
     val currentOrNull: ClientId?
-      get() = getCachedService()?.clientIdValue?.let(::ClientId)
+      get() = currentClientIdString?.let(::ClientId)
 
     /**
      * Overrides the ID of the owner of CWM/RD session.
@@ -208,25 +203,28 @@ data class ClientId(val value: String) {
         null
       }
 
-      val oldClientIdValue = service.clientIdValue
+      val oldClientIdValue = currentClientIdString
       try {
-        service.clientIdValue = newClientIdValue
+        currentClientIdString = newClientIdValue
         return action()
       }
       finally {
-        service.clientIdValue = oldClientIdValue
+        currentClientIdString = oldClientIdValue
       }
     }
 
     class ClientIdAccessToken(private val oldClientIdValue: String?) : AccessToken() {
       override fun finish() {
-        getCachedService()?.clientIdValue = oldClientIdValue
+        currentClientIdString = oldClientIdValue
       }
     }
 
     @JvmStatic
     fun withClientId(clientId: ClientId?): AccessToken {
       if (clientId == null) {
+        if (absenceBehaviorValue == AbsenceBehavior.LOG_ERROR) {
+          LOG.error("Attempt to call withClientId with ClientId==null")
+        }
         return AccessToken.EMPTY_ACCESS_TOKEN
       }
       return withClientId(clientId.value)
@@ -238,7 +236,7 @@ data class ClientId(val value: String) {
       if (service == null) {
         return AccessToken.EMPTY_ACCESS_TOKEN
       }
-      val oldClientIdValue = service.clientIdValue ?: localId.value
+      val oldClientIdValue = currentClientIdString ?: localId.value
       if (clientIdValue == oldClientIdValue) {
         return AccessToken.EMPTY_ACCESS_TOKEN
       }
@@ -251,7 +249,7 @@ data class ClientId(val value: String) {
         null
       }
 
-      service.clientIdValue = newClientIdValue
+      currentClientIdString = newClientIdValue
       return ClientIdAccessToken(oldClientIdValue)
     }
 
@@ -370,6 +368,14 @@ private class ClientIdElement2(val clientId: ClientId) : AbstractCoroutineContex
 
   object Key : CoroutineContext.Key<ClientIdElement2>
 }
+
+// TODO: it's a temporary solution that solves stofl problem
+private val threadLocalClientIdString = ThreadLocal.withInitial<String?> { null }
+@get:Internal
+@set:Internal
+var currentClientIdString: String?
+  get() = threadLocalClientIdString.get()
+  set(value) = threadLocalClientIdString.set(value)
 
 @ApiStatus.Internal
 fun ClientId.asContextElement2(): CoroutineContext.Element = ClientIdElement2(this)

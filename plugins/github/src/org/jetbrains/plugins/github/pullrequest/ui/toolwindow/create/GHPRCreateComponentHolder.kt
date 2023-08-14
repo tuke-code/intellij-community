@@ -1,4 +1,4 @@
-// Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.plugins.github.pullrequest.ui.toolwindow.create
 
 import com.intellij.collaboration.async.CompletableFutureUtil.completionOnEdt
@@ -43,12 +43,13 @@ import org.jetbrains.annotations.Nls
 import org.jetbrains.plugins.github.api.data.pullrequest.GHPullRequestShort
 import org.jetbrains.plugins.github.i18n.GithubBundle
 import org.jetbrains.plugins.github.pullrequest.GHPRCombinedDiffPreviewBase.Companion.createAndSetupDiffPreview
+import org.jetbrains.plugins.github.pullrequest.GHPRDiffPreview
+import org.jetbrains.plugins.github.pullrequest.GHPRToolWindowProjectViewModel
 import org.jetbrains.plugins.github.pullrequest.config.GithubPullRequestsProjectUISettings
 import org.jetbrains.plugins.github.pullrequest.data.GHPRDataContext
 import org.jetbrains.plugins.github.pullrequest.data.GHPRIdentifier
 import org.jetbrains.plugins.github.pullrequest.ui.*
 import org.jetbrains.plugins.github.pullrequest.ui.toolwindow.GHPRDiffController
-import org.jetbrains.plugins.github.pullrequest.ui.toolwindow.GHPRToolWindowRepositoryContentController
 import org.jetbrains.plugins.github.pullrequest.ui.toolwindow.GHPRViewTabsFactory
 import org.jetbrains.plugins.github.ui.util.DisableableDocument
 import org.jetbrains.plugins.github.util.ChangeDiffRequestProducerFactory
@@ -67,7 +68,7 @@ internal class GHPRCreateComponentHolder(private val actionManager: ActionManage
                                          private val settings: GithubPullRequestsProjectUISettings,
                                          private val repositoriesManager: GHHostedRepositoriesManager,
                                          private val dataContext: GHPRDataContext,
-                                         private val viewController: GHPRToolWindowRepositoryContentController,
+                                         private val projectVm: GHPRToolWindowProjectViewModel,
                                          disposable: Disposable) {
 
   private val repositoryDataService = dataContext.repositoryDataService
@@ -167,19 +168,14 @@ internal class GHPRCreateComponentHolder(private val actionManager: ActionManage
   }
 
   val component by lazy {
-    val infoComponent = GHPRCreateInfoComponentFactory(project, settings, dataContext, viewController)
+    val infoComponent = GHPRCreateInfoComponentFactory(project, settings, dataContext, projectVm)
       .create(directionModel, titleDocument, descriptionDocument, metadataModel, commitsCountModel, existenceCheckLoadingModel,
               createLoadingModel)
 
     GHPRViewTabsFactory(project, uiDisposable)
       .create(infoComponent, diffController,
               createFilesComponent(), filesCountFlow, null,
-              createCommitsComponent(), commitsCountFlow).apply {
-        setDataProvider { dataId ->
-          if (DiffRequestChainProducer.DATA_KEY.`is`(dataId)) diffRequestProducer
-          else null
-        }
-      }.component
+              createCommitsComponent(), commitsCountFlow).component
   }
 
   private fun createFilesComponent(): JComponent {
@@ -245,7 +241,7 @@ internal class GHPRCreateComponentHolder(private val actionManager: ActionManage
                                 emptyTextText: @Nls String): JComponent {
     val tree = CodeReviewChangesTreeFactory(project, model).create(emptyTextText)
 
-    val diffPreviewHolder = createAndSetupDiffPreview(tree, diffRequestProducer.changeProducerFactory, null, dataContext.filesManager)
+    val diffPreviewHolder = createAndSetupDiffPreview(tree, GHPRDiffPreview(null, dataContext.filesManager))
 
     DataManager.registerDataProvider(parentPanel) { dataId ->
       when {
@@ -270,7 +266,7 @@ internal class GHPRCreateComponentHolder(private val actionManager: ActionManage
     return model
   }
 
-  fun resetModel() {
+  private fun resetModel() {
     existenceCheckLoadingModel.reset()
     createLoadingModel.future = null
 

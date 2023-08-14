@@ -317,6 +317,9 @@ public final class PsiUtil extends PsiUtilCore {
       } else if (declarationScope instanceof PsiLambdaExpression) {
         codeBlock = ((PsiLambdaExpression)declarationScope).getBody();
       }
+      else if (declarationScope instanceof PsiCodeBlock) {
+        codeBlock = declarationScope;
+      }
     }
     else if (variable instanceof PsiResourceVariable) {
       PsiElement resourceList = variable.getParent();
@@ -1011,6 +1014,7 @@ public final class PsiUtil extends PsiUtilCore {
   }
 
   public static boolean checkName(@NotNull PsiElement element, @NotNull String name, @NotNull PsiElement context) {
+    if (element instanceof PsiVariable && ((PsiVariable)element).isUnnamed()) return false;
     if (element instanceof PsiMetaOwner) {
       PsiMetaData data = ((PsiMetaOwner) element).getMetaData();
       if (data != null) {
@@ -1441,5 +1445,14 @@ public final class PsiUtil extends PsiUtilCore {
   @Contract("null -> false")
   public static boolean isJvmLocalVariable(PsiElement variable) {
     return variable instanceof PsiLocalVariable || variable instanceof PsiParameter;
+  }
+
+  public static boolean isFollowedByImport(PsiElement element) {
+    PsiElement currentElement = element.getNextSibling();
+    while (!(currentElement instanceof PsiImportStatement)) {
+      if (currentElement == null) return false;
+      currentElement = currentElement.getNextSibling();
+    }
+    return true;
   }
 }

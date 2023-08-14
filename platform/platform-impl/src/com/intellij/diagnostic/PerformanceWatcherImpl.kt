@@ -1,5 +1,5 @@
 // Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
-@file:Suppress("ReplaceGetOrSet")
+@file:Suppress("ReplaceGetOrSet", "JAVA_MODULE_DOES_NOT_EXPORT_PACKAGE")
 
 package com.intellij.diagnostic
 
@@ -32,6 +32,10 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.collectLatest
 import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.NonNls
+import sun.awt.ModalityEvent
+import sun.awt.ModalityListener
+import sun.awt.SunToolkit
+import java.awt.Toolkit
 import java.io.File
 import java.io.IOException
 import java.nio.file.Files
@@ -68,7 +72,6 @@ internal class PerformanceWatcherImpl(private val coroutineScope: CoroutineScope
 
   @Volatile
   private var lastSampling = System.nanoTime()
-  private var activeEvents = 0
   private var currentEdtEventChecker: FreezeCheckerTask? = null
   private val jitWatcher = JitWatcher()
   private val unresponsiveIntervalLazy by lazy {
@@ -84,19 +87,6 @@ internal class PerformanceWatcherImpl(private val coroutineScope: CoroutineScope
       coroutineScope.launch {
         asyncInit()
 
-        val samplingIntervalMs = samplingInterval
-        @Suppress("KotlinConstantConditions")
-        if (samplingIntervalMs <= 0) {
-          return@launch
-        }
-
-        while (true) {
-          delay(samplingIntervalMs)
-          samplePerformance(samplingIntervalMs)
-        }
-      }
-
-      coroutineScope.launch {
         taskFlow.collectLatest { task ->
           if (task == null) {
             return@collectLatest
@@ -105,6 +95,33 @@ internal class PerformanceWatcherImpl(private val coroutineScope: CoroutineScope
           delay(unresponsiveInterval.toLong())
           task.edtFrozen()
         }
+      }
+    }
+    (Toolkit.getDefaultToolkit() as? SunToolkit)?.addModalityListener(object : ModalityListener {
+      override fun modalityPushed(ev: ModalityEvent) {
+      }
+
+      override fun modalityPopped(ev: ModalityEvent) {
+        stopCurrentTaskAndReEmit(FreezeCheckerTask(System.nanoTime()))
+      }
+    })
+  }
+
+  override fun startEdtSampling() {
+    if (!isActive) {
+      return
+    }
+
+    coroutineScope.launch {
+      val samplingIntervalMs = samplingInterval
+      @Suppress("KotlinConstantConditions")
+      if (samplingIntervalMs <= 0) {
+        return@launch
+      }
+
+      while (true) {
+        delay(samplingIntervalMs)
+        samplePerformance(samplingIntervalMs)
       }
     }
   }
@@ -209,27 +226,18 @@ internal class PerformanceWatcherImpl(private val coroutineScope: CoroutineScope
 
   @ApiStatus.Internal
   override fun edtEventStarted() {
-    if (!isActive) {
-      return
-    }
-
-    val start = System.nanoTime()
-    activeEvents++
-    currentEdtEventChecker?.stop()
-    val task = FreezeCheckerTask(start)
-    currentEdtEventChecker = task
-    check(taskFlow.tryEmit(task))
+    if (!isActive) return
+    stopCurrentTaskAndReEmit(FreezeCheckerTask(System.nanoTime()))
   }
 
   @ApiStatus.Internal
   override fun edtEventFinished() {
-    if (!isActive) {
-      return
-    }
+    if (!isActive) return
+    stopCurrentTaskAndReEmit(null)
+  }
 
-    activeEvents--
+  private fun stopCurrentTaskAndReEmit(task: FreezeCheckerTask?) {
     currentEdtEventChecker?.stop()
-    val task = if (activeEvents > 0) FreezeCheckerTask(System.nanoTime()) else null
     currentEdtEventChecker = task
     check(taskFlow.tryEmit(task))
   }
@@ -301,16 +309,52 @@ internal class PerformanceWatcherImpl(private val coroutineScope: CoroutineScope
   }
 
   private inner class FreezeCheckerTask(private val taskStart: Long) {
-    private val state = AtomicReference(CheckerState.CHECKING)
-    private val dumpTask = AtomicReference<MySamplingTask?>()
+    private val state = AtomicReference<CheckerState>(CheckerState.CHECKING)
 
     fun stop() {
-      if (state.getAndSet(CheckerState.FINISHED) != CheckerState.FREEZE) {
+      val oldState = state.getAndSet(CheckerState.FINISHED)
+      if (oldState is CheckerState.FREEZE_LOGGING) {
+        val task = oldState.dumpDask
+        stopFreezeReporting(task)
+      }
+    }
+
+    fun edtFrozen() {
+      if (!state.compareAndSet(CheckerState.CHECKING, CheckerState.FREEZE_DETECTED)) {
         return
       }
 
+      val dumpTask = startFreezeReporting()
+
+      if (!state.compareAndSet(CheckerState.FREEZE_DETECTED, CheckerState.FREEZE_LOGGING(dumpTask))) {
+        stopFreezeReporting(dumpTask)
+      }
+    }
+
+    suspend fun stopDumpingAsync() {
+      val oldState = state.getAndSet(CheckerState.FINISHED)
+      if (oldState is CheckerState.FREEZE_LOGGING) {
+        oldState.dumpDask.stopDumpingThreads()
+      }
+    }
+
+    private fun startFreezeReporting(): MySamplingTask {
+      val freezeFolder = "${THREAD_DUMPS_PREFIX}freeze-${formatTime(ZonedDateTime.now())}-${buildName()}"
+
+      val reportDir = logDir.resolve(freezeFolder)
+      Files.createDirectories(reportDir)
+
+      for (listener in EP_NAME.extensionList) {
+        listener.uiFreezeStarted(reportDir, coroutineScope)
+      }
+      val dumpTask = MySamplingTask(freezeFolder = freezeFolder, taskStart = taskStart)
+      publisher?.uiFreezeStarted(reportDir)
+
+      return dumpTask
+    }
+
+    private fun stopFreezeReporting(task: MySamplingTask) {
       val taskStop = System.nanoTime()
-      val task = dumpTask.getAndSet(null) ?: return
       coroutineScope.launch {
         task.stopDumpingThreads()
 
@@ -329,29 +373,6 @@ internal class PerformanceWatcherImpl(private val coroutineScope: CoroutineScope
           listener.uiFreezeRecorded(durationMs, reportDir)
         }
       }
-    }
-
-    fun edtFrozen() {
-      if (!state.compareAndSet(CheckerState.CHECKING, CheckerState.FREEZE)) {
-        return
-      }
-
-      val freezeFolder = "${THREAD_DUMPS_PREFIX}freeze-${formatTime(ZonedDateTime.now())}-${buildName()}"
-
-      //TODO always true for some reason
-      //myFreezeDuringStartup = !LoadingState.INDEXING_FINISHED.isOccurred();
-      val reportDir = logDir.resolve(freezeFolder)
-      Files.createDirectories(reportDir)
-
-      for (listener in EP_NAME.extensionList) {
-        listener.uiFreezeStarted(reportDir, coroutineScope)
-      }
-      dumpTask.set(MySamplingTask(freezeFolder = freezeFolder, taskStart = taskStart))
-      publisher?.uiFreezeStarted(reportDir)
-    }
-
-    suspend fun stopDumpingAsync() {
-      (dumpTask.getAndSet(null) ?: return).stopDumpingThreads()
     }
   }
 
@@ -474,7 +495,7 @@ private suspend fun reportCrashesIfAny() {
         attachment.isIncluded = true
 
         // include plugins list
-        val plugins = PluginManagerCore.getLoadedPlugins()
+        val plugins = PluginManagerCore.loadedPlugins
           .asSequence()
           .filter { it.isEnabled && !it.isBundled }
           .map(::getPluginInfoByDescriptor)
@@ -593,8 +614,9 @@ internal fun compareStackTraceElements(el1: StackTraceElement, el2: StackTraceEl
   }
 }
 
-private enum class CheckerState {
-  CHECKING,
-  FREEZE,
-  FINISHED
+private sealed interface CheckerState {
+  object CHECKING : CheckerState
+  object FREEZE_DETECTED : CheckerState
+  class FREEZE_LOGGING(val dumpDask: PerformanceWatcherImpl.MySamplingTask) : CheckerState
+  object FINISHED : CheckerState
 }

@@ -1,4 +1,4 @@
-// Copyright 2000-2021 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
+// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.collaboration.ui
 
 import com.intellij.application.subscribe
@@ -166,6 +166,7 @@ object CollaborationToolsUIUtil {
   /**
    * Add [listener] that will be invoked on each UI update
    */
+  @Deprecated("Not needed when using proper color and fonts. For complicated colors see JBColor.lazy")
   fun <T : JComponent> overrideUIDependentProperty(component: T, listener: T.() -> Unit) {
     UiNotifyConnector.installOn(component, object : Activatable {
       private var listenerDisposable: Disposable? by Delegates.observable(null) { _, oldValue, _ ->
@@ -219,6 +220,8 @@ object CollaborationToolsUIUtil {
   /**
    * Checks if focus is somewhere down the hierarchy from [component]
    */
+  // used externally
+  @Suppress("MemberVisibilityCanBePrivate")
   fun isFocusParent(component: JComponent): Boolean {
     val focusOwner = IdeFocusManager.findInstanceByComponent(component).focusOwner ?: return false
     return SwingUtilities.isDescendingFrom(focusOwner, component)

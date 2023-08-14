@@ -10,8 +10,8 @@ import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.IntellijInternalApi
 import com.intellij.openapi.util.registry.Registry
-import com.intellij.searchEverywhereMl.common.SE_TABS
-import com.intellij.searchEverywhereMl.common.log.MLSE_RECORDER_ID
+import com.intellij.searchEverywhereMl.SE_TABS
+import com.intellij.searchEverywhereMl.log.MLSE_RECORDER_ID
 import com.intellij.searchEverywhereMl.ranking.features.*
 import com.intellij.searchEverywhereMl.ranking.id.SearchEverywhereMlItemIdProvider
 import com.intellij.util.concurrency.NonUrgentExecutor
@@ -272,7 +272,7 @@ class SearchEverywhereMLStatisticsCollector : CounterUsagesCollector() {
   }
 
   companion object {
-    private val GROUP = EventLogGroup("mlse.log", 66, MLSE_RECORDER_ID)
+    private val GROUP = EventLogGroup("mlse.log", 71, MLSE_RECORDER_ID)
     private const val REPORTED_ITEMS_LIMIT = 50
 
     private val ORDER_BY_ML_GROUP = EventFields.Boolean("orderByMl")
@@ -286,7 +286,7 @@ class SearchEverywhereMLStatisticsCollector : CounterUsagesCollector() {
     private val SE_TAB_ID_KEY = EventFields.String("seTabId", SE_TABS)
     private val CLOSE_POPUP_KEY = EventFields.Boolean("closePopup")
     private val SEARCH_START_TIME_KEY = EventFields.Long("startTime")
-    private val REBUILD_REASON_KEY = EventFields.Enum<SearchRestartReason>("rebuildReason")
+    internal val REBUILD_REASON_KEY = EventFields.Enum<SearchRestartReason>("rebuildReason")
     private val SESSION_ID_LOG_DATA_KEY = EventFields.Int("sessionId")
     private val SEARCH_INDEX_DATA_KEY = EventFields.Int("searchIndex")
     private val LOG_FEATURES_DATA_KEY = EventFields.Boolean("logFeatures")
@@ -326,7 +326,7 @@ class SearchEverywhereMLStatisticsCollector : CounterUsagesCollector() {
     // events
     @VisibleForTesting
     val SESSION_FINISHED = registerEvent("sessionFinished", CLOSE_POPUP_KEY, FORCE_EXPERIMENT_GROUP)
-    private val SEARCH_RESTARTED = registerEvent("searchRestarted")
+    internal val SEARCH_RESTARTED = registerEvent("searchRestarted")
 
     private fun collectNameFeaturesToFields(): Map<String, EventField<*>> {
       val nameFeatureToField = hashMapOf<String, EventField<*>>(

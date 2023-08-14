@@ -1,6 +1,7 @@
 // Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.xdebugger.impl
 
+import com.intellij.openapi.application.EDT
 import com.intellij.openapi.application.readAction
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.editor.ScrollType
@@ -12,6 +13,8 @@ import com.intellij.util.asSafely
 import com.intellij.util.concurrency.annotations.RequiresBackgroundThread
 import com.intellij.util.concurrency.annotations.RequiresEdt
 import com.intellij.util.concurrency.annotations.RequiresReadLock
+import com.intellij.util.ui.EDT
+import com.intellij.xdebugger.XDebuggerUtil
 import com.intellij.xdebugger.XSourcePosition
 import com.intellij.xdebugger.impl.settings.XDebuggerSettingManagerImpl
 import kotlinx.coroutines.CoroutineScope
@@ -20,7 +23,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.withContext
+import java.lang.ref.WeakReference
 
 
 enum class ExecutionPositionNavigationMode {
@@ -34,12 +37,16 @@ internal class ExecutionPositionNavigator(
   private val isTopFrame: Boolean,
   updateFlow: Flow<Boolean>,
 ) {
-  private var openedEditor: Editor? = null
+  private var openedEditorRef: WeakReference<Editor>? = null
+  private var openedEditor: Editor?
+    get() = openedEditorRef?.get()
+    set(value) { openedEditorRef = value?.let(::WeakReference) }
+
   private var openFileDescriptor: OpenFileDescriptor? = null
   private val descriptorMutex = Mutex()
 
   init {
-    coroutineScope.launch {
+    coroutineScope.launch(Dispatchers.EDT) {
       updateFlow.collect { isToScrollToPosition ->
         invalidate()
         if (isToScrollToPosition) {
@@ -49,8 +56,8 @@ internal class ExecutionPositionNavigator(
     }
   }
 
-  @RequiresEdt
   suspend fun navigateTo(navigationMode: ExecutionPositionNavigationMode, isActiveSourceKind: Boolean = true) {
+    EDT.assertIsEdt()
     val effectiveNavigationMode = if (isActiveSourceKind) navigationMode else ExecutionPositionNavigationMode.SCROLL
     val descriptor = getDescriptor()
     navigateTo(descriptor, effectiveNavigationMode)
@@ -67,10 +74,8 @@ internal class ExecutionPositionNavigator(
       var descriptor = openFileDescriptor
       if (descriptor == null || descriptor.rangeMarker?.isValid == false) {
         openFileDescriptor?.dispose()
-        descriptor = withContext(Dispatchers.Default) {
-          readAction {
-            createOpenFileDescriptor()
-          }
+        descriptor = readAction {
+          createOpenFileDescriptor()
         }
         openFileDescriptor = descriptor
       }
@@ -82,7 +87,7 @@ internal class ExecutionPositionNavigator(
   private fun navigateTo(openFileDescriptor: OpenFileDescriptor, navigationMode: ExecutionPositionNavigationMode) {
     when (navigationMode) {
       ExecutionPositionNavigationMode.OPEN -> {
-        openedEditor = XDebuggerUtilImpl.createEditor(openFileDescriptor)
+        openedEditor = XDebuggerUtil.getInstance().openTextEditor(openFileDescriptor)
       }
       ExecutionPositionNavigationMode.SCROLL -> {
         val fileEditorManager = FileEditorManager.getInstance(openFileDescriptor.project)

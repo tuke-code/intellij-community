@@ -57,6 +57,10 @@
             qualifiedName="org.jetbrains.kotlin.ktModuleFactory"
             interface="org.jetbrains.kotlin.idea.base.projectStructure.KtModuleFactory"
             dynamic="true"/>
+    <extensionPoint
+            qualifiedName="org.jetbrains.kotlin.classImportFilter"
+            interface="org.jetbrains.kotlin.idea.util.ClassImportFilter"
+            dynamic="true"/>
   </extensionPoints>
 
   <extensions defaultExtensionNs="com.intellij">
@@ -81,6 +85,9 @@
             serviceInterface="org.jetbrains.kotlin.analysis.project.structure.ProjectStructureProvider"
             serviceImplementation="org.jetbrains.kotlin.idea.base.projectStructure.ProjectStructureProviderIdeImpl"/>
     <projectService
+            serviceInterface="org.jetbrains.kotlin.analysis.project.structure.KotlinModuleDependentsProvider"
+            serviceImplementation="org.jetbrains.kotlin.idea.base.projectStructure.IdeKotlinModuleDependentsProvider"/>
+    <projectService
             serviceInterface="org.jetbrains.kotlin.analysis.project.structure.KtModuleScopeProvider"
             serviceImplementation="org.jetbrains.kotlin.idea.base.projectStructure.KtModuleScopeProviderIdeImpl"/>
     <projectService
@@ -90,8 +97,8 @@
             serviceInterface="org.jetbrains.kotlin.idea.base.projectStructure.RootKindMatcher"
             serviceImplementation="org.jetbrains.kotlin.idea.base.analysis.RootKindMatcherImpl"/>
     <projectService
-            serviceInterface="org.jetbrains.kotlin.analysis.api.lifetime.KtDefaultLifetimeTokenProvider"
-            serviceImplementation="org.jetbrains.kotlin.analysis.api.lifetime.KtReadActionConfinementDefaultLifetimeTokenProvider"/>
+            serviceInterface="org.jetbrains.kotlin.analysis.api.lifetime.KtLifetimeTokenProvider"
+            serviceImplementation="org.jetbrains.kotlin.analysis.api.lifetime.KtReadActionConfinementLifetimeTokenProvider"/>
 
     <applicationConfigurable
             groupId="language"
@@ -141,6 +148,7 @@
 
     <breadcrumbsInfoProvider implementation="org.jetbrains.kotlin.idea.codeInsight.KotlinBreadcrumbsInfoProvider"/>
 
+    <gotoDeclarationHandler implementation="org.jetbrains.kotlin.idea.search.ideaExtensions.KotlinImportAliasGotoDeclarationHandler"/>
 
 
     <createFromTemplateHandler implementation="org.jetbrains.kotlin.idea.actions.KotlinCreateFromTemplateHandler"/>
@@ -206,6 +214,11 @@
             description="For functions show vararg variant before no argruments variant"
             defaultValue="true"
             restartRequired="false"/>
+    <registryKey
+            key="kotlin.auto.completion.insert.constructor.parenthesis"
+            description="Insert constructor parenthesis on class autocompletion"
+            defaultValue="false"
+            restartRequired="false"/>
 
     <registryKey key="kotlin.create.sealed.templates.enabled"
                  defaultValue="false"
@@ -244,7 +257,7 @@
               topic="org.jetbrains.kotlin.idea.macros.KotlinBundledUsageDetectorListener"/>
 
     <listener class="org.jetbrains.kotlin.idea.macros.KotlinBundledUsageDetector$ModelChangeListener"
-              topic="com.intellij.workspaceModel.ide.WorkspaceModelChangeListener"/>
+              topic="com.intellij.platform.backend.workspace.WorkspaceModelChangeListener"/>
   </projectListeners>
 
   <applicationListeners>
@@ -393,7 +406,7 @@
   <extensions defaultExtensionNs="com.intellij">
     <advancedSetting
             id="kotlin.mpp.experimental"
-            default="true"
+            default="false"
             groupKey="group.advanced.settings.kotlin"
             bundle="messages.KotlinBundle"/>
   </extensions>

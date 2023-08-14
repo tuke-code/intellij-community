@@ -58,7 +58,6 @@ class IntellijIconClassGeneratorConfig : IconClasses() {
                                                                          packageName = "org.intellij.plugins.markdown")
 
       "intellij.grazie.core" -> IntellijIconClassGeneratorModuleConfig(className = "GrazieIcons", packageName = "com.intellij.grazie.icons")
-      "intellij.sh.core" -> IntellijIconClassGeneratorModuleConfig(className = "ShIcons", packageName = "com.intellij.sh")
       "intellij.django.core" -> IntellijIconClassGeneratorModuleConfig(
         className = "DjangoIcons",
         packageName = "com.jetbrains.django"
@@ -78,6 +77,8 @@ class IntellijIconClassGeneratorConfig : IconClasses() {
       "intellij.ml.llm.core" -> IntellijIconClassGeneratorModuleConfig(className = "MLLlmCoreIcons", packageName = "com.intellij.ml.llm.core")
 
       "intellij.dts" -> IntellijIconClassGeneratorModuleConfig(className = "DtsIcons", packageName = "com.intellij.dts")
+
+      "intellij.protoeditor.core" -> IntellijIconClassGeneratorModuleConfig(className = "ProtoeditorCoreIcons", packageName = "com.intellij.protobuf")
 
       else -> super.getConfigForModule(moduleName)
     }

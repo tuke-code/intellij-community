@@ -118,6 +118,7 @@ class BasicCompletionKindGenerationSession(
                 expression = it,
                 resolutionFacade = resolutionFacade,
                 bindingContext = bindingContext,
+                applicabilityFilter = applicabilityFilter,
                 moduleDescriptor = moduleDescriptor,
                 visibilityFilter = isVisibleFilter,
                 indicesHelper = indicesHelper(false),
@@ -589,6 +590,7 @@ class BasicCompletionKindGenerationSession(
                         referenceVariantsHelper = rvHelper,
                         indicesHelper = indicesHelper(true),
                         prefixMatcher = prefixMatcher,
+                        applicabilityFilter = applicabilityFilter,
                         nameExpression = nameExpression,
                         callTypeAndReceiver = callTypeAndReceiver,
                         resolutionFacade = resolutionFacade,
@@ -733,6 +735,7 @@ class BasicCompletionKindGenerationSession(
 
             KeywordValues.process(
                 keywordValueConsumer,
+                position,
                 callTypeAndReceiver,
                 bindingContext,
                 resolutionFacade,
@@ -806,7 +809,7 @@ class BasicCompletionKindGenerationSession(
                                     "continue" -> KtTokens.CONTINUE_KEYWORD
                                     else -> error("'$keyword' can only be 'break' or 'continue'")
                                 }
-                                collector.addElements(BreakContinueKeywordHandler(ktKeywordToken).createLookups(this, expression))
+                                collector.addElements(BreakContinueKeywordHandler(ktKeywordToken).createLookups(expression))
                             }
                         }
                     }

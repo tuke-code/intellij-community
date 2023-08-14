@@ -1,4 +1,4 @@
-// Copyright 2000-2021 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
+// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.xdebugger.impl;
 
 import com.intellij.CommonBundle;
@@ -46,12 +46,14 @@ import com.intellij.xdebugger.*;
 import com.intellij.xdebugger.breakpoints.*;
 import com.intellij.xdebugger.breakpoints.ui.XBreakpointGroupingRule;
 import com.intellij.xdebugger.evaluation.EvaluationMode;
-import com.intellij.xdebugger.evaluation.XDebuggerEvaluator;
 import com.intellij.xdebugger.frame.XExecutionStack;
 import com.intellij.xdebugger.frame.XStackFrame;
 import com.intellij.xdebugger.frame.XSuspendContext;
 import com.intellij.xdebugger.frame.XValueContainer;
-import com.intellij.xdebugger.impl.breakpoints.*;
+import com.intellij.xdebugger.impl.breakpoints.XBreakpointBase;
+import com.intellij.xdebugger.impl.breakpoints.XBreakpointManagerImpl;
+import com.intellij.xdebugger.impl.breakpoints.XBreakpointUtil;
+import com.intellij.xdebugger.impl.breakpoints.XExpressionImpl;
 import com.intellij.xdebugger.impl.breakpoints.ui.grouping.XBreakpointFileGroupingRule;
 import com.intellij.xdebugger.impl.evaluate.quick.common.ValueLookupManager;
 import com.intellij.xdebugger.impl.frame.XStackFrameContainerEx;
@@ -104,7 +106,7 @@ public class XDebuggerUtilImpl extends XDebuggerUtil {
   }
 
   @NotNull
-  public Promise<XLineBreakpoint> toggleAndReturnLineBreakpoint(@NotNull final Project project,
+  public Promise<@Nullable XLineBreakpoint> toggleAndReturnLineBreakpoint(@NotNull final Project project,
                                                                 @NotNull final VirtualFile file,
                                                                 final int line,
                                                                 boolean temporary) {
@@ -131,7 +133,7 @@ public class XDebuggerUtilImpl extends XDebuggerUtil {
   }
 
   @NotNull
-  public <P extends XBreakpointProperties> Promise<XLineBreakpoint> toggleAndReturnLineBreakpoint(@NotNull final Project project,
+  public <P extends XBreakpointProperties> Promise<@Nullable XLineBreakpoint> toggleAndReturnLineBreakpoint(@NotNull final Project project,
                                                                                                   @NotNull final XLineBreakpointType<P> type,
                                                                                                   @NotNull final VirtualFile file,
                                                                                                   final int line,
@@ -170,7 +172,7 @@ public class XDebuggerUtilImpl extends XDebuggerUtil {
   }
 
   @NotNull
-  public static Promise<XLineBreakpoint> toggleAndReturnLineBreakpoint(@NotNull final Project project,
+  public static Promise<@Nullable XLineBreakpoint> toggleAndReturnLineBreakpoint(@NotNull final Project project,
                                                                        @NotNull List<? extends XLineBreakpointType> types,
                                                                        @NotNull final XSourcePosition position,
                                                                        final boolean temporary,
@@ -375,7 +377,7 @@ public class XDebuggerUtilImpl extends XDebuggerUtil {
 
   @Override
   public <T extends XDebuggerSettings<?>> T getDebuggerSettings(Class<T> aClass) {
-    return XDebuggerSettings.EXTENSION_POINT.findExtension(aClass);
+    return XDebuggerSettingManagerImpl.getInstanceImpl().getSettings(aClass);
   }
 
   @Override
@@ -534,7 +536,13 @@ public class XDebuggerUtilImpl extends XDebuggerUtil {
     ValueLookupManager.DISABLE_VALUE_LOOKUP.set(editor, Boolean.TRUE);
   }
 
+
+  @Override
   @Nullable
+  public Editor openTextEditor(@NotNull OpenFileDescriptor descriptor) {
+    return createEditor(descriptor);
+  }
+
   public static Editor createEditor(@NotNull OpenFileDescriptor descriptor) {
     if (descriptor.canNavigate()) {
       FileEditorManagerEx fileEditorManager = FileEditorManagerEx.getInstanceEx(descriptor.getProject());

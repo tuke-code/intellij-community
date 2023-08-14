@@ -4,7 +4,7 @@ interface X {
 }
 
 interface XX : X {
-    open override fun foo() {
+    override fun foo() {
 
     }
 }
@@ -17,3 +17,5 @@ class B(y: XX) : A(y) {
     }
 }
 /* IGNORE_FIR */
+
+// FUS_QUICKFIX_NAME: org.jetbrains.kotlin.idea.quickfix.MakeOverriddenMemberOpenFix

@@ -8,7 +8,6 @@ import com.intellij.openapi.application.*
 import com.intellij.openapi.components.service
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.progress.ProgressManager
-import com.intellij.openapi.progress.blockingContext
 import com.intellij.openapi.progress.util.BackgroundTaskUtil
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.ProjectManager
@@ -16,16 +15,14 @@ import com.intellij.openapi.project.ProjectManagerListener
 import com.intellij.openapi.projectRoots.Sdk
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.VirtualFileManager
+import com.intellij.platform.backend.workspace.WorkspaceModel
 import com.intellij.psi.PsiManager
 import com.intellij.refactoring.suggested.createSmartPointer
 import com.intellij.testFramework.LightVirtualFile
 import com.intellij.util.applyIf
 import com.intellij.util.ui.EDT.isCurrentThreadEdt
-import com.intellij.workspaceModel.ide.WorkspaceModel
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import org.jetbrains.kotlin.idea.base.util.CheckCanceledLock
 import org.jetbrains.kotlin.idea.core.KotlinPluginDisposable
 import org.jetbrains.kotlin.idea.core.script.ScriptDependenciesModificationTracker
@@ -53,6 +50,7 @@ import java.util.concurrent.atomic.AtomicReference
  * This will start indexing.
  * Also analysis cache will be cleared and changed opened script files will be reanalyzed.
  */
+
 abstract class ScriptClassRootsUpdater(
     val project: Project,
     val manager: CompositeScriptConfigurationManager,
@@ -78,6 +76,7 @@ abstract class ScriptClassRootsUpdater(
      * We need CAS due to concurrent unblocking sync update in [checkInvalidSdks]
      */
     private val cache: AtomicReference<ScriptClassRootsCache> = AtomicReference(ScriptClassRootsCache.EMPTY)
+
 
     init {
         ProjectManager.getInstance().addProjectManagerListener(project, object : ProjectManagerListener {
@@ -357,13 +356,11 @@ abstract class ScriptClassRootsUpdater(
         }
         if (ktFiles.isNotEmpty()) {
             scope.launch {
-                withContext(Dispatchers.EDT) {
-                    blockingContext {
-                        ktFiles.forEach {
-                            val ktFile = it.element ?: return@forEach
-                            DaemonCodeAnalyzer.getInstance(project)
-                                .restart(ktFile)
-                        }
+                readAction {
+                    val daemonCodeAnalyzer = DaemonCodeAnalyzer.getInstance(project)
+                    for (it in ktFiles) {
+                        val ktFile = it.element ?: continue
+                        daemonCodeAnalyzer.restart(ktFile) // only requires read action, do not move to EDT
                     }
                 }
             }

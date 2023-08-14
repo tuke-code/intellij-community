@@ -54,7 +54,6 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public abstract class AbstractGotoSEContributor implements WeightedSearchEverywhereContributor<Object>, ScopeSupporting,
-                                                           SearchFieldActionsContributor,
                                                            SearchEverywhereExtendedInfoProvider {
   protected static final Pattern ourPatternToDetectAnonymousClasses = Pattern.compile("([.\\w]+)((\\$[\\d]+)*(\\$)?)");
   private static final Logger LOG = Logger.getInstance(AbstractGotoSEContributor.class);
@@ -62,7 +61,7 @@ public abstract class AbstractGotoSEContributor implements WeightedSearchEverywh
 
   private static final Pattern ourPatternToDetectLinesAndColumns = Pattern.compile(
     "(.+?)" + // name, non-greedy matching
-    "(?::|@|,| |#|#L|\\?l=| on line | at line |:?\\(|:?\\[)" + // separator
+    "(?::|@|,| |#|#L|\\?l=| on line | at line |:line |:?\\(|:?\\[)" + // separator
     "(\\d+)?(?:\\W(\\d+)?)?" + // line + column
     "[)\\]]?" // possible closing paren/brace
   );
@@ -239,13 +238,6 @@ public abstract class AbstractGotoSEContributor implements WeightedSearchEverywh
       boolean everywhere = scope.isSearchInLibraries();
       ChooseByNameViewModel viewModel = new MyViewModel(myProject, model);
 
-      if (Registry.is("search.everywhere.recents")) {
-        if (provider.fetchRecents(myProject, progressIndicator, pattern, viewModel,
-                                  item -> processElement(progressIndicator, consumer, model, item.getItem(), item.getWeight()))) {
-          return;
-        }
-      }
-
       if (provider instanceof ChooseByNameInScopeItemProvider) {
         FindSymbolParameters parameters = FindSymbolParameters.wrap(pattern, scope);
         ((ChooseByNameInScopeItemProvider)provider).filterElementsWithWeights(viewModel, parameters, progressIndicator,
@@ -277,13 +269,6 @@ public abstract class AbstractGotoSEContributor implements WeightedSearchEverywh
       ProgressIndicatorUtils.runInReadActionWithWriteActionPriority(fetchRunnable, progressIndicator);
     }
   }
-
-  @NotNull
-  @Override
-  public List<AnAction> createRightActions(@NotNull String pattern, @NotNull Runnable onChanged) {
-    return ContainerUtil.emptyList();
-  }
-
   protected boolean processElement(@NotNull ProgressIndicator progressIndicator,
                                    @NotNull Processor<? super FoundItemDescriptor<Object>> consumer,
                                    FilteringGotoByModel<?> model, Object element, int degree) {

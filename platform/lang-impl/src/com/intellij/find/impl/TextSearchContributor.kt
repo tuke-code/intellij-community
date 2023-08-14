@@ -6,11 +6,14 @@ import com.intellij.find.FindManager
 import com.intellij.find.FindModel
 import com.intellij.find.FindSettings
 import com.intellij.find.impl.TextSearchRightActionAction.*
+import com.intellij.ide.IdeBundle
 import com.intellij.ide.actions.GotoActionBase
 import com.intellij.ide.actions.SearchEverywhereBaseAction
 import com.intellij.ide.actions.SearchEverywhereClassifier
 import com.intellij.ide.actions.searcheverywhere.*
 import com.intellij.ide.actions.searcheverywhere.AbstractGotoSEContributor.createContext
+import com.intellij.ide.actions.searcheverywhere.SETabSwitcherListener.Companion.SE_TAB_TOPIC
+import com.intellij.ide.actions.searcheverywhere.SETabSwitcherListener.SETabSwitchedEvent
 import com.intellij.ide.actions.searcheverywhere.footer.createTextExtendedInfo
 import com.intellij.ide.util.scopeChooser.ScopeDescriptor
 import com.intellij.ide.util.scopeChooser.ScopeModel
@@ -18,6 +21,7 @@ import com.intellij.openapi.Disposable
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.CommonDataKeys
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.observable.properties.AtomicBooleanProperty
 import com.intellij.openapi.options.advanced.AdvancedSettings
 import com.intellij.openapi.progress.ProgressIndicator
@@ -27,13 +31,17 @@ import com.intellij.openapi.util.Key
 import com.intellij.psi.SmartPointerManager
 import com.intellij.psi.search.GlobalSearchScope
 import com.intellij.reference.SoftReference
+import com.intellij.ui.SimpleTextAttributes
 import com.intellij.usages.UsageInfo2UsageAdapter
 import com.intellij.usages.UsageViewPresentation
 import com.intellij.util.Processor
 import com.intellij.util.containers.ContainerUtil
 import com.intellij.util.containers.JBIterable
+import com.intellij.util.ui.StatusText
 import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.Nls
+import java.awt.event.ActionEvent
+import java.awt.event.ActionListener
 import java.lang.ref.Reference
 import java.lang.ref.WeakReference
 import javax.swing.ListCellRenderer
@@ -43,6 +51,7 @@ class TextSearchContributor(val event: AnActionEvent) : WeightedSearchEverywhere
                                                         SearchFieldActionsContributor,
                                                         SearchEverywhereExtendedInfoProvider,
                                                         PossibleSlowContributor,
+                                                        SearchEverywhereEmptyTextProvider,
                                                         DumbAware, ScopeSupporting, Disposable {
 
   private val project = event.getRequiredData(CommonDataKeys.PROJECT)
@@ -88,7 +97,7 @@ class TextSearchContributor(val event: AnActionEvent) : WeightedSearchEverywhere
                                      consumer: Processor<in FoundItemDescriptor<SearchEverywhereItem>>) {
     FindModel.initStringToFind(model, pattern)
 
-    val presentation = FindInProjectUtil.setupProcessPresentation(project, UsageViewPresentation())
+    val presentation = FindInProjectUtil.setupProcessPresentation(UsageViewPresentation())
 
     val scope = GlobalSearchScope.projectScope(project) // TODO use scope from model ?
     val recentItemRef = ThreadLocal<Reference<SearchEverywhereItem>>()
@@ -99,9 +108,11 @@ class TextSearchContributor(val event: AnActionEvent) : WeightedSearchEverywhere
       val recentItem = SoftReference.dereference(recentItemRef.get())
       val newItem = if (recentItem != null && recentItem.usage.merge(usage)) {
         // recompute merged presentation
+        recentItem.usage.updateCachedPresentation()
         recentItem.withPresentation(usagePresentation(project, scope, recentItem.usage))
       }
       else {
+        usage.updateCachedPresentation()
         SearchEverywhereItem(usage, usagePresentation(project, scope, usage)).also {
           if (!consumer.process(FoundItemDescriptor(it, 0))) return@findUsages false
         }
@@ -126,21 +137,37 @@ class TextSearchContributor(val event: AnActionEvent) : WeightedSearchEverywhere
   override fun getActions(onChanged: Runnable): List<AnAction> =
     listOf(ScopeAction { onChanged.run() }, JComboboxAction(project) { onChanged.run() }.also { onDispose = it.saveMask })
 
-  override fun createRightActions(pattern: String, onChanged: Runnable): List<TextSearchRightActionAction> {
-    lateinit var regexp: AtomicBooleanProperty
-    val word = AtomicBooleanProperty(model.isWholeWordsOnly).apply {
-      afterChange {
-        model.isWholeWordsOnly = it; if (it) regexp.set(false)
-      }
-    }
+  override fun createRightActions(registerShortcut: (AnAction) -> Unit, onChanged: Runnable): List<TextSearchRightActionAction> {
+    val word = AtomicBooleanProperty(model.isWholeWordsOnly).apply { afterChange { model.isWholeWordsOnly = it } }
     val case = AtomicBooleanProperty(model.isCaseSensitive).apply { afterChange { model.isCaseSensitive = it } }
-    regexp = AtomicBooleanProperty(model.isRegularExpressions).apply {
-      afterChange {
-        model.isRegularExpressions = it; if (it) word.set(false)
-      }
+    val regexp = AtomicBooleanProperty(model.isRegularExpressions).apply { afterChange { model.isRegularExpressions = it } }
+
+    val findModelObserver = FindModel.FindModelObserver {
+      if (model.isCaseSensitive != case.get()) case.set(model.isCaseSensitive)
+      if (model.isRegularExpressions != regexp.get()) regexp.set(model.isRegularExpressions)
+      if (model.isWholeWordsOnly != word.get()) word.set(model.isWholeWordsOnly)
     }
 
-    return listOf(CaseSensitiveAction(case, onChanged), WordAction(word, onChanged), RegexpAction(regexp, onChanged))
+    ApplicationManager.getApplication().getMessageBus().connect().subscribe<SETabSwitcherListener>(
+      SE_TAB_TOPIC, object : SETabSwitcherListener {
+      override fun tabSwitched(event: SETabSwitchedEvent) {
+        case.set(false)
+        regexp.set(false)
+        word.set(false)
+      }
+    })
+
+    val onDisposeLocal = onDispose
+    onDispose = {
+      onDisposeLocal.invoke()
+      model.removeObserver(findModelObserver)
+    }
+
+    model.addObserver(findModelObserver)
+
+    return listOf(CaseSensitiveAction(case, registerShortcut, onChanged),
+                  WordAction(word, registerShortcut, onChanged),
+                  RegexpAction(regexp, registerShortcut, onChanged))
   }
 
   override fun getDataForItem(element: SearchEverywhereItem, dataId: String): Any? {
@@ -208,6 +235,38 @@ class TextSearchContributor(val event: AnActionEvent) : WeightedSearchEverywhere
   }
 
   override fun createExtendedInfo() = createTextExtendedInfo()
+
+  override fun updateEmptyStatus(statusText: StatusText, rebuild: () -> Unit) {
+    statusText.appendLine(IdeBundle.message("searcheverywhere.nothing.found.for.all.anywhere")).appendText(".").appendLine("")
+
+    if (!(model.isCaseSensitive || model.isWholeWordsOnly || model.isRegularExpressions || model.fileFilter?.isNotBlank() == true)) return
+
+    statusText.appendLine(FindBundle.message("message.nothingFound.used.options")).appendLine("")
+
+    if (model.isCaseSensitive) {
+      statusText.appendText(FindBundle.message("find.popup.case.sensitive.label"))
+    }
+    if (model.isWholeWordsOnly) {
+      statusText.appendText(" ").appendText(FindBundle.message("find.whole.words.label"))
+    }
+    if (model.isRegularExpressions) {
+      statusText.appendText(" ").appendText(FindBundle.message("find.regex.label"))
+    }
+    if (model.fileFilter?.isNotBlank() == true) {
+      statusText.appendText(" ").appendText(FindBundle.message("find.popup.filemask.label"))
+    }
+
+    val clear = {
+      model.isCaseSensitive = false
+      model.isWholeWordsOnly = false
+      model.isRegularExpressions = false
+      model.fileFilter = null
+    }
+
+    statusText.appendLine(FindBundle.message("find.popup.clear.all.options"),
+                          SimpleTextAttributes.LINK_PLAIN_ATTRIBUTES,
+                          ActionListener { _: ActionEvent? -> clear.invoke(); rebuild.invoke() })
+  }
 
   companion object {
     private const val ID = "TextSearchContributor"

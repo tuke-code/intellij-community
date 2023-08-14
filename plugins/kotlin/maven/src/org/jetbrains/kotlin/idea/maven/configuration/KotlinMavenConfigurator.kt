@@ -37,6 +37,7 @@ import org.jetbrains.kotlin.idea.framework.ui.ConfigureDialogWithModulesAndVersi
 import org.jetbrains.kotlin.idea.maven.*
 import org.jetbrains.kotlin.idea.projectConfiguration.LibraryJarDescriptor
 import org.jetbrains.kotlin.idea.quickfix.AbstractChangeFeatureSupportLevelFix
+import org.jetbrains.kotlin.idea.statistics.KotlinJ2KOnboardingFUSCollector
 
 abstract class KotlinMavenConfigurator
 protected constructor(
@@ -64,6 +65,10 @@ protected constructor(
             return runReadAction { checkKotlinPlugin(module) }
         }
         return ConfigureKotlinStatus.CAN_BE_CONFIGURED
+    }
+
+    override fun isApplicable(module: Module): Boolean {
+        return module.buildSystemType == BuildSystemType.Maven
     }
 
     private fun checkKotlinPlugin(module: Module): ConfigureKotlinStatus {
@@ -101,13 +106,16 @@ protected constructor(
 
         dialog.show()
         if (!dialog.isOK) return
+        val kotlinVersion = dialog.kotlinVersion ?: return
+
+        KotlinJ2KOnboardingFUSCollector.logStartConfigureKt(project)
 
         WriteCommandAction.runWriteCommandAction(project) {
             val collector = NotificationMessageCollector.create(project)
             for (module in excludeMavenChildrenModules(project, dialog.modulesToConfigure)) {
                 val file = findModulePomFile(module)
                 if (file != null && canConfigureFile(file)) {
-                    configureModule(module, file, IdeKotlinVersion.get(dialog.kotlinVersion), collector)
+                    configureModule(module, file, IdeKotlinVersion.get(kotlinVersion), collector)
                     OpenFileAction.openFile(file.virtualFile, project)
                 } else {
                     showErrorMessage(project, KotlinMavenBundle.message("error.cant.find.pom.for.module", module.name))

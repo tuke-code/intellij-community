@@ -7,9 +7,6 @@ import org.jetbrains.annotations.NotNull;
 import java.nio.file.Path;
 
 public final class PersistentFSPaths {
-  /** @deprecated remove as soon as {@link VfsDependentEnum} class is removed */
-  @Deprecated
-  @NonNls private static final String DEPENDENT_PERSISTENT_LIST_START_PREFIX = "vfs_enum_";
 
   @NonNls private static final String ROOTS_START_PREFIX = "roots_";
   static final String VFS_FILES_EXTENSION = System.getProperty("idea.vfs.files.extension", ".dat");
@@ -25,15 +22,11 @@ public final class PersistentFSPaths {
     return storagesDir.resolve("corruption.marker");
   }
 
-  //@NotNull File getVfsEnumBaseFile() {
-  //  return new File(new File(myCachesDir), DEPENDENT_PERSISTENT_LIST_START_PREFIX);
-  //}
-
-  /** @deprecated remove as soon as {@link VfsDependentEnum} is removed */
-  @Deprecated
-  public @NotNull Path getVfsEnumFile(@NotNull String enumName) {
-    return storagesDir.resolve(DEPENDENT_PERSISTENT_LIST_START_PREFIX + enumName + VFS_FILES_EXTENSION);
+  public @NotNull Path getStoragesReplacementMarkerFile() {
+    return storagesDir.resolve("replace-storages.marker");
   }
+
+  public @NotNull Path getVfsLogStorage() { return storagesDir.resolve("vfslog"); }
 
   public @NotNull Path getRootsBaseFile() {
     return storagesDir.resolve(ROOTS_START_PREFIX);
@@ -45,5 +38,9 @@ public final class PersistentFSPaths {
 
   public @NotNull Path storagePath(final @NotNull String storageName) {
     return storagesDir.resolve(storageName + VFS_FILES_EXTENSION);
+  }
+
+  public @NotNull Path storagesSubDir(final @NotNull String name) {
+    return storagesDir.resolve(name);
   }
 }

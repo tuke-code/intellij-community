@@ -12,6 +12,7 @@ import com.intellij.ui.hover.HoverStateListener
 import com.intellij.ui.scale.JBUIScale
 import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.JBUI.Panels.simplePanel
+import com.intellij.util.ui.UIUtil
 import net.miginfocom.layout.CC
 import net.miginfocom.layout.LC
 import net.miginfocom.swing.MigLayout
@@ -178,7 +179,7 @@ object CodeReviewChatItemUIUtil {
   object ComponentFactory {
     fun wrapWithHeader(item: JComponent, title: JComponent, actions: JComponent?): JComponent {
       val headerPanel = JPanel(null).apply {
-        layout = MigLayout(LC().gridGap("0", "0").insets("0")
+        layout = MigLayout(LC().gridGap("0", "0").insets("0").height("16")
                              .hideMode(3).fill())
         isOpaque = false
 
@@ -211,6 +212,7 @@ object CodeReviewChatItemUIUtil {
   fun withHoverHighlight(comp: JComponent): JComponent {
     val highlighterPanel = JPanelWithBackground(BorderLayout()).apply {
       isOpaque = false
+      background = UIUtil.TRANSPARENT_COLOR
       add(comp, BorderLayout.CENTER)
     }.also {
       object : HoverStateListener() {
@@ -220,7 +222,7 @@ object CodeReviewChatItemUIUtil {
             JBColor.namedColor("Review.ChatItem.Hover", JBColor(ColorUtil.fromHex("#D8D8D833"), ColorUtil.fromHex("#4B4B4B33")))
           }
           else {
-            null
+            UIUtil.TRANSPARENT_COLOR
           }
         }
       }.apply {

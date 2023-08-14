@@ -2,9 +2,11 @@
 package com.intellij.codeInsight.intention.impl;
 
 
-import com.intellij.codeInspection.EditorUpdater;
-import com.intellij.codeInspection.PsiUpdateModCommandAction;
 import com.intellij.java.JavaBundle;
+import com.intellij.modcommand.ActionContext;
+import com.intellij.modcommand.ModPsiUpdater;
+import com.intellij.modcommand.Presentation;
+import com.intellij.modcommand.PsiUpdateModCommandAction;
 import com.intellij.openapi.application.Application;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.psi.*;
@@ -32,7 +34,7 @@ public class ChangeUIDAction extends PsiUpdateModCommandAction<PsiField> {
   }
 
   @Override
-  protected void invoke(@NotNull ActionContext context, @NotNull PsiField field, @NotNull EditorUpdater updater) {
+  protected void invoke(@NotNull ActionContext context, @NotNull PsiField field, @NotNull ModPsiUpdater updater) {
     PsiElementFactory factory = JavaPsiFacade.getElementFactory(context.project());
     Application application = ApplicationManager.getApplication();
     Random random = application.isUnitTestMode() ? new Random(42) : new SecureRandom();

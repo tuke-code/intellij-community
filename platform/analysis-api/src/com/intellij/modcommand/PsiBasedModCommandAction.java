@@ -52,8 +52,7 @@ public abstract class PsiBasedModCommandAction<E extends PsiElement> implements 
     return element == null ? null : getPresentation(context, element);
   }
 
-  @Nullable
-  private E getElement(@NotNull ActionContext context) {
+  private @Nullable E getElement(@NotNull ActionContext context) {
     if (myPointer != null) {
       E element = myPointer.getElement();
       if (element != null && !BaseIntentionAction.canModify(element)) return null;
@@ -97,7 +96,7 @@ public abstract class PsiBasedModCommandAction<E extends PsiElement> implements 
    */
   protected @NotNull IntentionPreviewInfo generatePreview(ActionContext context, E element) {
     ModCommand command = perform(context, element);
-    return IntentionPreviewUtils.getModCommandPreview(command, context.file());
+    return IntentionPreviewUtils.getModCommandPreview(command, context);
   }
 
   /**

@@ -5,11 +5,7 @@ package org.jetbrains.sqlite
  * A class for safely wrapping calls to a native pointer to a statement, ensuring no other thread
  * has access to the pointer while it is run
  */
-internal class SafeStatementPointer(
-  private val connection: SqliteConnection,
-  @JvmField
-  internal val pointer: Long,
-) {
+internal class SafeStatementPointer(private val connection: SqliteConnection, @JvmField internal val pointer: Long) {
   /**
    * Check whether this pointer has been closed
    */
@@ -17,35 +13,16 @@ internal class SafeStatementPointer(
   var isClosed: Boolean = false
     private set
 
-  // to return on subsequent calls to close() after this ptr has been closed
-  private var closeOperationStatus = 0
-
-  // to throw on subsequent calls to close, after this ptr has been closed if the close function threw an exception
-  private var closeException: Exception? = null
-
-  /**
-   * Close this pointer
-   *
-   * @return the return code of the close callback function
-   */
-  fun close(): Int = connection.useDb { db -> internalClose(db) }
-
-  internal fun internalClose(db: SqliteDb): Int {
-    // if this is already closed, return or throw the previous result
+  internal fun close(db: SqliteDb) {
     if (isClosed) {
-      closeException?.let {
-        throw it
-      }
-      return closeOperationStatus
+      return
     }
 
     try {
-      closeOperationStatus = db.finalize(this, pointer)
-      return closeOperationStatus
-    }
-    catch (e: Exception) {
-      closeException = e
-      throw e
+      val status = db.finalize(this, pointer)
+      if (status != SqliteCodes.SQLITE_OK && status != SqliteCodes.SQLITE_MISUSE) {
+        throw db.newException(status)
+      }
     }
     finally {
       isClosed = true
@@ -58,7 +35,7 @@ internal class SafeStatementPointer(
    * @param task the function to run
    * @return the return of the passed in function
    */
-  inline fun safeRunInt(task: (db: SqliteDb, statementPointer: Long) -> Int): Int {
+  inline fun safeRunInt(task: (db: NativeDB, statementPointer: Long) -> Int): Int {
     connection.useDb { db ->
       ensureOpen()
       return task(db, pointer)

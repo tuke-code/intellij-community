@@ -32,7 +32,6 @@ import com.intellij.openapi.progress.EmptyProgressIndicator
 import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.progress.blockingContext
-import com.intellij.openapi.progress.util.ProgressIndicatorUtils
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.rd.createLifetime
 import com.intellij.openapi.rd.createNestedDisposable
@@ -59,8 +58,10 @@ import com.jetbrains.rd.util.reactive.whenTrue
 import com.jetbrains.rd.util.trace
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import org.jetbrains.annotations.TestOnly
 import java.util.concurrent.CompletableFuture
+import kotlin.time.Duration.Companion.milliseconds
 
 open class CodeVisionHost(val project: Project) {
   companion object {
@@ -178,10 +179,11 @@ open class CodeVisionHost(val project: Project) {
   }
 
   @RequiresReadLock
-  fun collectPlaceholders(editor: Editor,
-                          psiFile: PsiFile?): List<Pair<TextRange, CodeVisionEntry>> {
-    return ProgressIndicatorUtils.withTimeout(100) {
-      collectPlaceholdersInner(editor, psiFile)
+  suspend fun collectPlaceholders(editor: Editor, psiFile: PsiFile?): List<Pair<TextRange, CodeVisionEntry>> {
+    return withTimeoutOrNull(100.milliseconds) {
+      readAction {
+        collectPlaceholdersInner(editor, psiFile)
+      }
     } ?: emptyList()
   }
 
@@ -340,14 +342,14 @@ open class CodeVisionHost(val project: Project) {
       calculateFrontendLenses(lt, editor, groupToRecalculate) { lenses, providersToUpdate ->
         val newLenses = previousLenses.filter { !providersToUpdate.contains(it.second.providerId) } + lenses
 
-        editor.lensContextOrThrow.setResults(newLenses)
+        editor.lensContext.setResults(newLenses)
         previousLenses = newLenses
         calcRunning = false
       }
     }
 
     fun pokeEditor(providersToRecalculate: Collection<String> = emptyList()) {
-      editor.lensContextOrThrow.notifyPendingLenses()
+      editor.lensContext.notifyPendingLenses()
       val shouldRecalculateAll = mergingQueueFront.isEmpty.not()
       mergingQueueFront.cancelAllUpdates()
       mergingQueueFront.queue(object : Update("") {
@@ -367,7 +369,7 @@ open class CodeVisionHost(val project: Project) {
       }
     }
 
-    editor.lensContextOrThrow.notifyPendingLenses()
+    editor.lensContext.notifyPendingLenses()
     recalculateLenses()
 
     application.messageBus.connect(editorLifetime.createNestedDisposable()).subscribe(FileEditorManagerListener.FILE_EDITOR_MANAGER,
@@ -385,7 +387,7 @@ open class CodeVisionHost(val project: Project) {
       }
     }, editorLifetime.createNestedDisposable())
 
-    editorLifetime.onTermination { editor.lensContextOrThrow.clearLenses() }
+    editorLifetime.onTermination { editor.lensContext.clearLenses() }
   }
 
   private fun calculateFrontendLenses(calcLifetime: Lifetime,
@@ -428,7 +430,7 @@ open class CodeVisionHost(val project: Project) {
         ProgressManager.checkCanceled()
         if (project.isDisposed) return@executeOnPooledThread
         if (!inlaySettingsEditor && lifeSettingModel.disabledCodeVisionProviderIds.contains(it.groupId)) {
-          if (editor.lensContextOrThrow.hasProviderCodeVision(it.id)) {
+          if (editor.lensContext.hasProviderCodeVision(it.id)) {
             providerWhoWantToUpdate.add(it.id)
           }
           return@forEach
@@ -465,12 +467,12 @@ open class CodeVisionHost(val project: Project) {
       }
 
       if (!everyProviderReadyToUpdate) {
-        editor.lensContextOrThrow.discardPending()
+        editor.lensContext.discardPending()
         return@executeOnPooledThread
       }
 
       if (providerWhoWantToUpdate.isEmpty()) {
-        editor.lensContextOrThrow.discardPending()
+        editor.lensContext.discardPending()
         return@executeOnPooledThread
       }
 
@@ -530,7 +532,7 @@ open class CodeVisionHost(val project: Project) {
   @TestOnly
   fun calculateCodeVisionSync(editor: Editor, testRootDisposable: Disposable) {
     calculateFrontendLenses(testRootDisposable.createLifetime(), editor, inTestSyncMode = true) { lenses, _ ->
-      editor.lensContextOrThrow.setResults(lenses)
+      editor.lensContext.setResults(lenses)
     }
   }
 }

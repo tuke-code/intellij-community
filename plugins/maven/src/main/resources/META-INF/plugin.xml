@@ -66,6 +66,8 @@
   <depends optional="true" config-file="maven-performance-plugin-support.xml">com.jetbrains.performancePlugin</depends>
 
   <extensions defaultExtensionNs="com.intellij">
+    <postStartupActivity implementation="org.jetbrains.idea.maven.project.MavenProjectsManagerProjectActivity"/>
+
     <pathMacroContributor implementation="org.jetbrains.idea.maven.utils.MavenPathMacroContributor"/>
     <customJavadocTagProvider implementation="org.jetbrains.idea.maven.javadoc.MojoClassAnnotationTagProvider"/>
     <fileType name="MavenConfig" implementationClass="org.jetbrains.idea.maven.config.MavenConfigFileType"
@@ -142,7 +144,7 @@
     <externalIconProvider key="MAVEN" implementationClass="org.jetbrains.idea.maven.ui.MavenIconProvider"/>
     <externalSystemKeymapProvider implementation="org.jetbrains.idea.maven.tasks.MavenKeymapExtension"/>
     <externalSystemWorkspaceContributor implementation="org.jetbrains.idea.maven.importing.MavenWorkspaceContributor"/>
-    <externalProjectWatcherContributor implementation="org.jetbrains.idea.maven.project.MavenProjectsManager$ExternalWatcherContributor"/>
+    <externalProjectWatcherContributor implementation="org.jetbrains.idea.maven.project.auto.reload.MavenProjectWatcherContributor"/>
     <configurationType implementation="org.jetbrains.idea.maven.execution.MavenRunConfigurationType"/>
     <runConfigurationProducer implementation="org.jetbrains.idea.maven.execution.MavenConfigurationProducer"/>
     <orderEnumerationHandlerFactory implementation="org.jetbrains.idea.maven.execution.MavenOrderEnumeratorHandler$FactoryImpl"/>
@@ -303,6 +305,10 @@
     <statistics.counterUsagesCollector implementationClass="org.jetbrains.idea.maven.statistics.MavenActionsUsagesCollector"/>
     <statistics.counterUsagesCollector implementationClass="org.jetbrains.idea.maven.statistics.MavenImportCollector"/>
     <statistics.counterUsagesCollector implementationClass="org.jetbrains.idea.maven.statistics.MavenDependencyInsertionCollector"/>
+    <statistics.projectUsagesCollector implementation="org.jetbrains.idea.maven.statistics.MavenPluginCollector"/>
+
+    <statistics.validation.customValidationRule implementation="org.jetbrains.idea.maven.statistics.MavenPluginCoordinatesWhitelistValidationRule"/>
+    <statistics.validation.customValidationRule implementation="org.jetbrains.idea.maven.statistics.MavenPluginVersionValidationRule"/>
 
 
     <registryKey key="maven.dedicated.indexer.vmargs" defaultValue="-Xmx1024m"
@@ -316,6 +322,9 @@
 
     <registryKey key="maven.plugins.use.cache" defaultValue="true"
                  description="Use cache for plugin resolving"/>
+
+    <registryKey key="maven.auto.update.local.index" defaultValue="true"
+                 description="Auto update local index if local repository is not indexed"/>
 
     <registryKey key="maven.import.separate.main.and.test.modules.when.needed" defaultValue="true"
                  description="In order to support different 'testSource' and 'testTarget' compiler options, IntelliJ IDEA will create separate modules for such projects (IDEA-85478).\nAvailable only when Import using IntelliJ Workspace API is enabled."/>
@@ -346,9 +355,6 @@
     <registryKey key="maven.server.vm.remove.javaagent" defaultValue="true"
                  description="Maven server remove -javaagent vm parameter"/>
 
-    <registryKey key="maven.consumer.pom.support" defaultValue="false"
-                 description="Enable Maven consumer pom support"/>
-
     <registryKey key="maven.server.force.resolve.dependencies.sequentially" defaultValue="false"
                  description="Resolve maven dependencies sequentially (slow in case of many maven modules)"/>
 
@@ -357,9 +363,6 @@
 
     <registryKey key="maven.server.generate.sources.for.aggregator.projects" defaultValue="true"
                  description="Generate sources for aggregator projects (instead of all projects) for better performance"/>
-
-    <registryKey key="maven.import.to.workspace.model.fast.facet.creation" defaultValue="false"
-                 description="Create facets in a background thread instead of EDT"/>
 
     <intentionAction>
       <language>XML</language>
@@ -783,12 +786,12 @@
       <reference id="Maven.DownloadAllGroup"/>
       <separator/>
       <reference id="Maven.ShowEffectivePom"/>
-      <separator/>
-      <reference id="Maven.ViewDependencyAnalyzer"/>
     </group>
 
     <group id="Maven.NavigatorProjectMenu" popup="true">
       <reference ref="Maven.BaseProjectMenu"/>
+      <separator/>
+      <reference id="Maven.NavigatorDependencyAnalyzer"/>
       <separator/>
       <reference id="Maven.RunBuild"/>
       <reference ref="RunContextGroup"/>

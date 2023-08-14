@@ -30,8 +30,11 @@ import com.intellij.util.PlatformUtils
 import com.intellij.util.application
 import com.intellij.util.concurrency.AppExecutorUtil
 import com.intellij.util.concurrency.EdtScheduledExecutorService
-import com.intellij.util.io.*
+import com.intellij.util.io.BaseOutputReader
+import com.intellij.util.io.DigestUtil
+import com.intellij.util.io.HttpRequests
 import com.intellij.util.io.HttpRequests.HttpStatusException
+import com.intellij.util.io.readText
 import com.intellij.util.system.CpuArch
 import com.intellij.util.text.VersionComparatorUtil
 import com.intellij.util.withFragment
@@ -61,7 +64,6 @@ import java.util.concurrent.ExecutionException
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.io.path.*
-import kotlin.io.path.exists
 import kotlin.math.min
 
 @ApiStatus.Experimental
@@ -363,9 +365,7 @@ object CodeWithMeClientDownloader {
 
     val dataList = listOfNotNull(jdkData, guestData)
 
-    val activity: StructuredIdeActivity? =
-      if (dataList.isNotEmpty()) RemoteDevStatisticsCollector.onGuestDownloadStarted()
-      else null
+    val activity: StructuredIdeActivity? = if (dataList.isEmpty()) null else RemoteDevStatisticsCollector.onGuestDownloadStarted()
 
     fun updateStateText() {
       val downloadList = dataList.filter { it.status.get() == DownloadableFileData.DownloadableFileState.Downloading }.joinToString(", ") { it.fileCaption }
@@ -692,11 +692,18 @@ object CodeWithMeClientDownloader {
     else executable.resolveSibling("jetbrains_client64.vmoptions")
     service<JetBrainsClientDownloaderConfigurationProvider>().patchVmOptions(vmOptionsFile, URI(url))
 
+    val clientEnvironment = mutableMapOf<String, String>()
+    val separateConfigOption = ClientVersionUtil.computeSeparateConfigEnvVariableValue(extractedJetBrainsClientData.version)
+    if (separateConfigOption != null) {
+      clientEnvironment["JBC_SEPARATE_CONFIG"] = separateConfigOption
+    }
+
     if (SystemInfo.isWindows) {
-      val hProcess = WindowsFileUtil.windowsShellExecute(
+      val hProcess = WindowsFileUtil.windowsCreateProcess(
         executable = executable,
         workingDirectory = extractedJetBrainsClientData.clientDir,
-        parameters = parameters
+        parameters = parameters,
+        environment = clientEnvironment
       )
 
       @Suppress("LocalVariableName")
@@ -733,6 +740,8 @@ object CodeWithMeClientDownloader {
 
       fun doRunProcess() {
         val commandLine = GeneralCommandLine(fullLauncherCmd + parameters)
+          .withEnvironment(clientEnvironment)
+
         config.modifyClientCommandLine(commandLine)
 
         LOG.info("Starting JetBrains Client process (attempts left: $attemptCount): ${commandLine}")

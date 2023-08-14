@@ -12,6 +12,8 @@ import org.jetbrains.kotlin.psi.KtConstructor
 import org.jetbrains.kotlin.util.OperatorNameConventions
 import org.jetbrains.uast.*
 import com.intellij.platform.uast.testFramework.env.findElementByTextFromPsi
+import org.jetbrains.kotlin.psi.KtDestructuringDeclaration
+import org.jetbrains.kotlin.psi.psiUtil.getParentOfType
 import org.jetbrains.uast.util.isConstructorCall
 import org.jetbrains.uast.visitor.AbstractUastVisitor
 
@@ -350,6 +352,35 @@ interface UastApiFixtureTestBase : UastPluginSelection {
         TestCase.assertEquals(UastCallKind.CONSTRUCTOR_CALL, uCallExpression.kind)
     }
 
+    // Regression test from KT-59564
+    fun checkExpressionTypeOfForEach(myFixture: JavaCodeInsightTestFixture) {
+        myFixture.configureByText(
+            "main.kt", """
+                // !LANGUAGE: +RangeUntilOperator
+                @file:OptIn(ExperimentalStdlibApi::class)
+                fun test(a: Int, b: Int) {
+                  for (i in a..<b step 1) {
+                       println(i)
+                  }
+                }
+            """.trimIndent()
+        )
+
+        val uFile = myFixture.file.toUElement()!!
+        uFile.accept(object : AbstractUastVisitor() {
+            override fun visitForEachExpression(node: UForEachExpression): Boolean {
+                when (val exp = node.iteratedValue.skipParenthesizedExprDown()) {
+                    is UBinaryExpression -> {
+                        TestCase.assertEquals("kotlin.ranges.IntProgression", exp.getExpressionType()?.canonicalText)
+                        TestCase.assertEquals("kotlin.ranges.IntRange", exp.leftOperand.getExpressionType()?.canonicalText)
+                    }
+                }
+
+                return super.visitForEachExpression(node)
+            }
+        })
+    }
+
     // Regression test from KTIJ-23503
     fun checkExpressionTypeFromIncorrectObject(myFixture: JavaCodeInsightTestFixture) {
         myFixture.configureByText(
@@ -640,4 +671,69 @@ interface UastApiFixtureTestBase : UastPluginSelection {
         })
     }
 
+    fun checkLambdaBodyAsParentOfDestructuringDeclaration(myFixture: JavaCodeInsightTestFixture) {
+        // KTIJ-24108
+        myFixture.configureByText(
+            "main.kt", """
+                fun fi(data: List<String>) =
+                    data.filter {
+                        va<caret>l (a, b)
+                    }
+            """.trimIndent()
+        )
+
+        val destructuringDeclaration =
+            myFixture.file.findElementAt(myFixture.caretOffset)
+                ?.getParentOfType<KtDestructuringDeclaration>(strict = true)
+                .orFail("Cannot find KtDestructuringDeclaration")
+
+        val uDestructuringDeclaration =
+            destructuringDeclaration.toUElement().orFail("Cannot convert to KotlinUDestructuringDeclarationExpression")
+
+        TestCase.assertNotNull(uDestructuringDeclaration.uastParent)
+    }
+
+    fun checkIdentifierOfNullableExtensionReceiver(myFixture: JavaCodeInsightTestFixture) {
+        myFixture.configureByText(
+            "main.kt", """
+                enum class SortOrder {
+                  ASCENDING, DESCENDING, UNSORTED
+                }
+
+                fun <C> Comparator<C>?.withOrder(sortOrder: SortOrder): Comparator<C>? =
+                  this?.let {
+                    when (sortOrder) {
+                      SortOrder.ASCENDING -> it
+                      SortOrder.DESCENDING -> it.reversed()
+                      SortOrder.UNSORTED -> null
+                    }
+                  }
+            """.trimIndent()
+        )
+
+        val uFile = myFixture.file.toUElement()!!
+        val withOrder = uFile.findElementByTextFromPsi<UMethod>("withOrder", strict = false)
+            .orFail("can't convert extension function: withOrder")
+        val extensionReceiver = withOrder.uastParameters.first()
+        val identifier = extensionReceiver.uastAnchor as? UIdentifier
+        TestCase.assertNotNull(identifier)
+    }
+
+    fun checkReceiverTypeOfExtensionFunction(myFixture: JavaCodeInsightTestFixture) {
+        myFixture.configureByText(
+            "main.kt", """
+                class Foo
+                class Bar {
+                  fun Foo.ext() {}
+                  
+                  fun test(f: Foo) {
+                    f.ex<caret>t()
+                  }
+                }
+            """.trimIndent()
+        )
+        val uCallExpression = myFixture.file.findElementAt(myFixture.caretOffset).toUElement().getUCallExpression()
+            .orFail("cant convert to UCallExpression")
+        TestCase.assertEquals("Foo", uCallExpression.receiverType?.canonicalText)
+    }
 }

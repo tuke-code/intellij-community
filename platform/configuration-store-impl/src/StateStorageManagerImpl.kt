@@ -1,4 +1,4 @@
-// Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 @file:Suppress("ReplaceGetOrSet")
 
 package com.intellij.configurationStore
@@ -232,27 +232,14 @@ open class StateStorageManagerImpl(@NonNls private val rootTagName: String,
                                             roamingType: RoamingType,
                                             usePathMacroManager: Boolean,
                                             rootTagName: String?): StateStorage {
-    val provider = if (roamingType == RoamingType.DISABLED) {
-      // remove to ensure that repository doesn't store non-roamable files
-      try {
-        compoundStreamProvider.delete(collapsedPath, roamingType)
-      }
-      catch (e: IllegalStateException) {
-        LOG.debug(e)
-        // ignore - it means that delete operation is not supported
-      }
-      null
-    }
-    else {
-      compoundStreamProvider
-    }
+    compoundStreamProvider.deleteIfObsolete(collapsedPath, roamingType)
     return MyFileStorage(storageManager = this,
                          file = path,
                          fileSpec = collapsedPath,
                          rootElementName = rootTagName,
                          roamingType = roamingType,
                          pathMacroManager = if (usePathMacroManager) macroSubstitutor else null,
-                         provider = provider)
+                         provider = compoundStreamProvider)
   }
 
   // open for upsource
@@ -406,7 +393,8 @@ fun checkStorageIsNotTracked(module: ComponentManager) {
 
 private class MyAsyncVfsListener : AsyncFileListener {
   override fun prepareChange(events: List<VFileEvent>): AsyncFileListener.ChangeApplier? {
-    return service<StorageVirtualFileTracker>().prepare(events)
+    service<StorageVirtualFileTracker>().schedule(events)
+    return null
   }
 }
 

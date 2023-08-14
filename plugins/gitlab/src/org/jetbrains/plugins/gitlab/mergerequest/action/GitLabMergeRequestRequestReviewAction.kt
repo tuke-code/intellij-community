@@ -2,15 +2,15 @@
 package org.jetbrains.plugins.gitlab.mergerequest.action
 
 import com.intellij.collaboration.async.combineAndCollect
+import com.intellij.collaboration.async.throwFailure
 import com.intellij.collaboration.messages.CollaborationToolsBundle
 import com.intellij.collaboration.ui.codereview.Avatar
 import com.intellij.collaboration.ui.codereview.list.search.ChooserPopupUtil
 import com.intellij.collaboration.ui.codereview.list.search.SimpleSelectablePopupItemRenderer
 import com.intellij.collaboration.ui.icon.IconsProvider
-import com.intellij.openapi.ui.popup.JBPopup
 import com.intellij.ui.awt.RelativePoint
-import com.intellij.ui.popup.PopupState
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.jetbrains.plugins.gitlab.api.dto.GitLabUserDTO
 import org.jetbrains.plugins.gitlab.mergerequest.ui.details.model.GitLabMergeRequestReviewFlowViewModel
@@ -36,26 +36,24 @@ internal class GitLabMergeRequestRequestReviewAction(
     val parentComponent = event.source as? JComponent ?: return
     val point = RelativePoint.getSouthWestOf(parentComponent)
     scope.launch {
-      val users = reviewFlowVm.getPotentialReviewers()
-
-      val selectedUser = ChooserPopupUtil.showChooserPopup(
+      val reviewers = reviewFlowVm.reviewers.first()
+      val selectedUser = ChooserPopupUtil.showAsyncChooserPopup(
         point,
-        users,
+        reviewFlowVm.potentialReviewers.throwFailure(),
         filteringMapper = { user -> user.username },
         renderer = SimpleSelectablePopupItemRenderer.create { reviewer ->
           ChooserPopupUtil.SelectablePopupItemPresentation.Simple(
             reviewer.username,
             avatarIconsProvider.getIcon(reviewer, Avatar.Sizes.BASE),
             null,
-            isSelected = reviewer in reviewFlowVm.reviewers.value
+            isSelected = reviewers.any { it.id == reviewer.id }
           )
         }
       )
 
       // TODO: replace on CollectionDelta
       if (selectedUser != null) {
-        val reviewers = reviewFlowVm.reviewers.value
-        if (selectedUser in reviewers) {
+        if (reviewers.any { it.id == selectedUser.id }) {
           reviewFlowVm.removeReviewer(selectedUser)
         }
         else {

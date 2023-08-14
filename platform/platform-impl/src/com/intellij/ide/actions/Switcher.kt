@@ -95,11 +95,11 @@ object Switcher : BaseSwitcherAction(null) {
     return SwitcherPanel(project, title, event, if (pinned) vFiles != null else null, event == null || !event.isShiftDown)
   }
 
-  class SwitcherPanel internal constructor(val project: Project,
-                                           title: @Nls String,
-                                           event: InputEvent?,
-                                           onlyEditedFiles: Boolean?,
-                                           forward: Boolean) : BorderLayoutPanel(), DataProvider, QuickSearchComponent, Disposable {
+  class SwitcherPanel(val project: Project,
+                      title: @Nls String,
+                      event: InputEvent?,
+                      onlyEditedFiles: Boolean?,
+                      forward: Boolean) : BorderLayoutPanel(), DataProvider, QuickSearchComponent, Disposable {
     val myPopup: JBPopup?
     val toolWindows: JBList<SwitcherListItem>
     val files: JBList<SwitcherVirtualFile>
@@ -117,7 +117,7 @@ object Switcher : BaseSwitcherAction(null) {
       : Boolean
     val pinned // false - auto closeable on modifier key release, true - default popup
       : Boolean
-    val onKeyRelease: SwitcherKeyReleaseListener
+    private val onKeyRelease: SwitcherKeyReleaseListener
     val mySpeedSearch: SwitcherSpeedSearch?
     val myTitle: String
     private var myHint: JBPopup? = null
@@ -444,7 +444,7 @@ object Switcher : BaseSwitcherAction(null) {
       }
     }
 
-    private fun cancel() {
+    fun cancel() {
       myPopup!!.cancel()
     }
 
@@ -486,7 +486,7 @@ object Switcher : BaseSwitcherAction(null) {
     val selectedList: JBList<out SwitcherListItem>?
       get() = getSelectedList(files)
 
-    fun getSelectedList(preferable: JBList<out SwitcherListItem>?): JBList<out SwitcherListItem>? {
+    private fun getSelectedList(preferable: JBList<out SwitcherListItem>?): JBList<out SwitcherListItem>? {
       return if (files.hasFocus()) files else if (toolWindows.hasFocus()) toolWindows else preferable
     }
 
@@ -654,7 +654,7 @@ object Switcher : BaseSwitcherAction(null) {
     }
 
     companion object {
-      const val SWITCHER_ELEMENTS_LIMIT: Int = 30
+      private const val SWITCHER_ELEMENTS_LIMIT: Int = 30
       private fun collectFiles(project: Project, onlyEdited: Boolean): List<VirtualFile> {
         return if (onlyEdited) IdeDocumentHistory.getInstance(project).changedFiles else getRecentFiles(project)
       }

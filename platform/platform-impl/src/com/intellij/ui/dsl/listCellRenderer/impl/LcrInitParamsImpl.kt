@@ -5,7 +5,7 @@ import com.intellij.ui.dsl.listCellRenderer.LcrInitParams
 import org.jetbrains.annotations.ApiStatus
 
 @ApiStatus.Internal
-internal open class LcrInitParamsImpl: LcrInitParams {
+internal sealed class LcrInitParamsImpl: LcrInitParams {
 
   override var grow: Boolean = false
 }

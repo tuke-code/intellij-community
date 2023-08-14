@@ -4,7 +4,6 @@ package com.intellij.ui.layout
 import com.intellij.BundleBase
 import com.intellij.icons.AllIcons
 import com.intellij.ide.DataManager
-import com.intellij.ide.ui.UINumericRange
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.DefaultActionGroup
 import com.intellij.openapi.fileChooser.FileChooserDescriptor
@@ -18,7 +17,6 @@ import com.intellij.openapi.ui.ValidationInfo
 import com.intellij.openapi.ui.emptyText
 import com.intellij.openapi.ui.panel.ComponentPanelBuilder
 import com.intellij.openapi.ui.popup.JBPopupFactory
-import com.intellij.openapi.util.NlsContexts
 import com.intellij.openapi.util.NlsContexts.*
 import com.intellij.openapi.util.text.StringUtil
 import com.intellij.openapi.vfs.VirtualFile
@@ -36,7 +34,6 @@ import java.awt.Dimension
 import java.awt.event.ActionEvent
 import java.awt.event.ActionListener
 import java.awt.event.MouseEvent
-import java.util.*
 import javax.swing.*
 import javax.swing.text.JTextComponent
 import kotlin.jvm.internal.CallableReference
@@ -167,7 +164,7 @@ interface CellBuilder<out T : JComponent> {
    * If this method is called, the value of the component will be stored to the backing property only if the component is enabled.
    */
   @ApiStatus.ScheduledForRemoval
-  @Deprecated("Use Kotlin UI DSL Version 2")
+  @Deprecated("Use Kotlin UI DSL Version 2", level = DeprecationLevel.HIDDEN)
   fun applyIfEnabled(): CellBuilder<T>
 
   @ApiStatus.ScheduledForRemoval
@@ -196,7 +193,7 @@ interface CellBuilder<out T : JComponent> {
   fun enableIf(predicate: ComponentPredicate): CellBuilder<T>
 
   @ApiStatus.ScheduledForRemoval
-  @Deprecated("Use Kotlin UI DSL Version 2")
+  @Deprecated("Use Kotlin UI DSL Version 2", level = DeprecationLevel.HIDDEN)
   fun visible(isVisible: Boolean)
 
   @ApiStatus.ScheduledForRemoval
@@ -204,7 +201,7 @@ interface CellBuilder<out T : JComponent> {
   fun visibleIf(predicate: ComponentPredicate): CellBuilder<T>
 
   @ApiStatus.ScheduledForRemoval
-  @Deprecated("Use Kotlin UI DSL Version 2")
+  @Deprecated("Use Kotlin UI DSL Version 2", level = DeprecationLevel.HIDDEN)
   fun withErrorOnApplyIf(@DialogMessage message: String, callback: (T) -> Boolean): CellBuilder<T> {
     withValidationOnApply { if (callback(it)) error(message) else null }
     return this
@@ -215,16 +212,12 @@ interface CellBuilder<out T : JComponent> {
   fun shouldSaveOnApply(): Boolean
 
   @ApiStatus.ScheduledForRemoval
-  @Deprecated("Use Kotlin UI DSL Version 2")
+  @Deprecated("Use Kotlin UI DSL Version 2", level = DeprecationLevel.HIDDEN)
   fun withLargeLeftGap(): CellBuilder<T>
 
   @ApiStatus.ScheduledForRemoval
-  @Deprecated("Use Kotlin UI DSL Version 2")
-  fun withLeftGap(): CellBuilder<T>
-
-  @ApiStatus.ScheduledForRemoval
   @Deprecated("Use Kotlin UI DSL Version 2", level = DeprecationLevel.HIDDEN)
-  fun withLeftGap(gapLeft: Int): CellBuilder<T>
+  fun withLeftGap(): CellBuilder<T>
 }
 
 @ApiStatus.ScheduledForRemoval
@@ -288,11 +281,11 @@ abstract class Cell : BaseBuilder {
    * Makes the row that the component is residing in grow with `weight`.
    */
   @ApiStatus.ScheduledForRemoval
-  @Deprecated("Use Kotlin UI DSL Version 2")
+  @Deprecated("Use Kotlin UI DSL Version 2", level = DeprecationLevel.HIDDEN)
   val pushY: CCFlags = CCFlags.pushY
 
   @ApiStatus.ScheduledForRemoval
-  @Deprecated("Use Kotlin UI DSL Version 2")
+  @Deprecated("Use Kotlin UI DSL Version 2", level = DeprecationLevel.HIDDEN)
   val push: CCFlags = CCFlags.push
 
   @ApiStatus.ScheduledForRemoval
@@ -527,7 +520,7 @@ abstract class Cell : BaseBuilder {
   }
 
   @ApiStatus.ScheduledForRemoval
-  @Deprecated("Use Kotlin UI DSL Version 2")
+  @Deprecated("Use Kotlin UI DSL Version 2", level = DeprecationLevel.HIDDEN)
   fun spinner(getter: () -> Int, setter: (Int) -> Unit, minValue: Int, maxValue: Int, step: Int = 1): CellBuilder<JBIntSpinner> {
     val spinner = JBIntSpinner(getter(), minValue, maxValue, step)
     return component(spinner).withBinding(JBIntSpinner::getNumber, JBIntSpinner::setNumber, PropertyBinding(getter, setter))
@@ -642,7 +635,7 @@ abstract class Cell : BaseBuilder {
   }
 
   @ApiStatus.ScheduledForRemoval
-  @Deprecated("Use Kotlin UI DSL Version 2")
+  @Deprecated("Use Kotlin UI DSL Version 2", level = DeprecationLevel.HIDDEN)
   fun gearButton(vararg actions: AnAction): CellBuilder<JComponent> {
     val label = JLabel(LayeredIcon.GEAR_WITH_DROPDOWN)
     label.disabledIcon = AllIcons.General.GearPlain
@@ -699,12 +692,6 @@ abstract class Cell : BaseBuilder {
   }
 
   @ApiStatus.ScheduledForRemoval
-  @Deprecated("Use Kotlin UI DSL Version 2", level = DeprecationLevel.HIDDEN)
-  fun placeholder(): CellBuilder<JComponent> {
-    return internalPlaceholder()
-  }
-
-  @ApiStatus.ScheduledForRemoval
   @Deprecated("Use Kotlin UI DSL Version 2")
   abstract fun <T : JComponent> component(component: T): CellBuilder<T>
 
@@ -749,12 +736,6 @@ class InnerCell(val cell: Cell) : Cell() {
   override fun <T : JComponent> component(component: T, viewComponent: JComponent): CellBuilder<T> {
     return cell.component(component, viewComponent)
   }
-
-  @ApiStatus.ScheduledForRemoval
-  @Deprecated("Use Kotlin UI DSL Version 2", level = DeprecationLevel.HIDDEN)
-  override fun withButtonGroup(title: @NlsContexts.BorderTitle String?, buttonGroup: ButtonGroup, body: () -> Unit) {
-    cell.withButtonGroup(title, buttonGroup, body)
-  }
 }
 
 @ApiStatus.ScheduledForRemoval
@@ -768,35 +749,3 @@ fun <T> listCellRenderer(renderer: SimpleListCellRenderer<T?>.(value: T, index: 
     }
   }
 }
-
-@ApiStatus.ScheduledForRemoval
-@Deprecated("Use Kotlin UI DSL Version 2", level = DeprecationLevel.HIDDEN)
-fun Cell.slider(min: Int, max: Int, minorTick: Int, majorTick: Int): CellBuilder<JSlider> {
-  val slider = JSlider()
-  UIUtil.setSliderIsFilled(slider, true)
-  slider.paintLabels = true
-  slider.paintTicks = true
-  slider.paintTrack = true
-  slider.minimum = min
-  slider.maximum = max
-  slider.minorTickSpacing = minorTick
-  slider.majorTickSpacing = majorTick
-  return slider()
-}
-
-@ApiStatus.ScheduledForRemoval
-@Deprecated("Use Kotlin UI DSL Version 2", level = DeprecationLevel.HIDDEN)
-fun <T : JSlider> CellBuilder<T>.labelTable(table: Hashtable<Int, JComponent>.() -> Unit): CellBuilder<T> {
-  component.labelTable = Hashtable<Int, JComponent>().apply(table)
-  return this
-}
-
-@ApiStatus.ScheduledForRemoval
-@Deprecated("Use Kotlin UI DSL Version 2", level = DeprecationLevel.HIDDEN)
-fun <T : JSlider> CellBuilder<T>.withValueBinding(modelBinding: PropertyBinding<Int>): CellBuilder<T> {
-  return withBinding(JSlider::getValue, JSlider::setValue, modelBinding)
-}
-
-@ApiStatus.ScheduledForRemoval
-@Deprecated("Use Kotlin UI DSL Version 2", level = DeprecationLevel.HIDDEN)
-fun UINumericRange.asRange(): IntRange = min..max

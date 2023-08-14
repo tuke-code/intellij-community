@@ -4,18 +4,19 @@
 package com.intellij.openapi.wm.impl.customFrameDecorations.header.toolbar
 
 import com.intellij.ide.ProjectWindowCustomizerService
-import com.intellij.openapi.Disposable
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.application.ApplicationManager
-import com.intellij.openapi.observable.util.whenDisposed
 import com.intellij.openapi.util.SystemInfoRt
 import com.intellij.openapi.util.registry.Registry
 import com.intellij.openapi.wm.impl.IdeMenuBar
+import com.intellij.openapi.wm.impl.createMenuBar
 import com.intellij.ui.dsl.builder.Align
 import com.intellij.ui.dsl.builder.AlignY
 import com.intellij.ui.dsl.builder.EmptySpacingConfiguration
 import com.intellij.ui.dsl.builder.panel
 import com.intellij.util.IJSwingUtilities
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.job
 import java.awt.*
 import java.awt.event.ComponentAdapter
 import java.awt.event.ComponentEvent
@@ -26,10 +27,9 @@ import javax.swing.event.ChangeListener
 
 private const val ALPHA = (255 * 0.6).toInt()
 
-internal class ExpandableMenu(private val headerContent: JComponent, disposable: Disposable) {
-
-  val ideMenu: IdeMenuBar = IdeMenuBar.createMenuBar()
-  private val ideMenuHelper = IdeMenuHelper(ideMenu, null)
+internal class ExpandableMenu(private val headerContent: JComponent, coroutineScope: CoroutineScope, frame: JFrame) {
+  val ideMenu: IdeMenuBar = createMenuBar(coroutineScope, frame)
+  private val ideMenuHelper = IdeMenuHelper(menu = ideMenu, coroutineScope = null)
   private var expandedMenuBar: JPanel? = null
   private var headerColorfulPanel: HeaderColorfulPanel? = null
   private val shadowComponent = ShadowComponent()
@@ -38,7 +38,7 @@ internal class ExpandableMenu(private val headerContent: JComponent, disposable:
   private var hideMenu = false
   private val menuSelectionListener = ChangeListener {
     if (MenuSelectionManager.defaultManager().selectedPath.isNullOrEmpty()) {
-      // After resetting selectedPath another menu can be shown right after that, so don't hide main menu immediately
+      // After resetting selectedPath another menu can be shown right after that, so don't hide the main menu immediately
       hideMenu = true
       ApplicationManager.getApplication().invokeLater {
         if (hideMenu) {
@@ -53,7 +53,9 @@ internal class ExpandableMenu(private val headerContent: JComponent, disposable:
 
   init {
     MenuSelectionManager.defaultManager().addChangeListener(menuSelectionListener)
-    disposable.whenDisposed { MenuSelectionManager.defaultManager().removeChangeListener(menuSelectionListener) }
+    coroutineScope.coroutineContext.job.invokeOnCompletion {
+      MenuSelectionManager.defaultManager().removeChangeListener(menuSelectionListener)
+    }
 
     ideMenuHelper.installListeners()
 
@@ -104,7 +106,7 @@ internal class ExpandableMenu(private val headerContent: JComponent, disposable:
     updateColor()
     layeredPane.add(expandedMenuBar!!, (JLayeredPane.DEFAULT_LAYER - 2) as Any)
 
-    // First menu usage has no selection in menu. Fix it by invokeLater
+    // The first menu usage has no selection in the menu. Fix it by invokeLater
     ApplicationManager.getApplication().invokeLater {
       selectMenu(actionToShow)
     }
@@ -141,14 +143,16 @@ internal class ExpandableMenu(private val headerContent: JComponent, disposable:
   }
 
   private fun updateBounds() {
-    val location = SwingUtilities.convertPoint(headerContent, 0, 0, rootPane ?: return)
+    val rootPaneCopy = rootPane ?: return
+    val location = SwingUtilities.convertPoint(headerContent, 0, 0, rootPaneCopy)
     if (location == null) {
       headerColorfulPanel?.horizontalOffset = 0
     } else {
       val insets = headerContent.insets
       headerColorfulPanel?.horizontalOffset = location.x + insets.left
       expandedMenuBar?.let {
-        it.bounds = Rectangle(location.x + insets.left, location.y + insets.top,
+        val rootPaneInsets = rootPaneCopy.insets
+        it.bounds = Rectangle(location.x + insets.left - rootPaneInsets.left, location.y + insets.top - rootPaneInsets.top,
                               headerContent.width - insets.left - insets.right,
                               headerContent.height - insets.top - insets.bottom)
       }

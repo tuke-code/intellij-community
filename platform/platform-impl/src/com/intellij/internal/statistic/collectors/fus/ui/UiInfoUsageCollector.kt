@@ -1,4 +1,4 @@
-// Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 @file:Suppress("ReplaceJavaStaticMethodWithKotlinAnalog")
 
 package com.intellij.internal.statistic.collectors.fus.ui
@@ -20,6 +20,9 @@ import com.intellij.internal.statistic.service.fus.collectors.ApplicationUsagesC
 import com.intellij.jdkEx.JdkEx
 import com.intellij.openapi.actionSystem.ex.QuickListsManager
 import com.intellij.openapi.application.EDT
+import com.intellij.openapi.application.ModalityState
+import com.intellij.openapi.application.asContextElement
+import com.intellij.toolWindow.ToolWindowDefaultLayoutManager
 import com.intellij.ui.JreHiDpiUtil
 import com.intellij.ui.scale.JBUIScale
 import com.intellij.util.ui.UIUtil
@@ -32,7 +35,7 @@ import java.awt.GraphicsEnvironment
 /**
  * @author Konstantin Bulenkov
  */
-internal class UiInfoUsageCollector : ApplicationUsagesCollector() {
+private class UiInfoUsageCollector : ApplicationUsagesCollector() {
   override fun getGroup(): EventLogGroup = GROUP
 
   override suspend fun getMetricsAsync(): Set<MetricEvent> = getDescriptors()
@@ -53,7 +56,7 @@ private enum class HidpiMode {
   per_monitor_dpi, system_dpi
 }
 
-private val GROUP = EventLogGroup("ui.info.features", 13)
+private val GROUP = EventLogGroup("ui.info.features", 14)
 private val orientationField = Enum("value", VisibilityType::class.java)
 private val NAV_BAR = GROUP.registerEvent("Nav.Bar", Enum("value", NavBarType::class.java))
 private val NAV_BAR_MEMBERS = GROUP.registerEvent("Nav.Bar.members", orientationField)
@@ -67,6 +70,7 @@ private val SHOW_TOOLWINDOW = GROUP.registerEvent("QuickDoc.Show.Toolwindow", Ev
 private val QUICK_DOC_AUTO_UPDATE = GROUP.registerEvent("QuickDoc.AutoUpdate", EventFields.Enabled)
 private val LOOK_AND_FEEL = GROUP.registerEvent("Look.and.Feel", StringValidatedByEnum("value", "look_and_feel"))
 private val LAF_AUTODETECT = GROUP.registerEvent("laf.autodetect", EventFields.Enabled)
+private val TOOL_WINDOW_LAYOUTS_COUNT = GROUP.registerEvent("tool.window.layouts", EventFields.Count)
 private val HIDPI_MODE = GROUP.registerEvent("Hidpi.Mode", Enum("value", HidpiMode::class.java))
 private val SCREEN_READER = GROUP.registerEvent("Screen.Reader", EventFields.Enabled)
 private val QUICK_LISTS_COUNT = GROUP.registerEvent("QuickListsCount", Int("value"))
@@ -100,6 +104,7 @@ private suspend fun getDescriptors(): Set<MetricEvent> {
   val value1 = laf?.name?.takeIf(String::isNotEmpty) ?: "unknown"
   set.add(LOOK_AND_FEEL.metric(value1))
   set.add(LAF_AUTODETECT.metric(LafManager.getInstance().autodetect))
+  set.add(TOOL_WINDOW_LAYOUTS_COUNT.metric(ToolWindowDefaultLayoutManager.getInstance().getLayoutNames().size))
   val value = if (JreHiDpiUtil.isJreHiDPIEnabled()) HidpiMode.per_monitor_dpi else HidpiMode.system_dpi
   set.add(HIDPI_MODE.metric(value))
   set.add(SCREEN_READER.metric(ScreenReader.isActive()))
@@ -145,7 +150,7 @@ private suspend fun addScreenScale(set: MutableSet<MetricEvent>) {
   val userScale = roundScaleValue(JBUIScale.scale(1.0f))
   var isScaleMode: Boolean? = null
   if (!GraphicsEnvironment.isHeadless()) {
-    withContext(Dispatchers.EDT) {
+    withContext(Dispatchers.EDT + ModalityState.any().asContextElement()) {
       val dm = GraphicsEnvironment.getLocalGraphicsEnvironment().defaultScreenDevice.displayMode
       isScaleMode = dm != null && !JdkEx.getDisplayModeEx().isDefault(dm)
     }

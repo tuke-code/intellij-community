@@ -51,25 +51,23 @@ private val LOG: Logger
 private val CLOSE_LOG_TIMEOUT = 10.seconds
 
 @Service(Service.Level.PROJECT)
-class VcsProjectLog(private val project: Project, internal val coroutineScope: CoroutineScope) {
+class VcsProjectLog(private val project: Project, private val coroutineScope: CoroutineScope) {
   private val uiProperties = project.service<VcsLogProjectTabsProperties>()
-  internal val tabManager = VcsLogTabsManager(project, uiProperties, coroutineScope)
   private val errorHandler = VcsProjectLogErrorHandler(this, coroutineScope)
 
   @Volatile
-  private var cachedLogManager: VcsLogManager? = null
+  private var cachedLogManager: VcsProjectLogManager? = null
 
   private val disposeStarted = AtomicBoolean(false)
 
   // not-reentrant - invoking [lock] even from the same thread/coroutine that currently holds the lock still suspends the invoker
   private val mutex = Mutex()
 
-  val logManager: VcsLogManager?
-    get() = cachedLogManager
-  val dataManager: VcsLogData?
-    get() = cachedLogManager?.dataManager
-  val isDisposing: Boolean
-    get() = disposeStarted.get()
+  val logManager: VcsLogManager? get() = cachedLogManager
+  val dataManager: VcsLogData? get() = cachedLogManager?.dataManager
+  val tabManager: VcsLogTabsManager? get() = cachedLogManager?.tabsManager
+
+  val isDisposing: Boolean get() = disposeStarted.get()
 
   /** The instance of the [MainVcsLogUi] or null if the log was not initialized yet. */
   val mainLogUi: VcsLogUiImpl?
@@ -127,8 +125,7 @@ class VcsProjectLog(private val project: Project, internal val coroutineScope: C
 
   @RequiresEdt
   fun openLogTab(filters: VcsLogFilterCollection, location: VcsLogTabLocation): MainVcsLogUi? {
-    val logManager = logManager ?: return null
-    return tabManager.openAnotherLogTab(manager = logManager, filters = filters, location = location)
+    return tabManager?.openAnotherLogTab(filters = filters, location = location)
   }
 
   @RequiresBackgroundThread
@@ -195,12 +192,13 @@ class VcsProjectLog(private val project: Project, internal val coroutineScope: C
     }
 
     LOG.debug { "Creating Vcs Log for ${VcsLogUtil.getProvidersMapText(logProviders)}" }
-    val result = VcsLogManager(project, uiProperties, logProviders, false) { s, t ->
+    val result = VcsProjectLogManager(project, uiProperties, logProviders) { s, t ->
       errorHandler.recreateOnError(s, t)
     }
     cachedLogManager = result
     val publisher = project.messageBus.syncPublisher(VCS_PROJECT_LOG_CHANGED)
     withContext(Dispatchers.EDT) {
+      result.createUi()
       publisher.logCreated(result)
     }
     return result
@@ -266,7 +264,7 @@ class VcsProjectLog(private val project: Project, internal val coroutineScope: C
     }
 
     private fun hasLogExtensions(descriptor: IdeaPluginDescriptor): Boolean {
-      for (logProvider in VcsLogProvider.LOG_PROVIDER_EP.getExtensions(project)) {
+      for (logProvider in VcsLogProvider.LOG_PROVIDER_EP.getExtensionList(project)) {
         if (logProvider.javaClass.classLoader === descriptor.pluginClassLoader) {
           return true
         }

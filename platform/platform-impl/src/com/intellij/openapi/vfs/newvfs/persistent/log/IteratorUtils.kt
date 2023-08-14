@@ -70,7 +70,7 @@ object IteratorUtils {
           .onInvalid { return ReadResult.Invalid(it) } as OperationReadResult.Incomplete
         if (rec.tag.isVFileEventStartOperation) {
           // found start, validate it
-          if (prev is OperationReadResult.Valid) {
+          if (prev is OperationReadResult.Complete) {
             val op = prev.operation as VfsOperation.VFileEventOperation.EventEnd
             if (op.eventTag != rec.tag) {
               return ReadResult.Invalid(
@@ -116,7 +116,7 @@ object IteratorUtils {
           .onInvalid { return ReadResult.Invalid(it) }
         if (rec.getTag() == VfsOperationTag.VFILE_EVENT_END) {
           // found END, validate it
-          if (rec is OperationReadResult.Valid) {
+          if (rec is OperationReadResult.Complete) {
             val op = rec.operation as VfsOperation.VFileEventOperation.EventEnd
             if (op.eventTag != tag) {
               return ReadResult.Invalid(
@@ -186,7 +186,7 @@ object IteratorUtils {
    * Skips previous record efficiently, assumes that the read must succeed
    * @throws IllegalStateException in case [OperationLogStorage.OperationReadResult.Invalid] was read
    */
-  fun OperationLogStorage.Iterator.skipPrevious(): OperationLogStorage.Iterator = this.also {
+  private fun OperationLogStorage.Iterator.skipPrevious(): OperationLogStorage.Iterator = this.also {
     previousIncomplete().onInvalid {
       throw IllegalStateException("failed to skip previous record", it.cause)
     }
@@ -218,4 +218,22 @@ object IteratorUtils {
       TraverseDirection.REWIND -> hasPrevious()
       TraverseDirection.PLAY -> hasNext()
     }
+
+  /**
+   * After invocation, the iterator will be positioned at the [position].
+   * If it is impossible to reach [position] via log traversal, [IllegalStateException] will be thrown.
+   * @return the original iterator instance with adjusted [position]
+   */
+  fun OperationLogStorage.Iterator.navigateTo(position: Long) = this.also {
+    val initialPosition = getPosition()
+    while (getPosition() < position && hasNext()) {
+      skipNext()
+    }
+    while (getPosition() > position && hasPrevious()) {
+      skipPrevious()
+    }
+    if (getPosition() != position) {
+      throw IllegalStateException("impossible to reach position $position from $initialPosition, current position is $position")
+    }
+  }
 }

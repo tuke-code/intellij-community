@@ -14,8 +14,9 @@ import com.intellij.openapi.util.CheckedDisposable;
 import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.util.registry.Registry;
 import com.intellij.openapi.vcs.VcsException;
+import com.intellij.openapi.vcs.telemetry.VcsTelemetrySpan.LogData;
 import com.intellij.openapi.vfs.VirtualFile;
-import com.intellij.platform.diagnostic.telemetry.TelemetryTracer;
+import com.intellij.platform.diagnostic.telemetry.TelemetryManager;
 import com.intellij.util.containers.ContainerUtil;
 import com.intellij.vcs.log.*;
 import com.intellij.vcs.log.data.index.*;
@@ -29,15 +30,19 @@ import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.TestOnly;
 
 import java.io.IOException;
-import java.util.*;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.*;
 
 import static com.intellij.openapi.vcs.VcsScopeKt.VcsScope;
-import static com.intellij.platform.diagnostic.telemetry.impl.TraceKt.runSpanWithScope;
+import static com.intellij.platform.diagnostic.telemetry.helpers.TraceKt.runSpanWithScope;
 
 public final class VcsLogData implements Disposable, VcsLogDataProvider {
   private static final Logger LOG = Logger.getInstance(VcsLogData.class);
   public static final int RECENT_COMMITS_COUNT = Registry.intValue("vcs.log.recent.commits.count");
+
   public static final VcsLogProgress.ProgressKey DATA_PACK_REFRESH = new VcsLogProgress.ProgressKey("data pack");
 
   private final @NotNull Project myProject;
@@ -73,8 +78,6 @@ public final class VcsLogData implements Disposable, VcsLogDataProvider {
   private final @NotNull Object myLock = new Object();
   private @NotNull State myState = State.CREATED;
   private @Nullable SingleTaskController.SingleTask myInitialization = null;
-
-  private static final boolean useSqlite = Registry.is("vcs.log.index.sqlite.storage", false);
 
   public VcsLogData(@NotNull Project project,
                     @NotNull Map<VirtualFile, VcsLogProvider> logProviders,
@@ -131,7 +134,7 @@ public final class VcsLogData implements Disposable, VcsLogDataProvider {
 
   private @NotNull VcsLogStorage createStorage() {
     try {
-      if (useSqlite) {
+      if (Registry.is("vcs.log.index.sqlite.storage", false)) {
         return new SqliteVcsLogStorageBackend(myProject, myLogProviders, myErrorHandler, this);
       }
       return new VcsLogStorageImpl(myProject, myLogProviders, myErrorHandler, this);
@@ -160,7 +163,7 @@ public final class VcsLogData implements Disposable, VcsLogDataProvider {
     synchronized (myLock) {
       if (myState.equals(State.CREATED)) {
         myState = State.INITIALIZED;
-        Span span = TelemetryTracer.getInstance().getTracer(VcsScope).spanBuilder("initialize").startSpan();
+        Span span = TelemetryManager.getInstance().getTracer(VcsScope).spanBuilder(LogData.Initialize.getName()).startSpan();
         Task.Backgroundable backgroundable = new Task.Backgroundable(myProject,
                                                                      VcsLogBundle.message("vcs.log.initial.loading.process"),
                                                                      false) {
@@ -221,7 +224,7 @@ public final class VcsLogData implements Disposable, VcsLogDataProvider {
   }
 
   private void readCurrentUser() {
-    Span span = TelemetryTracer.getInstance().getTracer(VcsScope).spanBuilder("readCurrentUser").startSpan();
+    Span span = TelemetryManager.getInstance().getTracer(VcsScope).spanBuilder(LogData.ReadCurrentUser.getName()).startSpan();
     for (Map.Entry<VirtualFile, VcsLogProvider> entry : myLogProviders.entrySet()) {
       VirtualFile root = entry.getKey();
       try {

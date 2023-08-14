@@ -12,6 +12,7 @@ import com.intellij.ui.render.RenderingHelper;
 import com.intellij.ui.render.RenderingUtil;
 import com.intellij.ui.tree.AsyncTreeModel;
 import com.intellij.ui.tree.TreePathBackgroundSupplier;
+import com.intellij.ui.treeStructure.Tree;
 import com.intellij.util.ObjectUtils;
 import com.intellij.util.ReflectionUtil;
 import com.intellij.util.ui.JBUI;
@@ -274,7 +275,12 @@ public class DefaultTreeUI extends BasicTreeUI {
               int rendererOffset = painter.getRendererOffset(control, depth, leaf);
               int controlOffset = painter.getControlOffset(control, depth, leaf);
               int left = Math.min(helper.getX() + borderOffset, insets.left + (controlOffset < 0 ? rendererOffset : controlOffset));
-              int right = Math.max(helper.getX() + helper.getWidth() - borderOffset, insets.left + rendererOffset + bounds.width + JBUI.scale(4));
+              int treeRight = helper.getX() + helper.getWidth() - borderOffset;
+              int right = treeRight;
+              if (helper.isShrinkingSelectionDisabled(row)) {
+                int rendererRight = insets.left + rendererOffset + bounds.width + JBUI.scale(4);
+                right = Math.max(treeRight, rendererRight);
+              }
               int[] rows = tree.getSelectionRows();
               boolean shouldPaintTop = false;
               boolean shouldPaintBottom = false;
@@ -413,6 +419,14 @@ public class DefaultTreeUI extends BasicTreeUI {
            // BasicTreeUI uses clickCount % toggleClickCount == 0, which works terrible for single-click, so we double-check here:
            && tree.getToggleClickCount() == event.getClickCount()
            && isExpandPreferable(tree, tree.getSelectionPath());
+  }
+
+  @Override
+  protected void toggleExpandState(TreePath path) {
+    if (!tree.isExpanded(path) && tree instanceof Tree) {
+      ((Tree)tree).startMeasuringExpandDuration(path);
+    }
+    super.toggleExpandState(path);
   }
 
   @Override
@@ -590,7 +604,7 @@ public class DefaultTreeUI extends BasicTreeUI {
 
   @Override
   protected AbstractLayoutCache createLayoutCache() {
-    if (is("ide.tree.experimental.layout.cache", false)) {
+    if (is("ide.tree.experimental.layout.cache", true)) {
       return new DefaultTreeLayoutCache(path -> {
         handleAutoExpand(path);
         return Unit.INSTANCE;

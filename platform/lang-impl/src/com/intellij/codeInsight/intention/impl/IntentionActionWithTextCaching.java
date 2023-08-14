@@ -16,6 +16,7 @@ import com.intellij.openapi.project.DumbService;
 import com.intellij.openapi.project.PossiblyDumbAware;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Comparing;
+import com.intellij.openapi.util.Iconable;
 import com.intellij.openapi.util.NlsContexts;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
@@ -41,17 +42,29 @@ public class IntentionActionWithTextCaching
   private final IntentionAction myAction;
   private final @NlsContexts.PopupTitle String myDisplayName;
   private final Icon myIcon;
+  @Nullable
+  private final String myToolId;
+  private final int myProblemOffset;
+
+  public IntentionActionWithTextCaching(@NotNull IntentionAction action) {
+    this(action, action.getText(), action instanceof Iconable iconable ? iconable.getIcon(0) : null, null, -1, (actWithText, act) -> {
+    });
+  }
 
   IntentionActionWithTextCaching(@NotNull IntentionAction action,
                                  @NlsContexts.PopupTitle String displayName,
                                  @Nullable Icon icon,
+                                 @Nullable String toolId,
+                                 int problemOffset,
                                  @NotNull BiConsumer<? super IntentionActionWithTextCaching, ? super IntentionAction> markInvoked) {
+    myToolId = toolId;
     myIcon = icon;
     myText = action.getText();
     // needed for checking errors in user written actions
     LOG.assertTrue(myText != null, "action " + action.getClass() + " text returned null");
     myAction = new MyIntentionAction(action, markInvoked);
     myDisplayName = displayName;
+    myProblemOffset = problemOffset;
   }
 
   public @NotNull @IntentionName String getText() {
@@ -115,7 +128,7 @@ public class IntentionActionWithTextCaching
     return Comparing.compare(getText(), other.getText());
   }
 
-  Icon getIcon() {
+  public Icon getIcon() {
     return myIcon;
   }
 
@@ -164,6 +177,15 @@ public class IntentionActionWithTextCaching
     if (this == o) return true;
     if (!(o instanceof IntentionActionWithTextCaching other)) return false;
     return getActionClass(this) == getActionClass(other) && this.getText().equals(other.getText());
+  }
+
+  @Nullable
+  public String getToolId() {
+    return myToolId;
+  }
+
+  public int getProblemOffset() {
+    return myProblemOffset;
   }
 
   private static Class<? extends IntentionAction> getActionClass(IntentionActionWithTextCaching o1) {

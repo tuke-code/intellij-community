@@ -14,6 +14,7 @@ import java.io.File;
 import java.nio.file.Path;
 import java.rmi.RemoteException;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 public abstract class AbstractMavenServerConnector implements MavenServerConnector {
 
@@ -22,7 +23,7 @@ public abstract class AbstractMavenServerConnector implements MavenServerConnect
   protected final Project myProject;
   protected @NotNull final MavenDistribution myDistribution;
   protected final Sdk myJdk;
-  protected final Set<String> myMultimoduleDirectories;
+  protected final Set<String> myMultimoduleDirectories = ConcurrentHashMap.newKeySet();
   private final Object embedderLock = new Object();
 
   protected final String myVmOptions;
@@ -36,7 +37,6 @@ public abstract class AbstractMavenServerConnector implements MavenServerConnect
     myDistribution = mavenDistribution;
     myVmOptions = vmOptions;
     myJdk = jdk;
-    myMultimoduleDirectories = new LinkedHashSet<>();
     myMultimoduleDirectories.add(multimoduleDirectory);
   }
 
@@ -102,7 +102,8 @@ public abstract class AbstractMavenServerConnector implements MavenServerConnect
       () -> {
         RemotePathTransformerFactory.Transformer transformer = RemotePathTransformerFactory.createForProject(myProject);
         File targetBasedir = new File(transformer.toRemotePathOrSelf(basedir.toString()));
-        return getServer().applyProfiles(model, targetBasedir, explicitProfiles, alwaysOnProfiles, MavenRemoteObjectWrapper.ourToken);
+        return getServer().applyProfiles(model, targetBasedir, explicitProfiles, new HashSet<>(alwaysOnProfiles),
+                                         MavenRemoteObjectWrapper.ourToken);
       });
   }
 

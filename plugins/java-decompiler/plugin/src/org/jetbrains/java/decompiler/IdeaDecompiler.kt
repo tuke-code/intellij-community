@@ -122,9 +122,20 @@ class IdeaDecompiler : ClassFileDecompilers.Light() {
 
   override fun accepts(file: VirtualFile): Boolean = true
 
-  override fun getText(file: VirtualFile): CharSequence =
-    if (canWork()) TASK_KEY.pop(file)?.get() ?: decompile(file)
-    else ClsFileImpl.decompile(file)
+  override fun getText(file: VirtualFile): CharSequence {
+    if (canWork()) {
+      val previous = TASK_KEY.pop(file)?.get()
+      if (previous != null) {
+        return previous
+      }
+      else {
+        return decompile(file)
+      }
+    }
+    else {
+      return ClsFileImpl.decompile(file)
+    }
+  }
 
   private fun decompile(file: VirtualFile): CharSequence {
     val indicator = ProgressManager.getInstance().progressIndicator
@@ -202,19 +213,19 @@ class IdeaDecompiler : ClassFileDecompilers.Light() {
       }
     }
 
-    override fun saveFolder(path: String) { }
+    override fun saveFolder(path: String) {}
 
-    override fun copyFile(source: String, path: String, entryName: String) { }
+    override fun copyFile(source: String, path: String, entryName: String) {}
 
-    override fun createArchive(path: String, archiveName: String, manifest: Manifest) { }
+    override fun createArchive(path: String, archiveName: String, manifest: Manifest) {}
 
-    override fun saveDirEntry(path: String, archiveName: String, entryName: String) { }
+    override fun saveDirEntry(path: String, archiveName: String, entryName: String) {}
 
-    override fun copyEntry(source: String, path: String, archiveName: String, entry: String) { }
+    override fun copyEntry(source: String, path: String, archiveName: String, entry: String) {}
 
-    override fun saveClassEntry(path: String, archiveName: String, qualifiedName: String, entryName: String, content: String) { }
+    override fun saveClassEntry(path: String, archiveName: String, qualifiedName: String, entryName: String, content: String) {}
 
-    override fun closeArchive(path: String, archiveName: String) { }
+    override fun closeArchive(path: String, archiveName: String) {}
   }
 
   private fun <T> Key<T>.pop(holder: UserDataHolder): T? {

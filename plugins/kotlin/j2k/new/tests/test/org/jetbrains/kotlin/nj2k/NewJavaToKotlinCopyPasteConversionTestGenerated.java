@@ -88,9 +88,19 @@ public class NewJavaToKotlinCopyPasteConversionTestGenerated extends AbstractNew
         runTest("testData/copyPaste/CopyAnnotation.java");
     }
 
+    @TestMetadata("ExplicitApi.java")
+    public void testExplicitApi() throws Exception {
+        runTest("testData/copyPaste/ExplicitApi.java");
+    }
+
     @TestMetadata("ExtendsTypeRef.java")
     public void testExtendsTypeRef() throws Exception {
         runTest("testData/copyPaste/ExtendsTypeRef.java");
+    }
+
+    @TestMetadata("FacadeClassName.java")
+    public void testFacadeClassName() throws Exception {
+        runTest("testData/copyPaste/FacadeClassName.java");
     }
 
     @TestMetadata("FieldWithNoEndComment.java")

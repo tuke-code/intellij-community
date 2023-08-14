@@ -9,6 +9,8 @@ import com.intellij.codeInspection.*;
 import com.intellij.codeInspection.options.OptPane;
 import com.intellij.java.JavaBundle;
 import com.intellij.lang.ASTNode;
+import com.intellij.modcommand.ModPsiUpdater;
+import com.intellij.modcommand.PsiUpdateModCommandQuickFix;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Comparing;
 import com.intellij.openapi.util.text.StringUtil;
@@ -481,10 +483,10 @@ public class JavadocDeclarationInspection extends LocalInspectionTool {
             String inlineRegion = region != null && markup.getRegionStart(region) == null ? null : region;
             String inlineRendered = renderText(markup, inlineRegion);
             if (!externalRendered.equals(inlineRendered)) {
-              holder.registerProblem(nameElement, 
-                                     JavaBundle.message("inspection.message.external.snippet.differs.from.inline.snippet"),
-                                     new SynchronizeInlineMarkupFix(externalRendered),
-                                     new DeleteElementFix(body));
+              holder.problem(nameElement, JavaBundle.message("inspection.message.external.snippet.differs.from.inline.snippet"))
+                .fix(new SynchronizeInlineMarkupFix(externalRendered))
+                .fix(new DeleteElementFix(body))
+                .register();
             }
           }
         }
@@ -543,10 +545,10 @@ public class JavadocDeclarationInspection extends LocalInspectionTool {
     return set != null ? set : new HashSet<>();
   }
 
-  private static class SynchronizeInlineMarkupFix implements LocalQuickFix, HighPriorityAction {
+  private static class SynchronizeInlineMarkupFix extends PsiUpdateModCommandQuickFix implements HighPriorityAction {
     private final String myText;
 
-    public SynchronizeInlineMarkupFix(@NotNull String text) {
+    private SynchronizeInlineMarkupFix(@NotNull String text) {
       myText = text;
     }
 
@@ -556,8 +558,8 @@ public class JavadocDeclarationInspection extends LocalInspectionTool {
     }
 
     @Override
-    public void applyFix(@NotNull Project project, @NotNull ProblemDescriptor descriptor) {
-      PsiSnippetDocTag snippetTag = PsiTreeUtil.getParentOfType(descriptor.getStartElement(), PsiSnippetDocTag.class);
+    protected void applyFix(@NotNull Project project, @NotNull PsiElement element, @NotNull ModPsiUpdater updater) {
+      PsiSnippetDocTag snippetTag = PsiTreeUtil.getParentOfType(element, PsiSnippetDocTag.class);
       if (snippetTag == null) return;
       PsiSnippetDocTagValue valueElement = snippetTag.getValueElement();
       if (valueElement == null) return;

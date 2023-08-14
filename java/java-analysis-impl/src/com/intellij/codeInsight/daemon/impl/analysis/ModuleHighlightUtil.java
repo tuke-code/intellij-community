@@ -119,7 +119,7 @@ final class ModuleHighlightUtil {
         .descriptionAndTooltip(message);
       rootModuleInfos.stream().map(f -> PsiManager.getInstance(project).findFile(f)).filter(f -> f != file).findFirst().ifPresent(
         duplicate -> {
-          IntentionAction action = new GoToSymbolFix(duplicate, JavaErrorBundle
+          var action = new GoToSymbolFix(duplicate, JavaErrorBundle
             .message("module.open.duplicate.text"));
           info.registerFix(action, null, null, null, null);
         }
@@ -150,7 +150,7 @@ final class ModuleHighlightUtil {
           HighlightInfo.newHighlightInfo(HighlightInfoType.ERROR).range(statement).descriptionAndTooltip(message);
         IntentionAction action1 = QuickFixFactory.getInstance().createDeleteFix(statement);
         info.registerFix(action1, null, null, null, null);
-        IntentionAction action = MergeModuleStatementsFix.createFix(statement);
+        var action = MergeModuleStatementsFix.createFix(statement);
         if (action != null) {
           info.registerFix(action, null, null, null, null);
         }

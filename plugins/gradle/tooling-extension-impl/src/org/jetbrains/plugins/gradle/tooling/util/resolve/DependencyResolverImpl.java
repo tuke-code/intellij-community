@@ -36,7 +36,7 @@ import org.jetbrains.plugins.gradle.model.*;
 import org.jetbrains.plugins.gradle.tooling.serialization.internal.adapter.Supplier;
 import org.jetbrains.plugins.gradle.tooling.util.DependencyResolver;
 import org.jetbrains.plugins.gradle.tooling.util.ModuleComponentIdentifierImpl;
-import org.jetbrains.plugins.gradle.tooling.util.SourceSetCachedFinder;
+import com.intellij.gradle.toolingExtension.impl.modelBuilder.SourceSetCachedFinder;
 import org.jetbrains.plugins.gradle.tooling.util.resolve.deprecated.DeprecatedDependencyResolver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -219,7 +219,7 @@ public final class DependencyResolverImpl implements DependencyResolver {
             }
           }
         }
-        resolvedArtifacts.put(dependency, Collections.<ResolvedArtifact>emptySet());
+        resolvedArtifacts.put(dependency, Collections.emptySet());
       }
       catch (Exception ignore) {
         // ignore other artifact resolution exceptions
@@ -272,7 +272,7 @@ public final class DependencyResolverImpl implements DependencyResolver {
             projectDependencyArtifacts.add(artifactFile);
             projectDependency.setProjectDependencyArtifacts(projectDependencyArtifacts);
             Set<File> artifactSources = new LinkedHashSet<>(projectDependency.getProjectDependencyArtifactsSources());
-            artifactSources.addAll(findArtifactSources(singleton(artifactFile), mySourceSetFinder));
+            artifactSources.addAll(mySourceSetFinder.findArtifactSources(singleton(artifactFile)));
             projectDependency.setProjectDependencyArtifactsSources(artifactSources);
             continue;
           }
@@ -290,7 +290,7 @@ public final class DependencyResolverImpl implements DependencyResolver {
           projectDependency.setConfigurationName(resolvedDependency.getConfiguration());
           Set<File> projectArtifacts = singleton(artifactFile);
           projectDependency.setProjectDependencyArtifacts(projectArtifacts);
-          projectDependency.setProjectDependencyArtifactsSources(findArtifactSources(projectArtifacts, mySourceSetFinder));
+          projectDependency.setProjectDependencyArtifactsSources(mySourceSetFinder.findArtifactSources(projectArtifacts));
         }
         else {
           DefaultExternalLibraryDependency libraryDependency = new DefaultExternalLibraryDependency();
@@ -374,7 +374,7 @@ public final class DependencyResolverImpl implements DependencyResolver {
 
     Set<File> projectArtifacts = configuration1.getArtifacts().getFiles().getFiles();
     projectDependency.setProjectDependencyArtifacts(projectArtifacts);
-    projectDependency.setProjectDependencyArtifactsSources(findArtifactSources(projectArtifacts, mySourceSetFinder));
+    projectDependency.setProjectDependencyArtifactsSources(mySourceSetFinder.findArtifactSources(projectArtifacts));
     return projectDependency;
   }
 
@@ -622,18 +622,6 @@ public final class DependencyResolverImpl implements DependencyResolver {
       return ((ExternalProjectDependency)dependency).getProjectDependencyArtifacts();
     }
     return emptySet();
-  }
-
-  @NotNull
-  public static List<File> findArtifactSources(Collection<? extends File> artifactFiles, SourceSetCachedFinder sourceSetFinder) {
-    List<File> artifactSources = new ArrayList<>();
-    for (File artifactFile : artifactFiles) {
-      Set<File> sources = sourceSetFinder.findSourcesByArtifact(artifactFile.getPath());
-      if (sources != null) {
-        artifactSources.addAll(sources);
-      }
-    }
-    return artifactSources;
   }
 
   public static ModuleComponentIdentifier toComponentIdentifier(ModuleVersionIdentifier id) {

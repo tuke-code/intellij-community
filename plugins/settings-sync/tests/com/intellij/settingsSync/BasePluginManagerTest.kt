@@ -13,14 +13,11 @@ import com.intellij.testFramework.junit5.TestApplication
 import com.intellij.testFramework.junit5.TestDisposable
 import com.intellij.testFramework.replaceService
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.test.*
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.BeforeEach
-import kotlin.coroutines.CoroutineContext
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @TestApplication
@@ -67,11 +64,16 @@ abstract class BasePluginManagerTest {
     listOf(TestPluginDependency("com.intellij.modules.platform", isOptional = false)),
     bundled = true
   )
+  internal val scala = TestPluginDescriptor(
+    "org.intellij.scala",
+    listOf(TestPluginDependency("com.intellij.modules.java", isOptional = false)),
+    isDynamic = false
+  )
 
   @BeforeEach
   fun setUp() {
     SettingsSyncSettings.getInstance().syncEnabled = true
-    SettingsSyncSettings.getInstance().loadState(SettingsSyncSettings.SettingsSyncSettingsState())
+    SettingsSyncSettings.getInstance().loadState(SettingsSyncSettings.State())
     testPluginManager = TestPluginManager()
     ApplicationManager.getApplication().replaceService(PluginManagerProxy::class.java, testPluginManager, testRootDisposable)
     testScheduler = TestCoroutineScheduler()
@@ -133,8 +135,9 @@ internal fun assertPluginsState(expectedStates: Map<PluginId, PluginData>, actua
       .joinToString { (id, data) -> "$id: ${enabledOrDisabled(data.enabled)}" }
 
   if (expectedStates.size != actualStates.size) {
-    assertEquals("Expected and actual states have different number of elements",
-                 stringifyStates(expectedStates), stringifyStates(actualStates))
+    assertEquals(stringifyStates(expectedStates), stringifyStates(actualStates),
+                 "Expected and actual states have different number of elements"
+    )
   }
   for ((expectedId, expectedData) in expectedStates) {
     val actualData = actualStates[expectedId]

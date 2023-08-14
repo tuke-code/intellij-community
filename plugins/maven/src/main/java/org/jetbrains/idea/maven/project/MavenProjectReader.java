@@ -1,22 +1,17 @@
 // Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.idea.maven.project;
 
-import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Pair;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.openapi.vfs.VfsUtilCore;
 import com.intellij.openapi.vfs.VirtualFile;
-import com.intellij.util.containers.CollectionFactory;
-import com.intellij.util.containers.ContainerUtil;
 import org.jdom.Element;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.jetbrains.idea.maven.buildtool.MavenSyncConsole;
 import org.jetbrains.idea.maven.dom.converters.MavenConsumerPomUtil;
 import org.jetbrains.idea.maven.model.*;
 import org.jetbrains.idea.maven.server.MavenEmbedderWrapper;
-import org.jetbrains.idea.maven.server.MavenServerExecutionResult;
 import org.jetbrains.idea.maven.server.MavenServerManager;
 import org.jetbrains.idea.maven.server.ProfileApplicationResult;
 import org.jetbrains.idea.maven.utils.MavenJDOMUtil;
@@ -27,12 +22,8 @@ import org.jetbrains.idea.maven.utils.MavenUtil;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.*;
-import java.util.function.Function;
 
-import static com.intellij.openapi.util.io.FileUtil.toSystemIndependentName;
 import static com.intellij.openapi.util.text.StringUtil.isEmptyOrSpaces;
-import static com.intellij.util.containers.ContainerUtil.getFirstItem;
-import static java.util.stream.Collectors.toMap;
 import static org.jetbrains.idea.maven.utils.MavenUtil.getBaseDir;
 
 public final class MavenProjectReader {
@@ -169,7 +160,7 @@ public final class MavenProjectReader {
                                         Collection<MavenProjectProblem> problems,
                                         VirtualFile file) {
     String version = MavenJDOMUtil.findChildValueByPath(xmlProject, "parent.version");
-    if (version != null || !MavenConsumerPomUtil.isConsumerPomResolutionApplicable(myProject)) {
+    if (version != null || !MavenConsumerPomUtil.isAutomaticVersionFeatureEnabled(file, myProject)) {
       return StringUtil.notNullize(version, UNKNOWN);
     }
     String parentGroupId = MavenJDOMUtil.findChildValueByPath(xmlProject, "parent.groupId");
@@ -180,7 +171,8 @@ public final class MavenProjectReader {
                                            false));
       return UNKNOWN;
     }
-    VirtualFile parentFile = file.findFileByRelativePath("../../pom.xml");
+    String relativePath = MavenJDOMUtil.findChildValueByPath(xmlProject, "parent.relativePath", "../pom.xml");
+    VirtualFile parentFile = file.getParent().findFileByRelativePath(relativePath);
     if (parentFile == null) {
       problems.add(new MavenProjectProblem(file.getPath(), MavenProjectBundle.message("consumer.pom.cannot.determine.parent.version"),
                                            MavenProjectProblem.ProblemType.STRUCTURE,
@@ -194,47 +186,6 @@ public final class MavenProjectReader {
       return version;
     }
     return calculateParentVersion(parentXmlProject, problems, parentFile);
-  }
-
-  private static void readModelBody(MavenModelBase mavenModelBase, MavenBuildBase mavenBuildBase, Element xmlModel) {
-    mavenModelBase.setModules(MavenJDOMUtil.findChildrenValuesByPath(xmlModel, "modules", "module"));
-    collectProperties(MavenJDOMUtil.findChildByPath(xmlModel, "properties"), mavenModelBase);
-
-    Element xmlBuild = MavenJDOMUtil.findChildByPath(xmlModel, "build");
-
-    mavenBuildBase.setFinalName(MavenJDOMUtil.findChildValueByPath(xmlBuild, "finalName"));
-    mavenBuildBase.setDefaultGoal(MavenJDOMUtil.findChildValueByPath(xmlBuild, "defaultGoal"));
-    mavenBuildBase.setDirectory(MavenJDOMUtil.findChildValueByPath(xmlBuild, "directory"));
-    mavenBuildBase.setResources(collectResources(MavenJDOMUtil.findChildrenByPath(xmlBuild, "resources", "resource")));
-    mavenBuildBase.setTestResources(collectResources(MavenJDOMUtil.findChildrenByPath(xmlBuild, "testResources", "testResource")));
-    mavenBuildBase.setFilters(MavenJDOMUtil.findChildrenValuesByPath(xmlBuild, "filters", "filter"));
-
-    if (mavenBuildBase instanceof MavenBuild mavenBuild) {
-
-      String source = MavenJDOMUtil.findChildValueByPath(xmlBuild, "sourceDirectory");
-      if (!isEmptyOrSpaces(source)) mavenBuild.addSource(source);
-      String testSource = MavenJDOMUtil.findChildValueByPath(xmlBuild, "testSourceDirectory");
-      if (!isEmptyOrSpaces(testSource)) mavenBuild.addTestSource(testSource);
-
-      mavenBuild.setOutputDirectory(MavenJDOMUtil.findChildValueByPath(xmlBuild, "outputDirectory"));
-      mavenBuild.setTestOutputDirectory(MavenJDOMUtil.findChildValueByPath(xmlBuild, "testOutputDirectory"));
-    }
-  }
-
-  private static List<MavenResource> collectResources(List<Element> xmlResources) {
-    List<MavenResource> result = new ArrayList<>();
-    for (Element each : xmlResources) {
-      String directory = MavenJDOMUtil.findChildValueByPath(each, "directory");
-      boolean filtered = "true".equals(MavenJDOMUtil.findChildValueByPath(each, "filtering"));
-      String targetPath = MavenJDOMUtil.findChildValueByPath(each, "targetPath");
-      List<String> includes = MavenJDOMUtil.findChildrenValuesByPath(each, "includes", "include");
-      List<String> excludes = MavenJDOMUtil.findChildrenValuesByPath(each, "excludes", "exclude");
-
-      if (null == directory) continue;
-
-      result.add(new MavenResource(directory, filtered, targetPath, includes, excludes));
-    }
-    return result;
   }
 
   private void repairModelBody(MavenModel model) {
@@ -403,20 +354,6 @@ public final class MavenProjectReader {
     return true;
   }
 
-  private static void collectProperties(Element xmlProperties, MavenModelBase mavenModelBase) {
-    if (xmlProperties == null) return;
-
-    Properties props = mavenModelBase.getProperties();
-
-    for (Element each : xmlProperties.getChildren()) {
-      String name = each.getName();
-      String value = each.getTextTrim();
-      if (!props.containsKey(name) && !isEmptyOrSpaces(name)) {
-        props.setProperty(name, value);
-      }
-    }
-  }
-
   private ProfileApplicationResult applyProfiles(MavenModel model,
                                                  Path projectPomDir,
                                                  Path basedir,
@@ -457,7 +394,7 @@ public final class MavenProjectReader {
       }
 
       Pair<VirtualFile, RawModelReadResult> parentModelWithProblems =
-        new MavenParentProjectFileProcessor<Pair<VirtualFile, RawModelReadResult>>() {
+        new MavenParentProjectFileProcessor<Pair<VirtualFile, RawModelReadResult>>(myProject) {
           @Override
           @Nullable
           protected VirtualFile findManagedFile(@NotNull MavenId id) {
@@ -517,92 +454,84 @@ public final class MavenProjectReader {
     }
   }
 
+  /**
+   * @deprecated use {@link MavenProjectResolver}
+   */
   // used in third-party plugins
+  @Deprecated(forRemoval = true)
   public Collection<MavenProjectReaderResult> resolveProject(MavenGeneralSettings generalSettings,
                                                              MavenEmbedderWrapper embedder,
                                                              Collection<VirtualFile> files,
                                                              MavenExplicitProfiles explicitProfiles,
                                                              MavenProjectReaderProjectLocator locator)
     throws MavenProcessCanceledException {
-    return resolveProject(generalSettings, embedder, files, explicitProfiles, locator, null, null, null, null, false);
+    return MavenProjectResolutionUtil.resolveProjectSync(
+      this,
+      generalSettings,
+      embedder,
+      files,
+      explicitProfiles,
+      locator,
+      null,
+      null,
+      null,
+      null,
+      false);
   }
 
-  public Collection<MavenProjectReaderResult> resolveProject(MavenGeneralSettings generalSettings,
-                                                             MavenEmbedderWrapper embedder,
-                                                             Collection<VirtualFile> files,
-                                                             MavenExplicitProfiles explicitProfiles,
-                                                             MavenProjectReaderProjectLocator locator,
-                                                             @Nullable ProgressIndicator process,
-                                                             @Nullable MavenSyncConsole syncConsole,
-                                                             @Nullable MavenConsole console,
-                                                             @Nullable MavenWorkspaceMap workspaceMap,
-                                                             boolean updateSnapshots)
-    throws MavenProcessCanceledException {
-    try {
-      Collection<MavenServerExecutionResult> executionResults =
-        embedder.resolveProject(files, explicitProfiles, process, syncConsole, console, workspaceMap, updateSnapshots);
-      Map<String, VirtualFile> filesMap = CollectionFactory.createFilePathMap();
-      filesMap.putAll(files.stream().collect(toMap(VirtualFile::getPath, Function.identity())));
+  private static void readModelBody(MavenModelBase mavenModelBase, MavenBuildBase mavenBuildBase, Element xmlModel) {
+    mavenModelBase.setModules(MavenJDOMUtil.findChildrenValuesByPath(xmlModel, "modules", "module"));
+    collectProperties(MavenJDOMUtil.findChildByPath(xmlModel, "properties"), mavenModelBase);
 
-      Collection<MavenProjectReaderResult> readerResults = new ArrayList<>();
-      for (MavenServerExecutionResult result : executionResults) {
-        MavenServerExecutionResult.ProjectData projectData = result.projectData;
-        if (projectData == null) {
-          VirtualFile file = detectPomFile(filesMap, result);
-          if (file != null) {
-            MavenProjectReaderResult temp = readProject(generalSettings, file, explicitProfiles, locator);
-            temp.readingProblems.addAll(result.problems);
-            temp.unresolvedArtifactIds.addAll(result.unresolvedArtifacts);
-            readerResults.add(temp);
-          }
-        }
-        else {
-          readerResults.add(new MavenProjectReaderResult(
-            projectData.mavenModel,
-            projectData.mavenModelMap,
-            new MavenExplicitProfiles(projectData.activatedProfiles, explicitProfiles.getDisabledProfiles()),
-            projectData.nativeMavenProject,
-            result.problems,
-            result.unresolvedArtifacts,
-            result.unresolvedProblems));
-        }
-      }
+    Element xmlBuild = MavenJDOMUtil.findChildByPath(xmlModel, "build");
 
-      return readerResults;
-    }
-    catch (MavenProcessCanceledException e) {
-      throw e;
-    }
-    catch (final Throwable e) {
-      MavenLog.LOG.info(e);
-      MavenLog.printInTests(e); // print exception since we need to know if something wrong with our logic
+    mavenBuildBase.setFinalName(MavenJDOMUtil.findChildValueByPath(xmlBuild, "finalName"));
+    mavenBuildBase.setDefaultGoal(MavenJDOMUtil.findChildValueByPath(xmlBuild, "defaultGoal"));
+    mavenBuildBase.setDirectory(MavenJDOMUtil.findChildValueByPath(xmlBuild, "directory"));
+    mavenBuildBase.setResources(collectResources(MavenJDOMUtil.findChildrenByPath(xmlBuild, "resources", "resource")));
+    mavenBuildBase.setTestResources(collectResources(MavenJDOMUtil.findChildrenByPath(xmlBuild, "testResources", "testResource")));
+    mavenBuildBase.setFilters(MavenJDOMUtil.findChildrenValuesByPath(xmlBuild, "filters", "filter"));
 
-      return ContainerUtil.mapNotNull(files, file -> {
-        MavenProjectReaderResult result = readProject(generalSettings, file, explicitProfiles, locator);
-        String message = e.getMessage();
-        if (message != null) {
-          result.readingProblems.add(MavenProjectProblem.createStructureProblem(file.getPath(), message));
-        }
-        else {
-          result.readingProblems.add(MavenProjectProblem.createSyntaxProblem(file.getPath(), MavenProjectProblem.ProblemType.SYNTAX));
-        }
-        return result;
-      });
+    if (mavenBuildBase instanceof MavenBuild mavenBuild) {
+
+      String source = MavenJDOMUtil.findChildValueByPath(xmlBuild, "sourceDirectory");
+      if (!isEmptyOrSpaces(source)) mavenBuild.addSource(source);
+      String testSource = MavenJDOMUtil.findChildValueByPath(xmlBuild, "testSourceDirectory");
+      if (!isEmptyOrSpaces(testSource)) mavenBuild.addTestSource(testSource);
+
+      mavenBuild.setOutputDirectory(MavenJDOMUtil.findChildValueByPath(xmlBuild, "outputDirectory"));
+      mavenBuild.setTestOutputDirectory(MavenJDOMUtil.findChildValueByPath(xmlBuild, "testOutputDirectory"));
     }
   }
 
-  @Nullable
-  private static VirtualFile detectPomFile(Map<String, VirtualFile> filesMap, MavenServerExecutionResult result) {
-    if (filesMap.size() == 1) {
-      return getFirstItem(filesMap.values());
+  private static List<MavenResource> collectResources(List<Element> xmlResources) {
+    List<MavenResource> result = new ArrayList<>();
+    for (Element each : xmlResources) {
+      String directory = MavenJDOMUtil.findChildValueByPath(each, "directory");
+      boolean filtered = "true".equals(MavenJDOMUtil.findChildValueByPath(each, "filtering"));
+      String targetPath = MavenJDOMUtil.findChildValueByPath(each, "targetPath");
+      List<String> includes = MavenJDOMUtil.findChildrenValuesByPath(each, "includes", "include");
+      List<String> excludes = MavenJDOMUtil.findChildrenValuesByPath(each, "excludes", "exclude");
+
+      if (null == directory) continue;
+
+      result.add(new MavenResource(directory, filtered, targetPath, includes, excludes));
     }
-    if (!result.problems.isEmpty()) {
-      String path = getFirstItem(result.problems).getPath();
-      if (path != null) {
-        return filesMap.get(toSystemIndependentName(path));
+    return result;
+  }
+
+  private static void collectProperties(Element xmlProperties, MavenModelBase mavenModelBase) {
+    if (xmlProperties == null) return;
+
+    Properties props = mavenModelBase.getProperties();
+
+    for (Element each : xmlProperties.getChildren()) {
+      String name = each.getName();
+      String value = each.getTextTrim();
+      if (!props.containsKey(name) && !isEmptyOrSpaces(name)) {
+        props.setProperty(name, value);
       }
     }
-    return null;
   }
 
   private static Element readXml(final VirtualFile file,

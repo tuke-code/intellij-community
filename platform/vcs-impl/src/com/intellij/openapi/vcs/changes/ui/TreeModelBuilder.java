@@ -426,7 +426,7 @@ public class TreeModelBuilder implements ChangesViewModelBuilder {
 
     StaticFilePath pathKey = getKey(change);
     ChangesBrowserNode<?> parentNode = ReadAction.compute(
-      () -> notNull(GROUPING_POLICY.getRequired(subtreeRoot).getParentNodeFor(pathKey, subtreeRoot), subtreeRoot));
+      () -> notNull(GROUPING_POLICY.getRequired(subtreeRoot).getParentNodeFor(pathKey, node, subtreeRoot), subtreeRoot));
     ChangesBrowserNode<?> cachingRoot = BaseChangesGroupingPolicy.getCachingRoot(parentNode, subtreeRoot);
 
     myModel.insertNodeInto(node, parentNode, myModel.getChildCount(parentNode));
@@ -508,9 +508,9 @@ public class TreeModelBuilder implements ChangesViewModelBuilder {
       return child;
     }
 
-    if (parent instanceof ChangesBrowserModuleNode &&
+    if (parent instanceof ChangesBrowserNode.NodeWithFilePath parentWithPath &&
         childUserObject instanceof FilePath childPath) {
-      FilePath parentPath = ((ChangesBrowserModuleNode)parent).getModuleRoot();
+      FilePath parentPath = parentWithPath.getNodeFilePath();
       if (!parentPath.equals(childPath)) return null;
 
       parent.remove(0);

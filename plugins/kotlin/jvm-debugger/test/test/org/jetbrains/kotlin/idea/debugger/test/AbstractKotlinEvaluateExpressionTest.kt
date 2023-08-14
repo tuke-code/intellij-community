@@ -1,9 +1,10 @@
-// Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 
 package org.jetbrains.kotlin.idea.debugger.test
 
 import com.intellij.debugger.engine.ContextUtil
 import com.intellij.debugger.engine.SuspendContextImpl
+import com.intellij.debugger.engine.evaluation.CodeFragmentFactory
 import com.intellij.debugger.engine.evaluation.CodeFragmentKind
 import com.intellij.debugger.engine.evaluation.EvaluateException
 import com.intellij.debugger.engine.evaluation.TextWithImportsImpl
@@ -17,6 +18,7 @@ import com.intellij.debugger.ui.impl.watch.NodeDescriptorImpl
 import com.intellij.execution.process.ProcessOutputTypes
 import com.intellij.openapi.application.runReadAction
 import com.intellij.openapi.util.io.FileUtil
+import com.intellij.openapi.util.registry.Registry
 import com.intellij.ui.treeStructure.Tree
 import com.intellij.xdebugger.XDebuggerTestUtil
 import com.intellij.xdebugger.impl.ui.tree.ValueMarkup
@@ -25,7 +27,8 @@ import org.jetbrains.eval4j.ObjectValue
 import org.jetbrains.eval4j.Value
 import org.jetbrains.eval4j.jdi.asValue
 import org.jetbrains.kotlin.idea.KotlinFileType
-import org.jetbrains.kotlin.idea.debugger.evaluate.KotlinCodeFragmentFactory
+import org.jetbrains.kotlin.idea.debugger.core.CodeFragmentContextTuner
+import org.jetbrains.kotlin.idea.debugger.evaluate.DebugContextProvider
 import org.jetbrains.kotlin.idea.debugger.test.preference.DebuggerPreferenceKeys
 import org.jetbrains.kotlin.idea.debugger.test.preference.DebuggerPreferences
 import org.jetbrains.kotlin.idea.debugger.test.util.FramePrinter
@@ -63,9 +66,25 @@ abstract class AbstractKotlinEvaluateExpressionTest : KotlinDescriptorTestCaseWi
     private var isMultipleBreakpointsTest = false
     private var isFrameTest = false
 
+    private var originalEnableKotlinEvaluatorInJavaContext: Boolean = false
+
     override fun setUp() {
         super.setUp()
+        allowEvaluationInJavaContext()
         atDebuggerTearDown { exceptions.clear() }
+        atDebuggerTearDown { restoreEvaluationInJavaContext() }
+    }
+
+    private fun allowEvaluationInJavaContext() {
+        Registry.get("debugger.enable.kotlin.evaluator.in.java.context").let {
+            originalEnableKotlinEvaluatorInJavaContext = it.asBoolean()
+            it.setValue(true)
+        }
+    }
+
+    private fun restoreEvaluationInJavaContext() {
+        Registry.get("debugger.enable.kotlin.evaluator.in.java.context")
+          .setValue(originalEnableKotlinEvaluatorInJavaContext)
     }
 
     override fun fragmentCompilerBackend() =
@@ -186,15 +205,20 @@ abstract class AbstractKotlinEvaluateExpressionTest : KotlinDescriptorTestCaseWi
         val debuggerContext = createDebuggerContext(myDebuggerSession, suspendContext, threadProxy, frameProxy)
         debuggerContext.initCaches()
 
-        val contextElement = ContextUtil.getContextElement(debuggerContext)!!
+        val contextElement = runReadAction {
+            CodeFragmentContextTuner.getInstance().tuneContextElement(ContextUtil.getContextElement(debuggerContext))!!
+        }
 
-        assert(KotlinCodeFragmentFactory().isContextAccepted(contextElement)) {
+        val codeFragmentFactory = CodeFragmentFactory.EXTENSION_POINT_NAME.extensions
+            .first { it.fileType == KotlinFileType.INSTANCE }
+
+        assert(codeFragmentFactory.isContextAccepted(contextElement)) {
             val text = runReadAction { contextElement.text }
             "KotlinCodeFragmentFactory should be accepted for context element otherwise default evaluator will be called. " +
                     "ContextElement = $text"
         }
 
-        contextElement.putCopyableUserData(KotlinCodeFragmentFactory.DEBUG_CONTEXT_FOR_TESTS, debuggerContext)
+        DebugContextProvider.supplyTestDebugContext(contextElement, debuggerContext)
 
         suspendContext.runActionInSuspendCommand {
             try {

@@ -4,6 +4,8 @@ package com.intellij.openapi.progress;
 import com.intellij.concurrency.ThreadContext;
 import com.intellij.openapi.application.AccessToken;
 import com.intellij.openapi.util.ThrowableComputable;
+import kotlin.coroutines.CoroutineContext;
+import kotlinx.coroutines.CompletableJob;
 import kotlinx.coroutines.Job;
 import org.jetbrains.annotations.ApiStatus.Internal;
 import org.jetbrains.annotations.NotNull;
@@ -24,6 +26,11 @@ public final class Cancellation {
     return ThreadContext.currentThreadContext().get(Job.Key);
   }
 
+  public static @Nullable CompletableJob getJob(@NotNull CoroutineContext context) {
+    Job job = context.get(Job.Key);
+    return job instanceof CompletableJob ? (CompletableJob)job : null;
+  }
+
   public static void checkCancelled() {
     Job currentJob = currentJob();
     if (currentJob != null) {
@@ -31,7 +38,7 @@ public final class Cancellation {
         ensureActive(currentJob);
       }
       catch (CancellationException e) {
-        throw new JobCanceledException(e);
+        throw new CeProcessCanceledException(e);
       }
     }
   }
@@ -65,7 +72,7 @@ public final class Cancellation {
     }
   }
 
-  public static @NotNull AccessToken withCancelableSection() {
+  public static @NotNull AccessToken withNonCancelableSection() {
     if (isInNonCancelableSection()) {
       return AccessToken.EMPTY_ACCESS_TOKEN;
     }

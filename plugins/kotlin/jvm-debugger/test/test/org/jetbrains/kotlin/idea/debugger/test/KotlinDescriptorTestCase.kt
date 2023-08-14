@@ -1,4 +1,4 @@
-// Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 
 package org.jetbrains.kotlin.idea.debugger.test
 
@@ -20,6 +20,7 @@ import com.intellij.execution.target.TargetEnvironmentRequest
 import com.intellij.execution.target.TargetedCommandLineBuilder
 import com.intellij.openapi.application.invokeAndWaitIfNeeded
 import com.intellij.openapi.application.runInEdt
+import com.intellij.openapi.application.runReadAction
 import com.intellij.openapi.application.runWriteAction
 import com.intellij.openapi.roots.LibraryOrderEntry
 import com.intellij.openapi.roots.ModifiableRootModel
@@ -32,10 +33,15 @@ import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.psi.PsiFile
 import com.intellij.testFramework.runInEdtAndGet
 import com.intellij.util.ThrowableRunnable
-import com.intellij.util.ui.UIUtil
+import com.intellij.util.containers.addIfNotNull
 import com.intellij.xdebugger.XDebugSession
+import org.jetbrains.kotlin.analysis.api.analyze
 import org.jetbrains.kotlin.config.*
+import org.jetbrains.kotlin.fileClasses.JvmFileClassUtil
+import org.jetbrains.kotlin.idea.base.codeInsight.KotlinMainFunctionDetector
+import org.jetbrains.kotlin.idea.base.codeInsight.PsiOnlyKotlinMainFunctionDetector
 import org.jetbrains.kotlin.idea.base.plugin.artifacts.TestKotlinArtifacts
+import org.jetbrains.kotlin.idea.base.psi.classIdIfNonLocal
 import org.jetbrains.kotlin.idea.compiler.configuration.KotlinCommonCompilerArgumentsHolder
 import org.jetbrains.kotlin.idea.compiler.configuration.KotlinCompilerSettings
 import org.jetbrains.kotlin.idea.compiler.configuration.KotlinPluginLayout
@@ -49,7 +55,10 @@ import org.jetbrains.kotlin.idea.test.KotlinBaseTest.TestFile
 import org.jetbrains.kotlin.idea.test.KotlinTestUtils.*
 import org.jetbrains.kotlin.idea.test.TestFiles.TestFileFactory
 import org.jetbrains.kotlin.idea.test.TestFiles.createTestFiles
-import org.jetbrains.kotlin.idea.test.testFramework.KtUsefulTestCase
+import org.jetbrains.kotlin.name.ClassId
+import org.jetbrains.kotlin.psi.KtNamedFunction
+import org.jetbrains.kotlin.psi.KtTreeVisitorVoid
+import org.jetbrains.kotlin.psi.psiUtil.containingClassOrObject
 import org.jetbrains.kotlin.test.TargetBackend
 import org.jetbrains.kotlin.test.utils.IgnoreTests
 import org.junit.ComparisonFailure
@@ -112,18 +121,27 @@ abstract class KotlinDescriptorTestCase : DescriptorTestCase() {
     protected open fun getK2IgnoreDirective(): String = IgnoreTests.DIRECTIVES.IGNORE_K2
 
     var originalUseIrBackendForEvaluation = true
+    private var originalDisableFallbackToOldEvaluator = false
 
     private fun registerEvaluatorBackend() {
-        val useIrBackendForEvaluation = Registry.get("debugger.kotlin.evaluator.use.jvm.ir.backend")
+        val useIrBackendForEvaluation = Registry.get("debugger.kotlin.evaluator.use.new.jvm.ir.backend")
         originalUseIrBackendForEvaluation = useIrBackendForEvaluation.asBoolean()
-        useIrBackendForEvaluation.setValue(
-            fragmentCompilerBackend() == FragmentCompilerBackend.JVM_IR
-        )
+
+        val isJvmIrBackend = fragmentCompilerBackend() == FragmentCompilerBackend.JVM_IR
+        useIrBackendForEvaluation.setValue(isJvmIrBackend)
+
+        if (isJvmIrBackend) {
+            val disableFallbackToOldEvaluator = Registry.get("debugger.kotlin.evaluator.disable.fallback.to.old.backend")
+            originalDisableFallbackToOldEvaluator = disableFallbackToOldEvaluator.asBoolean()
+            disableFallbackToOldEvaluator.setValue(true)
+        }
     }
 
     private fun restoreEvaluatorBackend() {
-        Registry.get("debugger.kotlin.evaluator.use.jvm.ir.backend")
+        Registry.get("debugger.kotlin.evaluator.use.new.jvm.ir.backend")
             .setValue(originalUseIrBackendForEvaluation)
+        Registry.get("debugger.kotlin.evaluator.disable.fallback.to.old.backend")
+            .setValue(originalDisableFallbackToOldEvaluator)
     }
 
     protected open val isK2Plugin: Boolean get() = false
@@ -201,7 +219,15 @@ abstract class KotlinDescriptorTestCase : DescriptorTestCase() {
         val rawJvmTarget = preferences[DebuggerPreferenceKeys.JVM_TARGET]
         val jvmTarget = JvmTarget.fromString(rawJvmTarget) ?: error("Invalid JVM target value: $rawJvmTarget")
 
-        val languageVersion = chooseLanguageVersionForCompilation(compileWithK2)
+        val languageVersion = if (useIrBackend()) {
+            chooseLanguageVersionForCompilation(compileWithK2)
+        } else {
+            check(!compileWithK2) {
+                "Old backend-backed evaluator cannot work with K2"
+            }
+            null
+        }
+
         val enabledLanguageFeatures = preferences[DebuggerPreferenceKeys.ENABLED_LANGUAGE_FEATURE]
             .map { LanguageFeature.fromString(it) ?: error("Not found language feature $it") }
 
@@ -214,7 +240,7 @@ abstract class KotlinDescriptorTestCase : DescriptorTestCase() {
 
         compileLibrariesAndTestSources(preferences, compilerFacility)
 
-        val mainClassName = analyzeAndFindMainClass(compilerFacility)
+        val mainClassName = getMainClassName(compilerFacility)
         breakpointCreator = BreakpointCreator(
             project,
             ::systemLogger,
@@ -250,8 +276,47 @@ abstract class KotlinDescriptorTestCase : DescriptorTestCase() {
     protected open fun compileAdditionalLibraries(compilerFacility: DebuggerTestCompilerFacility) {
     }
 
-    protected open fun analyzeAndFindMainClass(compilerFacility: DebuggerTestCompilerFacility): String {
-        return compilerFacility.analyzeAndFindMainClass(sourcesKtFiles.jvmKtFiles)
+    protected open fun getMainClassName(compilerFacility: DebuggerTestCompilerFacility): String {
+        if (!isK2Plugin) {
+            // Although the implementation below is frontend-agnostic, K1 tests seem to depend on resolution ordering.
+            // Some evaluation tests fail if not all files are analyzed at this point.
+            return compilerFacility.analyzeAndFindMainClass(sourcesKtFiles.jvmKtFiles)
+        }
+
+        return runReadAction {
+            val mainFunctionDetector = KotlinMainFunctionDetector.getInstance()
+            val candidates = mutableListOf<ClassId>()
+
+            for (file in sourcesKtFiles.jvmKtFiles) {
+                val visitor = object : KtTreeVisitorVoid() {
+                    override fun visitNamedFunction(function: KtNamedFunction) {
+                        if (mainFunctionDetector.isMain(function)) {
+                            val candidate = when (val containingClass = function.containingClassOrObject) {
+                                null -> ClassId.topLevel(JvmFileClassUtil.getFileClassInfoNoResolve(file).facadeClassFqName)
+                                else -> containingClass.classIdIfNonLocal
+                            }
+
+                            candidates.addIfNotNull(candidate)
+                        }
+                    }
+                }
+
+                file.accept(visitor)
+            }
+
+            when (candidates.size) {
+                0 -> error("Cannot find a 'main()' function")
+                1 -> {
+                    val candidate = candidates.single()
+                    val packagePrefix = if (candidate.packageFqName.isRoot) "" else candidate.packageFqName.asString() + "."
+                    val relativeNameString = candidate.relativeClassName.asString().replace('.', '$')
+                    packagePrefix + relativeNameString
+                }
+                else -> {
+                    error("Multiple main functions found: " + candidates.joinToString())
+                }
+            }
+        }
     }
 
     override fun createLocalProcess(className: String?) {
@@ -292,17 +357,9 @@ abstract class KotlinDescriptorTestCase : DescriptorTestCase() {
                 .asyncAgent(true)
                 .create(javaCommandLineState.javaParameters)
 
-        lateinit var debuggerSession: DebuggerSession
-
-        UIUtil.invokeAndWaitIfNeeded(Runnable {
-            try {
-                val env = javaCommandLineState.environment
-                env.putUserData(DefaultDebugEnvironment.DEBUGGER_TRACE_MODE, traceMode)
-                debuggerSession = attachVirtualMachine(javaCommandLineState, env, debugParameters, false)
-            } catch (e: ExecutionException) {
-                fail(e.message)
-            }
-        })
+        val env = javaCommandLineState.environment
+        env.putUserData(DefaultDebugEnvironment.DEBUGGER_TRACE_MODE, traceMode)
+        val debuggerSession = attachVirtualMachine(javaCommandLineState, env, debugParameters, false)
 
         val processHandler = debuggerSession.process.processHandler
         debuggerSession.process.addProcessListener(object : ProcessAdapter() {

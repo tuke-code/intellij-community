@@ -6,6 +6,8 @@ import com.intellij.codeInspection.*;
 import com.intellij.codeInspection.options.OptPane;
 import com.intellij.codeInspection.util.IntentionName;
 import com.intellij.java.JavaBundle;
+import com.intellij.modcommand.ModPsiUpdater;
+import com.intellij.modcommand.PsiUpdateModCommandQuickFix;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Predicates;
 import com.intellij.psi.*;
@@ -331,7 +333,7 @@ public class RawUseOfParameterizedTypeInspection extends BaseInspection {
     }
 
     @Override
-    protected void applyFix(@NotNull Project project, @NotNull PsiElement startElement, @NotNull EditorUpdater updater) {
+    protected void applyFix(@NotNull Project project, @NotNull PsiElement startElement, @NotNull ModPsiUpdater updater) {
       PsiJavaCodeReferenceElement element = ObjectUtils.tryCast(startElement, PsiJavaCodeReferenceElement.class);
       if (element == null) return;
       PsiReferenceParameterList parameterList = element.getParameterList();
@@ -359,7 +361,7 @@ public class RawUseOfParameterizedTypeInspection extends BaseInspection {
     }
 
     @Override
-    protected void applyFix(@NotNull Project project, @NotNull PsiElement startElement, @NotNull EditorUpdater updater) {
+    protected void applyFix(@NotNull Project project, @NotNull PsiElement startElement, @NotNull ModPsiUpdater updater) {
       PsiTypeElement cast = PsiTreeUtil.getNonStrictParentOfType(startElement, PsiTypeElement.class);
       if (cast == null) return;
       CodeStyleManager.getInstance(project).reformat(new CommentTracker().replace(cast, myTargetType));

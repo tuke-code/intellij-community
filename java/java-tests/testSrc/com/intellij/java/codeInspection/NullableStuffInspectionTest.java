@@ -5,6 +5,7 @@ package com.intellij.java.codeInspection;
 import com.intellij.JavaTestUtil;
 import com.intellij.codeInsight.NullableNotNullManager;
 import com.intellij.codeInspection.nullable.NullableStuffInspection;
+import com.intellij.openapi.application.impl.NonBlockingReadActionImpl;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.roots.GeneratedSourcesFilter;
 import com.intellij.openapi.util.Disposer;
@@ -48,6 +49,7 @@ public class NullableStuffInspectionTest extends LightJavaCodeInsightFixtureTest
   private void doTestWithFix(String intentionAction) {
     doTest();
     myFixture.launchAction(myFixture.findSingleIntention(intentionAction));
+    NonBlockingReadActionImpl.waitForAsyncTaskCompletion();
     myFixture.checkResultByFile(getTestName(false) + "_after.java");
   }
 
@@ -139,6 +141,12 @@ public class NullableStuffInspectionTest extends LightJavaCodeInsightFixtureTest
 
   public void testNotNullByDefaultParameterOverridesNotAnnotated() {
     myInspection.REPORT_NOTNULL_PARAMETERS_OVERRIDES_NOT_ANNOTATED = true;
+    DataFlowInspectionTest.addJavaxNullabilityAnnotations(myFixture);
+    DataFlowInspectionTest.addJavaxDefaultNullabilityAnnotations(myFixture);
+    doTest();
+  }
+  
+  public void testNullableCalledWithNullUnderNotNullByDefault() {
     DataFlowInspectionTest.addJavaxNullabilityAnnotations(myFixture);
     DataFlowInspectionTest.addJavaxDefaultNullabilityAnnotations(myFixture);
     doTest();
@@ -239,6 +247,12 @@ public class NullableStuffInspectionTest extends LightJavaCodeInsightFixtureTest
     myFixture.configureFromExistingVirtualFile(myFixture.copyFileToProject(getTestName(false) + ".java", "foo/Classes.java"));
     myFixture.enableInspections(myInspection);
     myFixture.checkHighlighting(true, false, true);
+  }
+  
+  public void testDefaultOverridesExplicit() {
+    DataFlowInspectionTest.addJavaxNullabilityAnnotations(myFixture);
+    DataFlowInspectionTest.addJavaxDefaultNullabilityAnnotations(myFixture);
+    doTest();
   }
 
   public void testBeanValidationNotNull() {

@@ -7,14 +7,17 @@ package com.intellij.concurrency
 import com.intellij.diagnostic.LoadingState
 import com.intellij.openapi.application.AccessToken
 import com.intellij.openapi.diagnostic.Logger
-import com.intellij.util.concurrency.isCheckContextAssertions
 import com.intellij.util.concurrency.captureCallableThreadContext
+import com.intellij.util.concurrency.capturePropagationAndCancellationContext
 import com.intellij.util.concurrency.captureRunnableThreadContext
+import com.intellij.util.concurrency.isCheckContextAssertions
+import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.Job
 import org.jetbrains.annotations.ApiStatus.Experimental
 import org.jetbrains.annotations.ApiStatus.Internal
 import org.jetbrains.annotations.VisibleForTesting
 import java.util.concurrent.Callable
+import java.util.function.Function
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.EmptyCoroutineContext
 
@@ -198,12 +201,27 @@ fun captureThreadContext(runnable: Runnable): Runnable {
 }
 
 /**
+ * Same as [captureThreadContext] but for [Function]
+ */
+fun <T, U> captureThreadContext(f : Function<in T, out U>) : Function<in T, out U> {
+  return capturePropagationAndCancellationContext(f)
+}
+
+/**
  * Strips off internal elements from thread contexts.
  * If you need to compare contexts by equality, most likely you need to use this method.
  */
 fun getContextSkeleton(context: CoroutineContext): Set<CoroutineContext.Element> {
   checkContextInstalled()
-  return context.minusKey(Job.Key).fold(HashSet()) { m, elem -> m.apply { add(elem) } }
+  return context.fold(HashSet()) { acc, element ->
+    when (element.key) {
+      Job -> Unit
+      CoroutineName -> Unit
+      @Suppress("INVISIBLE_MEMBER") kotlinx.coroutines.CoroutineId -> Unit
+      else -> acc.add(element)
+    }
+    acc
+  }
 }
 
 /**

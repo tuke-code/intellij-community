@@ -22,10 +22,11 @@ import com.intellij.openapi.roots.ui.configuration.SdkTestCase.Companion.assertS
 import com.intellij.openapi.roots.ui.configuration.SdkTestCase.TestSdk
 import com.intellij.openapi.roots.ui.configuration.SdkTestCase.TestSdkGenerator
 import com.intellij.testFramework.replaceService
+import com.intellij.util.lang.JavaVersion
+import org.jetbrains.plugins.gradle.jvmcompat.GradleJvmSupportMatrix
 import org.jetbrains.plugins.gradle.service.project.open.linkAndRefreshGradleProject
 import org.jetbrains.plugins.gradle.testFramework.util.createBuildFile
 import org.jetbrains.plugins.gradle.testFramework.util.createSettingsFile
-import org.jetbrains.plugins.gradle.util.isSupported
 import org.jetbrains.plugins.gradle.testFramework.util.waitForAnyGradleProjectReload
 
 abstract class GradleProjectResolverTestCase : GradleImportingTestCase() {
@@ -69,7 +70,7 @@ abstract class GradleProjectResolverTestCase : GradleImportingTestCase() {
     val jdkInfo = jdkType.suggestHomePaths().asSequence()
       .map { createSdkInfo(jdkType, it) }
       .filter { ExternalSystemJdkUtil.isValidJdk(it.homePath) }
-      .filter { isSupported(currentGradleVersion, it.versionString) }
+      .filter { GradleJvmSupportMatrix.isSupported(currentGradleVersion, JavaVersion.parse(it.versionString)) }
       .firstOrNull()
     if (jdkInfo == null) {
       LOG.warn("Cannot find test JDK for Gradle $currentGradleVersion")

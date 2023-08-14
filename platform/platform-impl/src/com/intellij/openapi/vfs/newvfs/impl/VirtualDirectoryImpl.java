@@ -4,6 +4,7 @@ package com.intellij.openapi.vfs.newvfs.impl;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ex.ApplicationManagerEx;
 import com.intellij.openapi.diagnostic.Logger;
+import com.intellij.openapi.diagnostic.ThrottledLogger;
 import com.intellij.openapi.util.Comparing;
 import com.intellij.openapi.util.Key;
 import com.intellij.openapi.util.SystemInfo;
@@ -21,7 +22,6 @@ import com.intellij.openapi.vfs.newvfs.events.ChildInfo;
 import com.intellij.openapi.vfs.newvfs.events.VFileCreateEvent;
 import com.intellij.openapi.vfs.newvfs.events.VFilePropertyChangeEvent;
 import com.intellij.openapi.vfs.newvfs.persistent.FSRecords;
-import com.intellij.openapi.vfs.newvfs.persistent.FileNameCache;
 import com.intellij.openapi.vfs.newvfs.persistent.PersistentFS;
 import com.intellij.openapi.vfs.newvfs.persistent.PersistentFSImpl;
 import com.intellij.psi.impl.PsiCachedValue;
@@ -45,8 +45,11 @@ import java.io.OutputStream;
 import java.util.*;
 import java.util.function.BiConsumer;
 
+import static java.util.concurrent.TimeUnit.SECONDS;
+
 public class VirtualDirectoryImpl extends VirtualFileSystemEntry {
   private static final Logger LOG = Logger.getInstance(VirtualDirectoryImpl.class);
+  private static final ThrottledLogger THROTTLED_LOG = new ThrottledLogger(LOG, SECONDS.toMillis(30));
 
   private static final boolean CHECK = ApplicationManager.getApplication().isUnitTestMode();
 
@@ -167,7 +170,7 @@ public class VirtualDirectoryImpl extends VirtualFileSystemEntry {
       int attributes = getPersistence().getFileAttributes(id);
       boolean isEmptyDirectory = PersistentFS.isDirectory(attributes) && !getPersistence().mayHaveChildren(id);
 
-      child = createChild(id, nameId, attributes, isEmptyDirectory);
+      child = createChildImpl(id, nameId, attributes, isEmptyDirectory);
 
       addChild(child);
     }
@@ -237,18 +240,21 @@ public class VirtualDirectoryImpl extends VirtualFileSystemEntry {
   }
 
   @ApiStatus.Internal
-  public @NotNull VirtualFileSystemEntry createChild(@NotNull String name,
-                                                     int id,
+  public @NotNull VirtualFileSystemEntry createChild(int fileId,
+                                                     int nameId,
                                                      @PersistentFS.Attributes int attributes,
                                                      boolean isEmptyDirectory) {
-    int nameId = FileNameCache.storeName(name);
     synchronized (myData) {
-      return createChild(id, nameId, attributes, isEmptyDirectory);
+      return createChildImpl(fileId, nameId, attributes, isEmptyDirectory);
     }
   }
 
+  //@GuardedBy("myData")
   @NotNull
-  private VirtualFileSystemEntry createChild(int id, int nameId, @PersistentFS.Attributes int attributes, boolean isEmptyDirectory) {
+  private VirtualFileSystemEntry createChildImpl(int id,
+                                                 int nameId,
+                                                 @PersistentFS.Attributes int attributes,
+                                                 boolean isEmptyDirectory) {
     FileLoadingTracker.fileLoaded(this, nameId);
 
     VfsData vfsData = getVfsData();
@@ -308,7 +314,8 @@ public class VirtualDirectoryImpl extends VirtualFileSystemEntry {
   private void updateCaseSensitivityIfUnknown(@NotNull String childName) {
     VFilePropertyChangeEvent caseSensitivityEvent = generateCaseSensitivityChangedEventForUnknownCase(this, childName);
     if (caseSensitivityEvent != null) {
-      PersistentFSImpl.executeChangeCaseSensitivity(this, (FileAttributes.CaseSensitivity)caseSensitivityEvent.getNewValue());
+
+      changeCaseSensitivity(this, (FileAttributes.CaseSensitivity)caseSensitivityEvent.getNewValue());
       // fire event asynchronously to avoid deadlocks with possibly currently-held VFP/Refresh queue locks
       RefreshQueue.getInstance().processEvents(true, List.of(caseSensitivityEvent));
       // when the case-sensitivity changes, the "children must be sorted by name" invariant must be restored
@@ -447,7 +454,7 @@ public class VirtualDirectoryImpl extends VirtualFileSystemEntry {
           if (file == null) {
             int attributes = getPersistence().getFileAttributes(id);
             boolean isEmptyDirectory = PersistentFS.isDirectory(attributes) && !getPersistence().mayHaveChildren(id);
-            file = createChild(id, child.getNameId(), attributes, isEmptyDirectory);
+            file = createChildImpl(id, child.getNameId(), attributes, isEmptyDirectory);
           }
           files[i] = file;
         }
@@ -541,22 +548,44 @@ public class VirtualDirectoryImpl extends VirtualFileSystemEntry {
       return fileById;
     }
 
+    //We come here only from PersistentFSImpl.findFileById(), on a descend phase, there we resolve fileIds to
+    // VFiles. Hence, it must be a child with childId -- because 'this' was collected as .parent during an
+    // ascend phase. If that is not the case -- either something was changed in between (e.g. children were
+    // refreshed), or there is an inconsistency in VFS (e.g. children and .parent fall out of sync):
+
+    //Actually, after this point we're already in a gray area: even if we manage to find a child by name
+    // with same id, this is already suspicious: how could we miss it while looking by id beforehand?
+    // 'By name' lookup is scanning the same myData.myChildrenIds array, as was already scanned while looking
+    // for id.
+
     PersistentFS persistence = getPersistence();
     String name = persistence.getName(id);
     VirtualFileSystemEntry fileByName = findChild(name, false, false, getFileSystem());
     if (fileByName != null && fileByName.getId() != id) {
       // a child with the same name and different ID was recreated after a refresh session -
       // it doesn't make sense to check it earlier because it is executed outside the VFS' read/write lock
-      final boolean deleted = FSRecords.isDeleted(id);
+      boolean deleted = FSRecords.isDeleted(id);
       if (!deleted) {
-        LOG.error("FSRecords(id: " + id + ", name: '" + name + "', !deleted), " +
-                  "but VDI.findChild(" + name + ")=" + fileByName + " with different id(=" + fileByName.getId() + ")" +
-                  "\n\tchildren (64 max): \n" +
-                  Arrays.stream(myData.myChildrenIds)
-                    .limit(64)
-                    .mapToObj(childId -> "\t" + childId + ": '" + persistence.getName(childId) + "'\n")
-                    .toList()
-        );
+        THROTTLED_LOG.info(() -> {
+          int parentId = FSRecords.getParent(id);
+          IntOpenHashSet childrenInPersistence = new IntOpenHashSet(FSRecords.listIds(id));
+          IntOpenHashSet childrenInMemory = new IntOpenHashSet(myData.myChildrenIds);
+          int[] childrenNotInPersistent = childrenInMemory.intStream()
+            .filter(childId -> !childrenInPersistence.contains(childId))
+            .toArray();
+          int[] childrenNotInMemory = childrenInPersistence.intStream()
+            .filter(childId -> !childrenInMemory.contains(childId))
+            .toArray();
+          return "FSRecords(id: " + id + ", parentId: " + parentId + ", name: '" + name + "', !deleted), " +
+                 "but VDI.findChild(" + name + ")=" + fileByName + " with different id(=" + fileByName.getId() + ")" +
+                 "\n\tchildrenInMemory: " + childrenInMemory.size() + ", childrenInPersistence: " + childrenInPersistence.size() + ", " +
+                 "\n\tdiff(" + childrenNotInPersistent.length + " vs " + childrenNotInMemory.length + ")" +
+                 "\n\tchildrenInMemory (up to 64): \n" +
+                 Arrays.stream(myData.myChildrenIds)
+                   .limit(64)
+                   .mapToObj(childId -> "\n\t" + childId + ": '" + persistence.getName(childId) + "'")
+                   .toList();
+        });
       }
       return null;
     }
@@ -574,7 +603,6 @@ public class VirtualDirectoryImpl extends VirtualFileSystemEntry {
                                    boolean markAllChildrenLoaded,
                                    @NotNull BiConsumer<? super VirtualFile, ? super ChildInfo> callback) {
     if (added.size() <= 1) {
-      //noinspection ForLoopReplaceableByForEach
       for (int i = 0; i < added.size(); i++) {
         ChildInfo info = added.get(i);
         assert info.getId() > 0 : info;
@@ -584,7 +612,7 @@ public class VirtualDirectoryImpl extends VirtualFileSystemEntry {
         synchronized (myData) {
           int[] oldIds = myData.myChildrenIds;
           if (ArrayUtil.indexOf(oldIds, info.getId()) < 0) {
-            VirtualFileSystemEntry file = createChild(info.getId(), info.getNameId(), attributes, isEmptyDirectory);
+            VirtualFileSystemEntry file = createChildImpl(info.getId(), info.getNameId(), attributes, isEmptyDirectory);
             addChild(file);
             callback.accept(file, info);
           }
@@ -625,7 +653,7 @@ public class VirtualDirectoryImpl extends VirtualFileSystemEntry {
           int attributes = nextInfo.getFileAttributeFlags();
           boolean isEmptyDirectory = nextInfo.getChildren() != null && nextInfo.getChildren().length == 0;
           myData.removeAdoptedName(nextInfo.getName());
-          VirtualFileSystemEntry file = createChild(nextInfo.getId(), nextInfo.getNameId(), attributes, isEmptyDirectory);
+          VirtualFileSystemEntry file = createChildImpl(nextInfo.getId(), nextInfo.getNameId(), attributes, isEmptyDirectory);
           callback.accept(file, nextInfo);
         }
         mergedIds.add(nextInfo.getId());
@@ -880,9 +908,17 @@ public class VirtualDirectoryImpl extends VirtualFileSystemEntry {
                                             actualCaseSensitivity, true);
       }
       else {
-        PersistentFSImpl.executeChangeCaseSensitivity(dir, actualCaseSensitivity);
+        changeCaseSensitivity(dir, actualCaseSensitivity);
       }
     }
     return null;
+  }
+
+  private static void changeCaseSensitivity(@NotNull VirtualFile vFile,
+                                            @NotNull FileAttributes.CaseSensitivity newValue) {
+    ((PersistentFSImpl)PersistentFS.getInstance()).executeChangeCaseSensitivity(
+      vFile,
+      newValue
+    );
   }
 }

@@ -18,16 +18,17 @@ import static com.intellij.util.io.IOUtil.MiB;
 public final class PageCacheUtils {
   private static final Logger LOG = Logger.getInstance(PageCacheUtils.class);
 
-  /**
-   * 10Mb default, or SystemProperty('idea.max.paged.storage.cache')Mb, but not less than 1 Mb
-   */
+  //@formatter:off
+
+  /** 10Mb default, or SystemProperty('idea.max.paged.storage.cache')Mb, but not less than 1 Mb */
   public static final int DEFAULT_PAGE_SIZE = Math.max(1, getIntProperty("idea.paged.storage.page.size", 10)) * MiB;
 
   /**
-   * Enables new (code-name 'lock-free') implementations for various VFS components.
-   * So far they co-exist with the legacy implementations
+   * Enables new {@link FilePageCacheLockFree file cache} to be used implementations for various VFS components.
+   * So far both new and {@link FilePageCache legacy} file caches co-exist: storages are incrementally migrated
+   * to new cache
    */
-  public static final boolean LOCK_FREE_VFS_ENABLED = getBooleanProperty("vfs.lock-free-impl.enable", false);
+  public static final boolean LOCK_FREE_PAGE_CACHE_ENABLED = getBooleanProperty("vfs.lock-free-impl.enable", true);
 
   /**
    * How much direct memory new (code name 'lock-free') FilePageCache impl allowed to utilize:
@@ -35,8 +36,7 @@ public final class PageCacheUtils {
    * NEW_PAGE_CACHE_MEMORY_FRACTION=0.1 => 10Mb will be allocated for new cache, and 90Mb for
    * the old one.
    */
-  public static final double NEW_PAGE_CACHE_MEMORY_FRACTION =
-    getFloatProperty("vfs.lock-free-impl.fraction-direct-memory-to-utilize", 0.1f);
+  public static final double NEW_PAGE_CACHE_MEMORY_FRACTION = getFloatProperty("vfs.lock-free-impl.fraction-direct-memory-to-utilize", 0.2f);
 
   /**
    * How much direct memory we're ready to use for file page cache(s) -- in total.
@@ -46,9 +46,7 @@ public final class PageCacheUtils {
   public static final long MAX_DIRECT_MEMORY_TO_USE_BYTES = maxDirectMemory() - 2L * DEFAULT_PAGE_SIZE;
 
 
-  /**
-   * Total size of the cache(s), bytes -- somewhere ~100-500 Mb, see static initializer for exact logic.
-   */
+  /** Total size of the cache(s), bytes -- somewhere ~100-500 Mb, see the code for exact logic. */
   public static final long FILE_PAGE_CACHES_TOTAL_CAPACITY_BYTES = estimateTotalCacheCapacityLimit(MAX_DIRECT_MEMORY_TO_USE_BYTES);
 
 
@@ -75,6 +73,7 @@ public final class PageCacheUtils {
 
     try {
       Class<?> aClass = Class.forName("java.nio.Bits");
+      //noinspection JavaReflectionMemberAccess
       Field maxMemory = aClass.getDeclaredField("maxMemory");
       maxMemory.setAccessible(true);
       return (Long)maxMemory.get(null);
@@ -118,19 +117,13 @@ public final class PageCacheUtils {
     );
   }
 
-  public static final long FILE_PAGE_CACHE_NEW_CAPACITY_BYTES =
-    LOCK_FREE_VFS_ENABLED ?
-    (long)(NEW_PAGE_CACHE_MEMORY_FRACTION * FILE_PAGE_CACHES_TOTAL_CAPACITY_BYTES) :
-    0;
+  public static final long FILE_PAGE_CACHE_NEW_CAPACITY_BYTES = LOCK_FREE_PAGE_CACHE_ENABLED ?
+                                                                (long)(NEW_PAGE_CACHE_MEMORY_FRACTION * FILE_PAGE_CACHES_TOTAL_CAPACITY_BYTES) :
+                                                                0;
 
-  public static final long FILE_PAGE_CACHE_OLD_CAPACITY_BYTES =
-    LOCK_FREE_VFS_ENABLED ?
-    (long)((1 - NEW_PAGE_CACHE_MEMORY_FRACTION) * FILE_PAGE_CACHES_TOTAL_CAPACITY_BYTES) :
-    FILE_PAGE_CACHES_TOTAL_CAPACITY_BYTES;
+  public static final long FILE_PAGE_CACHE_OLD_CAPACITY_BYTES = FILE_PAGE_CACHES_TOTAL_CAPACITY_BYTES - FILE_PAGE_CACHE_NEW_CAPACITY_BYTES;
 
-  /**
-   * Capacity of {@linkplain DirectByteBufferAllocator}
-   */
+  /** Capacity of {@linkplain DirectByteBufferAllocator} */
   static final int ALLOCATOR_SIZE = (int)Math.min(
     100 * MiB,
     Math.max(0, MAX_DIRECT_MEMORY_TO_USE_BYTES - FILE_PAGE_CACHES_TOTAL_CAPACITY_BYTES - 300 * MiB)
@@ -139,13 +132,15 @@ public final class PageCacheUtils {
 
   private static final int CHANNELS_CACHE_CAPACITY = getIntProperty("paged.file.storage.open.channel.cache.capacity", 400);
 
+  //@formatter:on
+
   /** Shared channels cache */
   static final OpenChannelsCache CHANNELS_CACHE = new OpenChannelsCache(CHANNELS_CACHE_CAPACITY);
 
   static {
     LOG.info("File page caching params:");
     LOG.info("\tDEFAULT_PAGE_SIZE:" + DEFAULT_PAGE_SIZE);
-    if (LOCK_FREE_VFS_ENABLED) {
+    if (LOCK_FREE_PAGE_CACHE_ENABLED) {
       LOG.info("\tFilePageCache: regular + lock-free (LOCK_FREE_VFS_ENABLED:true)");
       LOG.info("\tNEW_PAGE_CACHE_MEMORY_FRACTION: " + NEW_PAGE_CACHE_MEMORY_FRACTION);
       LOG.info("\tRegular FilePageCache: " + FILE_PAGE_CACHE_OLD_CAPACITY_BYTES + " bytes");

@@ -6,6 +6,7 @@ import com.intellij.ide.IdeBundle;
 import com.intellij.ide.plugins.*;
 import com.intellij.ide.plugins.marketplace.MarketplacePluginDownloadService;
 import com.intellij.ide.plugins.marketplace.PluginSignatureChecker;
+import com.intellij.ide.plugins.marketplace.utils.MarketplaceUrls;
 import com.intellij.ide.startup.StartupActionScriptManager;
 import com.intellij.idea.AppMode;
 import com.intellij.internal.statistic.DeviceIdManager;
@@ -20,8 +21,7 @@ import com.intellij.openapi.ui.Messages;
 import com.intellij.openapi.util.BuildNumber;
 import com.intellij.openapi.util.NlsContexts;
 import com.intellij.openapi.util.NlsSafe;
-import com.intellij.util.Urls;
-import com.intellij.util.concurrency.annotations.RequiresBackgroundThread;
+import com.intellij.util.concurrency.ThreadingAssertions;
 import com.intellij.util.text.VersionComparatorUtil;
 import com.intellij.xml.util.XmlStringUtil;
 import org.jetbrains.annotations.ApiStatus;
@@ -36,7 +36,8 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.file.Path;
-import java.util.*;
+import java.util.Date;
+import java.util.List;
 import java.util.function.Consumer;
 
 import static com.intellij.ide.plugins.BrokenPluginFileKt.isBrokenPlugin;
@@ -175,8 +176,8 @@ public final class PluginDownloader {
     return myShownErrors;
   }
 
-  @RequiresBackgroundThread
   public boolean prepareToInstall(@NotNull ProgressIndicator indicator) throws IOException {
+    ThreadingAssertions.assertBackgroundThread();
     myShownErrors = false;
 
     if (myFile != null) {
@@ -254,8 +255,8 @@ public final class PluginDownloader {
     return true;
   }
 
-  @RequiresBackgroundThread
   private @Nullable IdeaPluginDescriptorImpl loadDescriptorFromArtifact() throws IOException {
+    ThreadingAssertions.assertBackgroundThread();
     return PluginDescriptorLoader.loadDescriptorFromArtifact(getFilePath(), myBuildNumber);
   }
 
@@ -338,8 +339,8 @@ public final class PluginDownloader {
     return appliedWithoutRestart;
   }
 
-  @RequiresBackgroundThread
   private @NotNull File tryDownloadPlugin(@NotNull ProgressIndicator indicator) throws IOException {
+    ThreadingAssertions.assertBackgroundThread();
     indicator.checkCanceled();
     indicator.setText2(IdeBundle.message("progress.downloading.plugin", getPluginName()));
 
@@ -370,7 +371,7 @@ public final class PluginDownloader {
                                                            @Nullable BuildNumber buildNumber) throws IOException {
     String url = descriptor instanceof PluginNode && host != null ?
                  toAbsoluteUrl(((PluginNode)descriptor).getDownloadUrl(), host) :
-                 getMarketplaceBuildUrl(descriptor, buildNumber);
+                 MarketplaceUrls.getPluginDownloadUrl(descriptor, getMarketplaceDownloadsUUID(), buildNumber);
 
     return new PluginDownloader(descriptor,
                                 url,
@@ -413,25 +414,6 @@ public final class PluginDownloader {
     catch (URISyntaxException e) {
       throw new IOException(e);
     }
-  }
-
-  private static @NotNull String getMarketplaceBuildUrl(@NotNull IdeaPluginDescriptor descriptor,
-                                                        @Nullable BuildNumber buildNumber) {
-    Map<String, String> parameters = new LinkedHashMap<>();
-    parameters.put("id", descriptor.getPluginId().getIdString());
-    parameters.put("build", ApplicationInfoImpl.orFromPluginsCompatibleBuild(buildNumber));
-    parameters.put("uuid", getMarketplaceDownloadsUUID());
-
-    if (descriptor instanceof PluginNode) {
-      String channel = ((PluginNode)descriptor).getChannel();
-      if (channel != null) {
-        parameters.put("channel", channel);
-      }
-    }
-
-    return Urls.newFromEncoded(ApplicationInfoImpl.getShadowInstance().getPluginsDownloadUrl())
-      .addParameters(Collections.unmodifiableMap(parameters))
-      .toExternalForm();
   }
 
   @ApiStatus.Internal

@@ -59,8 +59,8 @@ import kotlin.io.path.nameWithoutExtension
 import kotlin.io.path.pathString
 
 class CreateMissedActualsFix(
-    val declaration: KtNamedDeclaration,
-    val notActualizedLeafModules: Collection<Module>
+  val declaration: KtNamedDeclaration,
+  private val notActualizedLeafModules: Collection<Module>
 ) : KotlinQuickFixAction<KtNamedDeclaration>(declaration) {
 
     override fun startInWriteAction(): Boolean = false
@@ -110,6 +110,7 @@ class CreateMissedActualsFix(
             when {
               name == "main" && it.isAndroidModule() && !it.isTestModule -> "androidMain"
               name == "unitTest" && it.isAndroidModule() && it.isTestModule -> "androidUnitTest"
+              name == "androidTest" && it.isAndroidModule() && it.isTestModule -> "androidInstrumentedTest"
               else -> name
             }
         }

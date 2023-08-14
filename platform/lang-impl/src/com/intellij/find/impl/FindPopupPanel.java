@@ -5,7 +5,7 @@ import com.intellij.CommonBundle;
 import com.intellij.accessibility.TextFieldWithListAccessibleContext;
 import com.intellij.find.*;
 import com.intellij.find.actions.ShowUsagesAction;
-import com.intellij.find.findInProject.FindInProjectState;
+import com.intellij.find.findInProject.FindInProjectScopeService;
 import com.intellij.find.replaceInProject.ReplaceInProjectManager;
 import com.intellij.icons.AllIcons;
 import com.intellij.ide.DataManager;
@@ -376,7 +376,7 @@ public class FindPopupPanel extends JBPanel<FindPopupPanel> implements FindUI, D
     myHelper.updateFindSettings();
     FindModel model = FindManager.getInstance(myProject).getFindInProjectModel();
     applyTo(model);
-    FindInProjectState.getInstance(myProject).save(model);
+    FindInProjectScopeService.getInstance(myProject).save(model);
   }
 
   @NotNull
@@ -1181,8 +1181,7 @@ public class FindPopupPanel extends JBPanel<FindPopupPanel> implements FindUI, D
           () -> GlobalSearchScopeUtil.toGlobalSearchScope(FindInProjectUtil.getScopeFromModel(project, myHelper.myPreviousModel), project)
         ).wrapProgress(indicator).executeSynchronously();
 
-        FindUsagesProcessPresentation processPresentation =
-          FindInProjectUtil.setupProcessPresentation(project, myUsageViewPresentation);
+        FindUsagesProcessPresentation processPresentation = FindInProjectUtil.setupProcessPresentation(myUsageViewPresentation);
         ThreadLocal<String> lastUsageFileRef = new ThreadLocal<>();
         ThreadLocal<Reference<FindPopupItem>> recentItemRef = new ThreadLocal<>();
 
@@ -1208,11 +1207,20 @@ public class FindPopupPanel extends JBPanel<FindPopupPanel> implements FindUI, D
           FindPopupItem newItem;
           boolean merged = !myHelper.isReplaceState() && recentItem != null && recentItem.getUsage().merge(usage);
           if (!merged) {
+            if (usage instanceof UsageInfo2UsageAdapter) {
+              ((UsageInfo2UsageAdapter)usage).updateCachedPresentation();
+            }
+
             newItem = new FindPopupItem(usage, usagePresentation(project, scope, usage));
           }
           else {
             // recompute presentation of a merged instance
-            newItem = recentItem.withPresentation(usagePresentation(project, scope, recentItem.getUsage()));
+            UsageInfoAdapter recentItemUsage = recentItem.getUsage();
+            if (recentItemUsage instanceof UsageInfo2UsageAdapter) {
+              ((UsageInfo2UsageAdapter)recentItemUsage).updateCachedPresentation();
+            }
+
+            newItem = recentItem.withPresentation(usagePresentation(project, scope, recentItemUsage));
           }
           recentItemRef.set(new WeakReference<>(newItem));
 

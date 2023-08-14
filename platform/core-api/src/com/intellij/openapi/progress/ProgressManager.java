@@ -197,7 +197,7 @@ public abstract class ProgressManager extends ProgressIndicatorProvider {
    *
    * @see com.intellij.openapi.progress.TasksKt#withBackgroundProgress
    * @see com.intellij.openapi.progress.TasksKt#withModalProgress
-   * @see com.intellij.openapi.progress.TasksKt#withModalProgressBlocking
+   * @see com.intellij.openapi.progress.TasksKt#runWithModalProgressBlocking
    */
   @RequiresBlockingContext
   public abstract void run(@NotNull Task task);
@@ -264,7 +264,7 @@ public abstract class ProgressManager extends ProgressIndicatorProvider {
    * @param action the code to execute under read action
    * @param indicator progress indicator that should be cancelled if a write action is about to start. Can be null.
    */
-  public abstract boolean runInReadActionWithWriteActionPriority(@NotNull final Runnable action, @Nullable ProgressIndicator indicator);
+  public abstract boolean runInReadActionWithWriteActionPriority(final @NotNull Runnable action, @Nullable ProgressIndicator indicator);
 
   @RequiresBlockingContext
   public abstract boolean isInNonCancelableSection();

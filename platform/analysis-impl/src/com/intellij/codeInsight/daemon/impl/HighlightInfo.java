@@ -11,6 +11,7 @@ import com.intellij.codeInspection.*;
 import com.intellij.codeInspection.ex.GlobalInspectionToolWrapper;
 import com.intellij.codeInspection.ex.InspectionToolWrapper;
 import com.intellij.codeInspection.ex.LocalInspectionToolWrapper;
+import com.intellij.codeInspection.ex.QuickFixWrapper;
 import com.intellij.lang.ASTNode;
 import com.intellij.lang.annotation.Annotation;
 import com.intellij.lang.annotation.HighlightSeverity;
@@ -704,12 +705,13 @@ public class HighlightInfo implements Segment {
   public static class IntentionActionDescriptor {
     private final IntentionAction myAction;
     volatile List<? extends IntentionAction> myOptions;
-    volatile HighlightDisplayKey myKey;
+    final @Nullable HighlightDisplayKey myKey;
     private final ProblemGroup myProblemGroup;
     private final HighlightSeverity mySeverity;
     private final @Nls String myDisplayName;
     private final Icon myIcon;
     private Boolean myCanCleanup;
+    private int myProblemOffset = -1;
 
     public IntentionActionDescriptor(@NotNull IntentionAction action,
                                      @Nullable List<? extends IntentionAction> options,
@@ -755,12 +757,11 @@ public class HighlightInfo implements Segment {
     boolean canCleanup(@NotNull PsiElement element) {
       if (myCanCleanup == null) {
         InspectionProfile profile = InspectionProjectProfileManager.getInstance(element.getProject()).getCurrentProfile();
-        HighlightDisplayKey key = myKey;
-        if (key == null) {
+        if (myKey == null) {
           myCanCleanup = false;
         }
         else {
-          InspectionToolWrapper<?, ?> toolWrapper = profile.getInspectionTool(key.toString(), element);
+          InspectionToolWrapper<?, ?> toolWrapper = profile.getInspectionTool(myKey.toString(), element);
           myCanCleanup = toolWrapper != null && toolWrapper.isCleanupTool();
         }
       }
@@ -863,7 +864,6 @@ public class HighlightInfo implements Segment {
       if (options == null) {
         myOptions = options = newOptions;
       }
-      myKey = null;
       return options;
     }
 
@@ -874,7 +874,12 @@ public class HighlightInfo implements Segment {
 
     @Override
     public String toString() {
-      return "IntentionActionDescriptor: " + IntentionActionDelegate.unwrap(getAction()).getClass();
+      ModCommandAction modCommandAction = getAction().asModCommandAction();
+      LocalQuickFix fix = QuickFixWrapper.unwrap(getAction());
+      Object action = fix != null ? fix : 
+                      modCommandAction != null ? modCommandAction : 
+                      IntentionActionDelegate.unwrap(getAction());
+      return "IntentionActionDescriptor: " + action.getClass();
     }
 
     @Nullable
@@ -885,6 +890,19 @@ public class HighlightInfo implements Segment {
     @Override
     public boolean equals(Object obj) {
       return obj instanceof IntentionActionDescriptor && myAction.equals(((IntentionActionDescriptor)obj).myAction);
+    }
+
+    @Nullable
+    public String getToolId() {
+      return myKey != null ? myKey.getID() : null;
+    }
+
+    public int getProblemOffset() {
+      return myProblemOffset;
+    }
+
+    public void setProblemOffset(int problemOffset) {
+      myProblemOffset = problemOffset;
     }
   }
 

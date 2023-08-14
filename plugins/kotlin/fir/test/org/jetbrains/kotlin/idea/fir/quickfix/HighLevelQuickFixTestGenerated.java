@@ -1480,14 +1480,14 @@ public abstract class HighLevelQuickFixTestGenerated extends AbstractHighLevelQu
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
 
+        @TestMetadata("abstractFakeOverrideInExpectClass.kt")
+        public void testAbstractFakeOverrideInExpectClass() throws Exception {
+            runTest("../idea/tests/testData/quickfix/override/abstractFakeOverrideInExpectClass.kt");
+        }
+
         @TestMetadata("changeToInvocation.kt")
         public void testChangeToInvocation() throws Exception {
             runTest("../idea/tests/testData/quickfix/override/changeToInvocation.kt");
-        }
-
-        @TestMetadata("dontOfferToImplementMembersForExpectedClass.kt")
-        public void testDontOfferToImplementMembersForExpectedClass() throws Exception {
-            runTest("../idea/tests/testData/quickfix/override/dontOfferToImplementMembersForExpectedClass.kt");
         }
 
         @TestMetadata("implemenAsConstructorParameter.kt")
@@ -1543,6 +1543,11 @@ public abstract class HighLevelQuickFixTestGenerated extends AbstractHighLevelQu
         @TestMetadata("overridingFinalMethodInLocal.kt")
         public void testOverridingFinalMethodInLocal() throws Exception {
             runTest("../idea/tests/testData/quickfix/override/overridingFinalMethodInLocal.kt");
+        }
+
+        @TestMetadata("overridingFinalOverrideMethod.kt")
+        public void testOverridingFinalOverrideMethod() throws Exception {
+            runTest("../idea/tests/testData/quickfix/override/overridingFinalOverrideMethod.kt");
         }
 
         @TestMetadata("overridingFinalProperty.kt")
@@ -3157,6 +3162,19 @@ public abstract class HighLevelQuickFixTestGenerated extends AbstractHighLevelQu
         @TestMetadata("typeMismatch.kt")
         public void testTypeMismatch() throws Exception {
             runTest("../idea/tests/testData/quickfix/specifySuperType/typeMismatch.kt");
+        }
+    }
+
+    @RunWith(JUnit3RunnerWithInners.class)
+    @TestMetadata("../idea/tests/testData/quickfix/convertToBlockBody")
+    public static class ConvertToBlockBody extends AbstractHighLevelQuickFixTest {
+        private void runTest(String testDataFilePath) throws Exception {
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+        }
+
+        @TestMetadata("simple.kt")
+        public void testSimple() throws Exception {
+            runTest("../idea/tests/testData/quickfix/convertToBlockBody/simple.kt");
         }
     }
 }

@@ -484,7 +484,7 @@
     </group>
 
     <!-- Code -->
-    <group id="Floating.CodeToolbar" popup="false">
+    <group id="Floating.CodeToolbar" popup="false" searchable="false">
       <group id="Floating.CodeToolbar.Extract" popup="true" class="com.intellij.ui.codeFloatingToolbar.DropdownActionGroup"
              searchable="false" />
       <group id="Floating.CodeToolbar.Surround" popup="true" class="com.intellij.ui.codeFloatingToolbar.DropdownActionGroup"
@@ -497,11 +497,9 @@
         <!--suppress PluginXmlCapitalization -->
         <action id="Floating.CodeToolbar.SurroundWithIf" class="com.intellij.codeInsight.generation.actions.SurroundWithActionBase" />
       </group>
-      <group id="Floating.CodeToolbar.Configure" class="com.intellij.openapi.actionSystem.impl.MoreActionGroup" searchable="false">
-        <action id="Floating.CodeToolbar.Customize" class="com.intellij.ui.codeFloatingToolbar.CustomizeCodeFloatingToolbarAction" />
-        <action id="Floating.CodeToolbar.Disable" class="com.intellij.ui.codeFloatingToolbar.DisableCodeFloatingToolbarAction" />
-      </group>
     </group>
+    <action id="Floating.CodeToolbar.Disable" class="com.intellij.ui.codeFloatingToolbar.DisableCodeFloatingToolbarAction" />
+
     <group id="CodeMenu" popup="true">
       <reference ref="OverrideMethods"/>
       <reference ref="ImplementMethods"/>
@@ -606,7 +604,7 @@
       </group>
 
       <group id="CodeFormatGroup">
-        <action id="ReformatCode" class="com.intellij.codeInsight.actions.ReformatCodeAction" icon="AllIcons.Actions.Minimap">
+        <action id="ReformatCode" class="com.intellij.codeInsight.actions.ReformatCodeAction" icon="AllIcons.Actions.ReformatCode">
           <add-to-group group-id="Floating.CodeToolbar" anchor="after" relative-to-action="CommentByLineComment" />
           <synonym key="action.ReformatCode.synonym1"/>
         </action>
@@ -1520,9 +1518,9 @@
              class="com.intellij.ide.actions.NonEmptyActionGroup"/>
       <group id="ServiceView.OpenInNewTabGroup" popup="true" icon="AllIcons.Actions.OpenNewTab"
              class="com.intellij.execution.services.OpenInNewTabActionGroup">
-      <action id="ServiceView.OpenInNewTab" class="com.intellij.execution.services.OpenInNewTabAction"/>
-      <action id="ServiceView.OpenEachInNewTab" class="com.intellij.execution.services.OpenEachInNewTabAction"/>
-      <action id="ServiceView.SplitByType" class="com.intellij.execution.services.SplitByTypeAction"/>
+        <action id="ServiceView.OpenInNewTab" class="com.intellij.execution.services.OpenInNewTabAction"/>
+        <action id="ServiceView.OpenEachInNewTab" class="com.intellij.execution.services.OpenEachInNewTabAction"/>
+        <action id="ServiceView.SplitByType" class="com.intellij.execution.services.SplitByTypeAction"/>
       </group>
       <separator/>
       <group id="ServiceView.AddService" popup="true" icon="AllIcons.General.Add" use-shortcut-of="NewElement"
@@ -1539,12 +1537,14 @@
       <reference id="ServiceView.OpenInNewTab"/>
       <reference id="ServiceView.OpenEachInNewTab"/>
       <reference id="ServiceView.SplitByType"/>
+      <action id="ServiceView.OpenInToolWindow" class="com.intellij.execution.services.OpenInToolWindowAction"/>
       <separator/>
       <reference id="$Delete"/>
       <separator/>
       <reference id="EditSource"/>
       <action id="ServiceView.JumpToServices" class="com.intellij.execution.services.JumpToServicesAction" use-shortcut-of="ShowNavBar"/>
     </group>
+    <action id="ServiceView.SelectActiveService" class="com.intellij.execution.services.SelectActiveServiceAction"/>
     <action id="ServiceView.ShowServices" class="com.intellij.execution.services.ShowServicesAction" icon="AllIcons.Actions.ShowAsTree"/>
     <action id="ServiceView.ConfigureServices" class="com.intellij.execution.services.ConfigureServicesAction" icon="AllIcons.General.GearPlain"/>
     <group id="RunDashboard.GroupBy" popup="true" class="com.intellij.ide.actions.NonEmptyActionGroup">
@@ -1679,10 +1679,7 @@
 
     <group id="RunToolbarMainActionGroup">
       <action class="com.intellij.execution.ui.RedesignedRunConfigurationSelector" id="RedesignedRunConfigurationSelector"/>
-      <group class="com.intellij.execution.ui.resume.RunWidgetMainResumeGroup">
-        <reference ref="Resume"/>
-        <reference ref="Pause"/>
-      </group>
+      <group id="compositeResumeGroup" searchable="false" popup="false"/>
       <group id="RunToolbarTopLevelExecutorActionGroup" class="com.intellij.execution.ui.RunToolbarTopLevelExecutorActionGroup" />
       <reference ref="Stop"/>
       <action id="MoreRunToolbarActions" class="com.intellij.execution.ui.MoreRunToolbarActions" />
@@ -1719,6 +1716,8 @@
     <action id="ForceIndexRescanning" internal="true" class="com.intellij.util.indexing.ForceIndexRescanningAction" icon="AllIcons.Actions.Refresh"/>
     <action id="ForceIndexRebuild" internal="true" class="com.intellij.util.indexing.ForceIndexRebuildAction" icon="AllIcons.Actions.Refresh"/>
 
+    <action class="com.intellij.internal.ClearFileTemplateNameInternalAction" internal="true"/>
+
     <group id="Internal.Dump" internal="true" popup="true">
       <action id="DumpExtensions" internal="true" class="com.intellij.internal.DumpExtensionsAction"/>
       <action id="DumpInspectionDescriptions" internal="true" class="com.intellij.internal.DumpInspectionDescriptionsAction"/>
@@ -1734,7 +1733,7 @@
     <group id="Internal.VFS" popup="true" internal="true">
       <action id="VirtualFileInfo" internal="true" class="com.intellij.openapi.vfs.impl.local.VirtualFileInfoAction"/>
       <separator/>
-      <action id="CheckVfsSanity" internal="true" class="com.intellij.openapi.vfs.newvfs.persistent.CheckVFSHealthAction"/>
+      <action id="CheckVfsSanityInMenu" internal="true" class="com.intellij.openapi.vfs.newvfs.persistent.CheckVFSHealthAction"/>
       <action id="MarkVfsCorrupted" internal="true" class="com.intellij.openapi.vfs.newvfs.persistent.MarkVfsCorruptedAction"/>
       <action id="LoadAllContent" internal="true" class="com.intellij.internal.LoadAllContentsAction"/>
       <action id="LoadAllVFSContent" internal="true" class="com.intellij.internal.LoadAllVfsStoredContentsAction"/>
@@ -1752,5 +1751,9 @@
     <action id="InsertInlineCompletionAction" class="com.intellij.codeInsight.inline.completion.InsertInlineCompletionAction">
       <keyboard-shortcut first-keystroke="TAB" keymap="$default"/>
     </action>
+    <action id="CallInlineCompletionAction" class="com.intellij.codeInsight.inline.completion.CallInlineCompletionAction" />
+
+    <!-- copy of CheckVfsSanityInMenu: !internal so could be invoked via 'search everywhere' -->
+    <action id="CheckVfsSanity" class="com.intellij.openapi.vfs.newvfs.persistent.CheckVFSHealthAction"/>
   </actions>
 </idea-plugin>

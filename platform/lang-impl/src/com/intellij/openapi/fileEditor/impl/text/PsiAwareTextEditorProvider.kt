@@ -2,12 +2,21 @@
 package com.intellij.openapi.fileEditor.impl.text
 
 import com.intellij.codeHighlighting.BackgroundEditorHighlighter
+import com.intellij.codeInsight.daemon.DaemonCodeAnalyzer
 import com.intellij.codeInsight.daemon.impl.TextEditorBackgroundHighlighter
 import com.intellij.codeInsight.folding.CodeFoldingManager
+import com.intellij.ide.plugins.PluginManagerCore
 import com.intellij.openapi.application.readAction
+import com.intellij.openapi.application.readActionBlocking
+import com.intellij.openapi.components.serviceAsync
+import com.intellij.openapi.diagnostic.ControlFlowException
+import com.intellij.openapi.diagnostic.logger
+import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.editor.EditorFactory
+import com.intellij.openapi.editor.ex.EditorEx
 import com.intellij.openapi.editor.impl.EditorFactoryImpl
+import com.intellij.openapi.extensions.ExtensionPointName
 import com.intellij.openapi.fileEditor.*
 import com.intellij.openapi.fileEditor.impl.text.AsyncEditorLoader.Companion.isEditorLoaded
 import com.intellij.openapi.fileEditor.impl.text.TextEditorImpl.Companion.createAsyncEditorLoader
@@ -15,12 +24,17 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.JDOMUtil
 import com.intellij.openapi.util.WriteExternalException
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.platform.diagnostic.telemetry.impl.span
 import com.intellij.psi.PsiDocumentManager
+import com.intellij.psi.PsiManager
+import kotlinx.coroutines.*
 import org.jdom.Element
 import org.jetbrains.annotations.NonNls
+import java.util.concurrent.CancellationException
 import java.util.function.Supplier
 
 private const val FOLDING_ELEMENT: @NonNls String = "folding"
+private val EDITOR_LOADER_EP = ExtensionPointName<TextEditorInitializer>("com.intellij.textEditorInitializer")
 
 open class PsiAwareTextEditorProvider : TextEditorProvider(), AsyncFileEditorProvider {
   override fun createEditor(project: Project, file: VirtualFile): FileEditor {
@@ -35,13 +49,42 @@ open class PsiAwareTextEditorProvider : TextEditorProvider(), AsyncFileEditorPro
       fileDocumentManager.getDocument(file, project)!!
     }
 
+    val editorDeferred = CompletableDeferred<EditorEx>()
+    val editorSupplier = suspend { editorDeferred.await() }
+
     val factory = EditorFactory.getInstance() as EditorFactoryImpl
-    val highlighter = asyncLoader.createHighlighterAsync(document, file)
+    val task = asyncLoader.coroutineScope.async(CoroutineName("TextEditorInitializer")) {
+      coroutineScope {
+        for (item in EDITOR_LOADER_EP.filterableLazySequence()) {
+          if (item.pluginDescriptor.pluginId != PluginManagerCore.CORE_ID) {
+            thisLogger().error("Only core plugin can define ${EDITOR_LOADER_EP.name}: ${item.pluginDescriptor}")
+            continue
+          }
+
+          val initializer = item.instance ?: continue
+          launch(CoroutineName(item.implementationClassName)) {
+            catchingExceptionsAsync {
+              initializer.init(project = project, file = file, document = document, editorSupplier = editorSupplier)
+            }
+          }
+        }
+      }
+
+      val psiManager = project.serviceAsync<PsiManager>()
+      val daemonCodeAnalyzer = project.serviceAsync<DaemonCodeAnalyzer>()
+      span("DaemonCodeAnalyzer.restart") {
+        readActionBlocking {
+          daemonCodeAnalyzer.restart(psiManager.findFile(file) ?: return@readActionBlocking)
+        }
+      }
+    }
+
     return object : AsyncFileEditorProvider.Builder() {
       override fun build(): FileEditor {
         val editor = factory.createMainEditor(document, project, file)
         val textEditor = PsiAwareTextEditorImpl(project = project, file = file, editor = editor, asyncLoader = asyncLoader)
-        asyncLoader.start(textEditor = textEditor, highlighterDeferred = highlighter)
+        editorDeferred.complete(textEditor.editor)
+        asyncLoader.start(textEditor = textEditor, tasks = listOf(task))
         return textEditor
       }
     }
@@ -117,7 +160,7 @@ open class PsiAwareTextEditorProvider : TextEditorProvider(), AsyncFileEditorPro
   }
 
   override fun setStateImpl(project: Project?, editor: Editor, state: TextEditorState, exactState: Boolean) {
-    super.setStateImpl(project, editor, state, exactState)
+    super.setStateImpl(project = project, editor = editor, state = state, exactState = exactState)
 
     // folding
     val foldState = state.foldingState
@@ -126,7 +169,8 @@ open class PsiAwareTextEditorProvider : TextEditorProvider(), AsyncFileEditorPro
       val psiDocumentManager = PsiDocumentManager.getInstance(project)
       if (!psiDocumentManager.isCommitted(editor.document)) {
         psiDocumentManager.commitDocument(editor.document)
-        LOG.error("File should be parsed when changing editor state, otherwise UI might be frozen for a considerable time")
+        logger<PsiAwareTextEditorProvider>()
+          .error("File should be parsed when changing editor state, otherwise UI might be frozen for a considerable time")
       }
       editor.foldingModel.runBatchFoldingOperation { CodeFoldingManager.getInstance(project).restoreFoldingState(editor, foldState) }
     }
@@ -135,16 +179,9 @@ open class PsiAwareTextEditorProvider : TextEditorProvider(), AsyncFileEditorPro
   override fun createWrapperForEditor(editor: Editor): EditorWrapper = PsiAwareEditorWrapper(editor)
 
   private inner class PsiAwareEditorWrapper(editor: Editor) : EditorWrapper(editor) {
-    private val backgroundHighlighter: TextEditorBackgroundHighlighter?
-
-    init {
-      val project = editor.project
-      backgroundHighlighter = project?.let { TextEditorBackgroundHighlighter(it, editor) }
-    }
+    private val backgroundHighlighter = editor.project?.let { TextEditorBackgroundHighlighter(it, editor) }
 
     override fun getBackgroundHighlighter(): BackgroundEditorHighlighter? = backgroundHighlighter
-
-    override fun isValid(): Boolean = !editor.isDisposed
   }
 }
 
@@ -166,3 +203,15 @@ private class MyDelayedFoldingState(private val project: Project,
     get() = _serializedState.clone()
 }
 
+private inline fun <T : Any> catchingExceptionsAsync(computable: () -> T?): T? {
+  try {
+    return computable()
+  }
+  catch (e: CancellationException) {
+    throw e
+  }
+  catch (e: Throwable) {
+    logger<AsyncFileEditorProvider>().warn("Exception during editor loading", if (e is ControlFlowException) RuntimeException(e) else e)
+    return null
+  }
+}

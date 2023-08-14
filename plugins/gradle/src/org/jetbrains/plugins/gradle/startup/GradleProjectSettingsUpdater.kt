@@ -19,14 +19,15 @@ import com.intellij.openapi.projectRoots.ProjectJdkTable
 import com.intellij.openapi.projectRoots.Sdk
 import com.intellij.openapi.roots.ui.configuration.SdkListPresenter
 import com.intellij.openapi.util.registry.Registry
+import com.intellij.util.lang.JavaVersion
 import org.jetbrains.plugins.gradle.GradleManager
+import org.jetbrains.plugins.gradle.jvmcompat.GradleJvmSupportMatrix
 import org.jetbrains.plugins.gradle.service.project.GradleNotification.NOTIFICATION_GROUP
 import org.jetbrains.plugins.gradle.service.project.GradleNotificationIdsHolder
 import org.jetbrains.plugins.gradle.settings.GradleProjectSettings
 import org.jetbrains.plugins.gradle.util.GradleBundle
 import org.jetbrains.plugins.gradle.util.GradleConstants
 import org.jetbrains.plugins.gradle.util.getGradleJvmLookupProvider
-import org.jetbrains.plugins.gradle.util.isSupported
 import java.util.concurrent.CompletableFuture
 
 class GradleProjectSettingsUpdater : ExternalSystemSettingsListenerEx {
@@ -59,7 +60,12 @@ class GradleProjectSettingsUpdater : ExternalSystemSettingsListenerEx {
       getGradleJvmLookupProvider(project, projectSettings)
         .newLookupBuilder()
         .withSdkName(gradleJvm)
-        .withVersionFilter { isSupported(gradleVersion, it) }
+        .withVersionFilter {
+          val javaVersion = JavaVersion.tryParse(it)
+          javaVersion != null &&
+          GradleJvmSupportMatrix.isJavaSupportedByIdea(javaVersion) &&
+          GradleJvmSupportMatrix.isSupported(gradleVersion, javaVersion)
+        }
         .withSdkType(ExternalSystemJdkUtil.getJavaSdkType())
         .withSdkHomeFilter { ExternalSystemJdkUtil.isValidJdk(it) }
         .onSdkNameResolved { sdk ->

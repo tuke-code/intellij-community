@@ -1,4 +1,4 @@
-// Copyright 2000-2021 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
+// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.plugins.gradle.tooling.builder;
 
 import org.gradle.api.Project;
@@ -15,7 +15,7 @@ import org.jetbrains.plugins.gradle.tooling.ModelBuilderContext;
 import org.jetbrains.plugins.gradle.tooling.internal.BuildScriptClasspathModelImpl;
 import org.jetbrains.plugins.gradle.tooling.internal.ClasspathEntryModelImpl;
 import org.jetbrains.plugins.gradle.tooling.util.DependencyTraverser;
-import org.jetbrains.plugins.gradle.tooling.util.SourceSetCachedFinder;
+import com.intellij.gradle.toolingExtension.impl.modelBuilder.SourceSetCachedFinder;
 import org.jetbrains.plugins.gradle.tooling.util.resolve.DependencyResolverImpl;
 
 import java.io.File;
@@ -61,7 +61,7 @@ public class ModelBuildScriptClasspathBuilderImpl extends AbstractModelBuilderSe
       downloadJavadoc = ideaModule.isDownloadJavadoc();
       downloadSources = ideaModule.isDownloadSources();
     }
-    boolean forceDisableSourceDownload = Boolean.parseBoolean(System.getProperty("idea.disable.gradle.download.sources", "true"));
+    boolean forceDisableSourceDownload = Boolean.parseBoolean(System.getProperty("idea.gradle.download.sources", "true"));
     downloadSources = downloadSources && forceDisableSourceDownload;
 
     Project parent = project.getParent();
@@ -86,7 +86,7 @@ public class ModelBuildScriptClasspathBuilderImpl extends AbstractModelBuilderSe
         buildScriptClasspath.add(new ClasspathEntryModelImpl(
           projectDependencyArtifacts,
           projectDependencyArtifactsSources,
-          Collections.<File>emptySet()
+          Collections.emptySet()
         ));
       }
       else if (dependency instanceof ExternalLibraryDependency) {
@@ -109,8 +109,8 @@ public class ModelBuildScriptClasspathBuilderImpl extends AbstractModelBuilderSe
         FileCollectionDependency fileCollectionDependency = (FileCollectionDependency)dependency;
         buildScriptClasspath.add(new ClasspathEntryModelImpl(
           fileCollectionDependency.getFiles(),
-          Collections.<File>emptySet(),
-          Collections.<File>emptySet()
+          Collections.emptySet(),
+          Collections.emptySet()
         ));
       }
     }
@@ -129,6 +129,6 @@ public class ModelBuildScriptClasspathBuilderImpl extends AbstractModelBuilderSe
 
   @NotNull
   private static List<File> singletonListOrEmpty(@Nullable File file) {
-    return file == null ? Collections.<File>emptyList() : Collections.singletonList(file);
+    return file == null ? Collections.emptyList() : Collections.singletonList(file);
   }
 }

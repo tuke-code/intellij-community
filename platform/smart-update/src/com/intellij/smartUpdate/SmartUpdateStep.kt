@@ -5,7 +5,7 @@ import com.intellij.openapi.extensions.ExtensionPointName
 import com.intellij.openapi.project.Project
 import org.jetbrains.annotations.Nls
 import org.jetbrains.annotations.NonNls
-import javax.swing.JPanel
+import javax.swing.JComponent
 
 val EP_NAME = ExtensionPointName.create<SmartUpdateStep>("com.intellij.smartUpdateStep")
 
@@ -14,6 +14,10 @@ interface SmartUpdateStep {
   val stepName: @Nls String
   fun performUpdateStep(project: Project, e: AnActionEvent? = null, onSuccess: () -> Unit)
   fun isAvailable(project: Project): Boolean = true
-  fun isEnabled(project: Project): Boolean = true
-  fun getOptionsPanel(project: Project): JPanel? = null
+  fun getDetailsComponent(project: Project): JComponent? = null
+}
+
+interface StepOption: SmartUpdateStep {
+  val optionName: @Nls String
+  val groupName: @Nls String
 }

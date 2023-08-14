@@ -7,6 +7,7 @@ import com.intellij.notification.NotificationType
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.diagnostic.ControlFlowException
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.extensions.ExtensionPointName
 import com.intellij.openapi.externalSystem.service.project.IdeModifiableModelsProvider
@@ -25,18 +26,19 @@ import com.intellij.openapi.util.UserDataHolderBase
 import com.intellij.openapi.util.UserDataHolderEx
 import com.intellij.openapi.util.io.FileUtil
 import com.intellij.openapi.vfs.VfsUtil
-import com.intellij.platform.workspaceModel.jps.JpsImportedEntitySource
-import com.intellij.platform.workspaceModel.jps.serialization.impl.FileInDirectorySourceNames
-import com.intellij.workspaceModel.ide.WorkspaceModel
+import com.intellij.platform.backend.workspace.WorkspaceModel
+import com.intellij.platform.workspace.jps.JpsImportedEntitySource
+import com.intellij.platform.workspace.jps.entities.*
+import com.intellij.platform.workspace.jps.serialization.impl.FileInDirectorySourceNames
+import com.intellij.platform.workspace.storage.EntitySource
+import com.intellij.platform.workspace.storage.EntityStorage
+import com.intellij.platform.workspace.storage.MutableEntityStorage
+import com.intellij.platform.workspace.storage.WorkspaceEntity
+import com.intellij.platform.workspace.storage.url.VirtualFileUrl
+import com.intellij.platform.workspace.storage.url.VirtualFileUrlManager
+import com.intellij.util.ExceptionUtil
 import com.intellij.workspaceModel.ide.getInstance
 import com.intellij.workspaceModel.ide.impl.legacyBridge.module.findModule
-import com.intellij.workspaceModel.storage.EntitySource
-import com.intellij.workspaceModel.storage.EntityStorage
-import com.intellij.workspaceModel.storage.MutableEntityStorage
-import com.intellij.workspaceModel.storage.WorkspaceEntity
-import com.intellij.workspaceModel.storage.bridgeEntities.*
-import com.intellij.workspaceModel.storage.url.VirtualFileUrl
-import com.intellij.workspaceModel.storage.url.VirtualFileUrlManager
 import org.jetbrains.annotations.ApiStatus.Internal
 import org.jetbrains.annotations.TestOnly
 import org.jetbrains.idea.maven.execution.SyncBundle
@@ -51,6 +53,7 @@ import org.jetbrains.idea.maven.utils.MavenProgressIndicator
 import org.jetbrains.idea.maven.utils.MavenUtil
 import java.nio.file.Path
 import java.util.function.Function
+import kotlin.coroutines.cancellation.CancellationException
 
 internal val WORKSPACE_CONFIGURATOR_EP: ExtensionPointName<MavenWorkspaceConfigurator> = ExtensionPointName.create(
   "org.jetbrains.idea.maven.importing.workspaceConfigurator")
@@ -399,7 +402,6 @@ internal class WorkspaceProjectImporter(
 
   // if a folder was excluded in legacy import, keep it excluded in workspace import as well
   private fun retainPreviouslyExcludedFolders(currentStorage: MutableEntityStorage, newStorage: MutableEntityStorage) {
-    val virtualFileManager = VirtualFileUrlManager.getInstance(myProject)
     val previouslyExcludedUrls = currentStorage.entities(ExcludeUrlEntity::class.java)
     val newExcludedUrlMap = newStorage.entities(ExcludeUrlEntity::class.java).associateBy({ it.url }, { it })
     val newContentRootMap = newStorage.entities(ContentRootEntity::class.java).associateBy({ it.url }, { it })
@@ -419,7 +421,7 @@ internal class WorkspaceProjectImporter(
             }
             break
           }
-          parentUrl = virtualFileManager.getParentVirtualUrl(parentUrl)
+          parentUrl = virtualFileUrlManager.getParentVirtualUrl(parentUrl)
         }
       }
     }
@@ -463,7 +465,7 @@ internal class WorkspaceProjectImporter(
             configurator.configureMavenProject(context.apply { mavenProjectWithModules = projectWithModules })
           }
           catch (e: Exception) {
-            MavenLog.LOG.error("Exception in MavenWorkspaceConfigurator.configureMavenProject, skipping it.", e)
+            logErrorIfNotControlFlow("configureMavenProject", e)
           }
         }
       }
@@ -487,7 +489,7 @@ internal class WorkspaceProjectImporter(
           configurator.beforeModelApplied(context)
         }
         catch (e: Exception) {
-          MavenLog.LOG.error("Exception in MavenWorkspaceConfigurator.beforeModelApplied, skipping it.", e)
+          logErrorIfNotControlFlow("beforeModelApplied", e)
         }
       }
     }
@@ -510,10 +512,20 @@ internal class WorkspaceProjectImporter(
           configurator.afterModelApplied(context)
         }
         catch (e: Exception) {
-          MavenLog.LOG.error("Exception in MavenWorkspaceConfigurator.afterModelApplied, skipping it.", e)
+          logErrorIfNotControlFlow("afterModelApplied", e)
         }
       }
     }
+  }
+
+  private fun logErrorIfNotControlFlow(methodName: String, e: Exception) {
+    if (e is ControlFlowException) {
+      ExceptionUtil.rethrowAllAsUnchecked(e)
+    }
+    if (e is CancellationException) {
+      throw e
+    }
+    MavenLog.LOG.error("Exception in MavenWorkspaceConfigurator.$methodName, skipping it.", e)
   }
 
   private fun configLegacyFacets(mavenProjectsWithModules: List<MavenProjectWithModulesData<Module>>,

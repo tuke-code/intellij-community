@@ -1,8 +1,6 @@
 // Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.jps.javac;
 
-import com.intellij.util.BooleanFunction;
-import com.intellij.util.Function;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.*;
@@ -49,6 +47,14 @@ public final class Iterators {
 
   public interface Provider<T> {
     T get();
+  }
+  
+  public interface Function<S, T> {
+    T fun(S s);
+  }
+  
+  public interface BooleanFunction<T> {
+    boolean fun(T t);
   }
   
   public static <T> Iterable<T> lazy(final Provider<? extends Iterable<T>> provider) {
@@ -334,6 +340,27 @@ public final class Iterators {
   @SuppressWarnings("unchecked")
   public static <T> BooleanFunction<? super T> notNullFilter() {
     return (BooleanFunction<T>)NOT_NULL_FILTER;
+  }
+
+  public static <T> boolean equals(Iterable<? extends T> s1, Iterable<? extends T> s2) {
+    Iterator<? extends T> it2 = s2.iterator();
+    for (T elem : s1) {
+      if (!it2.hasNext()) {
+        return false;
+      }
+      if (!elem.equals(it2.next())) {
+        return false;
+      }
+    }
+    return !it2.hasNext();
+  }
+
+  public static <T> int hashCode(Iterable<? extends T> s) {
+    int result = 1;
+    for (T elem : s) {
+      result = 31 * result + (elem == null? 0 : elem.hashCode());
+    }
+    return result;
   }
 
   private static abstract class BaseIterator<T> implements Iterator<T> {

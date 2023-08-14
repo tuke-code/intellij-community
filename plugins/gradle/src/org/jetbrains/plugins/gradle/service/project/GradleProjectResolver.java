@@ -42,9 +42,8 @@ import org.gradle.util.GradleVersion;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.jetbrains.plugins.gradle.execution.target.TargetBuildLauncher;
 import org.jetbrains.plugins.gradle.issue.DeprecatedGradleVersionIssue;
-import org.jetbrains.plugins.gradle.issue.UnsupportedGradleVersionIssue;
+import org.jetbrains.plugins.gradle.jvmcompat.GradleJvmSupportMatrix;
 import org.jetbrains.plugins.gradle.model.*;
 import org.jetbrains.plugins.gradle.model.data.BuildParticipant;
 import org.jetbrains.plugins.gradle.model.data.BuildScriptClasspathData;
@@ -68,6 +67,7 @@ import java.util.function.Predicate;
 import java.util.stream.Stream;
 
 import static com.intellij.openapi.externalSystem.util.ExternalSystemApiUtil.*;
+import static org.jetbrains.plugins.gradle.issue.UnsupportedGradleJvmIssueChecker.Util.isJavaHomeUnsupportedByIdea;
 import static org.jetbrains.plugins.gradle.service.project.GradleProjectResolverUtil.getDefaultModuleTypeId;
 import static org.jetbrains.plugins.gradle.service.project.GradleProjectResolverUtil.getModuleId;
 
@@ -204,33 +204,29 @@ public class GradleProjectResolver implements ExternalSystemProjectResolver<Grad
                                                      boolean isBuildSrcProject)
     throws IllegalArgumentException, IllegalStateException {
     final long activityId = resolverCtx.getExternalSystemTaskId().getId();
-    final PerformanceTrace performanceTrace = new PerformanceTrace();
-    performanceTrace.setId(activityId);
+    final PerformanceTrace performanceTrace = new PerformanceTrace(activityId);
     final GradleProjectResolverExtension tracedResolverChain = new TracedProjectResolverExtension(projectResolverChain, performanceTrace);
 
     final BuildEnvironment buildEnvironment = GradleExecutionHelper.getBuildEnvironment(resolverCtx);
     GradleVersion gradleVersion = null;
 
     boolean useCustomSerialization = Registry.is("gradle.tooling.custom.serializer", true);
-    boolean isCompositeBuildsSupported = false;
     if (buildEnvironment != null) {
       gradleVersion = GradleVersion.version(buildEnvironment.getGradle().getGradleVersion());
-      isCompositeBuildsSupported = gradleVersion.compareTo(GradleVersion.version("3.1")) >= 0;
       resolverCtx.setBuildEnvironment(buildEnvironment);
-      if (!isCustomSerializationSupported(resolverCtx, gradleVersion, isCompositeBuildsSupported)) {
-        useCustomSerialization = false;
-      }
-      if (UnsupportedGradleVersionIssue.isUnsupported(gradleVersion)) {
+      if (!GradleJvmSupportMatrix.isGradleSupportedByIdea(gradleVersion)) {
         throw new IllegalStateException("Unsupported Gradle version");
+      }
+      var javaHome = buildEnvironment.getJava().getJavaHome();
+      if (isJavaHomeUnsupportedByIdea(javaHome.getPath())) {
+        throw new IllegalStateException("Unsupported Gradle JVM version");
       }
     }
     final ProjectImportAction projectImportAction =
       useCustomSerialization
-      ? new ProjectImportActionWithCustomSerializer(resolverCtx.isPreviewMode(), isCompositeBuildsSupported)
-      : new ProjectImportAction(resolverCtx.isPreviewMode(), isCompositeBuildsSupported);
+      ? new ProjectImportActionWithCustomSerializer(resolverCtx.isPreviewMode())
+      : new ProjectImportAction(resolverCtx.isPreviewMode());
 
-    boolean useParallelModelsFetch = Registry.is("gradle.tooling.models.parallel.fetch", false);
-    projectImportAction.setParallelModelsFetch(useParallelModelsFetch);
     GradleExecutionSettings executionSettings = resolverCtx.getSettings();
     if (executionSettings == null) {
       executionSettings = new GradleExecutionSettings(null, null, DistributionType.BUNDLED, false);
@@ -250,14 +246,7 @@ public class GradleProjectResolver implements ExternalSystemProjectResolver<Grad
 
       // register classes of extra gradle project models required for extensions (e.g. com.android.builder.model.AndroidProject)
       try {
-        ProjectImportModelProvider modelProvider = resolverExtension.getModelProvider();
-        if (modelProvider != null) {
-          projectImportAction.addProjectImportModelProvider(modelProvider);
-        }
-        ProjectImportModelProvider projectsLoadedModelProvider = resolverExtension.getProjectsLoadedModelProvider();
-        if (projectsLoadedModelProvider != null) {
-          projectImportAction.addProjectImportModelProvider(projectsLoadedModelProvider, true);
-        }
+        projectImportAction.addProjectImportModelProviders(resolverExtension.getModelProviders());
       }
       catch (Throwable t) {
         LOG.warn(t);
@@ -275,6 +264,10 @@ public class GradleProjectResolver implements ExternalSystemProjectResolver<Grad
     GradleExecutionHelper.attachTargetPathMapperInitScript(executionSettings);
     var initScript = GradleInitScriptUtil.createMainInitScript(isBuildSrcProject, toolingExtensionClasses);
     executionSettings.withArguments(GradleConstants.INIT_SCRIPT_CMD_OPTION, initScript.toString());
+
+    if (!executionSettings.isDownloadSources()) {
+      GradleExecutionHelper.attachIdeaPluginConfigurator(executionSettings);
+    }
 
     BuildActionRunner buildActionRunner = new BuildActionRunner(resolverCtx, projectImportAction, executionSettings, myHelper);
     resolverCtx.checkCancelled();
@@ -305,7 +298,7 @@ public class GradleProjectResolver implements ExternalSystemProjectResolver<Grad
             buildFinishWaiter.countDown();
           }
         });
-      if (gradleVersion != null && DeprecatedGradleVersionIssue.isDeprecated(gradleVersion)) {
+      if (gradleVersion != null && GradleJvmSupportMatrix.isGradleDeprecatedByIdea(gradleVersion)) {
         resolverCtx.report(MessageEvent.Kind.WARNING, new DeprecatedGradleVersionIssue(gradleVersion, resolverCtx.getProjectPath()));
       }
       performanceTrace.addTrace(allModels.getPerformanceTrace());
@@ -561,17 +554,12 @@ public class GradleProjectResolver implements ExternalSystemProjectResolver<Grad
     }
   }
 
-  private static boolean isCustomSerializationSupported(@NotNull DefaultProjectResolverContext resolverCtx,
-                                                        GradleVersion gradleVersion,
-                                                        boolean isCompositeBuildsSupported) {
-    return isCompositeBuildsSupported ||
-           resolverCtx.getConnection().newBuild() instanceof TargetBuildLauncher ||
-           gradleVersion.getBaseVersion().compareTo(GradleVersion.version("3.0")) >= 0;
-  }
-
   private static void configureExecutionArgumentsAndVmOptions(@NotNull GradleExecutionSettings executionSettings,
                                                               @NotNull DefaultProjectResolverContext resolverCtx,
                                                               boolean isBuildSrcProject) {
+    if (!executionSettings.isDownloadSources()) {
+      executionSettings.withArgument("-Didea.gradle.download.sources=false");
+    }
     executionSettings.withArgument("-Didea.sync.active=true");
     if (resolverCtx.isResolveModulePerSourceSet()) {
       executionSettings.withArgument("-Didea.resolveSourceSetDependencies=true");

@@ -28,6 +28,11 @@ public class FirUastDeclarationTestGenerated extends AbstractFirUastDeclarationT
         runTest("testData/declaration/annotationOnElvis.kt");
     }
 
+    @TestMetadata("build.gradle.kts")
+    public void testBuild_gradle() throws Exception {
+        runTest("testData/declaration/build.gradle.kts");
+    }
+
     @TestMetadata("commentsOnDataClass.kt")
     public void testCommentsOnDataClass() throws Exception {
         runTest("testData/declaration/commentsOnDataClass.kt");
@@ -91,6 +96,11 @@ public class FirUastDeclarationTestGenerated extends AbstractFirUastDeclarationT
     @TestMetadata("mangling.kt")
     public void testMangling() throws Exception {
         runTest("testData/declaration/mangling.kt");
+    }
+
+    @TestMetadata("missingNames.kt")
+    public void testMissingNames() throws Exception {
+        runTest("testData/declaration/missingNames.kt");
     }
 
     @TestMetadata("nullabilityOfTypeParameter.kt")

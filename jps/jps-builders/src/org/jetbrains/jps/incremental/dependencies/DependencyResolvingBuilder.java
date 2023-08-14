@@ -21,6 +21,7 @@ import org.jetbrains.annotations.Nls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.idea.maven.aether.ArtifactRepositoryManager;
+import org.jetbrains.idea.maven.aether.ArtifactRepositoryManager.ArtifactAuthenticationData;
 import org.jetbrains.idea.maven.aether.ProgressConsumer;
 import org.jetbrains.idea.maven.aether.Retry;
 import org.jetbrains.idea.maven.aether.RetryProvider;
@@ -47,6 +48,7 @@ import org.jetbrains.jps.model.serialization.JpsModelSerializationDataService;
 import org.jetbrains.jps.model.serialization.JpsPathVariablesConfiguration;
 import org.jetbrains.jps.service.JpsServiceManager;
 import org.jetbrains.jps.util.JpsChecksumUtil;
+import org.jetbrains.jps.model.serialization.JpsMavenSettings;
 import org.jetbrains.jps.util.JpsPathUtil;
 
 import java.io.File;
@@ -76,6 +78,7 @@ public final class DependencyResolvingBuilder extends ModuleLevelBuilder {
   private static final Key<Pair<ArtifactRepositoryManager, Map<String, ArtifactRepositoryManager>>> MANAGERS_KEY = GlobalContextKey.create("_artifact_repository_manager_"); // pair[unnamedManager: {namedManagers}]
 
   private static final Key<Exception> RESOLVE_ERROR_KEY = Key.create("_artifact_repository_resolve_error_");
+  public static final String REMOTE_REPOSITORY_AUTH_PROPERTY_PREFIX = "org.jetbrains.jps.incremental.dependencies.resolution.remote.repository.auth.";
   public static final String RESOLUTION_PARALLELISM_PROPERTY = "org.jetbrains.jps.incremental.dependencies.resolution.parallelism";
   public static final String RESOLUTION_RETRY_ENABLED_PROPERTY = "org.jetbrains.jps.incremental.dependencies.resolution.retry.enabled";
   public static final String RESOLUTION_RETRY_MAX_ATTEMPTS_PROPERTY = "org.jetbrains.jps.incremental.dependencies.resolution.retry.max.attempts";
@@ -84,7 +87,13 @@ public final class DependencyResolvingBuilder extends ModuleLevelBuilder {
   public static final String RESOLUTION_SHA256_CHECKSUM_IGNORE_PROPERTY = "org.jetbrains.jps.incremental.dependencies.resolution.sha256.checksum.ignored";
   public static final String RESOLUTION_BIND_REPOSITORY_IGNORE_PROPERTY = "org.jetbrains.jps.incremental.dependencies.resolution.bind.repository.ignored";
   public static final String RESOLUTION_RETRY_DOWNLOAD_CORRUPTED_ZIP_PROPERTY = "org.jetbrains.jps.incremental.dependencies.resolution.retry.download.corrupted.zip";
-  public static final String RESOLUTION_RETRY_DOWNLOAD_CORRUPTED_ZIP_LEGACY_PROPERTY = "org.jetbrains.idea.maven.aether.strictValidation"; // TODO remove, preserved for backward compatibility.
+
+  /**
+   * @deprecated Replace with {@link DependencyResolvingBuilder#RESOLUTION_RETRY_DOWNLOAD_CORRUPTED_ZIP_PROPERTY}
+   */
+  @SuppressWarnings("DeprecatedIsStillUsed")
+  @Deprecated(forRemoval = true)
+  public static final String RESOLUTION_RETRY_DOWNLOAD_CORRUPTED_ZIP_LEGACY_PROPERTY = "org.jetbrains.idea.maven.aether.strictValidation";
   public static final String RESOLUTION_REPORT_CORRUPTED_ZIP_PROPERTY = "org.jetbrains.jps.incremental.dependencies.resolution.report.corrupted.zip";
   public static final String RESOLUTION_REPORT_INVALID_SHA256_CHECKSUM_PROPERTY = "org.jetbrains.jps.incremental.dependencies.resolution.report.invalid.sha256.checksum";
   public static final String RESOLUTION_CORRUPTED_ARTIFACTS_REPORTS_DIRECTORY_PROPERTY = "org.jetbrains.jps.incremental.dependencies.resolution.corrupted.artifacts.directory";
@@ -210,11 +219,14 @@ public final class DependencyResolvingBuilder extends ModuleLevelBuilder {
       try {
         // list of missing roots needed to be resolved
         List<File> required = ContainerUtil.filter(compiledRoots, root -> !verifyLibraryArtifact(context, lib.getName(), descriptor, root));
+
+        // be strict and verify effective repo manager exists (will throw an exception if bind repository is required, but missing)
+        ArtifactRepositoryManager effectiveRepoManager = getRepositoryManager(context, descriptor, lib.getName(), useBindRepositories);
+
         if (!required.isEmpty()) {
           context.processMessage(new ProgressMessage(JpsBuildBundle.message("progress.message.resolving.0.library", lib.getName()), currentTargets));
           LOG.debug("Downloading missing files for " + lib.getName() + " library: " + required);
 
-          ArtifactRepositoryManager effectiveRepoManager = getRepositoryManager(context, descriptor, lib.getName(), useBindRepositories);
           final Collection<File> resolved = effectiveRepoManager.resolveDependency(descriptor.getGroupId(), descriptor.getArtifactId(),
                                                                                    descriptor.getVersion(),
                                                                                    descriptor.isIncludeTransitiveDependencies(), descriptor.getExcludedDependencies());
@@ -223,6 +235,17 @@ public final class DependencyResolvingBuilder extends ModuleLevelBuilder {
           }
           else {
             LOG.info("No artifacts were resolved for repository dependency " + descriptor.getMavenId());
+          }
+
+          if (LOG.isDebugEnabled()) {
+            Set<String> missing = required.stream().map(it -> FileUtil.toCanonicalPath(it.getAbsolutePath())).collect(Collectors.toSet());
+            resolved.forEach(it -> missing.remove(FileUtil.toCanonicalPath(it.getAbsolutePath())));
+            if (!missing.isEmpty()) {
+              LOG.debug("Files are not downloaded completely for library '" + lib.getName() + "'," +
+                        " descriptor '" + descriptor.getMavenId() + "'." +
+                        " Required " + required + " but resolved " + resolved +
+                        ". Missing " + missing);
+            }
           }
         }
         verifyLibraryRootsChecksums(context, lib.getName(), descriptor, compiledRoots, verifySha256Checksums);
@@ -603,12 +626,15 @@ public final class DependencyResolvingBuilder extends ModuleLevelBuilder {
     
     Pair<ArtifactRepositoryManager, Map<String, ArtifactRepositoryManager>> managers = MANAGERS_KEY.get(context);
     if (managers == null) {
+      Map<String, JpsMavenSettings.RemoteRepositoryAuthentication> mavenSettingsXmlAuth = JpsMavenSettings.loadAuthenticationSettings(
+        JpsMavenSettings.getGlobalMavenSettingsXml(),
+        JpsMavenSettings.getUserMavenSettingsXml()
+      );
       final List<RemoteRepository> repositories = new SmartList<>();
       for (JpsRemoteRepositoryDescription repo : JpsRemoteRepositoryService.getInstance().getOrCreateRemoteRepositoriesConfiguration(context.getProjectDescriptor().getProject())
           .getRepositories()) {
-        repositories.add(
-          ArtifactRepositoryManager.createRemoteRepository(repo.getId(), repo.getUrl(), obtainAuthenticationData(repo.getUrl()))
-        );
+        ArtifactAuthenticationData authenticationData = obtainRemoteRepositoryAuthenticationData(repo, mavenSettingsXmlAuth);
+        repositories.add(ArtifactRepositoryManager.createRemoteRepository(repo.getId(), repo.getUrl(), authenticationData));
       }
       Retry retry = RetryProvider.disabled();
       if (SystemProperties.getBooleanProperty(RESOLUTION_RETRY_ENABLED_PROPERTY, false)) {
@@ -655,7 +681,29 @@ public final class DependencyResolvingBuilder extends ModuleLevelBuilder {
     return namedManager;
   }
 
-  private static ArtifactRepositoryManager.ArtifactAuthenticationData obtainAuthenticationData(String url) {
+  /**
+   * Obtain authentication for remote repository. Uses three sources for authentication data (ordered from higher to lower priority):
+   * <ol>
+   *   <li>System property with '{@link DependencyResolvingBuilder#REMOTE_REPOSITORY_AUTH_PROPERTY_PREFIX} + remote_repository_id' name and 'username:password' value.</li>
+   *   <li>{@link DependencyAuthenticationDataProvider} extensions</li>
+   *   <li>Maven's settings.xml file. See {@link JpsMavenSettings#loadAuthenticationSettings(File, File)}</li>
+   * </ol>
+   *
+   * @param description          Remote repo
+   * @param mavenSettingsXmlAuth Settings obtained from {@link JpsMavenSettings#loadAuthenticationSettings(File, File)}
+   * @return Authentication data or null, if no suitable authentication is found.
+   */
+  @Nullable
+  private static ArtifactAuthenticationData obtainRemoteRepositoryAuthenticationData(
+    @NotNull JpsRemoteRepositoryDescription description,
+    @NotNull Map<String, JpsMavenSettings.RemoteRepositoryAuthentication> mavenSettingsXmlAuth
+  ) {
+    ArtifactAuthenticationData fromProperty = loadRemoteRepositoryAuthenticationFromSystemProperty(description);
+    if (fromProperty != null) {
+      return fromProperty;
+    }
+
+    String url = description.getUrl();
     for (DependencyAuthenticationDataProvider provider : JpsServiceManager.getInstance()
       .getExtensions(DependencyAuthenticationDataProvider.class)) {
       DependencyAuthenticationDataProvider.AuthenticationData authData = provider.provideAuthenticationData(url);
@@ -663,7 +711,36 @@ public final class DependencyResolvingBuilder extends ModuleLevelBuilder {
         return new ArtifactRepositoryManager.ArtifactAuthenticationData(authData.getUserName(), authData.getPassword());
       }
     }
+
+    JpsMavenSettings.RemoteRepositoryAuthentication fromMavenSettings = mavenSettingsXmlAuth.get(description.getId());
+    if (fromMavenSettings != null) {
+      return new ArtifactAuthenticationData(fromMavenSettings.getUsername(), fromMavenSettings.getPassword());
+    }
     return null;
+  }
+
+  @Nullable
+  private static ArtifactAuthenticationData loadRemoteRepositoryAuthenticationFromSystemProperty(
+    @NotNull JpsRemoteRepositoryDescription description
+  ) {
+    String propertyName = REMOTE_REPOSITORY_AUTH_PROPERTY_PREFIX + description.getId();
+    String propertyValue = System.getProperty(propertyName);
+    if (propertyValue == null) {
+      return null;
+    }
+
+    // Expected 'username:password' property value.
+    // Use of ':' as separator is OK - the same one is used in HTTP Basic Authentication (RFC 7617).
+    String[] tokens = propertyValue.split(":");
+    if (tokens.length != 2) {
+      throw new IllegalArgumentException("Malformed remote repository authentication system property for repository with id '" +
+                                         description.getId() + "'. " +
+                                         "Expected system property format is '" + propertyName + "=username:password'");
+    }
+
+    String username = tokens[0];
+    String password = tokens[1];
+    return new ArtifactAuthenticationData(username, password);
   }
 
   private static @NotNull File getLocalArtifactRepositoryRoot(@NotNull JpsGlobal global) {

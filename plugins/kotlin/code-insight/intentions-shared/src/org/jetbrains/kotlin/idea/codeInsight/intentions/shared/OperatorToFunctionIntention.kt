@@ -19,7 +19,7 @@ import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.psi.psiUtil.lastBlockStatementOrThis
 import org.jetbrains.kotlin.resolve.references.ReferenceAccess
 
-class OperatorToFunctionIntention : AbstractKotlinApplicableIntention<KtExpression>(KtExpression::class) {
+internal class OperatorToFunctionIntention : AbstractKotlinApplicableIntention<KtExpression>(KtExpression::class) {
     context(KtAnalysisSession)
     private fun isApplicableUnary(element: KtUnaryExpression): Boolean {
         if (element.baseExpression == null) return false
@@ -68,7 +68,7 @@ class OperatorToFunctionIntention : AbstractKotlinApplicableIntention<KtExpressi
 
     context(KtAnalysisSession)
     private fun isImplicitInvokeFunctionCall(element: KtCallExpression): Boolean {
-        val functionCall = (element as KtElement).resolveCall()?.singleFunctionCallOrNull()
+        val functionCall = element.resolveCall()?.singleFunctionCallOrNull()
         return functionCall is KtSimpleFunctionCall && functionCall.isImplicitInvoke
     }
 

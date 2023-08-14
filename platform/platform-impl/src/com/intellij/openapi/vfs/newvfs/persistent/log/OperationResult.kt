@@ -1,6 +1,9 @@
 // Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.openapi.vfs.newvfs.persistent.log
 
+import com.intellij.openapi.diagnostic.Logger
+import com.intellij.openapi.progress.ProcessCanceledException
+import kotlinx.coroutines.CancellationException
 import kotlin.contracts.ExperimentalContracts
 import kotlin.contracts.InvocationKind
 import kotlin.contracts.contract
@@ -16,6 +19,12 @@ class OperationResult<out T : Any> private constructor(
     if (hasValue) return fromValue(action(value))
     return fromException(exceptionClass)
   }
+
+  override fun toString(): String {
+    return if (hasValue) "OperationResult(value=$value)"
+    else "OperationResult(exception=$exceptionClass)"
+  }
+
 
   companion object {
     fun <T : Any> fromValue(value: T): OperationResult<T> =
@@ -45,7 +54,12 @@ class OperationResult<out T : Any> private constructor(
           value as Int
         }
         Boolean::class.javaObjectType -> {
-          if (value as Boolean) { 1 } else { 0 }
+          if (value as Boolean) {
+            1
+          }
+          else {
+            0
+          }
         }
         Unit::class.javaObjectType -> 0
         else -> throw IllegalStateException("OperationResult is not designed to be used with type-parameter " + T::class.java.name)
@@ -73,25 +87,39 @@ class OperationResult<out T : Any> private constructor(
         else -> throw IllegalStateException("OperationResult is not designed to be used with type-parameter " + T::class.java.name)
       }
     }
+
+    internal val LOG = Logger.getInstance(OperationResult::class.java)
   }
 }
 
 @OptIn(ExperimentalContracts::class)
-internal inline fun <R : Any> catchResult(processor: (result: OperationResult<R>) -> Unit, body: () -> R): R {
+internal inline fun <R : Any> catchResult(crossinline processor: (result: OperationResult<R>) -> Unit, body: () -> R): R {
   contract {
     callsInPlace(processor, InvocationKind.EXACTLY_ONCE)
     callsInPlace(body, InvocationKind.EXACTLY_ONCE)
   }
+  val safeProcessor = { result: OperationResult<R> ->
+    try {
+      processor(result)
+    }
+    catch (e: Throwable) {
+      OperationResult.LOG.error(AssertionError("operation result processor must not throw an exception", e))
+    }
+  }
   return try {
     body().also {
-      // TODO check contract
-      processor(OperationResult.fromValue(it))
+      safeProcessor(OperationResult.fromValue(it))
     }
   }
   catch (e: Throwable) {
-    processor(OperationResult.fromException(e.javaClass.name))
+    if (e is ProcessCanceledException || e is CancellationException) {
+      // catchResult is currently used in write interceptors for VFS storages, cancellation of such operations is something strange
+      OperationResult.LOG.error("unexpected cancellation exception in catchResult: $e")
+    }
+    safeProcessor(OperationResult.fromException(e.javaClass.name))
     throw e
   }
 }
 
-internal inline infix fun <R : Any> (() -> R).catchResult(processor: (result: OperationResult<R>) -> Unit): R = catchResult(processor, this)
+internal inline infix fun <R : Any> (() -> R).catchResult(crossinline processor: (result: OperationResult<R>) -> Unit): R =
+  catchResult(processor, this)

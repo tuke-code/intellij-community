@@ -3,18 +3,23 @@ package com.intellij.ide.ui.laf.darcula.ui;
 
 import com.intellij.icons.AllIcons;
 import com.intellij.ide.ProjectWindowCustomizerService;
-import com.intellij.ide.ui.laf.darcula.DarculaUIUtil;
 import com.intellij.openapi.util.NlsSafe;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.openapi.wm.impl.ToolbarComboWidget;
 import com.intellij.ui.ClickListener;
 import com.intellij.ui.JBColor;
-import com.intellij.util.ui.*;
+import com.intellij.util.ui.GraphicsUtil;
+import com.intellij.util.ui.JBEmptyBorder;
+import com.intellij.util.ui.JBUI;
+import com.intellij.util.ui.UIUtil;
 import org.jetbrains.annotations.Nls;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import sun.swing.SwingUtilities2;
 
 import javax.swing.*;
+import javax.swing.border.Border;
+import javax.swing.border.EmptyBorder;
 import javax.swing.plaf.ComponentUI;
 import javax.swing.plaf.basic.BasicHTML;
 import javax.swing.text.BadLocationException;
@@ -31,7 +36,7 @@ import java.util.Objects;
 
 import static com.intellij.ide.ui.laf.darcula.ui.ToolbarComboWidgetUiSizes.*;
 
-public class ToolbarComboWidgetUI extends ComponentUI implements PropertyChangeListener {
+public final class ToolbarComboWidgetUI extends ComponentUI implements PropertyChangeListener {
   private static final Icon EXPAND_ICON = AllIcons.General.ChevronDown;
   private static final int SEPARATOR_WIDTH = 1;
   private static final int SEPARATOR_HEIGHT = 20;
@@ -79,11 +84,21 @@ public class ToolbarComboWidgetUI extends ComponentUI implements PropertyChangeL
       ToolbarComboWidget widget = (ToolbarComboWidget)evt.getSource();
       tryUpdateHtmlRenderer(widget, widget.getText());
     }
+
+    if ("pressListenersCount".equals(evt.getPropertyName())) {
+      ToolbarComboWidget widget = (ToolbarComboWidget)evt.getSource();
+      Insets insets = isSeparatorShown(widget)
+                      ? JBUI.CurrentTheme.MainToolbar.SplitDropdown.borderInsets()
+                      : JBUI.CurrentTheme.MainToolbar.Dropdown.borderInsets();
+      JBEmptyBorder border = JBUI.Borders.empty(insets.top, insets.left, insets.bottom, insets.right);
+      widget.setBorder(border);
+    }
   }
 
-  private void tryUpdateHtmlRenderer(ToolbarComboWidget widget, String text) {
-    if (widget.getFont() == null && BasicHTML.isHTMLString(text))
+  private static void tryUpdateHtmlRenderer(ToolbarComboWidget widget, String text) {
+    if (widget.getFont() == null && BasicHTML.isHTMLString(text)) {
       return;
+    }
     BasicHTML.updateRenderer(widget, text);
   }
 
@@ -94,7 +109,7 @@ public class ToolbarComboWidgetUI extends ComponentUI implements PropertyChangeL
     c.setTransparentHoverBackground(JBColor.namedColor("MainToolbar.Dropdown.transparentHoverBackground", c.getHoverBackground()));
 
     Insets insets = JBUI.CurrentTheme.MainToolbar.Dropdown.borderInsets();
-    JBEmptyBorder border = JBUI.Borders.empty(insets.top, insets.left, insets.bottom, insets.right);
+    Border border = new EmptyBorder(insets);
     c.setBorder(border);
   }
 
@@ -109,13 +124,14 @@ public class ToolbarComboWidgetUI extends ComponentUI implements PropertyChangeL
     Rectangle innerArea = SwingUtilities.calculateInnerArea(c, null);
     Graphics2D g2 = (Graphics2D)g.create(innerArea.x, innerArea.y, innerArea.width, innerArea.height);
     Rectangle paintRect = new Rectangle(0, 0, innerArea.width, innerArea.height);
-    doClip(paintRect, getLeftGap());
     int maxTextWidth = calcMaxTextWidth(combo, paintRect);
     try {
       GraphicsUtil.setupAAPainting(g2);
+      boolean skipNextGap = false;
       if (!leftIcons.isEmpty()) {
         Rectangle iconsRect = paintIcons(leftIcons, combo, g2, paintRect, combo.getLeftIconsGap());
         doClip(paintRect, iconsRect.width + getGapAfterLeftIcons());
+        skipNextGap = true;
       }
 
       String text = getText(combo);
@@ -123,24 +139,27 @@ public class ToolbarComboWidgetUI extends ComponentUI implements PropertyChangeL
         Rectangle textRect = new Rectangle(paintRect.x, paintRect.y, maxTextWidth, paintRect.height);
         drawText(c, text, g2, textRect);
         doClip(paintRect, maxTextWidth);
+        skipNextGap = false;
       }
 
       if (!rightIcons.isEmpty()) {
-        doClip(paintRect, getGapBeforeRightIcons());
+        if (!skipNextGap) doClip(paintRect, getGapBeforeRightIcons());
         Rectangle iconsRect = paintIcons(rightIcons, combo, g2, paintRect, combo.getRightIconsGap());
         doClip(paintRect, iconsRect.width);
+        skipNextGap = false;
       }
 
       if (isSeparatorShown(combo)) {
-        doClip(paintRect, getGapBeforeSeparator());
+        doClip(paintRect, getSeparatorGap());
         g2.setColor(c.isEnabled() ? UIManager.getColor("MainToolbar.separatorColor") : UIUtil.getLabelDisabledForeground());
         g2.fillRect(paintRect.x, ((int)paintRect.getCenterY()) - SEPARATOR_HEIGHT / 2, SEPARATOR_WIDTH, SEPARATOR_HEIGHT);
-        separatorPosition = paintRect.x;
-        doClip(paintRect, SEPARATOR_WIDTH);
+        separatorPosition = paintRect.x + combo.getInsets().left;
+        doClip(paintRect, SEPARATOR_WIDTH + getSeparatorGap());
+        skipNextGap = false;
       }
 
       if (combo.isExpandable()) {
-        doClip(paintRect, getGapBeforeExpandIcon());
+        if (!skipNextGap) doClip(paintRect, getGapBeforeExpandIcon());
         paintIcons(Collections.singletonList(EXPAND_ICON), combo, g2, paintRect, 0); // no gap for single icon
       }
     }
@@ -183,17 +202,16 @@ public class ToolbarComboWidgetUI extends ComponentUI implements PropertyChangeL
       }
 
       Color highlightBackground = c.getHighlightBackground();
-      int arc = DarculaUIUtil.COMPONENT_ARC.get();
+      int arc = JBUI.CurrentTheme.MainToolbar.Dropdown.hoverArc().get();
       if (highlightBackground != null) {
         Rectangle highlightRect = c.getVisibleRect();
-        JBInsets.removeFrom(highlightRect, c.getInsets());
         g2.setColor(highlightBackground);
         g2.fillRoundRect(highlightRect.x, highlightRect.y, highlightRect.width, highlightRect.height, arc, arc);
       }
 
       if (c.isEnabled()) {
         Rectangle hoverRect = hoverTracker.getHoverRect();
-        Color hoverBackground = ProjectWindowCustomizerService.getInstance().isActive()
+        Color hoverBackground = ProjectWindowCustomizerService.Companion.getInstance().isActive()
                                 ? c.getTransparentHoverBackground() : c.getHoverBackground();
         if (hoverRect != null && hoverBackground != null) {
           g2.setColor(hoverBackground);
@@ -232,7 +250,7 @@ public class ToolbarComboWidgetUI extends ComponentUI implements PropertyChangeL
     int right = calcIconsWidth(c.getRightIcons(), c.getRightIconsGap());
     if (right > 0) right += getGapBeforeRightIcons();
 
-    int separator = isSeparatorShown(c) ? getGapBeforeSeparator() + SEPARATOR_WIDTH : 0;
+    int separator = isSeparatorShown(c) ? 2 * getSeparatorGap() + SEPARATOR_WIDTH : 0;
     int expandButton = c.isExpandable() ? getGapBeforeExpandIcon() + EXPAND_ICON.getIconWidth() : 0;
 
     int otherElementsWidth = left + right + separator + expandButton;
@@ -276,12 +294,12 @@ public class ToolbarComboWidgetUI extends ComponentUI implements PropertyChangeL
     ToolbarComboWidget combo = (ToolbarComboWidget)c;
     Dimension res = new Dimension();
 
-    res.width += getLeftGap();
-
     List<Icon> icons = combo.getLeftIcons();
+    boolean skipNextGap = false;
     if (!icons.isEmpty()) {
       res.width += calcIconsWidth(icons, combo.getLeftIconsGap()) + getGapAfterLeftIcons();
       res.height = icons.stream().mapToInt(Icon::getIconHeight).max().orElse(0);
+      skipNextGap = true;
     }
 
     if (!StringUtil.isEmpty(combo.getText())) {
@@ -289,22 +307,24 @@ public class ToolbarComboWidgetUI extends ComponentUI implements PropertyChangeL
       String text = getText(combo);
       res.width += metrics.stringWidth(text);
       res.height = Math.max(res.height, metrics.getHeight());
+      skipNextGap = false;
     }
 
     icons = combo.getRightIcons();
     if (!icons.isEmpty()) {
-      if (res.width > 0) res.width += getGapBeforeSeparator();
+      if (res.width > 0 && !skipNextGap) res.width += getGapBeforeRightIcons();
       res.width += calcIconsWidth(icons, combo.getRightIconsGap());
       res.height = Math.max(res.height, icons.stream().mapToInt(Icon::getIconHeight).max().orElse(0));
+      skipNextGap = false;
     }
 
     if (isSeparatorShown(combo)) {
-      if (res.width > 0) res.width += getGapBeforeSeparator();
-      res.width += SEPARATOR_WIDTH + getGapBeforeSeparator();
+      res.width += 2 * getSeparatorGap() + SEPARATOR_WIDTH;
+      skipNextGap = false;
     }
 
     if (combo.isExpandable()) {
-      if (res.width > 0) res.width += getGapBeforeExpandIcon();
+      if (res.width > 0 && !skipNextGap) res.width += getGapBeforeExpandIcon();
       res.width += EXPAND_ICON.getIconWidth();
       res.height = Math.max(res.height, EXPAND_ICON.getIconHeight());
     }
@@ -317,7 +337,7 @@ public class ToolbarComboWidgetUI extends ComponentUI implements PropertyChangeL
     return res;
   }
 
-  private @Nls String getText(ToolbarComboWidget widget) {
+  private static @Nls String getText(ToolbarComboWidget widget) {
     View v = (View)widget.getClientProperty(BasicHTML.propertyKey);
     if (v != null) {
       try {
@@ -335,24 +355,26 @@ public class ToolbarComboWidgetUI extends ComponentUI implements PropertyChangeL
     return !widget.getPressListeners().isEmpty() && widget.isExpandable();
   }
 
-  private static abstract class MyMouseTracker extends MouseAdapter {
+  private static abstract class MyMouseTracker extends MouseAdapter implements PropertyChangeListener {
     protected ToolbarComboWidget comp;
 
     public void installTo(ToolbarComboWidget c) {
       comp = c;
       c.addMouseListener(this);
       c.addMouseMotionListener(this);
+      c.addPropertyChangeListener(this);
     }
 
     public void uninstall() {
       comp.removeMouseListener(this);
       comp.removeMouseMotionListener(this);
+      comp.removePropertyChangeListener(this);
       comp = null;
     }
   }
 
   private class HoverAreaTracker extends MyMouseTracker {
-
+    private boolean mouseInside = false;
     private Rectangle hoverRect;
 
     private Rectangle getHoverRect() {
@@ -361,12 +383,16 @@ public class ToolbarComboWidgetUI extends ComponentUI implements PropertyChangeL
 
     @Override
     public void mouseEntered(MouseEvent e) {
+      mouseInside = true;
       calcHoverRect(e.getPoint());
     }
 
     @Override
     public void mouseExited(MouseEvent e) {
-      updateHoverRect(null);
+      mouseInside = false;
+      if (!comp.isPopupShowing()) {
+        updateHoverRect(null);
+      }
     }
 
     @Override
@@ -374,19 +400,32 @@ public class ToolbarComboWidgetUI extends ComponentUI implements PropertyChangeL
       calcHoverRect(e.getPoint());
     }
 
-    private void calcHoverRect(Point mousePosition) {
+    @Override
+    public void propertyChange(PropertyChangeEvent evt) {
+      if ("isPopupShowing".equals(evt.getPropertyName())) {
+        if (Objects.equals(evt.getNewValue(), true)) {
+          calcHoverRect(null);
+        }
+        else if (!mouseInside) {
+          updateHoverRect(null);
+        }
+      }
+    }
+
+    private void calcHoverRect(@Nullable Point mousePosition) {
       Rectangle compBounds = comp.getVisibleRect();
-      Insets insets = comp.getInsets();
-      JBInsets.removeFrom(compBounds, insets);
       if (!isSeparatorShown(comp)) {
         updateHoverRect(compBounds);
         return;
       }
 
-      Rectangle left = new Rectangle(compBounds.x, compBounds.y, separatorPosition - 1, compBounds.height);
-      Rectangle right = new Rectangle(separatorPosition + SEPARATOR_WIDTH + insets.left + 1, compBounds.y, (compBounds.width - separatorPosition - SEPARATOR_WIDTH - 1), compBounds.height);
+      Rectangle left = new Rectangle(compBounds.x, compBounds.y, separatorPosition - getSeparatorGap(), compBounds.height);
+      Rectangle right = new Rectangle(separatorPosition + SEPARATOR_WIDTH + getSeparatorGap(),
+                                      compBounds.y,
+                                      (compBounds.width - separatorPosition - SEPARATOR_WIDTH - getSeparatorGap()),
+                                      compBounds.height);
 
-      updateHoverRect(mousePosition.x <= separatorPosition + insets.left ? left : right);
+      updateHoverRect(mousePosition == null || mousePosition.x <= separatorPosition ? left : right);
     }
 
     private void updateHoverRect(Rectangle newRect) {

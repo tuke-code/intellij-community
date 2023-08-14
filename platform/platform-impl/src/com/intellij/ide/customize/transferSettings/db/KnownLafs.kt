@@ -2,9 +2,24 @@
 package com.intellij.ide.customize.transferSettings.db
 
 import com.intellij.ide.customize.transferSettings.models.BundledLookAndFeel
+import com.intellij.ide.ui.LafManager
 
 object KnownLafs {
-  val Light: BundledLookAndFeel = BundledLookAndFeel.fromManager("IntelliJ Light")
-  val Darcula: BundledLookAndFeel = BundledLookAndFeel.fromManager("Darcula")
-  val HighContrast: BundledLookAndFeel = BundledLookAndFeel.fromManager("High contrast")
+  val Light: BundledLookAndFeel
+    get() = _light.value
+  private val _light = lazy {
+    LafManager.getInstance().defaultLightLaf?.let { BundledLookAndFeel(it) } ?: error("Light theme not found")
+  }
+
+  val Darcula: BundledLookAndFeel
+    get() = _dark.value
+  private val _dark = lazy {
+    LafManager.getInstance().defaultDarkLaf?.let { BundledLookAndFeel(it) } ?: error("Dark theme not found")
+  }
+
+  val HighContrast: BundledLookAndFeel
+    get() = _highContrast.value
+  private val _highContrast = lazy {
+    BundledLookAndFeel.fromManager("High contrast")
+  }
 }

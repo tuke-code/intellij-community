@@ -8,8 +8,8 @@ import com.google.common.util.concurrent.SettableFuture
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.EDT
 import com.intellij.openapi.diagnostic.logger
-import com.intellij.openapi.progress.indicatorRunBlockingCancellable
 import com.intellij.openapi.progress.runBackgroundableTask
+import com.intellij.openapi.progress.runBlockingCancellable
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.MessageType
 import com.intellij.openapi.util.IntRef
@@ -18,7 +18,6 @@ import com.intellij.openapi.vcs.FilePath
 import com.intellij.openapi.vcs.changes.ui.ChangesViewContentManager
 import com.intellij.openapi.vcs.ui.VcsBalloonProblemNotifier
 import com.intellij.openapi.vfs.VirtualFile
-import com.intellij.openapi.wm.ToolWindowManager
 import com.intellij.vcs.log.CommitId
 import com.intellij.vcs.log.Hash
 import com.intellij.vcs.log.VcsLogBundle
@@ -50,7 +49,7 @@ object VcsLogNavigationUtil {
 
     val progressTitle = VcsLogBundle.message("vcs.log.show.commit.in.log.process", hash.asString())
     runBackgroundableTask(progressTitle, project, true) { indicator ->
-      indicatorRunBlockingCancellable(indicator) {
+      runBlockingCancellable {
         resultFuture.computeResult {
           withContext(Dispatchers.EDT) {
             jumpToRevision(project, root, hash, filePath)
@@ -98,7 +97,7 @@ object VcsLogNavigationUtil {
       if (!manager.containsCommit(hash, root)) return null
     }
 
-    val window = ToolWindowManager.getInstance(project).getToolWindow(ChangesViewContentManager.TOOLWINDOW_ID) ?: return null
+    val window = VcsLogContentUtil.getToolWindow(project) ?: return null
     if (!window.isVisible) {
       suspendCancellableCoroutine { continuation ->
         window.activate { continuation.resumeWith(Result.success(Unit)) }
@@ -161,7 +160,7 @@ object VcsLogNavigationUtil {
     return nodeId != VcsLogUiEx.COMMIT_NOT_FOUND
   }
 
-  private suspend fun VcsLogManager.waitForRefresh() {
+  suspend fun VcsLogManager.waitForRefresh() {
     suspendCancellableCoroutine { continuation ->
       val dataPackListener = object : DataPackChangeListener {
         override fun onDataPackChange(newDataPack: DataPack) {

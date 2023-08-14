@@ -1,21 +1,25 @@
 // Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 @file:JvmName("PythonPackageManagerExt")
+
 package com.jetbrains.python.packaging.management
 
 import com.intellij.execution.RunCanceledByUserException
 import com.intellij.execution.process.CapturingProcessHandler
 import com.intellij.execution.target.TargetProgressIndicator
+import com.intellij.execution.target.value.getTargetEnvironmentValueForLocalPath
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.progress.EmptyProgressIndicator
 import com.intellij.openapi.progress.ProgressManager
-import com.intellij.openapi.progress.withBackgroundProgressIndicator
-import com.intellij.openapi.util.text.StringUtil
+import com.intellij.openapi.progress.withBackgroundProgress
+import com.intellij.openapi.project.guessProjectDir
 import com.intellij.util.net.HttpConfigurable
 import com.jetbrains.python.PySdkBundle
 import com.jetbrains.python.PythonHelper
 import com.jetbrains.python.packaging.PyExecutionException
+import com.jetbrains.python.packaging.common.PythonPackageSpecification
 import com.jetbrains.python.packaging.repository.PyPackageRepository
+import com.jetbrains.python.packaging.requirement.PyRequirementRelation
 import com.jetbrains.python.run.PythonInterpreterTargetEnvironmentFactory
 import com.jetbrains.python.run.buildTargetedCommandLine
 import com.jetbrains.python.run.prepareHelperScriptExecution
@@ -36,6 +40,9 @@ suspend fun PythonPackageManager.runPackagingTool(operation: String, arguments: 
   val pythonExecution = prepareHelperScriptExecution(PythonHelper.PACKAGING_TOOL, helpersAwareTargetRequest)
 
   // todo[akniazev]: check applyWorkingDir: PyTargetEnvironmentPackageManager.java:133
+  project.guessProjectDir()?.toNioPath()?.let {
+    pythonExecution.workingDir = getTargetEnvironmentValueForLocalPath(it)
+  }
 
   pythonExecution.addParameter(operation)
   if (operation == "install") {
@@ -72,7 +79,7 @@ suspend fun PythonPackageManager.runPackagingTool(operation: String, arguments: 
   thisLogger().debug("Running python packaging tool. Operation: $operation")
   val handler = CapturingProcessHandler(process, targetedCommandLine.charset, commandLineString)
 
-  val result = withBackgroundProgressIndicator(project, text, cancellable = true) {
+  val result = withBackgroundProgress(project, text, cancellable = true) {
     handler.runProcess(10 * 60 * 1000)
   }
 
@@ -82,7 +89,7 @@ suspend fun PythonPackageManager.runPackagingTool(operation: String, arguments: 
   val helperPath = commandLine.firstOrNull() ?: ""
   val args: List<String> = commandLine.subList(min(1, commandLine.size), commandLine.size)
   if (exitCode != 0) {
-    val message = if (StringUtil.isEmptyOrSpaces(result.stdout) && StringUtil.isEmptyOrSpaces(result.stderr)) PySdkBundle.message(
+    val message = if (result.stdout.isBlank() && result.stderr.isBlank()) PySdkBundle.message(
       "python.conda.permission.denied")
     else PySdkBundle.message("python.sdk.packaging.non.zero.exit.code", exitCode)
     throw PyExecutionException(message, helperPath, args, result)
@@ -107,4 +114,15 @@ private val proxyString: String?
 
 fun PythonRepositoryManager.packagesByRepository(): Sequence<Pair<PyPackageRepository, List<String>>> {
   return repositories.asSequence().map { it to packagesFromRepository(it) }
+}
+
+fun PythonPackageManager.isInstalled(name: String): Boolean {
+  return installedPackages.any { it.name.lowercase() == name.lowercase() }
+}
+
+fun PythonRepositoryManager.createSpecification(name: String,
+                                                version: String? = null,
+                                                relation: PyRequirementRelation? = null): PythonPackageSpecification {
+  val repository = packagesByRepository().first { it.second.any { pkg -> pkg.lowercase() == name.lowercase() } }.first
+  return repository.createPackageSpecification(name, version, relation)
 }

@@ -4,6 +4,7 @@ package com.intellij.openapi.vfs.newvfs.persistent
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.util.SystemProperties.getBooleanProperty
 import com.intellij.util.io.*
+import com.intellij.util.io.pagecache.impl.PageContentLockingStrategy
 import org.jetbrains.annotations.VisibleForTesting
 import java.io.IOException
 import java.nio.file.Path
@@ -112,7 +113,7 @@ object PersistentFSRecordsStorageFactory {
     val recordLength = PersistentFSRecordsOverLockFreePagedStorage.RECORD_SIZE_IN_BYTES
     val pageSize = PageCacheUtils.DEFAULT_PAGE_SIZE
 
-    if (!PageCacheUtils.LOCK_FREE_VFS_ENABLED) {
+    if (!PageCacheUtils.LOCK_FREE_PAGE_CACHE_ENABLED) {
       throw AssertionError(
         "Bug: PageCacheUtils.LOCK_FREE_VFS_ENABLED=false " +
         "=> can't create PersistentFSRecordsOverLockFreePagedStorage if FilePageCacheLockFree is disabled")
@@ -123,11 +124,12 @@ object PersistentFSRecordsStorageFactory {
       throw AssertionError("Bug: record length(=$recordLength) is not aligned with page size(=$pageSize)")
     }
 
-    val storage = PagedFileStorageLockFree(
+    val storage = PagedFileStorageWithRWLockedPageContent(
       file,
       PERSISTENT_FS_STORAGE_CONTEXT_RW,
       pageSize,
-      IOUtil.useNativeByteOrderForByteBuffers()
+      IOUtil.useNativeByteOrderForByteBuffers(),
+      PageContentLockingStrategy.LOCK_PER_PAGE
     )
     try {
       return PersistentFSRecordsOverLockFreePagedStorage(storage)

@@ -1,8 +1,7 @@
-// Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.openapi.vfs;
 
 import com.intellij.core.CoreBundle;
-import com.intellij.model.ModelBranchUtil;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.roots.ContentIterator;
@@ -131,7 +130,6 @@ public class VfsUtilCore {
    */
   public static @Nullable @NlsSafe String getRelativePath(@NotNull VirtualFile file, @NotNull VirtualFile ancestor, char separator) {
     if (!file.getFileSystem().equals(ancestor.getFileSystem())) {
-      ModelBranchUtil.checkSameBranch(file, ancestor);
       return null;
     }
 
@@ -174,7 +172,6 @@ public class VfsUtilCore {
    */
   public static @Nullable String findRelativePath(@NotNull VirtualFile src, @NotNull VirtualFile dst, char separatorChar) {
     if (!src.getFileSystem().equals(dst.getFileSystem())) {
-      ModelBranchUtil.checkSameBranch(src, dst);
       return null;
     }
 
@@ -341,8 +338,7 @@ public class VfsUtilCore {
     }
   }
 
-  @NotNull
-  public static <E extends Exception> VirtualFileVisitor.Result visitChildrenRecursively(@NotNull VirtualFile file,
+  public static @NotNull <E extends Exception> VirtualFileVisitor.Result visitChildrenRecursively(@NotNull VirtualFile file,
                                                                                                   @NotNull VirtualFileVisitor<?> visitor,
                                                                                                   @NotNull Class<E> eClass) throws E {
     try {
@@ -379,10 +375,19 @@ public class VfsUtilCore {
     }
   }
 
+  /**
+   * @return a text loaded from the {@code file}. {@code file} encoding is taken into account. Line separators stays intact.
+   * @see com.intellij.openapi.fileEditor.impl.LoadTextUtil#loadText(VirtualFile)
+   */
   public static @NotNull String loadText(@NotNull VirtualFile file) throws IOException {
     return loadText(file, (int)file.getLength());
   }
 
+  /**
+   * @return first {@code length} characters of a text loaded from the {@code file}. {@code file} encoding is taken into account.
+   * Line separators stays intact.
+   * @see com.intellij.openapi.fileEditor.impl.LoadTextUtil#loadText(VirtualFile, int)
+   */
   public static @NotNull String loadText(@NotNull VirtualFile file, int length) throws IOException {
     try (InputStreamReader reader = new InputStreamReader(file.getInputStream(), file.getCharset())) {
       return new String(FileUtilRt.loadText(reader, length));
@@ -861,12 +866,10 @@ public class VfsUtilCore {
   private static final NotNullLazyValue<VirtualFileSetFactory> VIRTUAL_FILE_SET_FACTORY =
     NotNullLazyValue.lazy(VirtualFileSetFactory::getInstance);
 
-  @NotNull
-  public static VirtualFileSet createCompactVirtualFileSet() {
+  public static @NotNull VirtualFileSet createCompactVirtualFileSet() {
     return VIRTUAL_FILE_SET_FACTORY.getValue().createCompactVirtualFileSet();
   }
-  @NotNull
-  public static VirtualFileSet createCompactVirtualFileSet(@NotNull Collection<? extends VirtualFile> files) {
+  public static @NotNull VirtualFileSet createCompactVirtualFileSet(@NotNull Collection<? extends VirtualFile> files) {
     return VIRTUAL_FILE_SET_FACTORY.getValue().createCompactVirtualFileSet(files);
   }
 }

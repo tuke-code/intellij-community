@@ -68,15 +68,15 @@ public abstract class ComboBoxAction extends AnAction implements CustomComponent
     JFrame frame = WindowManager.getInstance().getFrame(project);
     if (!(frame instanceof IdeFrame)) return;
 
-    ListPopup popup = createActionPopup(e.getDataContext(), ((IdeFrame)frame).getComponent(), null);
+    JBPopup popup = createActionPopup(e.getDataContext(), ((IdeFrame)frame).getComponent(), null);
     popup.showCenteredInCurrentWindow(project);
   }
 
-  protected @NotNull ListPopup createActionPopup(@NotNull DataContext context, @NotNull JComponent component, @Nullable Runnable disposeCallback) {
+  protected @NotNull JBPopup createActionPopup(@NotNull DataContext context, @NotNull JComponent component, @Nullable Runnable disposeCallback) {
     return createActionPopup(createPopupActionGroup(component, context), context, disposeCallback);
   }
 
-  protected ListPopup createActionPopup(DefaultActionGroup group, @NotNull DataContext context, @Nullable Runnable disposeCallback) {
+  protected JBPopup createActionPopup(DefaultActionGroup group, @NotNull DataContext context, @Nullable Runnable disposeCallback) {
     ListPopup popup = JBPopupFactory.getInstance().createActionGroupPopup(
       myPopupTitle, group, context, false, shouldShowDisabledActions(), false, disposeCallback, getMaxRows(), getPreselectCondition());
     popup.setMinimumSize(new Dimension(getMinWidth(), getMinHeight()));
@@ -167,7 +167,7 @@ public abstract class ComboBoxAction extends AnAction implements CustomComponent
       setHorizontalAlignment(LEFT);
       setFocusable(ScreenReader.isActive());
       putClientProperty("styleCombo", ComboBoxAction.this);
-      setMargin(JBUI.insets(0, 8, 0, 5));
+      setMargin();
       if (isSmallVariant()) {
         setFont(JBUI.Fonts.toolbarSmallComboBoxFont());
       }
@@ -205,6 +205,10 @@ public abstract class ComboBoxAction extends AnAction implements CustomComponent
       myPresentation.addPropertyChangeListener(evt -> {
         presentationChanged(evt);
       });
+    }
+
+    private void setMargin() {
+      setMargin(JBUI.insets(0, 8, 0, 5));
     }
 
     /**
@@ -382,6 +386,7 @@ public abstract class ComboBoxAction extends AnAction implements CustomComponent
       setUI(uiClassName == null ?
             BasicButtonUI.createUI(this) :
             UIManager.getUI(this));
+      setMargin();
     }
 
     @ApiStatus.Experimental

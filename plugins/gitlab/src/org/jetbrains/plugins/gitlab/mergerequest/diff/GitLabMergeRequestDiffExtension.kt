@@ -45,12 +45,12 @@ class GitLabMergeRequestDiffExtension : DiffExtension() {
 
     if (viewer !is DiffViewerBase) return
 
-    val reviewVm = context.getUserData(GitLabMergeRequestDiffReviewViewModel.KEY) ?: return
+    val reviewVm = context.getUserData(GitLabMergeRequestDiffViewModel.KEY) ?: return
 
     val change = request.getUserData(ChangeDiffRequestProducer.CHANGE_KEY) ?: return
 
     val dataProvider = GenericDataProvider().apply {
-      putData(GitLabMergeRequestDiffReviewViewModel.DATA_KEY, reviewVm)
+      putData(GitLabMergeRequestDiffViewModel.DATA_KEY, reviewVm)
     }
     context.putUserData(DiffUserDataKeys.DATA_PROVIDER, dataProvider)
     context.putUserData(DiffUserDataKeys.CONTEXT_ACTIONS,
@@ -61,7 +61,7 @@ class GitLabMergeRequestDiffExtension : DiffExtension() {
 
     cs.launch {
       val isCumulative = changeVmFlow.first().isCumulativeChange
-      GitLabStatistics.logMrDiffOpened(isCumulative)
+      GitLabStatistics.logMrDiffOpened(project, isCumulative)
     }
 
     val discussions = changeVmFlow.flatMapLatest { it.discussions }
@@ -110,7 +110,7 @@ class GitLabMergeRequestDiffExtension : DiffExtension() {
   private class NewNoteDiffInlayViewModel(private val changeVm: GitLabMergeRequestDiffChangeViewModel,
                                           private val newLocation: DiffLineLocation,
                                           val editVm: NewGitLabNoteViewModel) : DiffMapped {
-    val id: String = "NEW"
+    val id: String = "NEW_AT_$newLocation"
     override val location: Flow<DiffLineLocation> = flowOf(newLocation)
     override val isVisible: Flow<Boolean> = flowOf(true)
 

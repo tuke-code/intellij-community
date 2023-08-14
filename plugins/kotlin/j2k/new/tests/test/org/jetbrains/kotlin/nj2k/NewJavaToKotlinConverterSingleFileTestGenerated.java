@@ -1162,6 +1162,11 @@ public abstract class NewJavaToKotlinConverterSingleFileTestGenerated extends Ab
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
 
+        @TestMetadata("arrayInitializer.java")
+        public void testArrayInitializer() throws Exception {
+            runTest("testData/newJ2k/comments/arrayInitializer.java");
+        }
+
         @TestMetadata("beginningOfCommentInsideMultilineOne.java")
         public void testBeginningOfCommentInsideMultilineOne() throws Exception {
             runTest("testData/newJ2k/comments/beginningOfCommentInsideMultilineOne.java");
@@ -2109,9 +2114,32 @@ public abstract class NewJavaToKotlinConverterSingleFileTestGenerated extends Ab
             runTest("testData/newJ2k/equals/Equals4.java");
         }
 
+        @TestMetadata("EqualsFloatingPoint.java")
+        public void testEqualsFloatingPoint() throws Exception {
+            runTest("testData/newJ2k/equals/EqualsFloatingPoint.java");
+        }
+
         @TestMetadata("ObjectsEquals.java")
         public void testObjectsEquals() throws Exception {
             runTest("testData/newJ2k/equals/ObjectsEquals.java");
+        }
+    }
+
+    @RunWith(JUnit3RunnerWithInners.class)
+    @TestMetadata("testData/newJ2k/explicitApiMode")
+    public static class ExplicitApiMode extends AbstractNewJavaToKotlinConverterSingleFileTest {
+        private void runTest(String testDataFilePath) throws Exception {
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+        }
+
+        @TestMetadata("strict.java")
+        public void testStrict() throws Exception {
+            runTest("testData/newJ2k/explicitApiMode/strict.java");
+        }
+
+        @TestMetadata("warning.java")
+        public void testWarning() throws Exception {
+            runTest("testData/newJ2k/explicitApiMode/warning.java");
         }
     }
 
@@ -2370,6 +2398,11 @@ public abstract class NewJavaToKotlinConverterSingleFileTestGenerated extends Ab
             runTest("testData/newJ2k/for/forWithoutBody.java");
         }
 
+        @TestMetadata("incompatibleRightType.java")
+        public void testIncompatibleRightType() throws Exception {
+            runTest("testData/newJ2k/for/incompatibleRightType.java");
+        }
+
         @TestMetadata("indicesReversed.java")
         public void testIndicesReversed() throws Exception {
             runTest("testData/newJ2k/for/indicesReversed.java");
@@ -2388,6 +2421,11 @@ public abstract class NewJavaToKotlinConverterSingleFileTestGenerated extends Ab
         @TestMetadata("multipleInitializersWithvariableDeclarations.java")
         public void testMultipleInitializersWithvariableDeclarations() throws Exception {
             runTest("testData/newJ2k/for/multipleInitializersWithvariableDeclarations.java");
+        }
+
+        @TestMetadata("mutatedCondition.java")
+        public void testMutatedCondition() throws Exception {
+            runTest("testData/newJ2k/for/mutatedCondition.java");
         }
 
         @TestMetadata("nameConflict1.java")
@@ -2840,6 +2878,11 @@ public abstract class NewJavaToKotlinConverterSingleFileTestGenerated extends Ab
             runTest("testData/newJ2k/identifier/keywords.java");
         }
 
+        @TestMetadata("underscores.java")
+        public void testUnderscores() throws Exception {
+            runTest("testData/newJ2k/identifier/underscores.java");
+        }
+
         @TestMetadata("withDollar.java")
         public void testWithDollar() throws Exception {
             runTest("testData/newJ2k/identifier/withDollar.java");
@@ -2944,6 +2987,11 @@ public abstract class NewJavaToKotlinConverterSingleFileTestGenerated extends Ab
         @TestMetadata("ternary.java")
         public void testTernary() throws Exception {
             runTest("testData/newJ2k/implicitCasts/ternary.java");
+        }
+
+        @TestMetadata("ternaryCastBranchWithNumericType.java")
+        public void testTernaryCastBranchWithNumericType() throws Exception {
+            runTest("testData/newJ2k/implicitCasts/ternaryCastBranchWithNumericType.java");
         }
 
         @TestMetadata("unary.java")
@@ -3539,11 +3587,6 @@ public abstract class NewJavaToKotlinConverterSingleFileTestGenerated extends Ab
             runTest("testData/newJ2k/issues/kt-871.java");
         }
 
-        @TestMetadata("kt-879.java")
-        public void testKt_879() throws Exception {
-            runTest("testData/newJ2k/issues/kt-879.java");
-        }
-
         @TestMetadata("kt-893.java")
         public void testKt_893() throws Exception {
             runTest("testData/newJ2k/issues/kt-893.java");
@@ -4047,6 +4090,11 @@ public abstract class NewJavaToKotlinConverterSingleFileTestGenerated extends Ab
         @TestMetadata("specialBuiltinMembers.java")
         public void testSpecialBuiltinMembers() throws Exception {
             runTest("testData/newJ2k/methodCallExpression/specialBuiltinMembers.java");
+        }
+
+        @TestMetadata("stringConcatFormatting.java")
+        public void testStringConcatFormatting() throws Exception {
+            runTest("testData/newJ2k/methodCallExpression/stringConcatFormatting.java");
         }
 
         @TestMetadata("stringMethods.java")
@@ -4926,6 +4974,11 @@ public abstract class NewJavaToKotlinConverterSingleFileTestGenerated extends Ab
             runTest("testData/newJ2k/postProcessing/IfNullReturnToElvis.java");
         }
 
+        @TestMetadata("IfStatementsChain.java")
+        public void testIfStatementsChain() throws Exception {
+            runTest("testData/newJ2k/postProcessing/IfStatementsChain.java");
+        }
+
         @TestMetadata("IfToElvis.java")
         public void testIfToElvis() throws Exception {
             runTest("testData/newJ2k/postProcessing/IfToElvis.java");
@@ -4939,6 +4992,31 @@ public abstract class NewJavaToKotlinConverterSingleFileTestGenerated extends Ab
         @TestMetadata("java8MapForEachWithFullJdk.java")
         public void testJava8MapForEachWithFullJdk() throws Exception {
             runTest("testData/newJ2k/postProcessing/java8MapForEachWithFullJdk.java");
+        }
+
+        @TestMetadata("JoinDeclarationAndAssignment.java")
+        public void testJoinDeclarationAndAssignment() throws Exception {
+            runTest("testData/newJ2k/postProcessing/JoinDeclarationAndAssignment.java");
+        }
+
+        @TestMetadata("LiftAssignmentComplex.java")
+        public void testLiftAssignmentComplex() throws Exception {
+            runTest("testData/newJ2k/postProcessing/LiftAssignmentComplex.java");
+        }
+
+        @TestMetadata("LiftAssignmentSingleStatement.java")
+        public void testLiftAssignmentSingleStatement() throws Exception {
+            runTest("testData/newJ2k/postProcessing/LiftAssignmentSingleStatement.java");
+        }
+
+        @TestMetadata("LiftReturnComplex.java")
+        public void testLiftReturnComplex() throws Exception {
+            runTest("testData/newJ2k/postProcessing/LiftReturnComplex.java");
+        }
+
+        @TestMetadata("LiftReturnSingleStatement.java")
+        public void testLiftReturnSingleStatement() throws Exception {
+            runTest("testData/newJ2k/postProcessing/LiftReturnSingleStatement.java");
         }
 
         @TestMetadata("MapGetOrDefault.java")
@@ -4959,6 +5037,11 @@ public abstract class NewJavaToKotlinConverterSingleFileTestGenerated extends Ab
         @TestMetadata("OptimizeImports.java")
         public void testOptimizeImports() throws Exception {
             runTest("testData/newJ2k/postProcessing/OptimizeImports.java");
+        }
+
+        @TestMetadata("PrivateMutablePropertyAccessedByQualifiedExpression.java")
+        public void testPrivateMutablePropertyAccessedByQualifiedExpression() throws Exception {
+            runTest("testData/newJ2k/postProcessing/PrivateMutablePropertyAccessedByQualifiedExpression.java");
         }
 
         @TestMetadata("RedundantTypeCast.java")
@@ -5180,11 +5263,6 @@ public abstract class NewJavaToKotlinConverterSingleFileTestGenerated extends Ab
         @TestMetadata("publicByDefault.java")
         public void testPublicByDefault() throws Exception {
             runTest("testData/newJ2k/settings/publicByDefault.java");
-        }
-
-        @TestMetadata("specifyFieldTypeByDefault.java")
-        public void testSpecifyFieldTypeByDefault() throws Exception {
-            runTest("testData/newJ2k/settings/specifyFieldTypeByDefault.java");
         }
 
         @TestMetadata("specifyLocalVariableTypeByDefault.java")
@@ -5830,6 +5908,74 @@ public abstract class NewJavaToKotlinConverterSingleFileTestGenerated extends Ab
         @TestMetadata("varargLengthAccess.java")
         public void testVarargLengthAccess() throws Exception {
             runTest("testData/newJ2k/varArg/varargLengthAccess.java");
+        }
+    }
+
+    @RunWith(JUnit3RunnerWithInners.class)
+    @TestMetadata("testData/newJ2k/visibility")
+    public static class Visibility extends AbstractNewJavaToKotlinConverterSingleFileTest {
+        private void runTest(String testDataFilePath) throws Exception {
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+        }
+
+        @TestMetadata("exposedInternalSupertypeByPublic.java")
+        public void testExposedInternalSupertypeByPublic() throws Exception {
+            runTest("testData/newJ2k/visibility/exposedInternalSupertypeByPublic.java");
+        }
+
+        @TestMetadata("exposedParameterType.java")
+        public void testExposedParameterType() throws Exception {
+            runTest("testData/newJ2k/visibility/exposedParameterType.java");
+        }
+
+        @TestMetadata("exposedPrivateSupertypeByProtected.java")
+        public void testExposedPrivateSupertypeByProtected() throws Exception {
+            runTest("testData/newJ2k/visibility/exposedPrivateSupertypeByProtected.java");
+        }
+
+        @TestMetadata("exposedPrivateSupertypeByPublic.java")
+        public void testExposedPrivateSupertypeByPublic() throws Exception {
+            runTest("testData/newJ2k/visibility/exposedPrivateSupertypeByPublic.java");
+        }
+
+        @TestMetadata("exposedPropertyType.java")
+        public void testExposedPropertyType() throws Exception {
+            runTest("testData/newJ2k/visibility/exposedPropertyType.java");
+        }
+
+        @TestMetadata("exposedPropertyTypeInConstructor.java")
+        public void testExposedPropertyTypeInConstructor() throws Exception {
+            runTest("testData/newJ2k/visibility/exposedPropertyTypeInConstructor.java");
+        }
+
+        @TestMetadata("exposedReturnType.java")
+        public void testExposedReturnType() throws Exception {
+            runTest("testData/newJ2k/visibility/exposedReturnType.java");
+        }
+
+        @TestMetadata("exposedSuperInterface.java")
+        public void testExposedSuperInterface() throws Exception {
+            runTest("testData/newJ2k/visibility/exposedSuperInterface.java");
+        }
+
+        @TestMetadata("exposedTypeParameterBound.java")
+        public void testExposedTypeParameterBound() throws Exception {
+            runTest("testData/newJ2k/visibility/exposedTypeParameterBound.java");
+        }
+
+        @TestMetadata("nestedClassPrivateConstructor.java")
+        public void testNestedClassPrivateConstructor() throws Exception {
+            runTest("testData/newJ2k/visibility/nestedClassPrivateConstructor.java");
+        }
+
+        @TestMetadata("nestedClassPrivateField.java")
+        public void testNestedClassPrivateField() throws Exception {
+            runTest("testData/newJ2k/visibility/nestedClassPrivateField.java");
+        }
+
+        @TestMetadata("nestedClassPrivateMethod.java")
+        public void testNestedClassPrivateMethod() throws Exception {
+            runTest("testData/newJ2k/visibility/nestedClassPrivateMethod.java");
         }
     }
 

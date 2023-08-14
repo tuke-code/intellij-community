@@ -12,7 +12,6 @@ import com.intellij.openapi.actionSystem.PlatformDataKeys;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.command.CommandProcessor;
 import com.intellij.openapi.command.WriteCommandAction;
-import com.intellij.openapi.externalSystem.autoimport.ExternalSystemProjectNotificationAware;
 import com.intellij.openapi.externalSystem.autoimport.ExternalSystemProjectTracker;
 import com.intellij.openapi.module.ModifiableModuleModel;
 import com.intellij.openapi.module.Module;
@@ -31,6 +30,7 @@ import com.intellij.util.FileContentUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.idea.maven.importing.MavenProjectLegacyImporter;
 import org.jetbrains.idea.maven.importing.MavenRootModelAdapter;
+import org.jetbrains.idea.maven.model.MavenId;
 import org.jetbrains.idea.maven.project.MavenProject;
 import org.jetbrains.idea.maven.project.MavenProjectChanges;
 import org.jetbrains.idea.maven.project.MavenProjectsManager;
@@ -940,7 +940,7 @@ public class MavenProjectsManagerTest extends MavenMultiVersionImportingTestCase
     myProjectsManager.forceUpdateAllProjectsOrFindAllAvailablePomFiles();
     waitForReadingCompletion();
     myProjectsManager.waitForReadingCompletion();
-    MavenImportingTestCaseKt.importMavenProjectsSync(myProjectsManager);
+    MavenImportingTestCaseKt.importMavenProjects(myProjectsManager);
     //myProjectsManager.performScheduledImportInTests();
 
     assertSources("project", "src/main/java");
@@ -966,7 +966,7 @@ public class MavenProjectsManagerTest extends MavenMultiVersionImportingTestCase
                       </plugins>
                     </build>
                     """);
-    assertFalse(hasProjectsToBeImported());
+    assertNoPendingProjectForReload();
 
     createProjectPom("""
                        <groupId>test</groupId>
@@ -985,10 +985,9 @@ public class MavenProjectsManagerTest extends MavenMultiVersionImportingTestCase
                          </plugins>
                        </build>
                        """);
-    assertTrue(hasProjectsToBeImported());
+    assertHasPendingProjectForReload();
 
     scheduleProjectImportAndWait();
-    assertFalse(hasProjectsToBeImported());
   }
 
   @Test
@@ -1010,7 +1009,7 @@ public class MavenProjectsManagerTest extends MavenMultiVersionImportingTestCase
                       </plugins>
                     </build>
                     """);
-    assertFalse(hasProjectsToBeImported());
+    assertNoPendingProjectForReload();
 
     createProjectPom("""
                        <groupId>test</groupId>
@@ -1029,10 +1028,9 @@ public class MavenProjectsManagerTest extends MavenMultiVersionImportingTestCase
                          </plugins>
                        </build>
                        """);
-    assertTrue(hasProjectsToBeImported());
+    assertHasPendingProjectForReload();
 
     scheduleProjectImportAndWait();
-    assertFalse(hasProjectsToBeImported());
   }
 
   @Test
@@ -1068,7 +1066,7 @@ public class MavenProjectsManagerTest extends MavenMultiVersionImportingTestCase
 
   @Test
   public void testIgnoringProjectsForRemovedInUiModules() throws ConfigurationException {
-    configConfirmationForYesAnswer();
+    MavenProjectLegacyImporter.setAnswerToDeleteObsoleteModulesQuestion(true);
 
     createProjectPom("""
                        <groupId>test</groupId>
@@ -1099,8 +1097,7 @@ public class MavenProjectsManagerTest extends MavenMultiVersionImportingTestCase
     moduleStructureExtension.moduleRemoved(module);
     moduleStructureExtension.apply();
     moduleStructureExtension.disposeUIResources();
-    //myProjectsManager.performScheduledImportInTests();
-    MavenImportingTestCaseKt.importMavenProjectsSync(myProjectsManager);
+    updateAllProjects();
 
     assertNull(ModuleManager.getInstance(myProject).findModuleByName("m"));
     assertTrue(myProjectsManager.isIgnored(myProjectsManager.findProject(m)));
@@ -1137,7 +1134,7 @@ public class MavenProjectsManagerTest extends MavenMultiVersionImportingTestCase
       ApplicationManager.getApplication().runWriteAction(action);
     }, ProjectBundle.message("module.remove.command"), null);
     //myProjectsManager.performScheduledImportInTests();
-    MavenImportingTestCaseKt.importMavenProjectsSync(myProjectsManager);
+    MavenImportingTestCaseKt.importMavenProjects(myProjectsManager);
 
     assertNull(ModuleManager.getInstance(myProject).findModuleByName("m"));
     assertTrue(myProjectsManager.isIgnored(myProjectsManager.findProject(m)));
@@ -1202,8 +1199,7 @@ public class MavenProjectsManagerTest extends MavenMultiVersionImportingTestCase
     var action = new DeleteAction();
     action.actionPerformed(TestActionEvent.createTestEvent(action, createTestModuleDataContext(module1)));
 
-    //myProjectsManager.performScheduledImportInTests();
-    MavenImportingTestCaseKt.importMavenProjectsSync(myProjectsManager);
+    updateAllProjects();
 
     assertModuleModuleDeps("m2");
     assertModuleLibDep("m2", "Maven: test:m1:1");
@@ -1258,8 +1254,7 @@ public class MavenProjectsManagerTest extends MavenMultiVersionImportingTestCase
     moduleStructureExtension.apply();
     moduleStructureExtension.disposeUIResources();
 
-    //myProjectsManager.performScheduledImportInTests();
-    MavenImportingTestCaseKt.importMavenProjectsSync(myProjectsManager);
+    updateAllProjects();
 
     assertModuleModuleDeps("m2");
     assertModuleLibDep("m2", "Maven: test:m1:1");
@@ -1419,6 +1414,70 @@ public class MavenProjectsManagerTest extends MavenMultiVersionImportingTestCase
     assertEmpty(myProjectsManager.getIgnoredFilesPaths());
   }
 
+
+  @Test
+  public void testSameArtifactIdDifferentTypeDependency() {
+    createProjectPom("""
+                       <groupId>test</groupId>
+                       <artifactId>project</artifactId>
+                       <version>1</version>
+                       <packaging>pom</packaging>
+                       <modules>
+                         <module>m1</module>
+                         <module>m2</module>
+                         <module>m3</module>
+                       </modules>
+                       """);
+
+    VirtualFile m1 = createModulePom("m1",
+                                     """
+                                       <groupId>test</groupId>
+                                       <artifactId>m1</artifactId>
+                                       <version>1</version>
+                                       """);
+
+    VirtualFile m2 = createModulePom("m2",
+                                     """
+                                       <groupId>test</groupId>
+                                       <artifactId>m2</artifactId>
+                                       <version>1</version>
+                                       <dependencies>
+                                           <dependency>
+                                               <groupId>test</groupId>
+                                               <artifactId>m1</artifactId>
+                                               <version>1</version>
+                                           </dependency>
+                                       </dependencies>
+                                       """);
+
+    VirtualFile m3 = createModulePom("m3",
+                                     """
+                                       <groupId>test</groupId>
+                                       <artifactId>m3</artifactId>
+                                       <version>1</version>
+                                       <dependencies>
+                                           <dependency>
+                                               <groupId>test</groupId>
+                                               <artifactId>m1</artifactId>
+                                               <version>1</version>
+                                               <type>ejb</type>
+                                           </dependency>
+                                       </dependencies>
+                                       """);
+    importProject();
+
+    assertModuleModuleDeps("m2", "m1");
+    assertModuleModuleDeps("m3", "m1");
+
+    var mavenProject2 = myProjectsManager.findProject(m2);
+    var m21dep = mavenProject2.findDependencies(new MavenId("test:m1:1")).get(0);
+    assertEquals("jar", m21dep.getType());
+
+    var mavenProject3 = myProjectsManager.findProject(m3);
+    var m31dep = mavenProject3.findDependencies(new MavenId("test:m1:1")).get(0);
+    assertEquals("ejb", m31dep.getType());
+  }
+
   @Test
   public void shouldUnsetMavenizedIfManagedFilesWasRemoved(){
     //configConfirmationForYesAnswer();
@@ -1448,17 +1507,6 @@ public class MavenProjectsManagerTest extends MavenMultiVersionImportingTestCase
       resolveDependenciesAndImport(); // wait of full import completion
     }
 
-  }
-
-  private boolean hasProjectsToBeImported() {
-    return ExternalSystemProjectNotificationAware.getInstance(myProject).isNotificationVisible();
-  }
-
-  private void scheduleProjectImportAndWait() {
-    assertTrue(hasProjectsToBeImported()); // otherwise all imports will be skip
-    ExternalSystemProjectTracker.getInstance(myProject).scheduleProjectRefresh();
-    resolveDependenciesAndImport();
-    assertFalse(hasProjectsToBeImported()); // otherwise project settings was modified while importing
   }
 
   /**

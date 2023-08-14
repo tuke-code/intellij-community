@@ -79,16 +79,16 @@ class JavaToJKTreeBuilder(
     private val formattingCollector = FormattingCollector()
 
     // we don't want to capture comments of previous declaration/statement
-    private fun PsiElement.takeLeadingCommentsNeeded() =
+    private fun PsiElement.takeCommentsAfterNeeded() =
         this !is PsiMember && this !is PsiStatement
 
     private fun <T : JKFormattingOwner> T.withFormattingFrom(
         psi: PsiElement?,
         assignLineBreaks: Boolean = false,
-        takeTrailingComments: Boolean = true,
-        takeLeadingComments: Boolean = psi?.takeLeadingCommentsNeeded() ?: false
+        takeCommentsBefore: Boolean = true,
+        takeCommentsAfter: Boolean = psi?.takeCommentsAfterNeeded() ?: false
     ): T = with(formattingCollector) {
-        takeFormattingFrom(this@withFormattingFrom, psi, assignLineBreaks, takeTrailingComments, takeLeadingComments)
+        takeFormattingFrom(this@withFormattingFrom, psi, assignLineBreaks, takeCommentsBefore, takeCommentsAfter)
         this@withFormattingFrom
     }
 
@@ -97,10 +97,10 @@ class JavaToJKTreeBuilder(
         this@withLineBreaksFrom
     }
 
-    private fun <O : JKFormattingOwner> O.withLeadingCommentsWithParent(psi: PsiElement?) = with(formattingCollector) {
-        if (psi == null) return@with this@withLeadingCommentsWithParent
-        this@withLeadingCommentsWithParent.leadingComments += psi.leadingCommentsWithParent()
-        return this@withLeadingCommentsWithParent
+    private fun <O : JKFormattingOwner> O.withCommentsAfterWithParent(psi: PsiElement?) = with(formattingCollector) {
+        if (psi == null) return@with this@withCommentsAfterWithParent
+        this@withCommentsAfterWithParent.commentsAfter += psi.commentsAfterWithParent()
+        return this@withCommentsAfterWithParent
     }
 
     private fun PsiJavaFile.toJK(): JKFile =
@@ -115,7 +115,7 @@ class JavaToJKTreeBuilder(
             val innerComments = this?.collectDescendantsOfType<PsiComment>()?.map { comment ->
                 JKComment(comment.text)
             }.orEmpty()
-            importList.trailingComments += innerComments
+            importList.commentsBefore += innerComments
         }
 
     private fun PsiPackageStatement.toJK(): JKPackageDeclaration =
@@ -526,12 +526,18 @@ class JavaToJKTreeBuilder(
             return qualifierExpression?.toJK() ?: JKStubExpression()
         }
 
-        fun PsiReferenceExpression.toJK(): JKExpression {
+        fun PsiReferenceExpression.toJK(ignoreFacades: Boolean = true): JKExpression {
             if (this is PsiMethodReferenceExpression) return toJK()
             val target = resolve()
-            if (target is KtLightClassForFacade
-                || target is KtLightClassForDecompiledDeclaration
-            ) return JKStubExpression()
+
+            if (ignoreFacades && (target is KtLightClassForFacade || target is KtLightClassForDecompiledDeclaration)) {
+                // Normally, references to facade classes shouldn't be converted, because that would be
+                // an unresolved reference in Kotlin: hence the `JKStubExpression`.
+                // But in the case of copy-pasting a single facade class we handle it specially and just paste it as is.
+                // It will still be an unresolved reference in Kotlin, but at least the user won't be surprised by disappearing code.
+                return JKStubExpression()
+            }
+
             if (target is KtLightField
                 && target.name == "INSTANCE"
                 && target.containingClass.kotlinOrigin is KtObjectDeclaration
@@ -663,8 +669,8 @@ class JavaToJKTreeBuilder(
                                 JKKtSpreadOperator(lastExpressionType.toJK())
                             ).withFormattingFrom(jkExpressions.last())
                         staredExpression.expression.also {
-                            it.hasLeadingLineBreak = false
-                            it.hasTrailingLineBreak = false
+                            it.hasLineBreakAfter = false
+                            it.hasLineBreakBefore = false
                         }
                         jkExpressions.dropLast(1) + staredExpression
                     } else jkExpressions
@@ -780,11 +786,11 @@ class JavaToJKTreeBuilder(
             ).also {
                 it.leftBrace.withFormattingFrom(
                     lBrace,
-                    takeLeadingComments = false
+                    takeCommentsAfter = false
                 ) // do not capture comments which belongs to following declarations
                 it.rightBrace.withFormattingFrom(rBrace)
                 it.declarations.lastOrNull()?.let { lastMember ->
-                    lastMember.withLeadingCommentsWithParent(lastMember.psi)
+                    lastMember.withCommentsAfterWithParent(lastMember.psi)
                 }
             }
 
@@ -1154,6 +1160,7 @@ class JavaToJKTreeBuilder(
     fun buildTree(psi: PsiElement, saveImports: Boolean): JKTreeRoot? =
         when (psi) {
             is PsiJavaFile -> psi.toJK()
+            is PsiReferenceExpression -> with(expressionTreeMapper) { psi.toJK(ignoreFacades = false) }
             is PsiExpression -> with(expressionTreeMapper) { psi.toJK() }
             is PsiStatement -> with(declarationMapper) { psi.toJK() }
             is PsiTypeParameter -> with(declarationMapper) { psi.toJK() }

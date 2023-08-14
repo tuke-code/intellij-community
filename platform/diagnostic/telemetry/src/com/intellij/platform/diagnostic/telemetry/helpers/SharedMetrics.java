@@ -3,7 +3,7 @@ package com.intellij.platform.diagnostic.telemetry.helpers;
 
 import com.intellij.platform.diagnostic.telemetry.IJTracer;
 import com.intellij.platform.diagnostic.telemetry.Scope;
-import com.intellij.platform.diagnostic.telemetry.TelemetryTracer;
+import com.intellij.platform.diagnostic.telemetry.TelemetryManager;
 import com.intellij.platform.diagnostic.telemetry.TracerLevel;
 import com.intellij.openapi.diagnostic.Logger;
 import io.opentelemetry.api.metrics.Meter;
@@ -18,13 +18,12 @@ import java.util.function.Function;
 
 @ApiStatus.Internal
 public abstract class SharedMetrics {
-
   public final Scope rootScopeName;
   public final IJTracer tracer;
 
-  public SharedMetrics(Scope scope) {
+  public SharedMetrics(@NotNull Scope scope) {
     rootScopeName = scope;
-    this.tracer = TelemetryTracer.getInstance().getTracer(scope, false);
+    this.tracer = TelemetryManager.Companion.getTracer(scope);
   }
 
   private final ConcurrentHashMap<String, Span> spans = new ConcurrentHashMap<>();
@@ -86,6 +85,6 @@ public abstract class SharedMetrics {
   }
 
   public Meter getMeter() {
-    return TelemetryTracer.getMeter(rootScopeName);
+    return TelemetryManager.getInstance().getMeter(rootScopeName);
   }
 }

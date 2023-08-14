@@ -2,6 +2,7 @@
 package com.intellij.idea;
 
 import com.intellij.ide.BootstrapBundle;
+import com.intellij.openapi.application.ex.ApplicationManagerEx;
 import com.intellij.openapi.util.NlsSafe;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.Nls;
@@ -16,7 +17,8 @@ import static org.jetbrains.annotations.Nls.Capitalization.Title;
 
 @ApiStatus.Internal
 public final class StartupErrorReporter {
-  private static boolean hasGraphics = true;
+  private static final String STARTUP_ERROR_REPORTING_URL_PROPERTY = "intellij.custom.startup.error.reporting.url"; 
+  private static boolean hasGraphics = !ApplicationManagerEx.isInIntegrationTest();
 
   public static void showMessage(@Nls(capitalization = Title) String title, Throwable t) {
     @Nls(capitalization = Sentence) var message = new StringWriter();
@@ -59,7 +61,7 @@ public final class StartupErrorReporter {
   }
 
   private static @NlsSafe String supportUrl() {
-    return AppMode.isDroidFactory() ? "https://code.google.com/p/android/issues" : "https://jb.gg/ide/critical-startup-errors";
+    return System.getProperty(STARTUP_ERROR_REPORTING_URL_PROPERTY, "https://jb.gg/ide/critical-startup-errors");
   }
 
   @SuppressWarnings({"UndesirableClassUsage", "UseOfSystemOutOrSystemErr", "ExtractMethodRecommender"})

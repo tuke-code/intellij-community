@@ -52,10 +52,12 @@
     <projectResolve implementation="org.jetbrains.plugins.gradle.service.project.BaseResolverExtension"/>
     <projectResolve implementation="org.jetbrains.plugins.gradle.service.project.CommonGradleProjectResolverExtension"/>
     <issueChecker implementation="org.jetbrains.plugins.gradle.issue.UnsupportedGradleVersionIssueChecker"/>
+    <issueChecker implementation="org.jetbrains.plugins.gradle.issue.UnsupportedGradleJvmIssueChecker"/>
     <issueChecker implementation="org.jetbrains.plugins.gradle.issue.IncompatibleGradleJdkIssueChecker"/>
     <issueChecker implementation="org.jetbrains.plugins.gradle.issue.GradleDaemonStartupIssueChecker"/>
     <issueChecker implementation="org.jetbrains.plugins.gradle.issue.GradleBuildCancelledIssueChecker"/>
     <issueChecker implementation="org.jetbrains.plugins.gradle.issue.GradleOutOfMemoryIssueChecker"/>
+    <operationHelperExtension implementation="org.jetbrains.plugins.gradle.service.execution.GradleExecutionMeasuringExtension"/>
   </extensions>
 
   <extensions defaultExtensionNs="com.intellij">
@@ -95,7 +97,6 @@
     <externalProjectDataService implementation="org.jetbrains.plugins.gradle.service.project.data.GradleSourceSetDataService"/>
     <externalProjectDataService implementation="org.jetbrains.plugins.gradle.service.project.data.CompositeBuildDataService"/>
     <externalProjectDataService implementation="org.jetbrains.plugins.gradle.service.project.data.GradleExtensionsDataService"/>
-    <externalProjectDataService implementation="org.jetbrains.plugins.gradle.service.project.data.PerformanceTraceDataService"/>
     <externalProjectDataService implementation="org.jetbrains.plugins.gradle.service.project.data.GradleExcludeBuildFilesDataService"/>
     <externalProjectStructureCustomizer implementation="org.jetbrains.plugins.gradle.service.project.GradleProjectStructureCustomizer"/>
     <externalIconProvider key="GRADLE" implementationClass="org.jetbrains.plugins.gradle.ui.GradleIconProvider"/>
@@ -145,6 +146,9 @@
 
     <statistics.projectUsagesCollector implementation="org.jetbrains.plugins.gradle.statistics.GradleSettingsCollector"/>
     <statistics.counterUsagesCollector implementationClass="org.jetbrains.plugins.gradle.statistics.GradleActionsUsagesCollector"/>
+    <statistics.counterUsagesCollector implementationClass="org.jetbrains.plugins.gradle.statistics.GradleExecutionPerformanceCollector"/>
+    <statistics.validation.customValidationRule implementation="org.jetbrains.plugins.gradle.statistics.GradleExecutionPerformanceCollector$TaskNameValidator"/>
+    <statistics.validation.customValidationRule implementation="org.jetbrains.plugins.gradle.statistics.GradleExecutionPerformanceCollector$TaskPluginValidator"/>
 
     <externalSystem.runConfigurationEx implementation="org.jetbrains.plugins.gradle.service.execution.GradleRunConfigurationExtension"/>
     <externalSystem.runConfigurationImporter
@@ -167,9 +171,7 @@
                  description="Enable custom serialization of custom tooling objects"/>
     <registryKey key="gradle.tooling.use.external.process" defaultValue="false"
                  description="Enable running gradle tooling api out of IDE process"/>
-    <registryKey key="gradle.tooling.models.parallel.fetch" defaultValue="false"
-                 description="Enable parallel fetching of the Gradle TAPI models"/>
-    <registryKey key="gradle.testLauncherAPI.enabled" defaultValue="false"
+    <registryKey key="gradle.testLauncherAPI.enabled" defaultValue="true"
                  description="Allow to use Test Launcher API to run tests when applicable"/>
     <registryKey key="gradle.tooling.adjust.user.dir" defaultValue="true"
                  description="Change IDE user.dir system property during the Gradle tooling API call to have expected Gradle daemon CWD."/>
@@ -181,7 +183,10 @@
                  description="Send information on recently saved files to Gradle Daemon right before executing a task"/>
     <registryKey key="gradle.version.catalogs.dynamic.support" defaultValue="true"
                  description="Enable experimental support of version catalogs based on after-sync gradle models"/>
+    <registryKey key="gradle.download.sources" defaultValue="false"
+                 description="Download sources of project dependencies during import"/>
     <commandLineInspectionProjectConfigurator implementation="org.jetbrains.plugins.gradle.GradleCommandLineProjectConfigurator"/>
+    <warmupConfigurator implementation="org.jetbrains.plugins.gradle.GradleWarmupConfigurator"/>
     <notificationGroup id="Gradle Notification Group" displayType="STICKY_BALLOON" bundle="messages.GradleBundle" key="notification.group.gradle"/>
     <statistics.notificationIdsHolder implementation="org.jetbrains.plugins.gradle.service.project.GradleNotificationIdsHolder"/>
     <iconMapper mappingFile="GradleIconMappings.json"/>

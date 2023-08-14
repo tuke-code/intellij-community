@@ -10,7 +10,6 @@ import com.intellij.formatting.service.FormattingServiceUtil;
 import com.intellij.lang.ASTNode;
 import com.intellij.lang.FileASTNode;
 import com.intellij.lang.injection.InjectedLanguageManager;
-import com.intellij.model.ModelBranch;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.Application;
 import com.intellij.openapi.application.ApplicationListener;
@@ -42,6 +41,7 @@ import com.intellij.psi.impl.source.codeStyle.CodeEditUtil;
 import com.intellij.psi.impl.source.codeStyle.IndentHelperImpl;
 import com.intellij.psi.impl.source.tree.*;
 import com.intellij.util.Function;
+import com.intellij.util.InjectionUtils;
 import com.intellij.util.containers.ContainerUtil;
 import com.intellij.util.containers.JBIterable;
 import com.intellij.util.containers.MultiMap;
@@ -189,6 +189,16 @@ public final class PostprocessReformattingAspectImpl extends PostprocessReformat
     return ContainerUtil.all(getContext().myUpdatedProviders.keySet(), vp -> !vp.isEventSystemEnabled());
   }
 
+  private static @NotNull PsiFile getContainingFile(@NotNull PsiElement psiElement) {
+    PsiFile topLevelFile = InjectedLanguageManager.getInstance(psiElement.getProject()).getTopLevelFile(psiElement);
+    FileViewProvider topLevelViewProvider = topLevelFile.getViewProvider();
+    if (InjectionUtils.shouldFormatOnlyInjectedCode(topLevelViewProvider)) {
+      return psiElement.getContainingFile();
+    } else {
+      return topLevelFile;
+    }
+  }
+
   @Override
   public void update(@NotNull final PomModelEvent event) {
     if (isDisabled() || getContext().myPostponedCounter == 0) return;
@@ -196,10 +206,10 @@ public final class PostprocessReformattingAspectImpl extends PostprocessReformat
     if (changeSet == null) return;
     final PsiElement psiElement = changeSet.getRootElement().getPsi();
     if (psiElement == null) return;
-    PsiFile containingFile = InjectedLanguageManager.getInstance(psiElement.getProject()).getTopLevelFile(psiElement);
+    final PsiFile containingFile = getContainingFile(psiElement);
     final FileViewProvider viewProvider = containingFile.getViewProvider();
 
-    if (!viewProvider.isEventSystemEnabled() && ModelBranch.getPsiBranch(containingFile) == null &&
+    if (!viewProvider.isEventSystemEnabled() &&
         !IntentionPreviewUtils.isPreviewElement(containingFile) &&
         !FORCE_POSTPROCESS_FORMAT.isIn(viewProvider)) return;
     getContext().myUpdatedProviders.putValue(viewProvider, (FileElement)containingFile.getNode());
@@ -282,6 +292,7 @@ public final class PostprocessReformattingAspectImpl extends PostprocessReformat
   @Override
   public void doPostponedFormatting(@NotNull FileViewProvider viewProvider) {
     if (isDisabled()) return;
+
     ProgressManager.getInstance().executeNonCancelableSection(() -> {
       try {
         disablePostprocessFormattingInside(() -> doPostponedFormattingInner(viewProvider));

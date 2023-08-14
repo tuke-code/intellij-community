@@ -8,6 +8,7 @@ import com.intellij.codeInsight.navigation.actions.GotoDeclarationHandler
 import com.intellij.codeInsight.navigation.impl.NavigationActionResult.SingleTarget
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.progress.ProcessCanceledException
+import com.intellij.openapi.project.IndexNotReadyException
 import com.intellij.openapi.project.Project
 import com.intellij.psi.PsiDocumentManager
 import com.intellij.psi.PsiElement
@@ -32,6 +33,9 @@ private fun fromGTDProvidersInner(project: Project, editor: Editor, offset: Int)
     }
     catch (pce: ProcessCanceledException) {
       throw pce
+    }
+    catch (inre: IndexNotReadyException) {
+      throw inre // clients should catch and either show dumb mode notification or ignore
     }
     catch (t: Throwable) {
       LOG.error(t)
@@ -70,7 +74,7 @@ private class GTDProviderData(
       0 -> null
       1 -> {
         targetElements.single().gtdTargetNavigatable()?.navigationRequest()?.let { request ->
-          SingleTarget(request, navigationProvider)
+          SingleTarget({ request }, navigationProvider)
         }
       }
       else -> {

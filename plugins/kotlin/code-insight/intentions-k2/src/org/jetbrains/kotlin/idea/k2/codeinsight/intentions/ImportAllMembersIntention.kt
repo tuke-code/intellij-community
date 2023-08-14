@@ -98,7 +98,7 @@ internal class ImportAllMembersIntention :
     }
 
     private fun removeExistingImportsWhichWillBecomeRedundantAfterAddingStarImports(
-        starImportsToAdd: List<FqName>,
+        starImportsToAdd: Set<FqName>,
         ktFile: KtFile
     ) {
         for (starImportFqName in starImportsToAdd) {
@@ -135,10 +135,11 @@ private val KtExpression.actualReference: KtReference?
         else -> mainReference
     }
 
-private fun KtAnalysisSession.isReferenceToObjectMemberOrUnresolved(qualifiedAccess: KtExpression): Boolean {
+context(KtAnalysisSession)
+private fun isReferenceToObjectMemberOrUnresolved(qualifiedAccess: KtExpression): Boolean {
     val selectorExpression: KtExpression? = qualifiedAccess.getQualifiedExpressionForReceiver()?.selectorExpression
     val referencedSymbol = when (selectorExpression) {
-        is KtCallExpression -> selectorExpression.resolveCall().successfulCallOrNull<KtCallableMemberCall<*, *>>()?.symbol
+        is KtCallExpression -> selectorExpression.resolveCall()?.successfulCallOrNull<KtCallableMemberCall<*, *>>()?.symbol
         is KtNameReferenceExpression -> selectorExpression.mainReference.resolveToSymbol()
         else -> return false
     } as? KtSymbolWithKind ?: return true
@@ -164,7 +165,7 @@ private fun KtFile.hasImportedEnumSyntheticMethodCall(): Boolean = importDirecti
         if (getQualifiedExpressionForSelector() != null) return false
         if (((this as? KtNameReferenceExpression)?.parent as? KtCallableReferenceExpression)?.receiverExpression != null) return false
         val referencedSymbol = when (this) {
-            is KtCallExpression -> resolveCall().successfulCallOrNull<KtCallableMemberCall<*, *>>()?.symbol
+            is KtCallExpression -> resolveCall()?.successfulCallOrNull<KtCallableMemberCall<*, *>>()?.symbol
             is KtNameReferenceExpression -> mainReference.resolveToSymbol()
             else -> return false
         } ?: return false

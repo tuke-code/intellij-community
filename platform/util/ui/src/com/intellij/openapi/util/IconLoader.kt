@@ -1,4 +1,4 @@
-// Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 @file:Suppress("ReplaceGetOrSet", "ReplacePutWithAssignment", "DeprecatedCallableAddReplaceWith", "LiftReturnOrAssignment")
 
 package com.intellij.openapi.util
@@ -31,7 +31,6 @@ import java.awt.image.RGBImageFilter
 import java.net.URL
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
-import java.util.function.Function
 import java.util.function.Supplier
 import javax.swing.Icon
 import javax.swing.ImageIcon
@@ -52,15 +51,6 @@ private val standardDisablingFilter: () -> RGBImageFilter = { UIUtil.getGrayFilt
 
 private val colorPatchCache = ConcurrentHashMap<Int, MutableMap<LongArray, MutableMap<Icon, Icon>>>()
 
-@Volatile
-private var STRICT_GLOBAL = false
-
-private val STRICT_LOCAL: ThreadLocal<Boolean> = object : ThreadLocal<Boolean>() {
-  override fun initialValue(): Boolean = false
-
-  override fun get(): Boolean = STRICT_GLOBAL || super.get()
-}
-
 internal val fakeComponent: JComponent by lazy { object : JComponent() {} }
 
 /**
@@ -71,22 +61,6 @@ internal val fakeComponent: JComponent by lazy { object : JComponent() {} }
  * @see com.intellij.util.IconUtil
  */
 object IconLoader {
-  @TestOnly
-  @JvmStatic
-  fun <T> performStrictly(computable: Supplier<out T>): T {
-    STRICT_LOCAL.set(true)
-    return try {
-      computable.get()
-    }
-    finally {
-      STRICT_LOCAL.set(false)
-    }
-  }
-
-  fun setStrictGlobally(strict: Boolean) {
-    STRICT_GLOBAL = strict
-  }
-
   @JvmStatic
   fun installPathPatcher(patcher: IconPathPatcher) {
     updateTransform { it.withPathPatcher(patcher) }
@@ -406,6 +380,7 @@ object IconLoader {
    */
   @JvmStatic
   fun getDarkIcon(icon: Icon, dark: Boolean): Icon {
+    // Cannot `inline` this call, because we need an object to propagate the needed replacer recursively to the parts of compound icon
     return object : IconReplacer {
       override fun replaceIcon(icon: Icon): Icon {
         if (icon is DarkIconProvider) return icon.getDarkIcon(dark)
@@ -422,13 +397,7 @@ object IconLoader {
 
   @JvmStatic
   fun createLazy(producer: Supplier<out Icon>): Icon {
-    return object : LazyIcon() {
-      override fun replaceBy(replacer: IconReplacer): Icon {
-        return createLazy { replacer.replaceIcon(producer.get()) }
-      }
-
-      override fun compute(): Icon = producer.get()
-    }
+    return LazyIcon(producer)
   }
 
   @Deprecated("Do not use")
@@ -466,30 +435,33 @@ private fun getScaleContextSupport(icon: Icon): ScaleContextSupport? {
   }
 }
 
-private fun updateTransform(updater: Function<in IconTransform, IconTransform>) {
+private fun updateTransform(updater: (IconTransform) -> IconTransform) {
   var prev: IconTransform
   var next: IconTransform
   do {
     prev = pathTransform.get()
-    next = updater.apply(prev)
+    next = updater(prev)
   }
   while (!pathTransform.compareAndSet(prev, next))
-  pathTransformGlobalModCount.incrementAndGet()
-  if (prev != next) {
-    iconToDisabledIcon.clear()
-    colorPatchCache.clear()
-    iconToStrokeIcon.clear()
 
-    // clear svg cache
-    clearImageCache()
-    // iconCache is not cleared because it contains an original icon (instance that will delegate to)
+  pathTransformGlobalModCount.incrementAndGet()
+  if (prev == next) {
+    return
   }
+
+  iconToDisabledIcon.clear()
+  colorPatchCache.clear()
+  iconToStrokeIcon.clear()
+
+  // clear svg cache
+  clearImageCache()
+  // iconCache is not cleared because it contains an original icon (instance that will delegate to)
 }
 
 private fun findIcon(originalPath: String,
                      aClass: Class<*>?,
                      classLoader: ClassLoader,
-                     strict: Boolean = STRICT_LOCAL.get(),
+                     strict: Boolean = false,
                      deferUrlResolve: Boolean): Icon? {
   if (deferUrlResolve) {
     return findIconUsingDeprecatedImplementation(originalPath = originalPath,
@@ -512,7 +484,7 @@ fun findIconUsingDeprecatedImplementation(originalPath: String,
                                           classLoader: ClassLoader,
                                           aClass: Class<*>?,
                                           toolTip: Supplier<String?>? = null,
-                                          strict: Boolean = STRICT_LOCAL.get()): Icon? {
+                                          strict: Boolean = false): Icon? {
   var effectiveClassLoader = classLoader
   val startTime = StartUpMeasurer.getCurrentTimeIfEnabled()
   val patchedPath = patchIconPath(originalPath = originalPath, classLoader = effectiveClassLoader)
@@ -541,7 +513,7 @@ fun findIconUsingDeprecatedImplementation(originalPath: String,
   return icon
 }
 
-internal abstract class LazyIcon : ScaleContextSupport(), CopyableIcon, RetrievableIcon {
+internal class LazyIcon(private val producer: Supplier<out Icon>) : CopyableIcon, RetrievableIcon {
   private var wasComputed = false
 
   @Volatile
@@ -552,11 +524,11 @@ internal abstract class LazyIcon : ScaleContextSupport(), CopyableIcon, Retrieva
   override fun isComplex(): Boolean = true
 
   override fun paintIcon(c: Component?, g: Graphics, x: Int, y: Int) {
-    if (updateScaleContext(ScaleContext.create(g as Graphics2D))) {
-      icon = null
-    }
-
     getOrComputeIcon().paintIcon(c, g, x, y)
+  }
+
+  override fun replaceBy(replacer: IconReplacer): Icon {
+    return LazyIcon { replacer.replaceIcon(producer.get()) }
   }
 
   override fun getIconWidth(): Int = getOrComputeIcon().iconWidth
@@ -574,7 +546,7 @@ internal abstract class LazyIcon : ScaleContextSupport(), CopyableIcon, Retrieva
     transformModCount = newTransformModCount
     wasComputed = true
     icon = try {
-      compute()
+      producer.get()
     }
     catch (e: ProcessCanceledException) {
       throw e
@@ -586,8 +558,6 @@ internal abstract class LazyIcon : ScaleContextSupport(), CopyableIcon, Retrieva
     this.icon = icon
     return icon!!
   }
-
-  protected abstract fun compute(): Icon
 
   override fun retrieveIcon(): Icon = getOrComputeIcon()
 

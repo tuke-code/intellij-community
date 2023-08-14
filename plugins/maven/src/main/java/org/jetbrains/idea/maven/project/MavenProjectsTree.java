@@ -13,6 +13,7 @@ import com.intellij.openapi.util.Comparing;
 import com.intellij.openapi.util.Pair;
 import com.intellij.openapi.util.Ref;
 import com.intellij.openapi.util.io.FileUtil;
+import com.intellij.openapi.util.io.NioFiles;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.openapi.vfs.LocalFileSystem;
 import com.intellij.openapi.vfs.VfsUtilCore;
@@ -22,7 +23,6 @@ import com.intellij.util.containers.ArrayListSet;
 import com.intellij.util.containers.ContainerUtil;
 import com.intellij.util.containers.DisposableWrapperList;
 import com.intellij.util.containers.FileCollectionFactory;
-import com.intellij.util.io.PathKt;
 import it.unimi.dsi.fastutil.Hash;
 import it.unimi.dsi.fastutil.objects.ObjectOpenCustomHashSet;
 import one.util.streamex.MoreCollectors;
@@ -42,6 +42,7 @@ import org.jetbrains.idea.maven.utils.MavenJDOMUtil;
 import org.jetbrains.idea.maven.utils.*;
 
 import java.io.*;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -109,7 +110,7 @@ public final class MavenProjectsTree {
   public static @Nullable MavenProjectsTree read(Project project, Path file) throws IOException {
     MavenProjectsTree result = new MavenProjectsTree(project);
 
-    try (DataInputStream in = new DataInputStream(new BufferedInputStream(PathKt.inputStream(file)))) {
+    try (DataInputStream in = new DataInputStream(new BufferedInputStream(Files.newInputStream(file)))) {
       try {
         if (!STORAGE_VERSION.equals(in.readUTF())) return null;
         result.myManagedFilesPaths = readCollection(in, new LinkedHashSet<>());
@@ -121,7 +122,7 @@ public final class MavenProjectsTree {
       }
       catch (IOException e) {
         in.close();
-        PathKt.delete(file);
+        Files.delete(file);
         throw e;
       }
       catch (Throwable e) {
@@ -173,7 +174,7 @@ public final class MavenProjectsTree {
   public void save(@NotNull Path file) throws IOException {
     synchronized (myStateLock) {
       withReadLock(() -> {
-        try (DataOutputStream out = new DataOutputStream(new BufferedOutputStream(PathKt.outputStream(file)))) {
+        try (var out = new DataOutputStream(new BufferedOutputStream(Files.newOutputStream(NioFiles.createParentDirectories(file))))) {
           out.writeUTF(STORAGE_VERSION);
           writeCollection(out, myManagedFilesPaths);
           writeCollection(out, myIgnoredFilesPaths);

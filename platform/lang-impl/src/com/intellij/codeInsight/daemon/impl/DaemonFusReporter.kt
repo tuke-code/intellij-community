@@ -18,39 +18,42 @@ import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.fileEditor.FileEditor
 import com.intellij.openapi.fileEditor.TextEditor
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.util.Key
 import com.intellij.openapi.util.TextRange
 import com.intellij.psi.PsiDocumentManager
 import kotlinx.coroutines.launch
 import kotlin.math.log10
 import kotlin.math.pow
 
-private val lastReportedDaemonFinishedTimestamp = Key<Long>("lastReportedDaemonFinishedTimestamp")
-
-private class DaemonFusReporter(private val project: Project) : DaemonCodeAnalyzer.DaemonListener {
+open class DaemonFusReporter(private val project: Project) : DaemonCodeAnalyzer.DaemonListener {
   @Volatile
   private var daemonStartTime: Long = -1L
+
   @Volatile
   private var dirtyRange: TextRange? = null
   private var initialEntireFileHighlightingActivity: Activity? = null
-  private var initialEntireFileHighlightingCompleted: Boolean = false
+  private var initialEntireFileHighlightingReported: Boolean = false
+  private var documentModificationStamp: Long = 0
+  private var documentStartedHash: Int = 0 // Document the `daemonStarting` event was received for. Store the hash instead of Document instance to avoid leaks
+
   @Volatile
-  private var canceled: Boolean = false
+  protected var canceled: Boolean = false
 
   override fun daemonStarting(fileEditors: Collection<FileEditor>) {
     canceled = false
     daemonStartTime = System.currentTimeMillis()
     val editor = fileEditors.asSequence().filterIsInstance<TextEditor>().firstOrNull()?.editor
-    dirtyRange = if (editor == null) {
+    val document = editor?.document
+    dirtyRange = if (document == null) {
       null
     }
     else {
-      val document = editor.document
       val psiFile = PsiDocumentManager.getInstance(project).getPsiFile(document)
       if (psiFile == null) null else FileStatusMap.getDirtyTextRange(document, psiFile, Pass.UPDATE_ALL)
     }
+    documentModificationStamp = document?.modificationStamp ?: 0
+    documentStartedHash = document?.hashCode() ?: 0
 
-    if (!initialEntireFileHighlightingCompleted) {
+    if (!initialEntireFileHighlightingReported) {
       initialEntireFileHighlightingActivity = StartUpMeasurer.startActivity("initial entire file highlighting")
     }
   }
@@ -60,16 +63,17 @@ private class DaemonFusReporter(private val project: Project) : DaemonCodeAnalyz
   }
 
   override fun daemonFinished(fileEditors: Collection<FileEditor>) {
-    val editor = fileEditors.filterIsInstance<TextEditor>().firstOrNull()?.editor
+    val fileEditor = fileEditors.filterIsInstance<TextEditor>().firstOrNull()
+    val editor = fileEditor?.editor
     val document = editor?.document
+    if (document != null && documentStartedHash != document.hashCode()) {
+      // unmatched starting/finished events? bail out just in case
+      return
+    }
 
-    if (document != null) {
+    if (document != null && documentModificationStamp == document.modificationStamp && initialEntireFileHighlightingReported) {
       // Don't report 'finished' event in case of no changes in the document
-      val lastReportedTimestamp = document.getUserData(lastReportedDaemonFinishedTimestamp)
-      if (lastReportedTimestamp == document.modificationStamp) {
-        return
-      }
-      document.putUserData(lastReportedDaemonFinishedTimestamp, document.modificationStamp)
+      return
     }
 
     val analyzer = (editor?.markupModel as? EditorMarkupModel)?.errorStripeRenderer as? TrafficLightRenderer
@@ -82,11 +86,12 @@ private class DaemonFusReporter(private val project: Project) : DaemonCodeAnalyz
     val lines = document?.lineCount?.roundToOneSignificantDigit() ?: -1
     val elapsedTime = System.currentTimeMillis() - daemonStartTime
     val fileType = document?.let { FileDocumentManager.getInstance().getFile(it)?.fileType }
-    val wasEntireFileHighlighted = TextRange.from(0, document?.textLength ?: 0) == dirtyRange
+    val wasEntireFileHighlighted = document != null && DaemonCodeAnalyzerImpl.isHighlightingCompleted(fileEditor, project);
 
-    if (wasEntireFileHighlighted && !initialEntireFileHighlightingCompleted) {
-      initialEntireFileHighlightingCompleted = true
-      initialEntireFileHighlightingActivity?.end()
+    if (wasEntireFileHighlighted && !initialEntireFileHighlightingReported) {
+      initialEntireFileHighlightingReported = true
+      initialEntireFileHighlightingActivity!!.end()
+      initialEntireFileHighlightingActivity = null
       StartUpMeasurer.addInstantEvent("editor highlighting completed")
       @Suppress("DEPRECATION")
       project.coroutineScope.launch {
@@ -114,34 +119,33 @@ private fun Int.roundToOneSignificantDigit(): Int {
   return (this - this % p).coerceAtLeast(10) // 623 -> 623 - (623 % 100) = 600
 }
 
-private class DaemonFusCollector : CounterUsagesCollector() {
-  companion object {
-    @JvmField
-    val GROUP: EventLogGroup = EventLogGroup("daemon", 4)
-    @JvmField
-    val ERRORS: IntEventField = EventFields.Int("errors")
-    @JvmField
-    val WARNINGS: IntEventField = EventFields.Int("warnings")
-    @JvmField
-    val LINES: IntEventField = EventFields.Int("lines")
-    @JvmField
+private object DaemonFusCollector : CounterUsagesCollector() {
+  @JvmField
+  val GROUP: EventLogGroup = EventLogGroup("daemon", 5)
+  @JvmField
+  val ERRORS: IntEventField = EventFields.Int("errors")
+  @JvmField
+  val WARNINGS: IntEventField = EventFields.Int("warnings")
+  @JvmField
+  val LINES: IntEventField = EventFields.Int("lines")
+  @JvmField
     /**
      * `true` if the daemon was started with the entire file range,
      * `false` when the daemon was started with sub-range of the file, for example, after the change inside a code block
      */
-    val ENTIRE_FILE_HIGHLIGHTED: BooleanEventField = EventFields.Boolean("entireFileHighlighted")
+  val ENTIRE_FILE_HIGHLIGHTED: BooleanEventField = EventFields.Boolean("entireFileHighlighted")
 
-    @JvmField
+  @JvmField
     /**
      * `true` if the daemon was finished because of some cancellation event (e.g., user tried to type something into the editor).
      * Usually it means the highlighting results are incomplete.
      */
-    val CANCELED: BooleanEventField = EventFields.Boolean("canceled")
+  val CANCELED: BooleanEventField = EventFields.Boolean("canceled")
 
-    @JvmField
-    val FINISHED: VarargEventId = GROUP.registerVarargEvent("finished",
-         EventFields.DurationMs, ERRORS, WARNINGS, LINES, EventFields.FileType, ENTIRE_FILE_HIGHLIGHTED, CANCELED)
-  }
+  @JvmField
+  val FINISHED: VarargEventId = GROUP.registerVarargEvent("finished",
+                                                          EventFields.DurationMs, ERRORS, WARNINGS, LINES, EventFields.FileType,
+                                                          ENTIRE_FILE_HIGHLIGHTED, CANCELED)
 
   override fun getGroup(): EventLogGroup = GROUP
 }

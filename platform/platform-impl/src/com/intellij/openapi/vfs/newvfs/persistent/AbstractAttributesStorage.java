@@ -9,6 +9,7 @@ import com.intellij.openapi.vfs.newvfs.FileAttribute;
 import com.intellij.util.SystemProperties;
 import com.intellij.util.io.IOUtil;
 import it.unimi.dsi.fastutil.ints.IntList;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -20,6 +21,7 @@ import java.io.IOException;
  * used by {@link PersistentFSAttributeAccessor}
  */
 //TODO RC: rename to VFSAttributesStorage
+@ApiStatus.Internal
 public interface AbstractAttributesStorage extends Forceable, Closeable {
 
   /**
@@ -78,6 +80,8 @@ public interface AbstractAttributesStorage extends Forceable, Closeable {
 
   int getLocalModificationCount();
 
+  boolean isEmpty() throws IOException;
+
   void checkAttributesStorageSanity(final @NotNull PersistentFSConnection connection,
                                     final int fileId,
                                     final @NotNull IntList usedAttributeRecordIds,
@@ -95,7 +99,7 @@ public interface AbstractAttributesStorage extends Forceable, Closeable {
       throw new FileTooBigException(message);
     }
     else if (attributeValueSize > WARN_ATTRIBUTE_VALUE_SIZE) {
-      FSRecords.LOG.warn(
+      FSRecords.THROTTLED_LOG.warn(
         "Attribute " + attribute + " value is quite large: " +
         attributeValueSize + " b > warn threshold(" + WARN_ATTRIBUTE_VALUE_SIZE + ")" +
         " -> please, do not use VFS file attributes for huge blobs of data. Consider using GistManager or GistStorage."

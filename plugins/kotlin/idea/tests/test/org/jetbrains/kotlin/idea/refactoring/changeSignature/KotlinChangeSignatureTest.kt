@@ -361,7 +361,7 @@ class KotlinChangeSignatureTest : KotlinLightCodeInsightFixtureTestCase() {
 
         val adjustedDescriptor = kotlinChangeSignature.adjustDescriptor(declarations)!!
         val processor = kotlinChangeSignature.createSilentRefactoringProcessor(adjustedDescriptor) as KotlinChangeSignatureProcessor
-        processor.ktChangeInfo.also { it.checkUsedParameters = true }
+        processor.changeInfo.also { it.checkUsedParameters = true }
         processor.run()
 
         compareEditorsWithExpectedData()
@@ -1269,6 +1269,14 @@ class KotlinChangeSignatureTest : KotlinLightCodeInsightFixtureTestCase() {
         newParameters[0].name = "`x@yz`"
     }
 
+    fun testNamedLambdaArgumentIsNotMovedOutsideParentheses() = doTest {
+        newParameters[0].name = "p11"
+    }
+
+    fun testMultipleLambdaArgumentsAreNotMovedOutsideParentheses() = doTest {
+        newParameters[0].name = "p11"
+    }
+
     fun testParameterPropagation() = doTestAndIgnoreConflicts {
         val psiFactory = KtPsiFactory(project)
 
@@ -1301,7 +1309,7 @@ class KotlinChangeSignatureTest : KotlinLightCodeInsightFixtureTestCase() {
         newParameters.add(ParameterInfoImpl(-1, "n", PsiTypes.intType(), "1"))
         newParameters.add(ParameterInfoImpl(-1, "s", stringPsiType, "\"abc\""))
 
-        val classA = JavaFullClassNameIndex.getInstance().get("A", project, project.allScope()).first { it.name == "A" }
+        val classA = JavaFullClassNameIndex.getInstance().getClasses("A", project, project.allScope()).first { it.name == "A" }
         val methodBar = classA.methods.first { it.name == "bar" }
         parameterPropagationTargets.add(methodBar)
 
@@ -1610,5 +1618,5 @@ fun createChangeInfo(
     val declarations = callableDescriptor.safeAs<CallableMemberDescriptor>()?.getDeepestSuperDeclarations() ?: listOf(callableDescriptor)
     val adjustedDescriptor = kotlinChangeSignature.adjustDescriptor(declarations) ?: return null
     val processor = kotlinChangeSignature.createSilentRefactoringProcessor(adjustedDescriptor) as KotlinChangeSignatureProcessor
-    return processor.ktChangeInfo.also { it.checkUsedParameters = true }
+    return processor.changeInfo.also { it.checkUsedParameters = true }
 }

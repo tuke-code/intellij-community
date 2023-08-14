@@ -28,6 +28,11 @@ public class FE1UastDeclarationTestGenerated extends AbstractFE1UastDeclarationT
         runTest("../../uast-kotlin-fir/tests/testData/declaration/annotationOnElvis.kt");
     }
 
+    @TestMetadata("build.gradle.kts")
+    public void testBuild_gradle() throws Exception {
+        runTest("../../uast-kotlin-fir/tests/testData/declaration/build.gradle.kts");
+    }
+
     @TestMetadata("commentsOnDataClass.kt")
     public void testCommentsOnDataClass() throws Exception {
         runTest("../../uast-kotlin-fir/tests/testData/declaration/commentsOnDataClass.kt");
@@ -91,6 +96,11 @@ public class FE1UastDeclarationTestGenerated extends AbstractFE1UastDeclarationT
     @TestMetadata("mangling.kt")
     public void testMangling() throws Exception {
         runTest("../../uast-kotlin-fir/tests/testData/declaration/mangling.kt");
+    }
+
+    @TestMetadata("missingNames.kt")
+    public void testMissingNames() throws Exception {
+        runTest("../../uast-kotlin-fir/tests/testData/declaration/missingNames.kt");
     }
 
     @TestMetadata("nullabilityOfTypeParameter.kt")
