@@ -68,8 +68,7 @@ public final class SearchableOptionsRegistrarImpl extends SearchableOptionsRegis
   private volatile IndexedCharsInterner identifierTable = new IndexedCharsInterner();
 
   private static final Logger LOG = Logger.getInstance(SearchableOptionsRegistrarImpl.class);
-  @NonNls
-  private static final Pattern WORD_SEPARATOR_CHARS = Pattern.compile("[^-\\pL\\d#+]+");
+  private static final @NonNls Pattern WORD_SEPARATOR_CHARS = Pattern.compile("[^-\\pL\\d#+]+");
 
   public SearchableOptionsRegistrarImpl() {
     Application app = ApplicationManager.getApplication();
@@ -128,7 +127,7 @@ public final class SearchableOptionsRegistrarImpl extends SearchableOptionsRegis
   }
 
   @ApiStatus.Internal
-  public void initialize() {
+  public synchronized void initialize() {
     if (!isInitialized.compareAndSet(false, true)) {
       return;
     }
@@ -148,6 +147,14 @@ public final class SearchableOptionsRegistrarImpl extends SearchableOptionsRegis
 
     storage = processor.getStorage();
     identifierTable = processor.getIdentifierTable();
+  }
+
+  /**
+   * Retrieves all searchable option names.
+   */
+  @ApiStatus.Internal
+  public @NotNull Set<CharSequence> getAllOptionNames() {
+    return storage.keySet();
   }
 
   static void processSearchableOptions(@NotNull Predicate<? super String> fileNameFilter,
@@ -325,8 +332,7 @@ public final class SearchableOptionsRegistrarImpl extends SearchableOptionsRegis
     return new ConfigurableHit(nameHits, nameFullHits, new LinkedHashSet<>(contentHits), option);
   }
 
-  @Nullable
-  private static ConfigurableHit findGroupsByPath(@NotNull List<? extends ConfigurableGroup> groups, @NotNull String path) {
+  private static @Nullable ConfigurableHit findGroupsByPath(@NotNull List<? extends ConfigurableGroup> groups, @NotNull String path) {
     List<String> split = parseSettingsPath(path);
     if (split == null || split.isEmpty()) return null;
 
@@ -400,8 +406,7 @@ public final class SearchableOptionsRegistrarImpl extends SearchableOptionsRegis
     return split.subList(prefixSplit.size(), split.size());
   }
 
-  @NotNull
-  private static List<Configurable> filterById(@NotNull Set<Configurable> configurables, @NotNull Set<String> configurableIds) {
+  private static @NotNull List<Configurable> filterById(@NotNull Set<Configurable> configurables, @NotNull Set<String> configurableIds) {
     return ContainerUtil.filter(configurables, configurable -> {
       if (configurable instanceof SearchableConfigurable &&
           configurableIds.contains(((SearchableConfigurable)configurable).getId())) {
@@ -420,8 +425,7 @@ public final class SearchableOptionsRegistrarImpl extends SearchableOptionsRegis
     });
   }
 
-  @Nullable
-  private Set<String> findConfigurablesByDescriptions(@NotNull Set<String> descriptionOptions) {
+  private @Nullable Set<String> findConfigurablesByDescriptions(@NotNull Set<String> descriptionOptions) {
     Set<String> helpIds = null;
     for (String prefix : descriptionOptions) {
       final Set<OptionDescription> optionIds = getAcceptableDescriptions(prefix);

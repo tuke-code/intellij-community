@@ -29,7 +29,7 @@ run one of the `getPlugins` scripts located in the `<IDEA_HOME>` directory. Thes
 _**Note:**_ Always `git checkout` the `intellij-community` and `android` Git repositories to the same branches/tags. 
 
 ## Building IntelliJ Community Edition
-Version 2023.1.1 or newer of IntelliJ IDEA Community Edition or IntelliJ IDEA Ultimate Edition is required to build and develop
+Version 2023.2 or newer of IntelliJ IDEA Community Edition or IntelliJ IDEA Ultimate Edition is required to build and develop
 for the IntelliJ Platform.
 
 ### Opening the IntelliJ Source Code for Build
@@ -63,7 +63,7 @@ Examples (`./` should be added only for Linux/macOS):
  * Build installers only for current operating system: `./installers.cmd -Dintellij.build.target.os=current`
  * Build source code _incrementally_ (do not build what was already built before): `./installers.cmd -Dintellij.build.incremental.compilation=true`
 
-`installers.cmd` is used just to run [OpenSourceCommunityInstallersBuildTarget](build/scripts/OpenSourceCommunityInstallersBuildTarget.kt) from the command line.
+`installers.cmd` is used just to run [OpenSourceCommunityInstallersBuildTarget](build/src/OpenSourceCommunityInstallersBuildTarget.kt) from the command line.
 You may call it directly from IDEA, see run configuration `Build IDEA Community Installers (current OS)` for an example.
 
 #### Dockerized Build Environment
@@ -92,5 +92,5 @@ Examples (`./` should be added only for Linux/macOS):
 * Build source code _incrementally_ (do not build what was already built before): `./tests.cmd -Dintellij.build.incremental.compilation=true`
 * Run a specific test: `./tests.cmd -Dintellij.build.test.patterns=com.intellij.util.ArrayUtilTest`
 
-`tests.cmd` is used just to run [CommunityRunTestsBuildTarget](build/scripts/CommunityRunTestsBuildTarget.kt) from the command line.
+`tests.cmd` is used just to run [CommunityRunTestsBuildTarget](build/src/CommunityRunTestsBuildTarget.kt) from the command line.
 You may call it directly from IDEA, see run configuration `tests in community` for an example.

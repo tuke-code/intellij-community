@@ -2,7 +2,6 @@
 
 package org.jetbrains.kotlin.idea.highlighting
 
-import com.intellij.codeHighlighting.TextEditorHighlightingPass
 import com.intellij.codeInsight.daemon.impl.HighlightVisitor
 import com.intellij.codeInsight.daemon.impl.analysis.HighlightInfoHolder
 import com.intellij.psi.PsiElement
@@ -15,42 +14,48 @@ import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.psi.KtVisitorVoid
 
 /**
- * A highlight visitor which generates a semantic INFORMATION-level highlightings (e.g., for smartcasts) and adds them to the [holder]
+ * A highlight visitor which generates a semantic INFORMATION-level highlightings (e.g., for smart-casts) and adds them to the [HighlightInfoHolder]
  */
 class KotlinSemanticHighlightingVisitor : HighlightVisitor {
-    private lateinit var holder: HighlightInfoHolder
-    private lateinit var analyzers: Array<KotlinSemanticAnalyzer>
-    private lateinit var kotlinRefsHolder: KotlinRefsHolder
+    private var analyzers: Array<KtVisitorVoid>? = null
 
     override fun suitableForFile(file: PsiFile): Boolean {
         return file is KtFile && !file.isCompiled
     }
 
     override fun analyze(ktFile: PsiFile, updateWholeFile: Boolean, holder: HighlightInfoHolder, action: Runnable): Boolean {
-        this.holder = holder
-        kotlinRefsHolder = KotlinRefsHolder()
         analyze(ktFile as KtElement) {
-            analyzers = createSemanticAnalyzers(kotlinRefsHolder, holder)
-            action.run()
+            check(analyzers == null)
+            analyzers = createSemanticAnalyzers(holder)
+            try {
+                action.run()
+            } finally {
+                /*
+                `analyzers` store a reference to `KtAnalysisSession`.
+                This hack is needed to avoid `KtAnalysisSession` leak into the project via `HighlightVisitor` EP.
+                 */
+                analyzers = null
+            }
+            KotlinUnusedHighlightingVisitor(ktFile as KtFile).collectHighlights(holder)
         }
         return true
     }
 
     context(KtAnalysisSession)
-    private fun createSemanticAnalyzers(refsHolder: KotlinRefsHolder, holder: HighlightInfoHolder): Array<KotlinSemanticAnalyzer> = arrayOf(
-      TypeHighlighter(refsHolder, holder),
-      FunctionCallHighlighter(refsHolder, holder),
-      ExpressionsSmartcastHighlighter(holder),
-      VariableReferenceHighlighter(refsHolder, holder),
-      DslHighlighter(holder),
+    private fun createSemanticAnalyzers(holder: HighlightInfoHolder): Array<KtVisitorVoid> = arrayOf(
+        TypeHighlighter(holder),
+        FunctionCallHighlighter(holder),
+        ExpressionsSmartcastHighlighter(holder),
+        VariableReferenceHighlighter(holder),
+        DslHighlighter(holder),
     )
 
     override fun visit(element: PsiElement) {
+        val analyzers = analyzers
+            ?: error("analyzers are not initialized")
+
         analyzers.forEach { analyzer ->
             element.accept(analyzer)
-        }
-        if (element is KtFile) {
-            KotlinUnusedHighlightingVisitor(element, kotlinRefsHolder).collectHighlights(holder)
         }
     }
 

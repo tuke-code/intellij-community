@@ -32,6 +32,7 @@ object ClassPathUtil {
     val classLoader = PathManager::class.java.classLoader
     PathManager.getResourceRoot(classLoader, "kotlin/jdk7/AutoCloseableKt.class")?.let(classPath::add) // kotlin-stdlib-jdk7
     PathManager.getResourceRoot(classLoader, "kotlin/streams/jdk8/StreamsKt.class")?.let(classPath::add) // kotlin-stdlib-jdk8
+    PathManager.getResourceRoot(classLoader, "gnu/trove/THashSet.class")?.let(classPath::add) // Trove
   }
 
   @JvmStatic
@@ -44,12 +45,11 @@ object ClassPathUtil {
       classLoader.loadClass("com.intellij.util.xml.dom.XmlDomReader"),  // module 'intellij.platform.util.xmlDom'
       SystemInfoRt::class.java,  // module 'intellij.platform.util.rt'
       UrlClassLoader::class.java,  // module 'intellij.platform.util.classLoader'
-      classLoader.loadClass("org.jetbrains.xxh3.Xx3UnencodedString"),  // intellij.platform.util.rt.java8 (required for classLoader)
-      Flow::class.java,  // jetbrains-annotations-java5
+      classLoader.loadClass("com.intellij.util.lang.Xx3UnencodedString"),  // intellij.platform.util.rt.java8 (required for classLoader)
+      Flow::class.java,  // jetbrains-annotations
       Document::class.java,  // jDOM
       Appender::class.java,  // Log4J
       Object2IntMap::class.java,  // fastutil
-      classLoader.loadClass("gnu.trove.THashSet"),  // Trove,
       TypeMapper::class.java,  // JNA
       FileUtils::class.java,  // JNA (jna-platform)
       PatternMatcher::class.java,  // OROMatcher

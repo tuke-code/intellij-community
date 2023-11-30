@@ -1,11 +1,7 @@
 // Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.platform.workspace.storage.testEntities.entities
 
-import com.intellij.platform.workspace.storage.EntitySource
-import com.intellij.platform.workspace.storage.EntityType
-import com.intellij.platform.workspace.storage.GeneratedCodeApiVersion
-import com.intellij.platform.workspace.storage.MutableEntityStorage
-import com.intellij.platform.workspace.storage.WorkspaceEntity
+import com.intellij.platform.workspace.storage.*
 import com.intellij.platform.workspace.storage.annotations.Abstract
 import com.intellij.platform.workspace.storage.annotations.Child
 
@@ -38,7 +34,7 @@ interface ParentWithLinkToAbstractChild : WorkspaceEntity {
 
 //region generated code
 fun MutableEntityStorage.modifyEntity(entity: ParentWithLinkToAbstractChild,
-                                      modification: ParentWithLinkToAbstractChild.Builder.() -> Unit) = modifyEntity(
+                                      modification: ParentWithLinkToAbstractChild.Builder.() -> Unit): ParentWithLinkToAbstractChild = modifyEntity(
   ParentWithLinkToAbstractChild.Builder::class.java, entity, modification)
 //endregion
 
@@ -100,7 +96,7 @@ interface SpecificChildWithLinkToParentEntity : AbstractChildWithLinkToParentEnt
 
 //region generated code
 fun MutableEntityStorage.modifyEntity(entity: SpecificChildWithLinkToParentEntity,
-                                      modification: SpecificChildWithLinkToParentEntity.Builder.() -> Unit) = modifyEntity(
+                                      modification: SpecificChildWithLinkToParentEntity.Builder.() -> Unit): SpecificChildWithLinkToParentEntity = modifyEntity(
   SpecificChildWithLinkToParentEntity.Builder::class.java, entity, modification)
 //endregion
 

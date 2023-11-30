@@ -2,15 +2,6 @@
 package com.intellij.platform.workspace.storage.testEntities.entities
 
 import com.intellij.platform.workspace.storage.*
-import com.intellij.platform.workspace.storage.EntitySource
-import com.intellij.platform.workspace.storage.GeneratedCodeApiVersion
-
-import com.intellij.platform.workspace.storage.MutableEntityStorage
-import com.intellij.platform.workspace.storage.WorkspaceEntity
-import kotlin.jvm.JvmName
-import kotlin.jvm.JvmOverloads
-import kotlin.jvm.JvmStatic
-import com.intellij.platform.workspace.storage.EntityType
 import com.intellij.platform.workspace.storage.annotations.Child
 
 
@@ -47,7 +38,7 @@ interface KeyParent : WorkspaceEntity {
 }
 
 //region generated code
-fun MutableEntityStorage.modifyEntity(entity: KeyParent, modification: KeyParent.Builder.() -> Unit) = modifyEntity(
+fun MutableEntityStorage.modifyEntity(entity: KeyParent, modification: KeyParent.Builder.() -> Unit): KeyParent = modifyEntity(
   KeyParent.Builder::class.java, entity, modification)
 //endregion
 
@@ -81,6 +72,6 @@ interface KeyChild : WorkspaceEntity {
 }
 
 //region generated code
-fun MutableEntityStorage.modifyEntity(entity: KeyChild, modification: KeyChild.Builder.() -> Unit) = modifyEntity(
+fun MutableEntityStorage.modifyEntity(entity: KeyChild, modification: KeyChild.Builder.() -> Unit): KeyChild = modifyEntity(
   KeyChild.Builder::class.java, entity, modification)
 //endregion

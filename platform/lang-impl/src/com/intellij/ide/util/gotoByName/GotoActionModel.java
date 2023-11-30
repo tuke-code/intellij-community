@@ -1,13 +1,15 @@
-// Copyright 2000-2021 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
+// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 
 package com.intellij.ide.util.gotoByName;
 
 import com.intellij.BundleBase;
+import com.intellij.icons.AllIcons;
 import com.intellij.ide.DataManager;
 import com.intellij.ide.IdeBundle;
 import com.intellij.ide.actions.ApplyIntentionAction;
 import com.intellij.ide.actions.ShowSettingsUtilImpl;
 import com.intellij.ide.actions.searcheverywhere.MergeableElement;
+import com.intellij.ide.actions.searcheverywhere.PromoAction;
 import com.intellij.ide.ui.RegistryTextOptionDescriptor;
 import com.intellij.ide.ui.UISettings;
 import com.intellij.ide.ui.search.BooleanOptionDescription;
@@ -17,6 +19,7 @@ import com.intellij.internal.inspector.UiInspectorContextProvider;
 import com.intellij.internal.inspector.UiInspectorUtil;
 import com.intellij.lang.LangBundle;
 import com.intellij.openapi.actionSystem.*;
+import com.intellij.openapi.actionSystem.impl.ActionPresentationDecorator;
 import com.intellij.openapi.actionSystem.impl.Utils;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ReadAction;
@@ -28,6 +31,7 @@ import com.intellij.openapi.options.SearchableConfigurable;
 import com.intellij.openapi.project.DumbAware;
 import com.intellij.openapi.project.DumbService;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.updateSettings.impl.pluginsAdvertisement.FeaturePromoBundle;
 import com.intellij.openapi.util.*;
 import com.intellij.openapi.util.NlsActions.ActionText;
 import com.intellij.openapi.util.text.StringUtil;
@@ -42,6 +46,7 @@ import com.intellij.util.ArrayUtilRt;
 import com.intellij.util.Function;
 import com.intellij.util.containers.ContainerUtil;
 import com.intellij.util.ui.*;
+import com.intellij.util.ui.components.BorderLayoutPanel;
 import org.jetbrains.annotations.*;
 
 import javax.accessibility.AccessibleContext;
@@ -88,7 +93,7 @@ public final class GotoActionModel implements ChooseByNameModel, Comparator<Obje
   public GotoActionModel(@Nullable Project project, @Nullable Component component, @Nullable Editor editor) {
     myProject = project;
     myEditor = new WeakReference<>(editor);
-    myDataContext = Utils.wrapDataContext(DataManager.getInstance().getDataContext(component));
+    myDataContext = Utils.createAsyncDataContext(DataManager.getInstance().getDataContext(component));
     myUpdateSession = newUpdateSession();
   }
 
@@ -99,7 +104,7 @@ public final class GotoActionModel implements ChooseByNameModel, Comparator<Obje
     return event.getUpdateSession();
   }
 
-  void buildGroupMappings() {
+  public void buildGroupMappings() {
     if (!myActionGroups.isEmpty()) return;
     ActionGroup mainMenu = Objects.requireNonNull((ActionGroup)myActionManager.getActionOrStub(IdeActions.GROUP_MAIN_MENU));
     ActionGroup keymapOthers = Objects.requireNonNull((ActionGroup)myActionManager.getActionOrStub("Other.KeymapGroup"));
@@ -203,12 +208,13 @@ public final class GotoActionModel implements ChooseByNameModel, Comparator<Obje
 
     @Override
     public MergeableElement mergeWith(MergeableElement other) {
+      MatchedValue mergedValue = new MatchedValue(value, pattern, matchingDegree, type);
       if (other instanceof MatchedValue otherMatchedValue) {
         if (otherMatchedValue.type == MatchedValueType.SEMANTIC) {
-          similarityScore = otherMatchedValue.similarityScore;
+          mergedValue.similarityScore = otherMatchedValue.similarityScore;
         }
       }
-      return this;
+      return mergedValue;
     }
 
     @Override
@@ -219,7 +225,7 @@ public final class GotoActionModel implements ChooseByNameModel, Comparator<Obje
     @Nullable
     @VisibleForTesting
     public String getValueText() {
-      return GotoActionItemProvider.getActionText(value);
+      return ActionSearchUtilKt.getActionText(value);
     }
 
     @Nullable
@@ -511,8 +517,8 @@ public final class GotoActionModel implements ChooseByNameModel, Comparator<Obje
     return myDataContext;
   }
 
-  @NotNull
-  private UpdateSession getUpdateSession() {
+  @ApiStatus.Internal
+  public @NotNull UpdateSession getUpdateSession() {
     return myUpdateSession;
   }
 
@@ -533,7 +539,7 @@ public final class GotoActionModel implements ChooseByNameModel, Comparator<Obje
     return true;
   }
 
-  public static class GroupMapping implements Comparable<GroupMapping> {
+  public static final class GroupMapping implements Comparable<GroupMapping> {
     private final boolean myShowNonPopupGroups;
     private final List<List<ActionGroup>> myPaths = new ArrayList<>();
 
@@ -659,6 +665,7 @@ public final class GotoActionModel implements ChooseByNameModel, Comparator<Obje
     private final Presentation myPresentation;
     private final String myActionText;
 
+    @Deprecated(forRemoval = true)
     public ActionWrapper(@NotNull AnAction action,
                          @Nullable GroupMapping groupMapping,
                          @NotNull MatchMode mode,
@@ -674,7 +681,20 @@ public final class GotoActionModel implements ChooseByNameModel, Comparator<Obje
           return myModel.getUpdateSession().presentation(myAction);
         })
         .executeSynchronously();
-      myActionText = GotoActionItemProvider.getActionText(action);
+      myActionText = ActionSearchUtilKt.getActionText(action);
+    }
+
+    public ActionWrapper(@NotNull AnAction action,
+                         @Nullable GroupMapping groupMapping,
+                         @NotNull MatchMode mode,
+                         @NotNull GotoActionModel model,
+                         @NotNull Presentation presentation) {
+      myAction = action;
+      myMode = mode;
+      myGroupMapping = groupMapping;
+      myModel = model;
+      myPresentation = presentation;
+      myActionText = ActionSearchUtilKt.getActionText(action);
     }
 
     public String getActionText() {
@@ -763,7 +783,7 @@ public final class GotoActionModel implements ChooseByNameModel, Comparator<Obje
   }
 
   @DirtyUI
-  public static class GotoActionListCellRenderer extends DefaultListCellRenderer {
+  public static final class GotoActionListCellRenderer extends DefaultListCellRenderer {
     public static final Border TOGGLE_BUTTON_BORDER = JBUI.Borders.empty(0, 2);
     private final Function<? super OptionDescription, @ActionText String> myGroupNamer;
     private final boolean myUseListFont;
@@ -851,11 +871,16 @@ public final class GotoActionModel implements ChooseByNameModel, Comparator<Obje
           panel.setRight(groupLabel);
         }
 
+        if (anAction instanceof PromoAction promoAction) {
+          customizePromoAction(promoAction, bg, eastBorder, groupFg, panel);
+        }
+
         panel.setToolTipText(presentation.getDescription());
         @NlsSafe String actionId = ActionManager.getInstance().getId(anAction);
         Shortcut[] shortcuts = KeymapUtil.getActiveKeymapShortcuts(actionId).getShortcuts();
         String shortcutText = KeymapUtil.getPreferredShortcutText(shortcuts);
-        String name = getName(presentation.getText(), groupName, toggle);
+        String text = ActionPresentationDecorator.decorateTextIfNeeded(anAction, presentation.getText());
+        String name = getName(text, groupName, toggle);
         name = cutName(name, shortcutText, list, panel);
 
         appendWithColoredMatches(nameComponent, name, pattern, fg, isSelected);
@@ -901,6 +926,37 @@ public final class GotoActionModel implements ChooseByNameModel, Comparator<Obje
         appendWithColoredMatches(nameComponent, name, pattern, fg, isSelected);
       }
       return panel;
+    }
+
+    private static void customizePromoAction(PromoAction promoAction,
+                                             Color panelBackground,
+                                             Border eastBorder,
+                                             Color groupFg,
+                                             IconCompOptionalCompPanel<SimpleColoredComponent> panel) {
+      SimpleColoredComponent promo = new SimpleColoredComponent();
+      promo.setBackground(panelBackground);
+      promo.setForeground(groupFg);
+      promo.setIcon(AllIcons.Ide.External_link_arrow);
+      promo.setIconOnTheRight(true);
+      promo.setTransparentIconBackground(true);
+      promo.append(IdeBundle.message("plugin.advertiser.product.call.to.action",
+                                     promoAction.getPromotedProductTitle(), promoAction.getCallToAction()));
+
+      SimpleColoredComponent upgradeTo = new SimpleColoredComponent();
+      upgradeTo.setIcon(promoAction.getPromotedProductIcon());
+      upgradeTo.setBackground(panelBackground);
+      upgradeTo.setForeground(groupFg);
+      upgradeTo.setIconOnTheRight(true);
+      upgradeTo.append(FeaturePromoBundle.message("get.prefix") + " ");
+      upgradeTo.setTransparentIconBackground(true);
+
+      BorderLayoutPanel compositeUpgradeHint = JBUI.Panels.simplePanel(promo)
+        .addToLeft(upgradeTo)
+        .andTransparent();
+
+      compositeUpgradeHint.setBorder(eastBorder);
+
+      panel.setRight(compositeUpgradeHint);
     }
 
     @ActionText

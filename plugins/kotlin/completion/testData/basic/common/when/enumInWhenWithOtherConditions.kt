@@ -1,5 +1,5 @@
 // FIR_IDENTICAL
-// IGNORE_FE10
+// IGNORE_K1
 enum class ENUM {
     AAAA, BBBB, CCCC
 }
@@ -11,6 +11,6 @@ fun foo(e: ENUM) {
     }
 }
 
+// WITH_ORDER
 // EXIST: ENUM.BBBB
-// NOTHING_ELSE
 // FIR_COMPARISON

@@ -1,7 +1,6 @@
 // Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.codeInspection;
 
-import com.intellij.ProjectTopics;
 import com.intellij.analysis.AnalysisScope;
 import com.intellij.codeInspection.ex.*;
 import com.intellij.codeInspection.reference.RefElement;
@@ -17,7 +16,6 @@ import com.intellij.ide.impl.PatchProjectUtil;
 import com.intellij.ide.impl.ProjectUtil;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.*;
-import com.intellij.openapi.application.ex.ApplicationInfoEx;
 import com.intellij.openapi.application.ex.ApplicationManagerEx;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.editor.Document;
@@ -149,7 +147,7 @@ public class InspectionApplicationBase implements CommandLineInspectionProgressR
   public void header() { }
 
   public void execute() throws Exception {
-    ApplicationInfoEx appInfo = (ApplicationInfoEx)ApplicationInfo.getInstance();
+    ApplicationInfo appInfo = ApplicationInfo.getInstance();
     reportMessageNoLineBreak(1, InspectionsBundle.message("inspection.application.starting.up",
                                                           appInfo.getFullApplicationName() +
                                                           " (build " +
@@ -341,7 +339,7 @@ public class InspectionApplicationBase implements CommandLineInspectionProgressR
     reportConverter.projectData(project, rootLogDir.resolve("state0"));
 
     MessageBusConnection connection = project.getMessageBus().connect();
-    connection.subscribe(ProjectTopics.PROJECT_ROOTS, new ModuleRootListener() {
+    connection.subscribe(ModuleRootListener.TOPIC, new ModuleRootListener() {
       @Override
       public void rootsChanged(@NotNull ModuleRootEvent event) {
         updateProjectStructure(counter, reportConverter, project, rootLogDir);

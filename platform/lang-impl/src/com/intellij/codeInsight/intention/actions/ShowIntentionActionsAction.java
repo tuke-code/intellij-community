@@ -5,8 +5,10 @@ package com.intellij.codeInsight.intention.actions;
 import com.intellij.codeInsight.actions.BaseCodeInsightAction;
 import com.intellij.codeInsight.hint.HintManagerImpl;
 import com.intellij.codeInsight.intention.impl.ShowIntentionActionsHandler;
+import com.intellij.icons.AllIcons;
 import com.intellij.ide.lightEdit.LightEdit;
 import com.intellij.ide.lightEdit.LightEditCompatible;
+import com.intellij.openapi.actionSystem.ActionManager;
 import com.intellij.openapi.actionSystem.ActionPlaces;
 import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.actionSystem.Presentation;
@@ -17,14 +19,15 @@ import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.project.DumbAware;
 import com.intellij.openapi.project.DumbService;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.util.registry.Registry;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.util.PsiUtilBase;
 import org.jetbrains.annotations.NotNull;
 
-public class ShowIntentionActionsAction extends BaseCodeInsightAction implements HintManagerImpl.ActionToIgnore,
-                                                                                 LightEditCompatible,
-                                                                                 DumbAware,
-                                                                                 ActionRemoteBehaviorSpecification.Frontend {
+public final class ShowIntentionActionsAction extends BaseCodeInsightAction implements HintManagerImpl.ActionToIgnore,
+                                                                                       LightEditCompatible,
+                                                                                       DumbAware,
+                                                                                       ActionRemoteBehaviorSpecification.Frontend {
   public ShowIntentionActionsAction() {
     setEnabledInModalContext(true);
   }
@@ -38,6 +41,13 @@ public class ShowIntentionActionsAction extends BaseCodeInsightAction implements
       return;
     }
     super.update(event);
+    boolean isInFloatingToolbar = ActionPlaces.EDITOR_FLOATING_TOOLBAR.equals(event.getPlace());
+    if (isInFloatingToolbar || ActionPlaces.EDITOR_HINT.equals(event.getPlace())) {
+      presentation.setIcon(AllIcons.Actions.IntentionBulb);
+    }
+    if ( isInFloatingToolbar && Registry.is("floating.codeToolbar.showIntentionsUnderPopup")) {
+      presentation.setPopupGroup(true);
+    }
   }
 
   @Override
@@ -46,8 +56,9 @@ public class ShowIntentionActionsAction extends BaseCodeInsightAction implements
     if (project == null) return;
 
     if (!LightEdit.owns(project) && DumbService.isDumb(project)) {
-      DumbService.getInstance(project).showDumbModeNotification(
-        ApplicationBundle.message("intentions.are.not.available.message"));
+      DumbService.getInstance(project).showDumbModeNotificationForAction(
+        ApplicationBundle.message("intentions.are.not.available.message"),
+        ActionManager.getInstance().getId(this));
       return;
     }
 

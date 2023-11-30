@@ -73,12 +73,18 @@ public final class PsiImplUtil {
     if (referenceElement != null) {
       PsiElement resolved = referenceElement.resolve();
       if (resolved != null) {
-        PsiMethod[] methods = ((PsiClass)resolved).findMethodsByName(attributeName, false);
-        for (PsiMethod method : methods) {
-          if (PsiUtil.isAnnotationMethod(method)) {
-            return ((PsiAnnotationMethod)method).getDefaultValue();
-          }
-        }
+        return findAttributeValue((PsiClass)resolved, attributeName);
+      }
+    }
+    return null;
+  }
+
+  @Nullable
+  public static PsiAnnotationMemberValue findAttributeValue(@NotNull PsiClass annotationClass, @Nullable @NonNls String attributeName) {
+    PsiMethod[] methods = annotationClass.findMethodsByName(attributeName, false);
+    for (PsiMethod method : methods) {
+      if (PsiUtil.isAnnotationMethod(method)) {
+        return ((PsiAnnotationMethod)method).getDefaultValue();
       }
     }
     return null;
@@ -756,9 +762,6 @@ public final class PsiImplUtil {
     PsiElement parent = labelElement instanceof PsiParenthesizedPattern
                         ? JavaPsiPatternUtil.skipParenthesizedPatternUp(labelElement.getParent())
                         : PsiUtil.skipParenthesizedExprUp(labelElement.getParent());
-    if (parent instanceof PsiPatternGuard) {
-      parent = parent.getParent();
-    }
     if (parent instanceof PsiCaseLabelElementList) {
       PsiElement grand = parent.getParent();
       if (grand instanceof PsiSwitchLabelStatementBase) {

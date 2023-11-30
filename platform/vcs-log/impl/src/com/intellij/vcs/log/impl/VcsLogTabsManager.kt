@@ -109,7 +109,7 @@ class VcsLogTabsManager internal constructor(private val project: Project,
   }
 
   private fun openEditorLogTab(tabId: String, focus: Boolean, filters: VcsLogFilterCollection?): Array<FileEditor> {
-    val file = VcsLogVirtualFileSystem.getInstance().createVcsLogFile(project, tabId, filters)
+    val file = VcsLogVirtualFileSystem.Holder.getInstance().createVcsLogFile(project, tabId, filters)
     return FileEditorManager.getInstance(project).openFile(file, focus, true)
   }
 
@@ -144,7 +144,7 @@ class VcsLogTabsManager internal constructor(private val project: Project,
 
   companion object {
     private val LOG = Logger.getInstance(VcsLogTabsManager::class.java)
-    private val TAB_GROUP_ID = TabGroupId(VcsLogContentProvider.TAB_NAME, { VcsLogBundle.message("vcs.log.tab.name") }, true)
+    val TAB_GROUP_ID = TabGroupId(VcsLogContentProvider.TAB_NAME, { VcsLogBundle.message("vcs.log.tab.name") }, true)
 
     private fun generateShortDisplayName(ui: VcsLogUi): @TabTitle String {
       val filters = ui.filterUi.filters

@@ -1,5 +1,5 @@
 // FIR_IDENTICAL
-// IGNORE_FE10
+// IGNORE_K1
 sealed class SEALED
 class AAAA<E, S>: SEALED()
 object BBBB: SEALED()
@@ -11,9 +11,9 @@ fun foo(e: SEALED) {
     }
 }
 
+// WITH_ORDER
 // EXIST: { lookupString: "is AAAA", tailText: "<*, *> -> " }
 // EXIST: BBBB
 // EXIST: { lookupString: "is CCCC", tailText: "<*> -> " }
 // EXIST: { lookupString: "else -> "}
-// NOTHING_ELSE
 // FIR_COMPARISON

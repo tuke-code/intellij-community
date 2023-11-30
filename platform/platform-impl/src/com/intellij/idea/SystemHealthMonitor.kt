@@ -19,18 +19,20 @@ import com.intellij.openapi.application.Application
 import com.intellij.openapi.application.ApplicationNamesInfo
 import com.intellij.openapi.application.EDT
 import com.intellij.openapi.application.PathManager
-import com.intellij.openapi.application.ex.ApplicationInfoEx
 import com.intellij.openapi.application.ex.ApplicationManagerEx
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.logger
-import com.intellij.openapi.progress.ModalTaskOwner
-import com.intellij.openapi.progress.TaskCancellation
-import com.intellij.openapi.progress.runWithModalProgressBlocking
+import com.intellij.platform.ide.progress.runWithModalProgressBlocking
 import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.util.NlsContexts
 import com.intellij.openapi.util.SystemInfo
 import com.intellij.openapi.util.SystemInfoRt
+import com.intellij.openapi.util.io.NioFiles
 import com.intellij.platform.ide.CoreUiCoroutineScopeHolder
+import com.intellij.platform.ide.bootstrap.shellEnvDeferred
+import com.intellij.platform.ide.customization.ExternalProductResourceUrls
+import com.intellij.platform.ide.progress.ModalTaskOwner
+import com.intellij.platform.ide.progress.TaskCancellation
 import com.intellij.util.SystemProperties
 import com.intellij.util.lang.JavaVersion
 import com.intellij.util.system.CpuArch
@@ -45,6 +47,7 @@ import java.nio.file.FileStore
 import java.nio.file.Files
 import java.nio.file.InvalidPathException
 import java.nio.file.Path
+import java.util.concurrent.TimeUnit
 import kotlin.system.exitProcess
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
@@ -61,6 +64,7 @@ internal suspend fun startSystemHealthMonitor() {
   checkEnvironment()
   withContext(Dispatchers.IO) {
     checkSignalBlocking()
+    checkTempDirSanity()
     checkTempDirEnvVars()
     checkAncientOs()
   }
@@ -150,8 +154,10 @@ private suspend fun checkRuntime() {
 
   LOG.info("${CpuArch.CURRENT} appears to be emulated")
   if (SystemInfoRt.isMac && CpuArch.isIntel64()) {
-    val downloadAction = NotificationAction.createSimpleExpiring(IdeBundle.message("bundled.jre.m1.arch.message.download")) {
-      BrowserUtil.browse(ApplicationInfoEx.getInstanceEx().downloadUrl)
+    val downloadAction = ExternalProductResourceUrls.getInstance().downloadPageUrl?.let { downloadPageUrl ->
+      NotificationAction.createSimpleExpiring(IdeBundle.message("bundled.jre.m1.arch.message.download")) {
+        BrowserUtil.browse(downloadPageUrl.toExternalForm())
+      }
     }
     showNotification("bundled.jre.m1.arch.message", suppressable = true, downloadAction, ApplicationNamesInfo.getInstance().fullProductName)
   }
@@ -205,6 +211,7 @@ private suspend fun isJbrOperational(): Boolean {
   if (Files.isRegularFile(bin) && (SystemInfoRt.isWindows || Files.isExecutable(bin))) {
     try {
       return withTimeout(30.seconds) {
+        @Suppress("UsePlatformProcessAwaitExit")
         ProcessBuilder(bin.toString(), "-version")
           .redirectError(ProcessBuilder.Redirect.DISCARD)
           .redirectOutput(ProcessBuilder.Redirect.DISCARD)
@@ -278,6 +285,21 @@ private fun checkSignalBlocking() {
   }
 }
 
+private fun checkTempDirSanity() {
+  if (SystemInfoRt.isUnix && !SystemInfoRt.isMac) {
+    try {
+      val probe = Files.createTempFile(Path.of(PathManager.getTempPath()), "ij-exec-check-", ".sh")
+      NioFiles.setExecutable(probe)
+      val process = ProcessBuilder(probe.toString()).start()
+      if (!process.waitFor(1, TimeUnit.MINUTES)) throw IOException("${probe} timed out")
+      if (process.exitValue() != 0) throw IOException("${probe} returned ${process.exitValue()}")
+    }
+    catch (e: Exception) {
+      showNotification("temp.dir.exec.failed", suppressable = false, action = null, shorten(PathManager.getTempPath()))
+    }
+  }
+}
+
 private fun checkTempDirEnvVars() {
   val envVars = if (SystemInfoRt.isWindows) sequenceOf("TMP", "TEMP") else sequenceOf("TMPDIR")
   for (name in envVars) {
@@ -295,7 +317,7 @@ private fun checkTempDirEnvVars() {
 }
 
 private fun checkAncientOs() {
-  if (SystemInfo.isWindows) {
+  if (SystemInfoRt.isWindows) {
     val buildNumber = SystemInfo.getWinBuildNumber()
     if (buildNumber != null && buildNumber < 10000) {  // 10 1507 = 10240, Server 2016 = 14393
       showNotification("unsupported.windows", suppressable = true, null)

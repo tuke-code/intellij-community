@@ -75,7 +75,7 @@ class DummyMavenServer(val project: Project) : MavenServer {
     return DummyIndexer()
   }
 
-  override fun interpolateAndAlignModel(model: MavenModel, basedir: File?, token: MavenToken?): MavenModel {
+  override fun interpolateAndAlignModel(model: MavenModel, basedir: File?, pomDir: File?, token: MavenToken?): MavenModel {
     return model
   }
 
@@ -102,6 +102,10 @@ class DummyMavenServer(val project: Project) : MavenServer {
   override fun ping(token: MavenToken?): Boolean {
     return true
   }
+
+  override fun getDebugStatus(clean: Boolean): MavenServerStatus {
+    throw RuntimeException("not supported")
+  }
 }
 
 class DummyIndexer : MavenServerIndexer {
@@ -113,7 +117,10 @@ class DummyIndexer : MavenServerIndexer {
     return 0
   }
 
-  override fun updateIndex(id: MavenIndexId, indicator: MavenServerProgressIndicator?, token: MavenToken?) {
+  override fun updateIndex(id: MavenIndexId,
+                           indicator: MavenServerProgressIndicator?,
+                           multithreaded: Boolean,
+                           token: MavenToken?) {
   }
 
   override fun processArtifacts(indexId: MavenIndexId, startFrom: Int, token: MavenToken?): ArrayList<IndexedMavenId>? = null

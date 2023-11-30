@@ -3,20 +3,18 @@
 
 package org.jetbrains.intellij.build
 
+import com.intellij.util.containers.UnmodifiableHashMap
 import kotlinx.collections.immutable.*
 import org.jetbrains.intellij.build.impl.LibraryPackMode
 import org.jetbrains.intellij.build.impl.PlatformJarNames.TEST_FRAMEWORK_JAR
 import org.jetbrains.intellij.build.impl.PlatformLayout
 import org.jetbrains.intellij.build.kotlin.KotlinPluginBuilder
-import java.nio.file.Files
-import java.nio.file.Path
-import java.nio.file.StandardCopyOption
 
-private val BASE_CLASS_VERSIONS = persistentHashMapOf(
+private val BASE_CLASS_VERSIONS = UnmodifiableHashMap.fromMap(hashMapOf(
   "" to "17",
   "lib/idea_rt.jar" to "1.7",
   "lib/forms_rt.jar" to "1.7",
-  "lib/annotations.jar" to "1.7",
+  "lib/annotations.jar" to "1.8",
   "lib/util_rt.jar" to "1.7",
   "lib/util-8.jar" to "1.8",
   "lib/external-system-rt.jar" to "1.7",
@@ -30,8 +28,7 @@ private val BASE_CLASS_VERSIONS = persistentHashMapOf(
   "plugins/maven/lib/maven3-server-common.jar" to "1.8",
   "plugins/maven/lib/maven3-server.jar" to "1.8",
   "plugins/maven/lib/artifact-resolver-m31.jar" to "1.7",
-  "plugins/xpath/lib/rt/xslt-rt.jar" to "1.7",
-)
+))
 
 /**
  * Default bundled plugins for all editions of IntelliJ IDEA.
@@ -39,7 +36,7 @@ private val BASE_CLASS_VERSIONS = persistentHashMapOf(
  */
 @Suppress("SpellCheckingInspection")
 val IDEA_BUNDLED_PLUGINS: PersistentList<String> = DEFAULT_BUNDLED_PLUGINS + persistentListOf(
-  "intellij.java.plugin",
+  JavaPluginLayout.MAIN_MODULE_NAME,
   "intellij.java.ide.customization",
   "intellij.copyright",
   "intellij.properties",
@@ -70,16 +67,11 @@ val IDEA_BUNDLED_PLUGINS: PersistentList<String> = DEFAULT_BUNDLED_PLUGINS + per
   "intellij.groovy",
   "intellij.junit",
   "intellij.testng",
-  "intellij.xpath",
-  "intellij.android.plugin",
-  "intellij.android.design-plugin",
   "intellij.java.i18n",
-  "intellij.ant",
   "intellij.java.guiForms.designer",
   "intellij.java.byteCodeViewer",
   "intellij.java.coverage",
   "intellij.java.decompiler",
-  "intellij.devkit",
   "intellij.eclipse",
   "intellij.platform.langInjection",
   "intellij.java.debugger.streams",
@@ -102,7 +94,7 @@ val IDEA_BUNDLED_PLUGINS: PersistentList<String> = DEFAULT_BUNDLED_PLUGINS + per
   "intellij.turboComplete",
 )
 
-val CE_CLASS_VERSIONS: PersistentMap<String, String> = BASE_CLASS_VERSIONS.putAll(persistentHashMapOf(
+val CE_CLASS_VERSIONS: UnmodifiableHashMap<String, String> = BASE_CLASS_VERSIONS.withAll(hashMapOf(
   "plugins/java/lib/jshell-frontend.jar" to "9",
   "plugins/java/lib/sa-jdwp" to "",  // ignored
   "plugins/java/lib/rt/debugger-agent.jar" to "1.7",
@@ -121,7 +113,6 @@ val TEST_FRAMEWORK_WITH_JAVA_RT: (PlatformLayout, BuildContext) -> Unit = { layo
     layout.withModule(name, "testFramework.jar")
   }
 }
-
 
 /**
  * Base class for all editions of IntelliJ IDEA
@@ -151,9 +142,9 @@ abstract class BaseIdeaProperties : JetBrainsProductProperties() {
       }
       //todo currently intellij.platform.testFramework included into idea.jar depends on this jar so it cannot be moved to java plugin
       layout.withModule("intellij.java.rt", "idea_rt.jar")
-      // for compatibility with users' projects which take these libraries from IDEA installation
-      layout.withProjectLibrary("jetbrains-annotations", LibraryPackMode.STANDALONE_SEPARATE_WITHOUT_VERSION_NAME)
-      // for compatibility with users projects which refer to IDEA_HOME/lib/junit.jar
+      // for compatibility with user projects which refer to IDEA_HOME/lib/annotations.jar
+      layout.withProjectLibrary("jetbrains-annotations", "annotations.jar")
+      // for compatibility with user projects which refer to IDEA_HOME/lib/junit.jar
       layout.withProjectLibrary("JUnit3", LibraryPackMode.STANDALONE_SEPARATE_WITHOUT_VERSION_NAME)
 
       layout.withoutProjectLibrary("Ant")
@@ -175,18 +166,11 @@ abstract class BaseIdeaProperties : JetBrainsProductProperties() {
     }
 
     productLayout.compatiblePluginsToIgnore = persistentListOf(
-      "intellij.java.plugin",
+      JavaPluginLayout.MAIN_MODULE_NAME,
     )
     additionalModulesToCompile = persistentListOf("intellij.tools.jps.build.standalone")
     modulesToCompileTests = persistentListOf("intellij.platform.jps.build.tests")
 
     isAntRequired = true
-  }
-
-  override suspend fun copyAdditionalFiles(context: BuildContext, targetDirectory: String) {
-    val targetDir = Path.of(targetDirectory)
-    // for compatibility with user projects which refer to IDEA_HOME/lib/annotations.jar
-    Files.move(targetDir.resolve("lib/annotations-java5.jar"), targetDir.resolve("lib/annotations.jar"),
-               StandardCopyOption.REPLACE_EXISTING)
   }
 }

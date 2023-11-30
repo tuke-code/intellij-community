@@ -6,6 +6,7 @@ import com.intellij.ide.actions.searcheverywhere.FileSearchEverywhereContributor
 import com.intellij.ide.actions.searcheverywhere.RecentFilesSEContributor
 import com.intellij.ide.bookmark.BookmarksManager
 import com.intellij.ide.bookmark.FileBookmark
+import com.intellij.internal.statistic.collectors.fus.fileTypes.FileTypeUsagesCollector
 import com.intellij.internal.statistic.eventLog.events.EventField
 import com.intellij.internal.statistic.eventLog.events.EventFields
 import com.intellij.internal.statistic.eventLog.events.EventPair
@@ -15,6 +16,14 @@ import com.intellij.openapi.util.IntellijInternalApi
 import com.intellij.openapi.util.io.toNioPathOrNull
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.psi.PsiFileSystemItem
+import com.intellij.searchEverywhereMl.ranking.features.SearchEverywhereFileFeaturesProvider.Fields.FILETYPE_DATA_KEY
+import com.intellij.searchEverywhereMl.ranking.features.SearchEverywhereFileFeaturesProvider.Fields.FILETYPE_MATCHES_QUERY_DATA_KEY
+import com.intellij.searchEverywhereMl.ranking.features.SearchEverywhereFileFeaturesProvider.Fields.IS_BOOKMARK_DATA_KEY
+import com.intellij.searchEverywhereMl.ranking.features.SearchEverywhereFileFeaturesProvider.Fields.IS_DIRECTORY_DATA_KEY
+import com.intellij.searchEverywhereMl.ranking.features.SearchEverywhereFileFeaturesProvider.Fields.IS_EXACT_MATCH_DATA_KEY
+import com.intellij.searchEverywhereMl.ranking.features.SearchEverywhereFileFeaturesProvider.Fields.IS_EXACT_MATCH_WITH_REL_PATH_DATA_KEY
+import com.intellij.searchEverywhereMl.ranking.features.SearchEverywhereFileFeaturesProvider.Fields.IS_TOP_LEVEL_DATA_KEY
+import com.intellij.searchEverywhereMl.ranking.features.SearchEverywhereFileFeaturesProvider.Fields.REL_PATH_NAME_FEATURE_TO_FIELD
 import com.intellij.textMatching.PrefixMatchingUtil
 import org.jetbrains.annotations.ApiStatus
 import java.nio.file.InvalidPathException
@@ -24,8 +33,9 @@ import java.nio.file.Path
 @IntellijInternalApi
 class SearchEverywhereFileFeaturesProvider
   : SearchEverywhereElementFeaturesProvider(FileSearchEverywhereContributor::class.java, RecentFilesSEContributor::class.java) {
-  companion object {
-    val FILETYPE_DATA_KEY = EventFields.StringValidatedByCustomRule("fileType", "file_type")
+
+  object Fields {
+    val FILETYPE_DATA_KEY = EventFields.StringValidatedByCustomRule("fileType", FileTypeUsagesCollector.ValidationRule::class.java)
     val IS_BOOKMARK_DATA_KEY = EventFields.Boolean("isBookmark")
 
     internal val IS_DIRECTORY_DATA_KEY = EventFields.Boolean("isDirectory")
@@ -40,18 +50,6 @@ class SearchEverywhereFileFeaturesProvider
       "prefix_matched_words_score" to EventFields.Double("relPathPrefixMatchedWordsScore"),
       "prefix_matched_words_relative" to EventFields.Double("relPathPrefixMatchedWordsRelative")
     )
-
-    private fun VirtualFile.toNioPathOrNull(): Path? {
-      return try {
-        this.toNioPath()
-      }
-      catch (e: UnsupportedOperationException) {
-        null
-      }
-      catch (e: InvalidPathException) {
-        null
-      }
-    }
   }
 
   override fun getFeaturesDeclarations(): List<EventField<*>> {
@@ -141,7 +139,8 @@ class SearchEverywhereFileFeaturesProvider
     try {
       val relativePath = basePath.relativize(filePath)
       return queryPath == relativePath
-    } catch (e: IllegalArgumentException) {
+    }
+    catch (e: IllegalArgumentException) {
       return false
     }
   }
@@ -186,5 +185,17 @@ class SearchEverywhereFileFeaturesProvider
     }
 
     return extensionInQuery == fileExtension
+  }
+}
+
+private fun VirtualFile.toNioPathOrNull(): Path? {
+  return try {
+    this.toNioPath()
+  }
+  catch (e: UnsupportedOperationException) {
+    null
+  }
+  catch (e: InvalidPathException) {
+    null
   }
 }

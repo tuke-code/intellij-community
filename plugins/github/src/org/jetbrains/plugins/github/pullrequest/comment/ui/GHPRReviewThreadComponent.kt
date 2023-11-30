@@ -1,4 +1,4 @@
-// Copyright 2000-2021 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
+// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.plugins.github.pullrequest.comment.ui
 
 import com.intellij.collaboration.async.CompletableFutureUtil.handleOnEdt
@@ -17,7 +17,6 @@ import com.intellij.collaboration.ui.codereview.timeline.TimelineDiffComponentFa
 import com.intellij.collaboration.ui.codereview.timeline.comment.CommentTextFieldFactory
 import com.intellij.collaboration.ui.codereview.timeline.thread.TimelineThreadCommentsPanel
 import com.intellij.collaboration.ui.html.AsyncHtmlImageLoader
-import com.intellij.collaboration.ui.icon.OverlaidOffsetIconsIcon
 import com.intellij.collaboration.ui.util.ActivatableCoroutineScopeProvider
 import com.intellij.collaboration.ui.util.swingAction
 import com.intellij.diff.util.LineRange
@@ -25,13 +24,15 @@ import com.intellij.openapi.diff.impl.patch.PatchHunkUtil
 import com.intellij.openapi.editor.EditorFactory
 import com.intellij.openapi.progress.EmptyProgressIndicator
 import com.intellij.openapi.project.Project
+import com.intellij.ui.OverlaidOffsetIconsIcon
 import com.intellij.ui.components.labels.LinkLabel
 import com.intellij.ui.components.labels.LinkListener
 import com.intellij.ui.components.panels.Wrapper
 import com.intellij.util.containers.nullize
-import com.intellij.util.text.JBDateFormat
+import com.intellij.util.text.DateFormatUtil
 import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.UIUtil
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.*
 import org.jetbrains.plugins.github.api.data.GHActor
 import org.jetbrains.plugins.github.api.data.GHUser
@@ -125,7 +126,7 @@ object GHPRReviewThreadComponent {
     }
   }
 
-  private fun createDiff(thread: GHPRReviewThreadModel, project: Project): JComponent {
+  private fun CoroutineScope.createDiff(thread: GHPRReviewThreadModel, project: Project): JComponent {
     val hunk = thread.patchHunk
     if (hunk == null || hunk.lines.isEmpty()) {
       return JLabel(CollaborationToolsBundle.message("review.thread.diff.not.loaded"))
@@ -146,7 +147,7 @@ object GHPRReviewThreadComponent {
 
     val anchorRange = LineRange(truncatedHunk.lines.lastIndex - anchorLength, truncatedHunk.lines.size)
     return TimelineDiffComponentFactory
-      .createDiffComponent(project, EditorFactory.getInstance(), truncatedHunk, anchorRange)
+      .createDiffComponentIn(this, project, EditorFactory.getInstance(), truncatedHunk, anchorRange)
   }
 
   private fun getThreadActionsComponent(
@@ -300,7 +301,7 @@ object GHPRReviewThreadComponent {
           isVisible = repliesCount > 0
           if (isVisible) {
             text = repliesModel.getElementAt(repliesModel.size - 1).dateCreated.let {
-              JBDateFormat.getFormatter().formatPrettyDateTime(it)
+              DateFormatUtil.formatPrettyDateTime(it)
             }
           }
         }

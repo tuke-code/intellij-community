@@ -7,11 +7,10 @@ import org.jetbrains.kotlin.analysis.api.analyze
 import org.jetbrains.kotlin.analysis.api.lifetime.allowAnalysisOnEdt
 import org.jetbrains.kotlin.analysis.api.symbols.KtFunctionSymbol
 import org.jetbrains.kotlin.analysis.api.symbols.KtPropertySymbol
-import org.jetbrains.kotlin.analysis.api.symbols.markers.KtPossiblyNamedSymbol
 import org.jetbrains.kotlin.analysis.api.symbols.markers.KtSymbolWithMembers
+import org.jetbrains.kotlin.idea.base.analysis.api.utils.getSymbolContainingMemberDeclarations
 import org.jetbrains.kotlin.idea.fir.invalidateCaches
 import org.jetbrains.kotlin.idea.refactoring.rename.AbstractRenameTest
-import org.jetbrains.kotlin.idea.refactoring.rename.loadTestConfiguration
 import org.jetbrains.kotlin.idea.test.KotlinLightProjectDescriptor
 import org.jetbrains.kotlin.idea.test.KotlinWithJdkAndRuntimeLightProjectDescriptor
 import org.jetbrains.kotlin.idea.test.runAll
@@ -35,27 +34,26 @@ abstract class AbstractFirRenameTest : AbstractRenameTest() {
 
     @OptIn(KtAllowAnalysisOnEdt::class)
     override fun doTest(path: String) {
-        val renameObject = loadTestConfiguration(dataFile())
-        val testIsDisabledInK2 = renameObject.get("enabledInK2")?.asBoolean == false
-
-        if (testIsDisabledInK2) return
-
-        val result = allowAnalysisOnEdt { runCatching { super.doTest(path) } }
-        result.fold(
-            onSuccess = { require(!testIsDisabledInK2) { "This test passes and should be enabled!" } },
-            onFailure = { exception -> if (!testIsDisabledInK2) throw exception }
-        )
+        allowAnalysisOnEdt { super.doTest(path) }
     }
+
+    override fun checkForUnexpectedErrors(ktFile: KtFile) {}
 
     override fun findPsiDeclarationToRename(contextFile: KtFile, target: KotlinTarget): PsiElement = analyze(contextFile) {
         fun getContainingMemberSymbol(classId: ClassId): KtSymbolWithMembers {
             getClassOrObjectSymbolByClassId(classId)?.let { return it }
             val parentSymbol = getClassOrObjectSymbolByClassId(classId.parentClassId!!)!!
-            return parentSymbol.getDeclaredMemberScope().getAllSymbols().first { (it as? KtPossiblyNamedSymbol)?.name == classId.shortClassName } as KtSymbolWithMembers
+
+            // The function supports getting a `KtEnumEntrySymbol`'s initializer via the enum entry's "class ID". Despite not being 100%
+            // semantically correct in FIR (enum entries aren't classes), it simplifies referring to the initializing object.
+            val declarationSymbol = parentSymbol.getStaticDeclaredMemberScope().getCallableSymbols(classId.shortClassName).first()
+            return declarationSymbol.getSymbolContainingMemberDeclarations() ?:
+                error("Unexpected declaration symbol `$classId` of type `${declarationSymbol.javaClass.simpleName}`.")
         }
 
         when (target) {
             is KotlinTarget.Classifier -> getContainingMemberSymbol(target.classId).psi!!
+
             is KotlinTarget.Callable -> {
                 val callableId = target.callableId
                 val scope = callableId.classId
@@ -71,6 +69,12 @@ abstract class AbstractFirRenameTest : AbstractRenameTest() {
                     }
 
                 callablesOfProperType.first().psi!!
+            }
+
+            is KotlinTarget.EnumEntry -> {
+                val callableId = target.callableId
+                val containingScope = getContainingMemberSymbol(callableId.classId!!).getStaticDeclaredMemberScope()
+                containingScope.getCallableSymbols(callableId.callableName).singleOrNull()?.psi!!
             }
         }
     }

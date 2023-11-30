@@ -1,4 +1,4 @@
-// Copyright 2000-2020 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
+// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 
 package com.intellij.psi.impl.source.codeStyle;
 
@@ -35,7 +35,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
 
-public class CodeFormatterFacade {
+public final class CodeFormatterFacade {
 
   private static final Logger LOG = Logger.getInstance(CodeFormatterFacade.class);
 
@@ -67,8 +67,9 @@ public class CodeFormatterFacade {
     assert psiElement != null;
     final PsiFile file = psiElement.getContainingFile();
     final Document document = file.getViewProvider().getDocument();
+    final boolean delegateToTopLevel = shouldDelegateToTopLevel(document, file);
 
-    PsiElement elementToFormat = document instanceof DocumentWindow ? InjectedLanguageManager
+    PsiElement elementToFormat = delegateToTopLevel ? InjectedLanguageManager
           .getInstance(file.getProject()).getTopLevelFile(file) : psiElement;
     final PsiFile fileToFormat = elementToFormat.getContainingFile();
 
@@ -102,8 +103,8 @@ public class CodeFormatterFacade {
         }
 
         TextRange range = preprocess(codeFormattingData, element, TextRange.create(startOffset, endOffset));
-        if (document instanceof DocumentWindow documentWindow) {
-          range = documentWindow.injectedToHost(range);
+        if (delegateToTopLevel) {
+          range = ((DocumentWindow)document).injectedToHost(range);
         }
 
         final FormattingModel model = CoreFormatterUtil.buildModel(builder, elementToFormat, range, mySettings, FormattingMode.REFORMAT);
@@ -269,8 +270,7 @@ public class CodeFormatterFacade {
     }
   }
 
-  @Nullable
-  static ASTNode findContainingNode(@NotNull PsiFile file, @Nullable TextRange range) {
+  static @Nullable ASTNode findContainingNode(@NotNull PsiFile file, @Nullable TextRange range) {
     Language language = file.getLanguage();
     if (range == null) return null;
     final FileViewProvider viewProvider = file.getViewProvider();
@@ -295,7 +295,7 @@ public class CodeFormatterFacade {
     return node;
   }
 
-  private TextRange preprocess(@NotNull CodeFormattingData formattingData, @NotNull final ASTNode node, @NotNull TextRange range) {
+  private TextRange preprocess(@NotNull CodeFormattingData formattingData, final @NotNull ASTNode node, @NotNull TextRange range) {
     TextRange result = range;
     PsiElement psi = node.getPsi();
     if (!psi.isValid()) {
@@ -351,7 +351,7 @@ public class CodeFormatterFacade {
     return result;
   }
 
-  private TextRange preprocessEnabledRanges(@NotNull final ASTNode node, @NotNull TextRange range) {
+  private TextRange preprocessEnabledRanges(final @NotNull ASTNode node, @NotNull TextRange range) {
     TextRange result = TextRange.create(range.getStartOffset(), range.getEndOffset());
     List<TextRange> enabledRanges = myTagHandler.getEnabledRanges(node, result);
     int delta = 0;
@@ -369,13 +369,17 @@ public class CodeFormatterFacade {
   }
 
 
-  private static boolean shouldDelegateToTopLevel(@NotNull PsiFile file) {
-    for (var provider: InjectedFormattingOptionsProvider.EP_NAME.getExtensions()) {
+  static boolean shouldDelegateToTopLevel(@NotNull PsiFile file) {
+    for (var provider: InjectedFormattingOptionsProvider.EP_NAME.getExtensionList()) {
       var result = provider.shouldDelegateToTopLevel(file);
       if (result == null) continue;
       return result;
     }
     return true;
+  }
+
+  static boolean shouldDelegateToTopLevel(Document document, @NotNull PsiFile file) {
+    return document instanceof DocumentWindow && shouldDelegateToTopLevel(file);
   }
 }
 

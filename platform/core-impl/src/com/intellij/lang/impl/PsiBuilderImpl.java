@@ -51,7 +51,7 @@ import static com.intellij.lang.WhitespacesBinders.DEFAULT_RIGHT_BINDER;
 
 public class PsiBuilderImpl extends UnprotectedUserDataHolder implements PsiBuilder {
   private static final Logger LOG = Logger.getInstance(PsiBuilderImpl.class);
-
+  private long myLexingTimeNs = 0;
   static PsiBuilderDiagnostics DIAGNOSTICS;
 
   // function stored in PsiBuilderImpl's user data that is called during reparse when the algorithm is not sure what to merge
@@ -194,7 +194,13 @@ public class PsiBuilderImpl extends UnprotectedUserDataHolder implements PsiBuil
       return fromParent;
     }
 
-    return TokenSequence.performLexing(myText, myLexer);
+    long startTime = System.nanoTime();
+    try{
+      return TokenSequence.performLexing(myText, myLexer);
+    }
+    finally {
+      myLexingTimeNs = System.nanoTime() - startTime;
+    }
   }
 
   private static boolean doLexingOptimizationCorrectionCheck() {
@@ -747,6 +753,23 @@ public class PsiBuilderImpl extends UnprotectedUserDataHolder implements PsiBuil
   @Override
   public int rawTokenIndex() {
     return myCurrentLexeme;
+  }
+
+  @Override
+  public void rawAdvanceLexer(int steps) {
+    ProgressIndicatorProvider.checkCanceled();
+    if (steps < 0) {
+      throw new IllegalArgumentException("Steps must be a positive integer - lexer can only be advanced. " +
+                                         "Use Marker.rollbackTo if you want to rollback PSI building.");
+    }
+    if (steps == 0) return;
+    // Be permissive as advanceLexer() and don't throw error if advancing beyond eof state
+    myCurrentLexeme += steps;
+    if (myCurrentLexeme > myLexemeCount || myCurrentLexeme < 0 /* int overflow */ ) {
+      myCurrentLexeme = myLexemeCount;
+    }
+    myTokenTypeChecked = false;
+    clearCachedTokenType();
   }
 
   @Override
@@ -1735,5 +1758,13 @@ public class PsiBuilderImpl extends UnprotectedUserDataHolder implements PsiBuil
     else {
       super.putUserData(key, value);
     }
+  }
+
+  /**
+   * @return lexing time in nanoseconds
+   * @see #performLexing(Object)
+   */
+  public long getLexingTimeNs() {
+    return myLexingTimeNs;
   }
 }

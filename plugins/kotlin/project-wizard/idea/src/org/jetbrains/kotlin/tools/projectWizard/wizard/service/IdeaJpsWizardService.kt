@@ -62,7 +62,15 @@ class IdeaJpsWizardService(
         KotlinSdkType.setUpIfNeeded()
         val projectImporter = ProjectImporter(project, modulesModel, path, modulesIrs)
         modulesBuilder.addModuleConfigurationUpdater(
-            JpsModuleConfigurationUpdater(ideWizard.jpsData, projectImporter, project, reader)
+            JpsModuleConfigurationUpdater(
+                ideWizard.jpsData,
+                projectImporter,
+                project,
+                reader,
+                ideWizard.isCreatingNewProject,
+                ideWizard.projectName,
+                ideWizard.stdlibForJps
+            )
         )
 
         projectImporter.import()
@@ -75,18 +83,34 @@ private class JpsModuleConfigurationUpdater(
     private val jpsData: IdeWizard.JpsData,
     private val projectImporter: ProjectImporter,
     private val project: Project,
-    private val reader: Reader
+    private val reader: Reader,
+    private val isCreatingProject: Boolean,
+    private val newProjectOrModuleName: String?,
+    private val kotlinStdlib: LibraryOrderEntry? = null
 ) : ModuleBuilder.ModuleConfigurationUpdater() {
 
+    // All modules come to this function
     override fun update(module: IdeaModule, rootModel: ModifiableRootModel) = with(jpsData) {
+        if (isCreatingProject) {
+            addKotlinJavaRuntime(rootModel)
+        } else if (newProjectOrModuleName == module.name) {
+            if (kotlinStdlib != null) {
+                rootModel.addOrderEntry(kotlinStdlib)
+            } else {
+                addKotlinJavaRuntime(rootModel)
+            }
+        }
+        libraryDescription.finishLibConfiguration(module, rootModel, isCreatingProject)
+        setUpJvmTargetVersionForModules(module, rootModel)
+        ProjectCodeStyleImporter.apply(module.project, INSTANCE)
+    }
+
+    private fun IdeWizard.JpsData.addKotlinJavaRuntime(rootModel: ModifiableRootModel) {
         libraryOptionsPanel.apply()?.addLibraries(
             rootModel,
             ArrayList(),
             librariesContainer
         )
-        libraryDescription.finishLibConfiguration(module, rootModel, true)
-        setUpJvmTargetVersionForModules(module, rootModel)
-        ProjectCodeStyleImporter.apply(module.project, INSTANCE)
     }
 
     private fun setUpJvmTargetVersionForModules(module: IdeaModule, rootModel: ModifiableRootModel) {
@@ -143,17 +167,17 @@ private class ProjectImporter(
         )
         val rootModel = ModuleRootManager.getInstance(module).modifiableModel
         val contentRoot = rootModel.addContentEntry(moduleIr.path.url)
-
-        SourcesetType.ALL.forEach { sourceset ->
-            val isTest = sourceset == SourcesetType.test
-            contentRoot.addSourceFolder(
-                (moduleIr.path / "src" / sourceset.name / "kotlin").url,
-                if (isTest) JavaSourceRootType.TEST_SOURCE else JavaSourceRootType.SOURCE
-            )
-            contentRoot.addSourceFolder(
-                (moduleIr.path / "src" / sourceset.name / "resources").url,
-                if (isTest) JavaResourceRootType.TEST_RESOURCE else JavaResourceRootType.RESOURCE
-            )
+        moduleIr.sourcesets.forEach { sourceset ->
+            val isTest = sourceset.sourcesetType == SourcesetType.test
+            sourceset.sourcePaths.forEach { (sourceType, path) ->
+                val pathType = when {
+                  isTest && sourceType == SourcesetSourceType.RESOURCES -> JavaResourceRootType.TEST_RESOURCE
+                    sourceType == SourcesetSourceType.RESOURCES -> JavaResourceRootType.RESOURCE
+                    isTest -> JavaSourceRootType.TEST_SOURCE
+                    else -> JavaSourceRootType.SOURCE
+                }
+                contentRoot.addSourceFolder(path.url, pathType)
+            }
         }
 
         rootModel.inheritSdk()

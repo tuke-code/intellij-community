@@ -187,12 +187,12 @@ class CombinedDiffMainUI(private val model: CombinedDiffModel, goToChangeFactory
 
   private fun buildToolbar(viewerActions: List<AnAction?>?) {
     collectToolbarActions(viewerActions)
-    (leftToolbar as ActionToolbarImpl).clearPresentationCache()
+    (leftToolbar as ActionToolbarImpl).reset()
     leftToolbar.updateActionsImmediately()
     leftToolbar.background = CombinedDiffUI.MAIN_HEADER_BACKGROUND
     leftToolbar.border = JBUI.Borders.empty()
     DiffUtil.recursiveRegisterShortcutSet(leftToolbarGroup, mainPanel, null)
-    (rightToolbar as ActionToolbarImpl).clearPresentationCache()
+    (rightToolbar as ActionToolbarImpl).reset()
     rightToolbar.updateActionsImmediately()
     rightToolbar.background = CombinedDiffUI.MAIN_HEADER_BACKGROUND
     rightToolbar.border = JBUI.Borders.empty()
@@ -226,11 +226,11 @@ class CombinedDiffMainUI(private val model: CombinedDiffModel, goToChangeFactory
 
   private fun collectNavigationActions(): List<AnAction> {
     return listOfNotNull(
-      CombinedPrevDifferenceAction(context),
-      CombinedNextDifferenceAction(context),
       CombinedPrevBlockAction(context),
-      CombinedNextBlockAction(context),
+      CombinedPrevDifferenceAction(context),
       differencesLabel,
+      CombinedNextDifferenceAction(context),
+      CombinedNextBlockAction(context),
       openInEditorAction,
     )
   }
@@ -241,10 +241,7 @@ class CombinedDiffMainUI(private val model: CombinedDiffModel, goToChangeFactory
       .addToLeft(leftToolbarWrapper)
       .addToRight(rightToolbarWrapper)
       .apply {
-        border = JBUI.Borders.compound(
-          JBUI.Borders.customLineBottom(CombinedDiffUI.EDITOR_BORDER_COLOR),
-          JBUI.Borders.empty(5, 10)
-        )
+        border = JBUI.Borders.empty(CombinedDiffUI.MAIN_HEADER_INSETS)
       }
     GuiUtils.installVisibilityReferent(topPanel, leftToolbar.component)
     GuiUtils.installVisibilityReferent(topPanel, rightToolbar.component)
@@ -368,7 +365,6 @@ class CombinedDiffMainUI(private val model: CombinedDiffModel, goToChangeFactory
       if (data != null) return data
 
       return when {
-        OpenInEditorAction.KEY.`is`(dataId) -> OpenInEditorAction()
         DiffDataKeys.DIFF_REQUEST.`is`(dataId) -> model.getCurrentRequest()
         CommonDataKeys.PROJECT.`is`(dataId) -> context.project
         PlatformCoreDataKeys.HELP_ID.`is`(dataId) -> {

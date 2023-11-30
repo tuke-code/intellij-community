@@ -12,7 +12,6 @@ import com.intellij.lang.injection.InjectedLanguageManager
 import com.intellij.openapi.actionSystem.CommonDataKeys
 import com.intellij.openapi.actionSystem.DataProvider
 import com.intellij.openapi.actionSystem.PlatformCoreDataKeys
-import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.EDT
 import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.application.asContextElement
@@ -37,6 +36,7 @@ import com.intellij.openapi.util.registry.Registry
 import com.intellij.openapi.util.text.HtmlBuilder
 import com.intellij.openapi.util.text.StringUtil
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.platform.util.coroutines.childScope
 import com.intellij.pom.Navigatable
 import com.intellij.psi.PsiDocumentManager
 import com.intellij.psi.PsiElement
@@ -52,8 +52,10 @@ import com.intellij.usages.UsageContextPanel
 import com.intellij.usages.UsageView
 import com.intellij.usages.UsageViewPresentation
 import com.intellij.usages.similarity.clustering.ClusteringSearchSession
-import com.intellij.util.childScope
+import com.intellij.util.concurrency.ThreadingAssertions
+import com.intellij.util.concurrency.annotations.RequiresBackgroundThread
 import com.intellij.util.concurrency.annotations.RequiresEdt
+import com.intellij.util.concurrency.annotations.RequiresReadLock
 import com.intellij.util.containers.ContainerUtil
 import com.intellij.util.ui.PositionTracker
 import com.intellij.util.ui.StatusText
@@ -162,7 +164,7 @@ open class UsagePreviewPanel @JvmOverloads constructor(project: Project,
 
   var lineHeight: Int
     get() {
-      ApplicationManager.getApplication().assertIsDispatchThread()
+      ThreadingAssertions.assertEventDispatchThread()
       return myLineHeight
     }
     private set(lineHeight) {
@@ -223,7 +225,7 @@ open class UsagePreviewPanel @JvmOverloads constructor(project: Project,
   }
 
   fun releaseEditor() {
-    ApplicationManager.getApplication().assertIsDispatchThread()
+    ThreadingAssertions.assertEventDispatchThread()
     if (myEditor != null) {
       EditorFactory.getInstance().releaseEditor(myEditor!!)
       myEditor = null
@@ -233,6 +235,7 @@ open class UsagePreviewPanel @JvmOverloads constructor(project: Project,
     }
   }
 
+  @Deprecated("Implementation details of UsagePreviewPanel")
   fun getCannotPreviewMessage(infos: List<UsageInfo>): String? {
     return cannotPreviewMessage(infos)
   }
@@ -376,7 +379,7 @@ open class UsagePreviewPanel @JvmOverloads constructor(project: Project,
                   project: Project,
                   highlightOnlyNameElements: Boolean,
                   highlightLayer: Int) {
-      ApplicationManager.getApplication().assertIsDispatchThread()
+      ThreadingAssertions.assertEventDispatchThread()
       LOG.assertTrue(PsiDocumentManager.getInstance(project).isCommitted(editor.document))
       val markupModel = editor.markupModel
       for (highlighter in markupModel.allHighlighters) {
@@ -458,7 +461,7 @@ open class UsagePreviewPanel @JvmOverloads constructor(project: Project,
 
     private val REPLACEMENT_BALLOON_KEY = Key.create<Balloon>("REPLACEMENT_BALLOON_KEY")
     private fun showBalloon(project: Project, editor: Editor, range: TextRange, findModel: FindModel) {
-      ApplicationManager.getApplication().assertIsDispatchThread()
+      ThreadingAssertions.assertEventDispatchThread()
       try {
         val replacementPreviewText = FindManager.getInstance(project)
                                        .getStringToReplace(editor.document.getText(range), findModel, range.startOffset,
@@ -501,6 +504,9 @@ open class UsagePreviewPanel @JvmOverloads constructor(project: Project,
     private val PREVIEW_EDITOR_FLAG = Key.create<UsagePreviewPanel>("PREVIEW_EDITOR_FLAG")
     @Contract("null -> !null")
     private fun cannotPreviewMessage(infos: List<UsageInfo>?): @NlsContexts.StatusText String? {
+      if (infos == null) {
+        return UsageViewBundle.message("usage.preview.isnt.available")
+      }
       if (ContainerUtil.isEmpty(infos)) {
         return UsageViewBundle.message("select.the.usage.to.preview")
       }
@@ -518,6 +524,11 @@ open class UsagePreviewPanel @JvmOverloads constructor(project: Project,
       }
       return null
     }
+
+    @RequiresReadLock
+    @RequiresBackgroundThread
+    @JvmStatic
+    fun isOneAndOnlyOnePsiFileInUsages(infos: List<UsageInfo>?) = cannotPreviewMessage(infos) == null
 
     private fun isOnlyGroupNodesSelected(infos: List<UsageInfo>, groupNodes: Set<GroupNode>): Boolean {
       return infos.isEmpty() && !groupNodes.isEmpty()
@@ -558,7 +569,7 @@ open class UsagePreviewPanel @JvmOverloads constructor(project: Project,
     }
 
     private fun insideVisibleArea(e: Editor, r: TextRange): Boolean {
-      ApplicationManager.getApplication().assertIsDispatchThread()
+      ThreadingAssertions.assertEventDispatchThread()
       val textLength = e.document.textLength
       if (r.startOffset > textLength) return false
       if (r.endOffset > textLength) return false

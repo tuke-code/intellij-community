@@ -23,6 +23,7 @@ import com.intellij.psi.*;
 import com.intellij.psi.impl.source.tree.LeafElement;
 import com.intellij.util.DocumentUtil;
 import com.intellij.util.Processor;
+import com.intellij.util.SlowOperations;
 import com.intellij.util.SmartList;
 import com.intellij.util.containers.ContainerUtil;
 import com.intellij.xdebugger.XDebuggerUtil;
@@ -111,26 +112,37 @@ public class JavaLineBreakpointType extends JavaLineBreakpointTypeBase<JavaLineB
 
     SourcePosition pos = SourcePosition.createFromLine(file, position.getLine());
 
-    Document document = PsiDocumentManager.getInstance(project).getDocument(file);
+    Document document = file.getViewProvider().getDocument();
     if (document == null) {
       return Collections.emptyList();
     }
 
-    PsiElement startMethod = DebuggerUtilsEx.getContainingMethod(pos);
     List<PsiLambdaExpression> lambdas = DebuggerUtilsEx.collectLambdas(pos, true);
     PsiElement condRet = canStopOnConditionalReturn(file)
                          ? findSingleConditionalReturn(project, document, position.getLine())
                          : null;
 
-    if ((lambdas.isEmpty() || (lambdas.contains(startMethod) && lambdas.size() == 1)) && condRet == null) {
+    // Start method is either outer method/lambda or lambda starting at the beginning of the line.
+    PsiElement startMethod = DebuggerUtilsEx.getContainingMethod(pos);
+
+    PsiElement outerMethod = startMethod != null && startMethod.getTextOffset() >= pos.getOffset()
+                             ? DebuggerUtilsEx.getContainingMethod(startMethod.getParent())
+                             : startMethod;
+
+    // In this case, startMethod lambda is not treated like a real lambda variant, but it's just containing block for us.
+    boolean startMethodIsOuterLambda = startMethod == outerMethod && lambdas.contains(startMethod);
+
+    if ((lambdas.isEmpty() || (startMethodIsOuterLambda && lambdas.size() == 1)) && condRet == null) {
       return Collections.emptyList();
     }
 
     List<JavaBreakpointVariant> res = new SmartList<>();
 
+    boolean mainMethodAdded = false;
     int lambdaCount = 0;
     if (!(startMethod instanceof PsiLambdaExpression)) {
       res.add(new LineJavaBreakpointVariant(position, startMethod, -1));
+      mainMethodAdded = true;
     }
 
     {
@@ -139,18 +151,20 @@ public class JavaLineBreakpointType extends JavaLineBreakpointTypeBase<JavaLineB
         PsiElement firstElem = DebuggerUtilsEx.getFirstElementOnTheLine(lambda, document, position.getLine());
         XSourcePositionImpl elementPosition = XSourcePositionImpl.createByElement(firstElem);
         if (elementPosition != null) {
-          if (lambda == startMethod) {
-            res.add(0, new LineJavaBreakpointVariant(elementPosition, lambda, ordinal++));
+          if (startMethodIsOuterLambda && lambda == startMethod) {
+            res.add(0, new LineJavaBreakpointVariant(elementPosition, lambda, ordinal));
+            mainMethodAdded = true;
           }
-          else {
+          else if (lambda != outerMethod) {
             lambdaCount++;
-            res.add(new LambdaJavaBreakpointVariant(elementPosition, lambda, ordinal++));
+            res.add(new LambdaJavaBreakpointVariant(elementPosition, lambda, ordinal));
           }
+          ordinal++;
         }
       }
     }
 
-    if (lambdaCount > 0) {
+    if (lambdaCount >= 2 || (mainMethodAdded && lambdaCount == 1)) {
       res.add(new JavaBreakpointVariant(position, lambdaCount)); //all
     }
 
@@ -173,7 +187,7 @@ public class JavaLineBreakpointType extends JavaLineBreakpointTypeBase<JavaLineB
 
   public static @Nullable PsiElement findSingleConditionalReturn(@NotNull PsiFile file, int line) {
     Project project = file.getProject();
-    Document document = PsiDocumentManager.getInstance(project).getDocument(file);
+    Document document = file.getViewProvider().getDocument();
     if (document == null) return null;
     return findSingleConditionalReturn(project, document, line);
   }
@@ -215,7 +229,7 @@ public class JavaLineBreakpointType extends JavaLineBreakpointTypeBase<JavaLineB
       }
     }
     RetFinder finder = new RetFinder();
-    new XDebuggerUtilImpl().iterateLine(project, document, line, finder);
+    XDebuggerUtil.getInstance().iterateLine(project, document, line, finder);
     return finder.singleReturn;
   }
 
@@ -225,10 +239,12 @@ public class JavaLineBreakpointType extends JavaLineBreakpointTypeBase<JavaLineB
   }
 
   public static boolean canStopOnConditionalReturn(@NotNull PsiFile file) {
-    // We haven't implemented Dalvik bytecode parsing yet.
-    Module module = ModuleUtilCore.findModuleForFile(file);
-    return module == null ||
-           !ContainerUtil.exists(FacetManager.getInstance(module).getAllFacets(), f -> f.getName().equals("Android"));
+    try (var ignore = SlowOperations.knownIssue("IDEA-331623, EA-903915")) {
+      // We haven't implemented Dalvik bytecode parsing yet.
+      Module module = ModuleUtilCore.findModuleForFile(file);
+      return module == null ||
+             !ContainerUtil.exists(FacetManager.getInstance(module).getAllFacets(), f -> f.getName().equals("Android"));
+    }
   }
 
   public boolean matchesPosition(@NotNull LineBreakpoint<?> breakpoint, @NotNull SourcePosition position) {
@@ -348,7 +364,7 @@ public class JavaLineBreakpointType extends JavaLineBreakpointTypeBase<JavaLineB
     @Override
     public TextRange getHighlightRange() {
       if (myElement != null) {
-        return DebuggerUtilsEx.intersectWithLine(myElement.getTextRange(), myElement.getContainingFile(), mySourcePosition.getLine());
+        return DebuggerUtilsEx.getHighlightingRangeInsideLine(myElement.getTextRange(), myElement.getContainingFile(), mySourcePosition.getLine());
       }
       return null;
     }
@@ -364,8 +380,8 @@ public class JavaLineBreakpointType extends JavaLineBreakpointTypeBase<JavaLineB
   }
 
   public class LineJavaBreakpointVariant extends ExactJavaBreakpointVariant {
-    public LineJavaBreakpointVariant(@NotNull XSourcePosition position, @Nullable PsiElement element, int lambdaOrdinal) {
-      super(position, element, JavaLineBreakpointProperties.encodeInlinePosition(lambdaOrdinal, false));
+    public LineJavaBreakpointVariant(@NotNull XSourcePosition position, @Nullable PsiElement method, int lambdaOrdinal) {
+      super(position, method, JavaLineBreakpointProperties.encodeInlinePosition(lambdaOrdinal, false));
     }
 
     @NotNull
@@ -419,9 +435,12 @@ public class JavaLineBreakpointType extends JavaLineBreakpointTypeBase<JavaLineB
         }
       }
     }
-    return highlightedElement != null
-           ? DebuggerUtilsEx.intersectWithLine(highlightedElement.getTextRange(), highlightedElement.getContainingFile(), breakpoint.getLine())
-           : null;
+    if (highlightedElement != null) {
+      PsiFile file = highlightedElement.getContainingFile();
+      int line = breakpoint.getLine();
+      return DebuggerUtilsEx.getHighlightingRangeInsideLine(highlightedElement.getTextRange(), file, line);
+    }
+    return null;
   }
 
   @Override

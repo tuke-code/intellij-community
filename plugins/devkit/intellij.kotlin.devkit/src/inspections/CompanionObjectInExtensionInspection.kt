@@ -2,6 +2,7 @@
 package org.jetbrains.idea.devkit.kotlin.inspections
 
 import com.intellij.codeInsight.FileModificationService
+import com.intellij.codeInsight.intention.HighPriorityAction
 import com.intellij.codeInsight.intention.QuickFixFactory
 import com.intellij.codeInsight.intention.preview.IntentionPreviewInfo
 import com.intellij.codeInspection.*
@@ -27,7 +28,6 @@ import org.jetbrains.kotlin.analysis.api.analyze
 import org.jetbrains.kotlin.analysis.api.lifetime.allowAnalysisOnEdt
 import org.jetbrains.kotlin.analysis.api.types.KtTypeNullability
 import org.jetbrains.kotlin.asJava.toLightClass
-import org.jetbrains.kotlin.idea.base.codeInsight.KotlinDeclarationNameValidator
 import org.jetbrains.kotlin.idea.base.codeInsight.KotlinNameSuggester
 import org.jetbrains.kotlin.idea.base.codeInsight.KotlinNameSuggestionProvider
 import org.jetbrains.kotlin.idea.base.fe10.codeInsight.newDeclaration.Fe10KotlinNewDeclarationNameValidator
@@ -38,15 +38,13 @@ import org.jetbrains.kotlin.idea.util.findAnnotation
 import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.name.FqName
-import org.jetbrains.kotlin.name.StandardClassIds
+import org.jetbrains.kotlin.name.JvmStandardClassIds
 import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.psi.psiUtil.containingClass
 import org.jetbrains.kotlin.psi.psiUtil.endOffset
 import org.jetbrains.kotlin.psi.psiUtil.getStrictParentOfType
-import org.jetbrains.kotlin.psi.psiUtil.isAbstract
 
-
-class CompanionObjectInExtensionInspection : LocalInspectionTool() {
+internal class CompanionObjectInExtensionInspection : LocalInspectionTool() {
 
   override fun buildVisitor(holder: ProblemsHolder, isOnTheFly: Boolean): PsiElementVisitor {
     if (!DevKitInspectionUtil.isAllowed(holder.file)) return PsiElementVisitor.EMPTY_VISITOR
@@ -55,16 +53,10 @@ class CompanionObjectInExtensionInspection : LocalInspectionTool() {
 
       override fun visitObjectDeclaration(declaration: KtObjectDeclaration) {
         if (!declaration.isCompanion()) return
-        val klass = declaration.getStrictParentOfType<KtClass>() ?: return
 
-        if (klass.isAbstract() ||
-            klass.isInterface() ||
-            klass.isInner() ||
-            klass.isLocal ||
-            klass.isEnum()) return
+        val ktLightClass = declaration.getStrictParentOfType<KtClass>()?.toLightClass() ?: return
 
-        val ktLightClass = klass.toLightClass() ?: return
-
+        if (!ExtensionUtil.isExtensionPointImplementationCandidate(ktLightClass)) return
         if (!ExtensionUtil.isInstantiatedExtension(ktLightClass) { ExtensionUtil.hasServiceBeanFqn(it) }) return
 
         val anchor = declaration.modifierList?.getModifier(KtTokens.COMPANION_KEYWORD) ?: return
@@ -76,21 +68,20 @@ class CompanionObjectInExtensionInspection : LocalInspectionTool() {
             ProblemHighlightType.WARNING,
             RemoveEmptyCompanionObjectFix(declaration)
           )
-          return
         }
+        else {
+          val prohibitedDeclarations = declaration.namedDeclarations.filterNot { it.isAllowedInsideCompanionObject() }
+          if (prohibitedDeclarations.isEmpty()) return
 
-        val prohibitedDeclarations = declaration.namedDeclarations.filterNot { it.isAllowedInsideCompanionObject() }
-        if (prohibitedDeclarations.isEmpty()) return
-
-        holder.registerProblem(
-          anchor,
-          DevKitKotlinBundle.message("inspections.companion.object.in.extension.message"),
-          ProblemHighlightType.WARNING,
-          MoveProhibitedDeclarationsToTopLevelFix(declaration),
-          CreateObjectAndMoveProhibitedDeclarationsQuickFix(declaration)
-        )
+          holder.registerProblem(
+            anchor,
+            DevKitKotlinBundle.message("inspections.companion.object.in.extension.message"),
+            ProblemHighlightType.WARNING,
+            MoveProhibitedDeclarationsToTopLevelFix(declaration),
+            CreateObjectAndMoveProhibitedDeclarationsQuickFix(declaration)
+          )
+        }
       }
-
     }
   }
 }
@@ -145,9 +136,9 @@ private class CreateObjectAndMoveProhibitedDeclarationsQuickFix(
   }
 
   /**
-   *  1. Creates a new standalone object
-   *  2. Moves prohibited declarations from companion object to the created object
-   *  3. Invokes `rename fix` on the created object
+   *  1. Creates a new standalone object.
+   *  2. Moves prohibited declarations from the companion object to the created object.
+   *  3. Invokes `rename fix` on the created object.
    */
   override fun invoke(project: Project, file: PsiFile, startElement: PsiElement, endElement: PsiElement) {
     CommandProcessor.getInstance().runUndoTransparentAction {
@@ -212,7 +203,9 @@ private class CreateObjectAndMoveProhibitedDeclarationsQuickFix(
   }
 }
 
-private class MoveProhibitedDeclarationsToTopLevelFix(companionObject: KtObjectDeclaration) : LocalQuickFixOnPsiElement(companionObject) {
+private class MoveProhibitedDeclarationsToTopLevelFix(companionObject: KtObjectDeclaration)
+  : LocalQuickFixOnPsiElement(companionObject), HighPriorityAction {
+
   override fun getFamilyName(): String = DevKitKotlinBundle.message("inspections.move.prohibited.declarations.to.top.level.fix.text")
   override fun getText(): String = familyName
 
@@ -223,7 +216,7 @@ private class MoveProhibitedDeclarationsToTopLevelFix(companionObject: KtObjectD
   }
 
   /**
-   * Moves prohibited declarations from companion object to top-level.
+   * Moves prohibited declarations from the companion object to top-level.
    */
   override fun invoke(project: Project, file: PsiFile, startElement: PsiElement, endElement: PsiElement) {
     val companionObject = startElement as KtObjectDeclaration
@@ -292,7 +285,7 @@ private fun KtNamedDeclaration.removeProtectedModifierIfPresent(): KtNamedDeclar
 
 private fun KtNamedDeclaration.removeJvmStaticAnnotationIfPresent(): KtNamedDeclaration {
   return apply {
-    findAnnotation(StandardClassIds.Annotations.JvmStatic)?.delete()
+    findAnnotation(JvmStandardClassIds.Annotations.JvmStatic)?.delete()
   }
 }
 
@@ -300,8 +293,8 @@ private fun KtNamedDeclaration.removeJvmStaticAnnotationIfPresent(): KtNamedDecl
  * Moves [declarationsToMove] out of [companionObject] to the [moveTarget],
  * calling [preprocessDeclaration] on every declaration right before moving.
  *
- * Calls [onRefactoringExit] when refactoring is finished, both in cases when it was successfully performed or cancelled,
- * and, if [canShowConflictsInView] is true, when conflicts were open in the view but the refactoring can be started over or cancelled.
+ * Calls [onRefactoringExit] when refactoring is finished, both in cases when it was successfully performed or canceled,
+ * and, if [canShowConflictsInView] is true, when conflicts were open in the view but the refactoring can be started over or canceled.
  *
  * Setting the [canShowConflictsInView] parameter helps to track the way the refactoring exited in
  * and perform subsequent actions.
@@ -358,4 +351,3 @@ private fun moveDeclarationsOutOfCompanionObject(
 
   moveProcessor.run()
 }
-

@@ -29,7 +29,6 @@ import com.intellij.ui.PopupHandler;
 import com.intellij.ui.PopupMenuListenerAdapter;
 import com.intellij.ui.tree.TreeVisitor;
 import com.intellij.ui.treeStructure.Tree;
-import com.intellij.util.Consumer;
 import com.intellij.util.containers.ContainerUtil;
 import com.intellij.util.containers.TreeTraversal;
 import com.intellij.util.diff.Diff;
@@ -54,6 +53,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 public final class CustomizationUtil {
@@ -64,38 +64,10 @@ public final class CustomizationUtil {
   private CustomizationUtil() {
   }
 
-  public static @Nullable Icon getOriginalIconFrom(@NotNull AnAction reuseFrom) {
-    Presentation presentation = reuseFrom.getTemplatePresentation();
-    Icon original = presentation.getClientProperty(CustomActionsSchema.PROP_ORIGINAL_ICON);
-    if (original != null) return original;
-    return presentation.getIcon();
-  }
-
-  public static @Nullable Icon getIconForPath(@NotNull ActionManager actionManager, @Nullable String iconPath) {
-    if (iconPath == null) {
-      return null;
-    }
-    AnAction reuseFrom = actionManager.getAction(iconPath);
-    if (reuseFrom != null) {
-      return getOriginalIconFrom(reuseFrom);
-    }
-    else {
-      try {
-        return CustomActionsSchema.loadCustomIcon(iconPath);
-      }
-      catch (Throwable t) {
-        LOG.info(t.getMessage());
-        return null;
-      }
-    }
-  }
-
-
-
-  public static ActionGroup correctActionGroup(final ActionGroup group,
-                                               final CustomActionsSchema schema,
-                                               final String defaultGroupName,
-                                               final String rootGroupName,
+  public static ActionGroup correctActionGroup(ActionGroup group,
+                                               CustomActionsSchema schema,
+                                               String defaultGroupName,
+                                               String rootGroupName,
                                                boolean force) {
     if (!force && !schema.isCorrectActionGroup(group, defaultGroupName)) {
       return group;
@@ -122,15 +94,15 @@ public final class CustomizationUtil {
   }
 
 
-  static AnAction[] getReordableChildren(ActionGroup group,
-                                         CustomActionsSchema schema,
+  static AnAction[] getReordableChildren(@NotNull ActionGroup group,
+                                         AnAction @NotNull[] children,
+                                         @NotNull CustomActionsSchema schema,
                                          String defaultGroupName,
-                                         String rootGroupName,
-                                         AnActionEvent e) {
+                                         String rootGroupName) {
     String text = group.getTemplatePresentation().getText();
     ActionManager actionManager = ActionManager.getInstance();
     final ArrayList<AnAction> reorderedChildren = new ArrayList<>();
-    ContainerUtil.addAll(reorderedChildren, group.getChildren(e));
+    ContainerUtil.addAll(reorderedChildren, children);
     for (ActionUrl actionUrl : schema.getActions()) {
       if (actionUrl.getParentGroup() == null) continue;
       if ((actionUrl.getParentGroup().equals(text) ||
@@ -176,7 +148,7 @@ public final class CustomizationUtil {
   public static void optimizeSchema(final JTree tree, final CustomActionsSchema schema) {
     //noinspection HardCodedStringLiteral
     @SuppressWarnings("DialogTitleCapitalization")
-    Group rootGroup = new Group("root", null, null);
+    Group rootGroup = new Group("root");
     DefaultMutableTreeNode root = new DefaultMutableTreeNode(rootGroup);
     root.removeAllChildren();
     schema.fillActionGroups(root);
@@ -453,7 +425,7 @@ public final class CustomizationUtil {
 
     @NlsSafe
     String displayName = schema.getDisplayName(groupId);
-    return ActionsTreeUtil.createGroup(group, displayName, null, null, false, action -> true);
+    return ActionsTreeUtil.createGroup(group, displayName, null, false, action -> true);
   }
 
   /**
@@ -503,31 +475,10 @@ public final class CustomizationUtil {
       return null;
     }
 
-    String groupName = getGroupName(actionGroup, groupID);
-    if (groupName == null) {
-      return null;
-    }
-
     Ref<Component> popupInvoker = new Ref<>();
-    String actionID = "customize.toolbar." + groupID;
-    DefaultActionGroup customizationGroup = new DefaultActionGroup(
-      new MyDumbAction(actionID, IdeBundle.message("action.customizations.customize.action"), event -> {
-        Component src = popupInvoker.get();
-        AnAction targetAction = src instanceof ActionButton ? ((ActionButton)src).getAction() : null;
-        DialogWrapper dialogWrapper = createCustomizeGroupDialog(event.getProject(), groupID, groupName, targetAction);
-        dialogWrapper.show();
-      })
-    );
-
-    AnAction rollbackAction = ActionManager.getInstance().getAction(ToolbarSettings.ROLLBACK_ACTION_ID);
-    if (rollbackAction != null) {
-      customizationGroup.add(rollbackAction);
-    }
-
-    customizationGroup.addAll((ActionGroup)ActionManager.getInstance().getAction("ToolbarPopupActions"));
-    AnAction additionalActions = ActionManager.getInstance().getAction("ToolbarPopupActions." + groupID);
-    if (additionalActions instanceof ActionGroup) {
-      customizationGroup.add(additionalActions);
+    ActionGroup customizationGroup = createToolbarCustomizationGroup(actionGroup, groupID, popupInvoker);
+    if (customizationGroup == null) {
+      return null;
     }
 
     return new PopupHandler() {
@@ -558,6 +509,38 @@ public final class CustomizationUtil {
         menu.show(comp, x, y);
       }
     };
+  }
+
+  public static @Nullable ActionGroup createToolbarCustomizationGroup(@NotNull ActionGroup actionGroup,
+                                                                      String groupID,
+                                                                      Ref<? extends Component> popupInvoker) {
+    String groupName = getGroupName(actionGroup, groupID);
+    if (groupName == null) {
+      return null;
+    }
+
+    String actionID = "customize.toolbar." + groupID;
+    DefaultActionGroup customizationGroup = new DefaultActionGroup(
+      new MyDumbAction(actionID, IdeBundle.messagePointer("action.customizations.customize.action"), () -> AllIcons.General.GearPlain, event -> {
+        Component src = popupInvoker.get();
+        AnAction targetAction = src instanceof ActionButton ? ((ActionButton)src).getAction() : null;
+        DialogWrapper dialogWrapper = createCustomizeGroupDialog(event.getProject(), groupID, groupName, targetAction);
+        dialogWrapper.show();
+      })
+    );
+
+    ActionManager actionManager = ActionManager.getInstance();
+    AnAction rollbackAction = actionManager.getAction(ToolbarSettings.ROLLBACK_ACTION_ID);
+    if (rollbackAction != null) {
+      customizationGroup.add(rollbackAction);
+    }
+
+    customizationGroup.addAll((ActionGroup)actionManager.getAction("ToolbarPopupActions"));
+    AnAction additionalActions = actionManager.getAction("ToolbarPopupActions." + groupID);
+    if (additionalActions instanceof ActionGroup) {
+      customizationGroup.add(additionalActions);
+    }
+    return customizationGroup;
   }
 
   public static @NotNull DialogWrapper createCustomizeGroupDialog(@Nullable Project project, @NotNull String groupID,
@@ -761,7 +744,7 @@ public final class CustomizationUtil {
     void accept(@NotNull @Nls String text, @Nullable @Nls String description, @Nullable Icon icon);
   }
 
-  private static class PopupComputableActionGroup extends ActionGroup implements ActionWithDelegate<ActionGroup> {
+  private static final class PopupComputableActionGroup extends ActionGroup implements ActionWithDelegate<ActionGroup> {
     private final Supplier<? extends @Nullable ActionGroup> myActionGroupSupplier;
 
     PopupComputableActionGroup(Supplier<? extends @Nullable ActionGroup> actionGroupSupplier) {
@@ -784,15 +767,19 @@ public final class CustomizationUtil {
     private final @NotNull String id;
     private final @NotNull Consumer<? super AnActionEvent> myActionPerformed;
 
-    private MyDumbAction(@NotNull String id, @Nullable @NlsActions.ActionText String text, @NotNull Consumer<? super AnActionEvent> actionPerformed) {
-      super(text);
+    private MyDumbAction(@NotNull String id,
+                         @NotNull Supplier<@NlsActions.ActionText String> text,
+                         @Nullable Supplier<? extends @Nullable Icon> icon,
+                         @NotNull Consumer<? super AnActionEvent> actionPerformed) {
+      super(text, null, icon);
+
       this.id = id;
       myActionPerformed = actionPerformed;
     }
 
     @Override
     public void actionPerformed(@NotNull AnActionEvent e) {
-      myActionPerformed.consume(e);
+      myActionPerformed.accept(e);
     }
 
     @Override

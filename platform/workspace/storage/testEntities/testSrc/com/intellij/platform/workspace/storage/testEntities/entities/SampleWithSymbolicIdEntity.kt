@@ -2,18 +2,9 @@
 package com.intellij.platform.workspace.storage.testEntities.entities
 
 import com.intellij.platform.workspace.storage.*
-import com.intellij.platform.workspace.storage.WorkspaceEntity
+import com.intellij.platform.workspace.storage.annotations.Child
 import com.intellij.platform.workspace.storage.impl.containers.toMutableWorkspaceList
 import com.intellij.platform.workspace.storage.url.VirtualFileUrl
-import kotlin.jvm.JvmName
-import kotlin.jvm.JvmOverloads
-import kotlin.jvm.JvmStatic
-import com.intellij.platform.workspace.storage.EntityType
-import com.intellij.platform.workspace.storage.annotations.Child
-import com.intellij.platform.workspace.storage.EntitySource
-import com.intellij.platform.workspace.storage.GeneratedCodeApiVersion
-
-import com.intellij.platform.workspace.storage.MutableEntityStorage
 
 
 interface SampleWithSymbolicIdEntity : WorkspaceEntityWithSymbolicId {
@@ -69,7 +60,7 @@ interface SampleWithSymbolicIdEntity : WorkspaceEntityWithSymbolicId {
 
 //region generated code
 fun MutableEntityStorage.modifyEntity(entity: SampleWithSymbolicIdEntity,
-                                      modification: SampleWithSymbolicIdEntity.Builder.() -> Unit) = modifyEntity(
+                                      modification: SampleWithSymbolicIdEntity.Builder.() -> Unit): SampleWithSymbolicIdEntity = modifyEntity(
   SampleWithSymbolicIdEntity.Builder::class.java, entity, modification)
 //endregion
 
@@ -107,6 +98,7 @@ interface ChildWpidSampleEntity : WorkspaceEntity {
 }
 
 //region generated code
-fun MutableEntityStorage.modifyEntity(entity: ChildWpidSampleEntity, modification: ChildWpidSampleEntity.Builder.() -> Unit) = modifyEntity(
+fun MutableEntityStorage.modifyEntity(entity: ChildWpidSampleEntity,
+                                      modification: ChildWpidSampleEntity.Builder.() -> Unit): ChildWpidSampleEntity = modifyEntity(
   ChildWpidSampleEntity.Builder::class.java, entity, modification)
 //endregion

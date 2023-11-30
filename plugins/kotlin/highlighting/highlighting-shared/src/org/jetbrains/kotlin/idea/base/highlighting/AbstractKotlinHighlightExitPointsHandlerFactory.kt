@@ -10,6 +10,7 @@ import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
 import com.intellij.psi.impl.source.tree.LeafPsiElement
 import com.intellij.psi.util.PsiTreeUtil
+import com.intellij.psi.util.elementType
 import com.intellij.psi.util.parentOfTypes
 import com.intellij.util.Consumer
 import org.jetbrains.kotlin.lexer.KtToken
@@ -17,7 +18,6 @@ import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.psi.psiUtil.getStrictParentOfType
 import org.jetbrains.kotlin.psi.psiUtil.parents
-import org.jetbrains.kotlin.resolve.inline.InlineUtil
 import org.jetbrains.kotlin.utils.addIfNotNull
 import java.util.*
 
@@ -39,10 +39,11 @@ abstract class AbstractKotlinHighlightExitPointsHandlerFactory : HighlightUsages
     private fun getOnBreakOrContinueUsageHandler(editor: Editor, file: PsiFile, target: PsiElement): HighlightUsagesHandlerBase<*>? {
         val expression = when (val parent = target.parent) {
             is KtBreakExpression, is KtContinueExpression -> parent
+            is KtDoWhileExpression -> parent.takeIf { target.elementType == KtTokens.DO_KEYWORD }
             is KtLoopExpression -> parent
             else -> null
         } as? KtExpression ?: return null
-        return OnLoopUsagesHandler(editor, file, expression, false)
+        return OnLoopUsagesHandler(editor, file, expression)
     }
 
     private fun getOnLambdaCallUsageHandler(editor: Editor, file: PsiFile, target: PsiElement): HighlightUsagesHandlerBase<*>? {
@@ -75,6 +76,8 @@ abstract class AbstractKotlinHighlightExitPointsHandlerFactory : HighlightUsages
 
     protected abstract fun isInlinedArgument(declaration: KtDeclarationWithBody): Boolean
 
+    protected abstract fun hasNonUnitReturnType(functionLiteral: KtFunctionLiteral): Boolean
+
     protected fun getRelevantDeclaration(expression: KtExpression): KtDeclarationWithBody? {
         if (expression is KtReturnExpression) {
             getRelevantReturnDeclaration(expression)?.let { return it }
@@ -87,7 +90,7 @@ abstract class AbstractKotlinHighlightExitPointsHandlerFactory : HighlightUsages
                         return parent
                     }
 
-                    if (InlineUtil.canBeInlineArgument(parent) && !isInlinedArgument(parent)) {
+                    if ((parent is KtFunctionLiteral || parent is KtNamedFunction) && !isInlinedArgument(parent)) {
                         return parent
                     }
                 }
@@ -139,7 +142,7 @@ abstract class AbstractKotlinHighlightExitPointsHandlerFactory : HighlightUsages
             }
 
             val lastStatementExpressions =
-                if (relevantFunction is KtFunctionLiteral ||
+                if ((relevantFunction is KtFunctionLiteral && hasNonUnitReturnType(relevantFunction)) ||
                     (relevantFunction is KtNamedFunction && relevantFunction.bodyBlockExpression == null)
                 ) {
                     val lastStatements = mutableSetOf<PsiElement>(relevantFunction)
@@ -210,21 +213,25 @@ abstract class AbstractKotlinHighlightExitPointsHandlerFactory : HighlightUsages
                 override fun visitExpression(expression: KtExpression) {
                     if (relevantFunction is KtFunctionLiteral || relevantFunction is KtNamedFunction) {
                         if (occurrenceForFunctionLiteralReturnExpression(expression, expression in lastStatementExpressions)) {
-                            if (!targetOccurrenceAdded) {
-                                when (relevantFunction) {
-                                    is KtFunctionLiteral -> relevantFunction.parentOfTypes(KtCallExpression::class)?.calleeExpression
-                                    is KtNamedFunction -> relevantFunction.funKeyword
-                                    else -> null
-                                }?.let {
-                                    targetOccurrenceAdded = true
-                                    addOccurrence(it)
-                                }
-                            }
+                            addTargetOccurenceIfNeeded(relevantFunction)
                             return
                         }
                     }
 
                     super.visitExpression(expression)
+                }
+
+                private fun addTargetOccurenceIfNeeded(relevantFunction: KtDeclarationWithBody) {
+                    if (!targetOccurrenceAdded) {
+                        when (relevantFunction) {
+                            is KtFunctionLiteral -> relevantFunction.parentOfTypes(KtCallExpression::class)?.calleeExpression
+                            is KtNamedFunction -> relevantFunction.funKeyword
+                            else -> null
+                        }?.let {
+                            targetOccurrenceAdded = true
+                            addOccurrence(it)
+                        }
+                    }
                 }
 
                 private fun occurrenceForFunctionLiteralReturnExpression(expression: KtExpression, lastLambdaExpression: Boolean): Boolean {
@@ -288,6 +295,8 @@ abstract class AbstractKotlinHighlightExitPointsHandlerFactory : HighlightUsages
 
                         else -> addOccurrence(expression)
                     }
+
+                    addTargetOccurenceIfNeeded(relevantFunction)
                 }
 
                 override fun visitThrowExpression(expression: KtThrowExpression) {
@@ -301,7 +310,7 @@ abstract class AbstractKotlinHighlightExitPointsHandlerFactory : HighlightUsages
         override fun highlightReferences(): Boolean = highlightReferences
     }
 
-    private inner class OnLoopUsagesHandler(editor: Editor, file: PsiFile, val target: KtExpression, val highlightReferences: Boolean) :
+    private inner class OnLoopUsagesHandler(editor: Editor, file: PsiFile, val target: KtExpression) :
         HighlightUsagesHandlerBase<PsiElement>(editor, file) {
         override fun getTargets(): List<KtExpression> = listOf(target)
 

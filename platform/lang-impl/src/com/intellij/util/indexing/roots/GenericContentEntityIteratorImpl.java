@@ -10,7 +10,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 
-public class GenericContentEntityIteratorImpl extends RootHolderIteratorBase {
+public final class GenericContentEntityIteratorImpl extends RootHolderIteratorBase {
 
   public GenericContentEntityIteratorImpl(@NotNull EntityReference<?> entityReference,
                                           @NotNull IndexingRootHolder roots,
@@ -18,7 +18,7 @@ public class GenericContentEntityIteratorImpl extends RootHolderIteratorBase {
     super(entityReference, roots, presentation != null
                                   ? presentation
                                   : IndexableIteratorPresentation.create(
-                                    "Module unaware content roots from entity (" + roots.getRootsDebugStr() + ")",
+                                    "Module unaware content roots from entity (" + roots.getDebugDescription() + ")",
                                     IndexingBundle.message("indexable.files.provider.indexing.content"),
                                     IndexingBundle.message("indexable.files.provider.scanning.content")));
   }

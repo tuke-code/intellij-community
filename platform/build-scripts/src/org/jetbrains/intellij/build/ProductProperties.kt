@@ -1,18 +1,19 @@
 // Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.intellij.build
 
+import com.intellij.platform.runtime.repository.ProductMode
 import com.jetbrains.plugin.structure.base.plugin.PluginCreationFail
 import com.jetbrains.plugin.structure.base.plugin.PluginCreationResult
 import com.jetbrains.plugin.structure.base.plugin.PluginCreationSuccess
 import com.jetbrains.plugin.structure.base.plugin.PluginProblem
 import com.jetbrains.plugin.structure.intellij.plugin.IdePlugin
 import kotlinx.collections.immutable.PersistentList
-import kotlinx.collections.immutable.PersistentMap
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.persistentMapOf
 import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.intellij.build.impl.PlatformLayout
 import org.jetbrains.intellij.build.impl.productInfo.CustomProperty
+import org.jetbrains.jps.model.JpsProject
 import org.jetbrains.jps.model.module.JpsModule
 import java.nio.file.Path
 import java.util.*
@@ -74,7 +75,7 @@ abstract class ProductProperties {
   /**
    * Paths to directories containing images specified by 'logo/@url' and 'icon/@ico' attributes in ApplicationInfo.xml file.
    * <br>
-   * todo(nik) get rid of this and make sure that these resources are located in [applicationInfoModule] instead
+   * todo get rid of this and make sure that these resources are located in [applicationInfoModule] instead
    */
   var brandingResourcePaths: List<Path> = emptyList()
 
@@ -121,14 +122,14 @@ abstract class ProductProperties {
   /**
    * The specified options will be used instead of/in addition to the default JVM memory options for all operating systems.
    */
-  var customJvmMemoryOptions: PersistentMap<String, String> = persistentMapOf()
+  var customJvmMemoryOptions: Map<String, String> = persistentMapOf()
 
   /**
    * An identifier which will be used to form names for directories where configuration and caches will be stored, usually a product name
    * without spaces with an added version ('IntelliJIdea2016.1' for IntelliJ IDEA 2016.1).
    */
   open fun getSystemSelector(appInfo: ApplicationInfoProperties, buildNumber: String): String =
-    "${appInfo.productName}${appInfo.majorVersion}.${appInfo.minorVersionMainPart}"
+    "${appInfo.fullProductName}${appInfo.majorVersion}.${appInfo.minorVersionMainPart}"
 
   /**
    * If `true`, Alt+Button1 shortcut will be removed from 'Quick Evaluate Expression' action and assigned to 'Add/Remove Caret' action
@@ -163,6 +164,22 @@ abstract class ProductProperties {
   val productLayout: ProductModulesLayout = ProductModulesLayout()
 
   /**
+   * Base part of URL (ending with `/`) where additional product resources are located.
+   * For example, for IntelliJ IDEA it's `https://download.jetbrains.com/idea/`.
+   * Note that it can be used only for published builds; there will be no resources for snapshot or nightly builds.
+   * It's used by the build scripts for the following:
+   * * to inject URL of *.manifest file produced by [RepairUtilityBuilder][org.jetbrains.intellij.build.impl.support.RepairUtilityBuilder] and 
+   *   in `repair` executable;
+   * * to specify URL of distributions in [SBOM][SoftwareBillOfMaterials] files. 
+   */
+  var baseDownloadUrl: String? = null
+
+  /**
+   * See [SoftwareBillOfMaterials]
+   */
+  val sbomOptions = SoftwareBillOfMaterials.Options()
+
+  /**
    * If `true`, a cross-platform ZIP archive containing binaries for all OSes will be built.
    * The archive will be generated in [BuildPaths.artifactDir] directory and have ".portable" suffix by default
    * (override [getCrossPlatformZipFileName] to change the file name).
@@ -184,7 +201,21 @@ abstract class ProductProperties {
    * specified module is used to compute [JetBrainsClientModuleFilter]. 
    */
   @ApiStatus.Experimental
-  var embeddedJetBrainsClientMainModule: String? = null 
+  var embeddedJetBrainsClientMainModule: String? = null
+
+  /**
+   * Specifies a factory function for an instance which will be used to generate launchers for the embedded JetBrains Client. 
+   */
+  @ApiStatus.Experimental
+  var embeddedJetBrainsClientProperties: (() -> ProductProperties)? = null
+
+  /**
+   * Specifies the mode of this product which will be used to determine which plugin modules should be loaded at runtime by 
+   * [the modular loader][com.intellij.platform.bootstrap.ModuleBasedProductLoadingStrategy].
+   * This property makes sense only if [supportModularLoading] is set to `true`.
+   */
+  @ApiStatus.Experimental
+  var productMode: ProductMode = ProductMode.LOCAL_IDE
 
   /**
    * Specifies name of cross-platform ZIP archive if `[buildCrossPlatformDistribution]` is set to `true`.
@@ -197,7 +228,7 @@ abstract class ProductProperties {
    * A config map for [org.jetbrains.intellij.build.impl.ClassFileChecker],
    * when .class file version verification is needed.
    */
-  var versionCheckerConfig: PersistentMap<String, String> = persistentMapOf()
+  var versionCheckerConfig: Map<String, String> = java.util.Map.of()
 
   /**
    * Strings which are forbidden as a part of resulting class file path. E.g.:
@@ -278,13 +309,13 @@ abstract class ProductProperties {
 
   /**
    * Specified additional modules (not included into the product layout) which need to be compiled when product is built.
-   * todo(nik) get rid of this
+   * todo get rid of this
    */
   var additionalModulesToCompile: PersistentList<String> = persistentListOf()
 
   /**
    * Specified modules which tests need to be compiled when product is built.
-   * todo(nik) get rid of this
+   * todo get rid of this
    */
   var modulesToCompileTests: PersistentList<String> = persistentListOf()
 
@@ -307,7 +338,7 @@ abstract class ProductProperties {
    * @return the name of a subdirectory under `projectHome/out` where build artifacts will be placed,
    * must be unique among all products built from the same sources.
    */
-  open fun getOutputDirectoryName(appInfo: ApplicationInfoProperties) = appInfo.productName.lowercase(Locale.ROOT)
+  open fun getOutputDirectoryName(appInfo: ApplicationInfoProperties) = appInfo.fullProductName.lowercase(Locale.ROOT)
 
   /**
    * Paths to externally built plugins to be included in the IDE.
@@ -357,6 +388,20 @@ abstract class ProductProperties {
    * authoring tools and builds.
    */
   var buildDocAuthoringAssets: Boolean = false
+
+  /**
+   * Allows to override product name in ApplicationInfo.xml
+   * todo: remove me when platform is ready
+   */
+  @Deprecated("Do not use it. Needed only for JetBrains Client per-ide customisation + it's temporary")
+  open fun productNameOverride(project: JpsProject): ApplicationNamesInfoOverride? = null
+
+  @Deprecated("Do not use it. Needed only for JetBrains Client per-ide customisation + it's temporary")
+  data class ApplicationNamesInfoOverride(
+    val fullProductName: String,
+    val editionName: String?,
+    val motto: String?,
+  )
 
   /**
    * Allows customizing [BuildOptions.VALIDATE_PLUGINS_TO_BE_PUBLISHED] step.

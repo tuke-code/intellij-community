@@ -28,13 +28,26 @@ __jetbrains_intellij_encode_large() {
 }
 
 __jetbrains_intellij_is_generator_command() {
-  [[ "$1" == *"__jetbrains_intellij_get_directory_files"* ]]
+  [[ "$1" == *"__jetbrains_intellij_get_directory_files"* || "$1" == *"__jetbrains_intellij_get_environment"* ]]
 }
 
 __jetbrains_intellij_get_directory_files() {
   __JETBRAINS_INTELLIJ_GENERATOR_COMMAND=1
   builtin local request_id="$1"
   builtin local result="$(ls -1ap "$2")"
+  builtin printf '\e]1341;generator_finished;request_id=%s;result=%s\a' "$request_id" "$(__jetbrains_intellij_encode_large "${result}")"
+}
+
+__jetbrains_intellij_get_environment() {
+  __JETBRAINS_INTELLIJ_GENERATOR_COMMAND=1
+  builtin local request_id="$1"
+  builtin local env_vars="$(builtin print -l -- ${(ko)parameters[(R)*export*]})"
+  builtin local keyword_names="$(builtin print -l -- ${(ko)reswords})"
+  builtin local builtin_names="$(builtin print -l -- ${(ko)builtins})"
+  builtin local function_names="$(builtin print -l -- ${(ko)functions})"
+  builtin local command_names="$(builtin print -l -- ${(ko)commands})"
+
+  builtin local result="{\"envs\": \"$env_vars\", \"keywords\": \"$keyword_names\", \"builtins\": \"$builtin_names\", \"functions\": \"$function_names\", \"commands\": \"$command_names\"}"
   builtin printf '\e]1341;generator_finished;request_id=%s;result=%s\a' "$request_id" "$(__jetbrains_intellij_encode_large "${result}")"
 }
 
@@ -51,8 +64,6 @@ __jetbrains_intellij_configure_prompt() {
   # do not show right prompt
   builtin unset RPS1
   builtin unset RPROMPT
-  # always show new prompt after completion list
-  builtin unsetopt ALWAYS_LAST_PROMPT
 }
 
 __jetbrains_intellij_command_preexec() {
@@ -60,6 +71,7 @@ __jetbrains_intellij_command_preexec() {
   then
     return 0
   fi
+  __jetbrains_intellij_clear_all_and_move_cursor_to_top_left
   builtin local entered_command="$1"
   builtin local current_directory="$PWD"
   builtin printf '\e]1341;command_started;command=%s;current_directory=%s\a' \
@@ -67,29 +79,31 @@ __jetbrains_intellij_command_preexec() {
     "$(__jetbrains_intellij_encode "${current_directory}")"
 }
 
+__jetbrains_intellij_clear_all_and_move_cursor_to_top_left() {
+  builtin printf '\e[3J\e[1;1H'
+}
+
 __jetbrains_intellij_command_precmd() {
+  builtin local LAST_EXIT_CODE="$?"
   if [ ! -z $__JETBRAINS_INTELLIJ_GENERATOR_COMMAND ]
   then
     unset __JETBRAINS_INTELLIJ_GENERATOR_COMMAND
     return 0
   fi
-  builtin local LAST_EXIT_CODE="$?"
   builtin local current_directory="$PWD"
   builtin printf '\e]1341;command_finished;exit_code=%s;current_directory=%s\a' \
     "$LAST_EXIT_CODE" "$(__jetbrains_intellij_encode "${current_directory}")"
   __jetbrains_intellij_configure_prompt
 }
 
+# override clear behaviour to handle it on IDE side and remove the blocks
+clear() {
+  builtin printf '\e]1341;clear_invoked\a'
+}
+
 add-zsh-hook preexec __jetbrains_intellij_command_preexec
 add-zsh-hook precmd __jetbrains_intellij_command_precmd
 add-zsh-hook zshaddhistory __jetbrains_intellij_zshaddhistory
-
-# Do not show "zsh: do you wish to see all <N> possibilities (<M> lines)?" question
-# when there are big number of completion items
-LISTMAX=1000000
-
-# This script is sourced from inside a `precmd` hook, i.e. right before the first prompt.
-builtin printf '\e]1341;initialized\a'
 
 __jetbrains_intellij_configure_prompt
 
@@ -97,3 +111,6 @@ __jetbrains_intellij_configure_prompt
 # Get all commands from history from the first command
 builtin local hist="$(builtin history 1)"
 builtin printf '\e]1341;command_history;history_string=%s\a' "$(__jetbrains_intellij_encode_large "${hist}")"
+
+# This script is sourced from inside a `precmd` hook, i.e. right before the first prompt.
+builtin printf '\e]1341;initialized;current_directory=%s\a' "$(__jetbrains_intellij_encode "$PWD")"

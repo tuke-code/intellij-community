@@ -1,18 +1,9 @@
 // Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.platform.workspace.storage.testEntities.entities
 
-import com.intellij.platform.workspace.storage.EntitySource
-import com.intellij.platform.workspace.storage.GeneratedCodeApiVersion
-
-import com.intellij.platform.workspace.storage.WorkspaceEntity
+import com.intellij.platform.workspace.storage.*
 import com.intellij.platform.workspace.storage.impl.containers.toMutableWorkspaceList
 import com.intellij.platform.workspace.storage.url.VirtualFileUrl
-import kotlin.jvm.JvmName
-import kotlin.jvm.JvmOverloads
-import kotlin.jvm.JvmStatic
-import com.intellij.platform.workspace.storage.EntityType
-import com.intellij.platform.workspace.storage.MutableEntityStorage
-
 
 
 interface SampleEntity2 : WorkspaceEntity {
@@ -47,7 +38,7 @@ interface SampleEntity2 : WorkspaceEntity {
 }
 
 //region generated code
-fun MutableEntityStorage.modifyEntity(entity: SampleEntity2, modification: SampleEntity2.Builder.() -> Unit) = modifyEntity(
+fun MutableEntityStorage.modifyEntity(entity: SampleEntity2, modification: SampleEntity2.Builder.() -> Unit): SampleEntity2 = modifyEntity(
   SampleEntity2.Builder::class.java, entity, modification)
 //endregion
 
@@ -90,6 +81,6 @@ interface VFUEntity2 : WorkspaceEntity {
 }
 
 //region generated code
-fun MutableEntityStorage.modifyEntity(entity: VFUEntity2, modification: VFUEntity2.Builder.() -> Unit) = modifyEntity(
+fun MutableEntityStorage.modifyEntity(entity: VFUEntity2, modification: VFUEntity2.Builder.() -> Unit): VFUEntity2 = modifyEntity(
   VFUEntity2.Builder::class.java, entity, modification)
 //endregion

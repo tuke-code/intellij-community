@@ -11,7 +11,6 @@ import com.intellij.testFramework.fixtures.TestFixtureRule
 import com.intellij.testFramework.rules.TempDirectory
 import com.intellij.util.io.createParentDirectories
 import com.intellij.util.io.delete
-import com.intellij.util.io.readText
 import org.junit.Assert
 import org.junit.ClassRule
 import org.junit.Rule
@@ -100,6 +99,10 @@ class WslSyncTest(private val linToWin: Boolean) {
     }
   }
 
+  @Test
+  fun testNonExistingLinuxDir() {
+    Assert.assertTrue("Folder must be empty", LinuxFileStorage("/etc/foobarbuz", wslRule.wsl).isEmpty())
+  }
   @Test
   fun testLinks() {
     val sources = arrayOf("source", "source_2").map { FilePathRelativeToDir(it) }.toTypedArray()

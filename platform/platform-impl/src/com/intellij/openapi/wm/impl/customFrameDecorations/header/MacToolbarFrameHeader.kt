@@ -17,10 +17,10 @@ import com.intellij.openapi.wm.impl.customFrameDecorations.header.titleLabel.Sim
 import com.intellij.openapi.wm.impl.getPreferredWindowHeaderHeight
 import com.intellij.openapi.wm.impl.headertoolbar.MainToolbar
 import com.intellij.openapi.wm.impl.headertoolbar.computeMainActionGroups
+import com.intellij.platform.util.coroutines.childScope
 import com.intellij.ui.UIBundle
 import com.intellij.ui.mac.MacFullScreenControlsManager
 import com.intellij.ui.mac.MacMainFrameDecorator
-import com.intellij.util.childScope
 import com.intellij.util.ui.JBUI
 import com.jetbrains.JBR
 import com.jetbrains.WindowDecorations
@@ -61,7 +61,7 @@ internal class MacToolbarFrameHeader(private val coroutineScope: CoroutineScope,
     }
   }
 
-  private val customTitleBar: WindowDecorations.CustomTitleBar?
+  val customTitleBar: WindowDecorations.CustomTitleBar?
 
   init {
     // color full toolbar
@@ -125,7 +125,7 @@ internal class MacToolbarFrameHeader(private val coroutineScope: CoroutineScope,
   }
 
   private fun createView(isCompactHeader: Boolean): HeaderView {
-    return if (isCompactHeader) CompactHeaderView(this, frame) else ToolbarHeaderView(this, coroutineScope, frame)
+    return if (isCompactHeader) CompactHeaderView(this, frame, isFullScreen(rootPane)) else ToolbarHeaderView(this, coroutineScope, frame)
   }
 
   private fun getPreferredHeight(): Int {
@@ -163,6 +163,8 @@ internal class MacToolbarFrameHeader(private val coroutineScope: CoroutineScope,
   private suspend fun updateView(isCompactHeader: Boolean): Boolean {
     val view = withContext(Dispatchers.EDT) {
       if (isCompactHeader == (view is CompactHeaderView)) {
+        // IDEA-324521 Colored toolbar rendering is broken when enabling/disabling colored toolbar via main toolbar context menu
+        repaint()
         return@withContext null
       }
 
@@ -262,11 +264,11 @@ private class ToolbarHeaderView(panel: JPanel, parentCoroutineScope: CoroutineSc
   }
 }
 
-private class CompactHeaderView(panel: JPanel, frame: JFrame) : HeaderView {
+private class CompactHeaderView(panel: JPanel, frame: JFrame, isFullScreen: Boolean) : HeaderView {
   private val headerTitle: SimpleCustomDecorationPath
   init {
     headerTitle = SimpleCustomDecorationPath(frame)
-    headerTitle.add(panel, if (isFullScreen(frame.rootPane) && !MacFullScreenControlsManager.enabled()) 0 else GAP_FOR_BUTTONS)
+    headerTitle.add(panel, if (isFullScreen && !MacFullScreenControlsManager.enabled()) 0 else GAP_FOR_BUTTONS)
   }
 
   override fun updateBorders(left: Int, right: Int) {

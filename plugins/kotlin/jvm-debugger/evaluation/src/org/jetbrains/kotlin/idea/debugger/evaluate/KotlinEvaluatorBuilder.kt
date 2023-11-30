@@ -9,18 +9,17 @@ import com.intellij.debugger.engine.evaluation.EvaluateException
 import com.intellij.debugger.engine.evaluation.EvaluateExceptionUtil
 import com.intellij.debugger.engine.evaluation.EvaluationContextImpl
 import com.intellij.debugger.engine.evaluation.expression.*
-import com.intellij.debugger.engine.jdi.StackFrameProxy
 import com.intellij.debugger.impl.DebuggerUtilsEx
 import com.intellij.openapi.application.ReadAction
 import com.intellij.openapi.application.runReadAction
 import com.intellij.openapi.diagnostic.Attachment
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.progress.ProcessCanceledException
-import com.intellij.openapi.project.DumbService
+import com.intellij.openapi.project.IndexNotReadyException
+import com.intellij.openapi.project.Project
 import com.intellij.psi.PsiElement
 import com.intellij.psi.util.CachedValueProvider
 import com.intellij.psi.util.CachedValuesManager
-import com.intellij.psi.util.PsiModificationTracker
 import com.sun.jdi.*
 import com.sun.jdi.Value
 import org.jetbrains.annotations.ApiStatus
@@ -74,10 +73,12 @@ import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.resolve.AnalyzingUtils
 import org.jetbrains.kotlin.resolve.BindingContext
 import org.jetbrains.kotlin.resolve.jvm.AsmTypes
+import org.jetbrains.kotlin.resolve.jvm.diagnostics.ErrorsJvm
 import org.jetbrains.org.objectweb.asm.ClassReader
 import org.jetbrains.org.objectweb.asm.tree.ClassNode
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.ExecutionException
 import org.jetbrains.eval4j.Value as Eval4JValue
 
 internal val LOG = Logger.getInstance(KotlinEvaluator::class.java)
@@ -101,15 +102,10 @@ object KotlinEvaluatorBuilder : EvaluatorBuilder {
 }
 
 class KotlinEvaluator(val codeFragment: KtCodeFragment, private val sourcePosition: SourcePosition?) : Evaluator {
+
     override fun evaluate(context: EvaluationContextImpl): Any? {
         if (codeFragment.text.isEmpty()) {
             return context.debugProcess.virtualMachineProxy.mirrorOfVoid()
-        }
-
-        runReadAction {
-            if (DumbService.getInstance(codeFragment.project).isDumb) {
-                evaluationException(KotlinDebuggerEvaluationBundle.message("error.dumb.mode"))
-            }
         }
 
         if (!context.debugProcess.isAttached) {
@@ -135,6 +131,8 @@ class KotlinEvaluator(val codeFragment: KtCodeFragment, private val sourcePositi
             evaluationException(e.reason)
         } catch (e: EvaluateException) {
             throw e
+        } catch (e: IndexNotReadyException) {
+            evaluationException(KotlinDebuggerEvaluationBundle.message("error.dumb.mode"))
         } catch (e: ProcessCanceledException) {
             evaluationException(e)
         } catch (e: Eval4JInterpretingException) {
@@ -175,10 +173,7 @@ class KotlinEvaluator(val codeFragment: KtCodeFragment, private val sourcePositi
     private fun getCompiledCodeFragment(context: ExecutionContext): CompiledCodeFragmentData {
         val cache = runReadAction {
             val contextElement = codeFragment.context ?: return@runReadAction null
-            CachedValuesManager.getCachedValue(contextElement) {
-                val storage = ConcurrentHashMap<String, CompiledCodeFragmentData>()
-                CachedValueProvider.Result(ConcurrentFactoryCache(storage), PsiModificationTracker.MODIFICATION_COUNT)
-            }
+            CachedValuesManager.getCachedValue(contextElement, OnRefreshCachedValueProvider(context.project))
         }
         if (cache == null) return compileCodeFragment(context)
 
@@ -192,11 +187,42 @@ class KotlinEvaluator(val codeFragment: KtCodeFragment, private val sourcePositi
         }
     }
 
-    private fun compileCodeFragment(context: ExecutionContext): CompiledCodeFragmentData {
-        return if (isK2Plugin()) compiledCodeFragmentDataK2(context) else compiledCodeFragmentDataK1(context)
+    private class OnRefreshCachedValueProvider(private val project: Project) : CachedValueProvider<ConcurrentFactoryCache<String, CompiledCodeFragmentData>> {
+        override fun compute(): CachedValueProvider.Result<ConcurrentFactoryCache<String, CompiledCodeFragmentData>> {
+            val storage = ConcurrentHashMap<String, CompiledCodeFragmentData>()
+            return CachedValueProvider.Result(ConcurrentFactoryCache(storage), KotlinDebuggerSessionRefreshTracker.getInstance(project))
+        }
     }
 
-    private fun compiledCodeFragmentDataK2(context: ExecutionContext): CompiledCodeFragmentData = runReadAction {
+    private fun compileCodeFragment(context: ExecutionContext): CompiledCodeFragmentData {
+        try {
+            return if (isK2Plugin()) compiledCodeFragmentDataK2(context) else compiledCodeFragmentDataK1(context)
+        } catch (e: ExecutionException) {
+            throw e.cause ?: e
+        }
+    }
+
+    private fun compiledCodeFragmentDataK2(context: ExecutionContext): CompiledCodeFragmentData {
+        val stats = CodeFragmentCompilationStats()
+        fun onFinish(status: StatisticsEvaluationResult) =
+            KotlinDebuggerEvaluatorStatisticsCollector.logEvaluationResult(codeFragment.project, StatisticsEvaluator.K2, status, stats)
+        try {
+            patchCodeFragment(context, codeFragment, stats)
+
+            val result = stats.startAndMeasureAnalysisUnderReadAction {
+                compiledCodeFragmentDataK2Impl(context)
+            }.getOrThrow()
+            onFinish(StatisticsEvaluationResult.SUCCESS)
+            return result
+        } catch(e: ProcessCanceledException) {
+            throw e
+        } catch (e: Throwable) {
+            onFinish(StatisticsEvaluationResult.FAILURE)
+            throw e
+        }
+    }
+
+    private fun compiledCodeFragmentDataK2Impl(context: ExecutionContext): CompiledCodeFragmentData {
         val module = codeFragment.module
 
         val compilerConfiguration = CompilerConfiguration().apply {
@@ -208,7 +234,7 @@ class KotlinEvaluator(val codeFragment: KtCodeFragment, private val sourcePositi
             put(KtCompilerFacility.CODE_FRAGMENT_METHOD_NAME, GENERATED_FUNCTION_NAME)
         }
 
-        analyze(codeFragment) {
+        return analyze(codeFragment) {
             try {
                 val compilerTarget = KtCompilerTarget.Jvm(ClassBuilderFactories.BINARIES)
                 val allowedErrorFilter = KotlinCompilerIdeAllowedErrorFilter.getInstance()
@@ -238,7 +264,7 @@ class KotlinEvaluator(val codeFragment: KtCodeFragment, private val sourcePositi
             } catch (e: EvaluateException) {
                 throw e
             } catch (e: Throwable) {
-                reportErrorWithAttachments(context, codeFragment, CodeFragmentCodegenException(e))
+                reportErrorWithAttachments(context, codeFragment, e)
                 throw EvaluateExceptionUtil.createEvaluateException(e)
             }
         }
@@ -298,22 +324,10 @@ class KotlinEvaluator(val codeFragment: KtCodeFragment, private val sourcePositi
         } else {
             OldCodeFragmentCompilingStrategy(codeFragment)
         }
+        patchCodeFragment(context, codeFragment, compilerStrategy.stats)
 
         compilerStrategy.beforeAnalyzingCodeFragment()
-        var analysisResult = analyze(codeFragment, debugProcess)
-        val codeFragmentWasEdited = KotlinCodeFragmentEditor(codeFragment)
-            .withToStringWrapper(analysisResult.bindingContext)
-            .withSuspendFunctionWrapper(
-                analysisResult.bindingContext,
-                context,
-                isCoroutineScopeAvailable(context.frameProxy)
-            )
-            .editCodeFragment()
-
-        if (codeFragmentWasEdited) {
-            // Repeat analysis for edited code fragment
-            analysisResult = analyze(codeFragment, debugProcess)
-        }
+        val analysisResult = analyze(codeFragment, debugProcess)
 
         analysisResult.illegalSuspendFunCallDiagnostic?.let {
             evaluationException(DefaultErrorMessages.render(it))
@@ -328,12 +342,6 @@ class KotlinEvaluator(val codeFragment: KtCodeFragment, private val sourcePositi
 
         return createCompiledDataDescriptor(result)
     }
-
-    private fun isCoroutineScopeAvailable(frameProxy: StackFrameProxy) =
-        if (frameProxy is CoroutineStackFrameProxyImpl)
-            frameProxy.isCoroutineScopeAvailable()
-        else
-            false
 
     private data class ErrorCheckingResult(
         val bindingContext: BindingContext,
@@ -552,7 +560,10 @@ class KotlinEvaluator(val codeFragment: KtCodeFragment, private val sourcePositi
                     Errors.MISSING_DEPENDENCY_SUPERCLASS,
                     Errors.IR_WITH_UNSTABLE_ABI_COMPILED_CLASS,
                     Errors.FIR_COMPILED_CLASS,
-                    Errors.ILLEGAL_SUSPEND_FUNCTION_CALL
+                    Errors.ILLEGAL_SUSPEND_FUNCTION_CALL,
+                    ErrorsJvm.JAVA_MODULE_DOES_NOT_DEPEND_ON_MODULE,
+                    ErrorsJvm.JAVA_MODULE_DOES_NOT_READ_UNNAMED_MODULE,
+                    ErrorsJvm.JAVA_MODULE_DOES_NOT_EXPORT_PACKAGE
                 )
 
         private val DEFAULT_METHOD_MARKERS = listOf(AsmTypes.OBJECT_TYPE, AsmTypes.DEFAULT_CONSTRUCTOR_MARKER)

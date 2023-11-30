@@ -1,17 +1,9 @@
 // Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.platform.workspace.storage.testEntities.entities
 
-import com.intellij.platform.workspace.storage.EntitySource
-import com.intellij.platform.workspace.storage.GeneratedCodeApiVersion
-import com.intellij.platform.workspace.storage.MutableEntityStorage
-import com.intellij.platform.workspace.storage.WorkspaceEntity
-import kotlin.jvm.JvmName
-import kotlin.jvm.JvmOverloads
-import kotlin.jvm.JvmStatic
-import com.intellij.platform.workspace.storage.EntityType
+import com.intellij.platform.workspace.storage.*
 import com.intellij.platform.workspace.storage.annotations.Abstract
 import com.intellij.platform.workspace.storage.annotations.Child
-
 
 
 interface ParentChainEntity : WorkspaceEntity {
@@ -40,7 +32,8 @@ interface ParentChainEntity : WorkspaceEntity {
 }
 
 //region generated code
-fun MutableEntityStorage.modifyEntity(entity: ParentChainEntity, modification: ParentChainEntity.Builder.() -> Unit) = modifyEntity(
+fun MutableEntityStorage.modifyEntity(entity: ParentChainEntity,
+                                      modification: ParentChainEntity.Builder.() -> Unit): ParentChainEntity = modifyEntity(
   ParentChainEntity.Builder::class.java, entity, modification)
 //endregion
 
@@ -128,7 +121,7 @@ interface CompositeChildAbstractEntity : CompositeAbstractEntity {
 
 //region generated code
 fun MutableEntityStorage.modifyEntity(entity: CompositeChildAbstractEntity,
-                                      modification: CompositeChildAbstractEntity.Builder.() -> Unit) = modifyEntity(
+                                      modification: CompositeChildAbstractEntity.Builder.() -> Unit): CompositeChildAbstractEntity = modifyEntity(
   CompositeChildAbstractEntity.Builder::class.java, entity, modification)
 //endregion
 
@@ -157,6 +150,6 @@ interface SimpleChildAbstractEntity : SimpleAbstractEntity {
 
 //region generated code
 fun MutableEntityStorage.modifyEntity(entity: SimpleChildAbstractEntity,
-                                      modification: SimpleChildAbstractEntity.Builder.() -> Unit) = modifyEntity(
+                                      modification: SimpleChildAbstractEntity.Builder.() -> Unit): SimpleChildAbstractEntity = modifyEntity(
   SimpleChildAbstractEntity.Builder::class.java, entity, modification)
 //endregion

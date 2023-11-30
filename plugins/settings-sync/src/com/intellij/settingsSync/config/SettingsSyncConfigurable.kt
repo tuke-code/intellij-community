@@ -24,6 +24,7 @@ import com.intellij.settingsSync.*
 import com.intellij.settingsSync.SettingsSyncBundle.message
 import com.intellij.settingsSync.UpdateResult.*
 import com.intellij.settingsSync.auth.SettingsSyncAuthService
+import com.intellij.settingsSync.statistics.SettingsSyncEventsStatistics
 import com.intellij.ui.components.ActionLink
 import com.intellij.ui.dsl.builder.*
 import com.intellij.ui.layout.ComponentPredicate
@@ -59,11 +60,13 @@ internal class SettingsSyncConfigurable : BoundConfigurable(message("title.setti
 
   inner class LoggedInPredicate : ComponentPredicate() {
     override fun addListener(listener: (Boolean) -> Unit) =
-      SettingsSyncAuthService.getInstance().addListener(object : SettingsSyncAuthService.Listener {
-        override fun stateChanged() {
-          listener(invoke())
-        }
-      }, disposable!!)
+      SettingsSyncEvents.getInstance().addListener(
+        object : SettingsSyncEventListener {
+          override fun loginStateChanged() {
+            listener(invoke())
+          }
+        },
+        disposable!!)
 
     override fun invoke() = SettingsSyncAuthService.getInstance().isLoggedIn()
   }
@@ -236,13 +239,17 @@ internal class SettingsSyncConfigurable : BoundConfigurable(message("title.setti
         }
       }.visibleIf(LoggedInPredicate().and(EnabledPredicate()))
     }
-    SettingsSyncAuthService.getInstance().addListener(object : SettingsSyncAuthService.Listener {
-      override fun stateChanged() {
-        if (SettingsSyncAuthService.getInstance().isLoggedIn() && !SettingsSyncSettings.getInstance().syncEnabled) {
-          syncEnabler.checkServerState()
+    SettingsSyncEvents.getInstance().addListener(
+      object : SettingsSyncEventListener {
+        override fun loginStateChanged() {
+          if (SettingsSyncAuthService.getInstance().isLoggedIn() && !SettingsSyncSettings.getInstance().syncEnabled) {
+            syncEnabler.checkServerState()
+          }
+          reset()
         }
-      }
-    }, disposable!!)
+      },
+      disposable!!
+    )
     return configPanel
   }
 

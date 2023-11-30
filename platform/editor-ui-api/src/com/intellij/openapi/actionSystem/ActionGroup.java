@@ -55,12 +55,21 @@ public abstract class ActionGroup extends AnAction {
 
   public ActionGroup(@NotNull Supplier<@ActionText String> shortName, boolean popup) {
     super(shortName);
-    setPopup(popup);
+    // avoid creating template presentation right on init
+    if (popup) {
+      getTemplatePresentation().setPopupGroup(popup);
+    }
   }
 
   public ActionGroup(@Nullable @ActionText String text,
                      @Nullable @ActionDescription String description,
                      @Nullable Icon icon) {
+    super(text, description, icon);
+  }
+
+  public ActionGroup(@NotNull Supplier<@ActionText String> text,
+                     @NotNull Supplier<@ActionDescription String> description,
+                     @Nullable Supplier<? extends @Nullable Icon> icon) {
     super(text, description, icon);
   }
 
@@ -92,12 +101,6 @@ public abstract class ActionGroup extends AnAction {
   @ApiStatus.NonExtendable
   public boolean isPopup() {
     return getTemplatePresentation().isPopupGroup();
-  }
-
-  /** @deprecated Use {@link Presentation#setPopupGroup(boolean)} instead. */
-  @Deprecated(forRemoval = true)
-  public boolean isPopup(@NotNull String place) {
-    return isPopup();
   }
 
   /**

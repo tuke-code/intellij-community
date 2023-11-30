@@ -43,15 +43,21 @@ public final class ExpUiIcons {
     /** 16x16 */ public static final @NotNull Icon PlayFirst = load("expui/actions/playFirst.svg", -1624411616, 2);
     /** 16x16 */ public static final @NotNull Icon PlayForward = load("expui/actions/playForward.svg", 929979108, 2);
     /** 16x16 */ public static final @NotNull Icon PlayLast = load("expui/actions/playLast.svg", 1279252835, 2);
-    /** 16x16 */ public static final @NotNull Icon ProfileCPU = load("expui/actions/profileCPU.svg", 251390405, 2);
+    /** 16x16 */ public static final @NotNull Icon Preview = load("expui/actions/preview.svg", 216908392, 2);
+    /** 16x16 */ public static final @NotNull Icon ProfileCPU = load("expui/actions/profileCPU.svg", -2066399037, 2);
+    /** 16x16 */ public static final @NotNull Icon ProfileMemory = load("expui/actions/profileMemory.svg", -340841991, 2);
+    /** 16x16 */ public static final @NotNull Icon ProfileRed = load("expui/actions/profileRed.svg", 406132239, 2);
     /** 16x16 */ public static final @NotNull Icon ProjectDirectory = load("expui/actions/projectDirectory.svg", 910306733, 2);
     /** 16x16 */ public static final @NotNull Icon ReformatCode = load("expui/actions/reformatCode.svg", 1980487789, 2);
+    /** 16x16 */ public static final @NotNull Icon Report = load("expui/actions/report.svg", -808282148, 2);
     /** 17x16 */ public static final @NotNull Icon RerunAutomatically = load("expui/actions/rerunAutomatically.svg", 116680346, 2);
     /** 16x16 */ public static final @NotNull Icon RunAll = load("expui/actions/runAll.svg", 553449736, 2);
     /** 16x16 */ public static final @NotNull Icon ShowImportStatements = load("expui/actions/showImportStatements.svg", 701158559, 2);
     /** 16x16 */ public static final @NotNull Icon ShowReadAccess = load("expui/actions/showReadAccess.svg", -659006968, 2);
     /** 16x16 */ public static final @NotNull Icon ShowWriteAccess = load("expui/actions/showWriteAccess.svg", 48135364, 2);
     /** 16x16 */ public static final @NotNull Icon Split = load("expui/actions/split.svg", -2090554966, 2);
+    /** 16x16 */ public static final @NotNull Icon StartMemoryProfile = load("expui/actions/startMemoryProfile.svg", 1939692711, 2);
+    /** 16x16 */ public static final @NotNull Icon SuggestedRefactoringBulb = load("expui/actions/suggestedRefactoringBulb.svg", -1109100444, 2);
     /** 16x16 */ public static final @NotNull Icon SwapPanels = load("expui/actions/swapPanels.svg", 496326212, 2);
     /** 16x16 */ public static final @NotNull Icon SynchronizeScrolling = load("expui/actions/synchronizeScrolling.svg", 1854114394, 2);
     /** 16x16 */ public static final @NotNull Icon ToggleVisibility = load("expui/actions/toggleVisibility.svg", 943747548, 2);
@@ -102,6 +108,8 @@ public final class ExpUiIcons {
     /** 14x14 */ public static final @NotNull Icon BreakpointUnsuspendentValid = load("expui/breakpoints/breakpointUnsuspendentValid.svg", 1047349070, 2);
     /** 14x14 */ public static final @NotNull Icon BreakpointValid = load("expui/breakpoints/breakpointValid.svg", -201114417, 2);
     /** 14x14 */ public static final @NotNull Icon MultipleBreakpoints = load("expui/breakpoints/multipleBreakpoints.svg", -1217715084, 2);
+    /** 14x14 */ public static final @NotNull Icon MultipleBreakpointsDisabled = load("expui/breakpoints/multipleBreakpointsDisabled.svg", -111597027, 2);
+    /** 14x14 */ public static final @NotNull Icon MultipleBreakpointsMuted = load("expui/breakpoints/multipleBreakpointsMuted.svg", 1739755214, 2);
     /** 7x10 */ public static final @NotNull Icon QuestionBadge = load("expui/breakpoints/questionBadge.svg", -1949828496, 2);
   }
 
@@ -115,13 +123,13 @@ public final class ExpUiIcons {
   }
 
   public static final class CodeInsight {
-    /** 12x12 */ public static final @NotNull Icon InlayGlobe = load("expui/codeInsight/inlayGlobe.svg", 867064087, 2);
+    /** 12x12 */ public static final @NotNull Icon InlayGlobe = load("expui/codeInsight/inlayGlobe.svg", 1536948055, 2);
     /** 12x12 */ public static final @NotNull Icon InlayRenameInComments = load("expui/codeInsight/inlayRenameInComments.svg", 514503166, 2);
     /** 12x12 */ public static final @NotNull Icon InlayRenameInCommentsActive = load("expui/codeInsight/inlayRenameInCommentsActive.svg", 1405437941, 2);
     /** 12x12 */ public static final @NotNull Icon InlayRenameInNoCodeFiles = load("expui/codeInsight/inlayRenameInNoCodeFiles.svg", -1983946882, 2);
     /** 12x12 */ public static final @NotNull Icon InlayRenameInNoCodeFilesActive = load("expui/codeInsight/inlayRenameInNoCodeFilesActive.svg", -1065560628, 2);
-    /** 12x12 */ public static final @NotNull Icon InlaySecuredShield = load("expui/codeInsight/inlaySecuredShield.svg", 358705954, 2);
-    /** 12x12 */ public static final @NotNull Icon InlaySettings = load("expui/codeInsight/inlaySettings.svg", -462348171, 2);
+    /** 12x12 */ public static final @NotNull Icon InlaySecuredShield = load("expui/codeInsight/inlaySecuredShield.svg", 1768593830, 2);
+    /** 12x12 */ public static final @NotNull Icon InlaySettings = load("expui/codeInsight/inlaySettings.svg", 681598369, 2);
     /** 16x16 */ public static final @NotNull Icon IntentionBulb = load("expui/codeInsight/intentionBulb.svg", -169640950, 2);
     /** 16x16 */ public static final @NotNull Icon IntentionBulbGrey = load("expui/codeInsight/intentionBulbGrey.svg", -1895429769, 2);
     /** 16x16 */ public static final @NotNull Icon QuickfixBulb = load("expui/codeInsight/quickfixBulb.svg", 228909852, 2);
@@ -131,17 +139,35 @@ public final class ExpUiIcons {
   public static final class CodeWithMe {
     /** 16x16 */ public static final @NotNull Icon CwmAccess = load("expui/codeWithMe/cwmAccess.svg", -1521879530, 2);
     /** 20x20 */ public static final @NotNull Icon CwmAccess_20x20 = load("expui/codeWithMe/cwmAccess@20x20.svg", 907861688, 2);
+    /** 11x11 */ public static final @NotNull Icon CwmCamAvatarOff = load("expui/codeWithMe/cwmCamAvatarOff.svg", -1502366590, 2);
+    /** 11x11 */ public static final @NotNull Icon CwmCamAvatarOn = load("expui/codeWithMe/cwmCamAvatarOn.svg", 204596505, 2);
+    /** 16x16 */ public static final @NotNull Icon CwmCamOff = load("expui/codeWithMe/cwmCamOff.svg", 414342721, 2);
+    /** 16x16 */ public static final @NotNull Icon CwmCamOn = load("expui/codeWithMe/cwmCamOn.svg", 1922687100, 2);
     /** 16x16 */ public static final @NotNull Icon CwmDisableCall = load("expui/codeWithMe/cwmDisableCall.svg", -1412356211, 2);
     /** 16x16 */ public static final @NotNull Icon CwmEnableCall = load("expui/codeWithMe/cwmEnableCall.svg", 1826092367, 2);
     /** 17x17 */ public static final @NotNull Icon CwmIconModificator = load("expui/codeWithMe/cwmIconModificator.svg", -457325122, 2);
     /** 15x15 */ public static final @NotNull Icon CwmIconModificator_14x14 = load("expui/codeWithMe/cwmIconModificator@14x14.svg", 1233056681, 2);
     /** 22x22 */ public static final @NotNull Icon CwmIconModificator_20x20 = load("expui/codeWithMe/cwmIconModificator@20x20.svg", 561818425, 2);
+    /** 16x16 */ public static final @NotNull Icon CwmIconModificatorMenu = load("expui/codeWithMe/cwmIconModificatorMenu.svg", 91482355, 2);
     /** 16x16 */ public static final @NotNull Icon CwmInvite = load("expui/codeWithMe/cwmInvite.svg", 1273298697, 2);
+    /** 11x11 */ public static final @NotNull Icon CwmMicAvatarOff = load("expui/codeWithMe/cwmMicAvatarOff.svg", -957010857, 2);
+    /** 11x11 */ public static final @NotNull Icon CwmMicAvatarOn = load("expui/codeWithMe/cwmMicAvatarOn.svg", -1568190492, 2);
+    /** 16x16 */ public static final @NotNull Icon CwmMicOff = load("expui/codeWithMe/cwmMicOff.svg", 1109794268, 2);
+    /** 16x16 */ public static final @NotNull Icon CwmMicOn = load("expui/codeWithMe/cwmMicOn.svg", -1957203887, 2);
+    /** 16x16 */ public static final @NotNull Icon CwmPermissionEdit = load("expui/codeWithMe/cwmPermissionEdit.svg", 607632437, 2);
+    /** 16x16 */ public static final @NotNull Icon CwmPermissionFull = load("expui/codeWithMe/cwmPermissionFull.svg", 1383807042, 2);
+    /** 16x16 */ public static final @NotNull Icon CwmPermissions = load("expui/codeWithMe/cwmPermissions.svg", 1536220397, 2);
+    /** 16x16 */ public static final @NotNull Icon CwmPermissionsGranted = load("expui/codeWithMe/cwmPermissionsGranted.svg", 236039752, 2);
+    /** 16x16 */ public static final @NotNull Icon CwmPermissionView = load("expui/codeWithMe/cwmPermissionView.svg", 1023310169, 2);
+    /** 16x16 */ public static final @NotNull Icon CwmScreenOff = load("expui/codeWithMe/cwmScreenOff.svg", 53389877, 2);
+    /** 16x16 */ public static final @NotNull Icon CwmScreenOn = load("expui/codeWithMe/cwmScreenOn.svg", -831422832, 2);
     /** 16x16 */ public static final @NotNull Icon CwmUsers = load("expui/codeWithMe/cwmUsers.svg", 374429727, 2);
     /** 20x20 */ public static final @NotNull Icon CwmUsers_20x20 = load("expui/codeWithMe/cwmUsers@20x20.svg", 1716201367, 2);
+    /** 14x14 */ public static final @NotNull Icon CwmVerified = load("expui/codeWithMe/cwmVerified.svg", -1152626587, 2);
   }
 
   public static final class Debugger {
+    /** 16x16 */ public static final @NotNull Icon AddToWatch = load("expui/debugger/addToWatch.svg", -2091134385, 2);
     /** 16x16 */ public static final @NotNull Icon DbPrimitive = load("expui/debugger/dbPrimitive.svg", 1281239460, 2);
     /** 16x16 */ public static final @NotNull Icon Frame = load("expui/debugger/frame.svg", 1802453349, 2);
     /** 16x16 */ public static final @NotNull Icon Threads = load("expui/debugger/threads.svg", 154272727, 2);
@@ -211,9 +237,8 @@ public final class ExpUiIcons {
     /** 16x16 */ public static final @NotNull Icon Jsp = load("expui/fileTypes/jsp.svg", -701663125, 2);
     /** 16x16 */ public static final @NotNull Icon Jspx = load("expui/fileTypes/jspx.svg", 985217374, 2);
     /** 16x16 */ public static final @NotNull Icon Less = load("expui/fileTypes/less.svg", -238843875, 2);
-    /** 16x16 */ public static final @NotNull Icon Lombok = load("expui/fileTypes/lombok.svg", -2072549731, 2);
-    /** 16x16 */ public static final @NotNull Icon LombokConfig = load("expui/fileTypes/lombokConfig.svg", -551438902, 2);
     /** 16x16 */ public static final @NotNull Icon Manifest = load("expui/fileTypes/manifest.svg", 273592604, 2);
+    /** 16x16 */ public static final @NotNull Icon MicrosoftWindows = load("expui/fileTypes/microsoftWindows.svg", -1850267689, 2);
     /** 13x13 */ public static final @NotNull Icon Modified = load("expui/fileTypes/modified.svg", 1796473277, 2);
     /** 16x16 */ public static final @NotNull Icon Patch = load("expui/fileTypes/patch.svg", -1862136134, 2);
     /** 16x16 */ public static final @NotNull Icon Perl = load("expui/fileTypes/perl.svg", -895068164, 2);
@@ -255,16 +280,18 @@ public final class ExpUiIcons {
     /** 16x16 */ public static final @NotNull Icon CollapseAll = load("expui/general/collapseAll.svg", 497603787, 2);
     /** 16x16 */ public static final @NotNull Icon Copy = load("expui/general/copy.svg", -960424066, 2);
     /** 16x16 */ public static final @NotNull Icon Cut = load("expui/general/cut.svg", 469658744, 2);
+    /** 16x16 */ public static final @NotNull Icon DebugDisabled = load("expui/general/debugDisabled.svg", -2117038454, 2);
     /** 16x16 */ public static final @NotNull Icon Delete = load("expui/general/delete.svg", -262115518, 2);
     /** 16x16 */ public static final @NotNull Icon Down = load("expui/general/down.svg", 992595664, 2);
     /** 16x16 */ public static final @NotNull Icon Download = load("expui/general/download.svg", 1773838891, 2);
+    /** 16x16 */ public static final @NotNull Icon Drag = load("expui/general/drag.svg", 197434247, 2);
     /** 16x16 */ public static final @NotNull Icon Dropdown = load("expui/general/dropdown.svg", -1543337746, 2);
     /** 15x15 */ public static final @NotNull Icon DropdownGutter = load("expui/general/dropdownGutter.svg", 1563216643, 2);
     /** 16x16 */ public static final @NotNull Icon Edit = load("expui/general/edit.svg", -1146382909, 2);
     /** 16x16 */ public static final @NotNull Icon EditorOnly = load("expui/general/editorOnly.svg", 664284995, 2);
     /** 16x16 */ public static final @NotNull Icon EditorPreview = load("expui/general/editorPreview.svg", 1092233625, 2);
     /** 16x16 */ public static final @NotNull Icon EditorPreviewVertical = load("expui/general/editorPreviewVertical.svg", 1066008888, 2);
-    /** 28x28 */ public static final @NotNull Icon ErrorDialog = load("expui/general/errorDialog.svg", -775209288, 2);
+    /** 28x28 */ public static final @NotNull Icon ErrorDialog = load("expui/general/errorDialog.svg", 1022280318, 2);
     /** 16x16 */ public static final @NotNull Icon Exit = load("expui/general/exit.svg", 1345528853, 2);
     /** 16x16 */ public static final @NotNull Icon ExpandAll = load("expui/general/expandAll.svg", 732447936, 2);
     /** 16x16 */ public static final @NotNull Icon Export = load("expui/general/export.svg", -737835750, 2);
@@ -275,23 +302,24 @@ public final class ExpUiIcons {
     /** 16x16 */ public static final @NotNull Icon History = load("expui/general/history.svg", -1313586434, 2);
     /** 16x16 */ public static final @NotNull Icon IdeUpdate = load("expui/general/ideUpdate.svg", -835911935, 2);
     /** 16x16 */ public static final @NotNull Icon Import = load("expui/general/import.svg", 100114017, 2);
-    /** 28x28 */ public static final @NotNull Icon InformationDialog = load("expui/general/informationDialog.svg", 658647123, 2);
+    /** 28x28 */ public static final @NotNull Icon InformationDialog = load("expui/general/informationDialog.svg", -452195602, 2);
 
     public static final class Inspections {
-      /** 16x16 */ public static final @NotNull Icon InspectionsError = load("expui/general/inspections/inspectionsError.svg", -1168752437, 0);
-      /** 16x16 */ public static final @NotNull Icon InspectionsErrorEmpty = load("expui/general/inspections/inspectionsErrorEmpty.svg", 2135562312, 0);
+      /** 16x16 */ public static final @NotNull Icon InspectionsError = load("expui/general/inspections/inspectionsError.svg", 1576466233, 0);
+      /** 16x16 */ public static final @NotNull Icon InspectionsErrorEmpty = load("expui/general/inspections/inspectionsErrorEmpty.svg", -641361387, 0);
       /** 16x16 */ public static final @NotNull Icon InspectionsEye = load("expui/general/inspections/inspectionsEye.svg", -1922526067, 2);
-      /** 16x16 */ public static final @NotNull Icon InspectionsMixed = load("expui/general/inspections/inspectionsMixed.svg", -1889408145, 2);
-      /** 16x16 */ public static final @NotNull Icon InspectionsOK = load("expui/general/inspections/inspectionsOK.svg", 1799696664, 2);
-      /** 16x16 */ public static final @NotNull Icon InspectionsOKEmpty = load("expui/general/inspections/inspectionsOKEmpty.svg", -605501921, 2);
+      /** 16x16 */ public static final @NotNull Icon InspectionsMixed = load("expui/general/inspections/inspectionsMixed.svg", -1700862393, 2);
+      /** 16x16 */ public static final @NotNull Icon InspectionsOK = load("expui/general/inspections/inspectionsOK.svg", 1832549894, 2);
+      /** 16x16 */ public static final @NotNull Icon InspectionsOKEmpty = load("expui/general/inspections/inspectionsOKEmpty.svg", -926905296, 2);
       /** 16x16 */ public static final @NotNull Icon InspectionsPause = load("expui/general/inspections/inspectionsPause.svg", -1097867678, 2);
       /** 16x16 */ public static final @NotNull Icon InspectionsPowerSaveMode = load("expui/general/inspections/inspectionsPowerSaveMode.svg", -1084191665, 2);
-      /** 16x16 */ public static final @NotNull Icon InspectionsTrafficOff = load("expui/general/inspections/inspectionsTrafficOff.svg", 639662663, 2);
-      /** 16x16 */ public static final @NotNull Icon InspectionsTypos = load("expui/general/inspections/inspectionsTypos.svg", -179572159, 2);
-      /** 16x16 */ public static final @NotNull Icon InspectionsWarning = load("expui/general/inspections/inspectionsWarning.svg", 1204686546, 0);
-      /** 16x16 */ public static final @NotNull Icon InspectionsWarningEmpty = load("expui/general/inspections/inspectionsWarningEmpty.svg", -806840252, 0);
+      /** 16x16 */ public static final @NotNull Icon InspectionsTrafficOff = load("expui/general/inspections/inspectionsTrafficOff.svg", 23383921, 2);
+      /** 16x16 */ public static final @NotNull Icon InspectionsTypos = load("expui/general/inspections/inspectionsTypos.svg", -312735021, 2);
+      /** 16x16 */ public static final @NotNull Icon InspectionsWarning = load("expui/general/inspections/inspectionsWarning.svg", 1436857947, 0);
+      /** 16x16 */ public static final @NotNull Icon InspectionsWarningEmpty = load("expui/general/inspections/inspectionsWarningEmpty.svg", 57350527, 0);
     }
 
+    /** 16x16 */ public static final @NotNull Icon Keyboard = load("expui/general/keyboard.svg", 1621148328, 2);
     /** 16x16 */ public static final @NotNull Icon Layout = load("expui/general/layout.svg", 1425337863, 2);
     /** 16x16 */ public static final @NotNull Icon Left = load("expui/general/left.svg", -1406674628, 2);
     /** 16x16 */ public static final @NotNull Icon ListFiles = load("expui/general/listFiles.svg", 1446717573, 2);
@@ -315,10 +343,12 @@ public final class ExpUiIcons {
     /** 16x16 */ public static final @NotNull Icon PreviewOnly = load("expui/general/previewOnly.svg", 784372708, 2);
     /** 16x16 */ public static final @NotNull Icon PreviewVertically = load("expui/general/previewVertically.svg", -1158915095, 2);
     /** 16x16 */ public static final @NotNull Icon Print = load("expui/general/print.svg", -1069373447, 2);
+    /** 9x9 */ public static final @NotNull Icon ProjectConfigurable = load("expui/general/projectConfigurable.svg", -370113591, 2);
     /** 16x16 */ public static final @NotNull Icon ProjectStructure = load("expui/general/projectStructure.svg", 200874544, 2);
     /** 16x16 */ public static final @NotNull Icon ProjectWideAnalysisOff = load("expui/general/projectWideAnalysisOff.svg", 1505013057, 2);
     /** 16x16 */ public static final @NotNull Icon ProjectWideAnalysisOn = load("expui/general/projectWideAnalysisOn.svg", 103110158, 2);
-    /** 28x28 */ public static final @NotNull Icon QuestionDialog = load("expui/general/questionDialog.svg", 95839547, 2);
+    /** 28x28 */ public static final @NotNull Icon QuestionDialog = load("expui/general/questionDialog.svg", 2033181276, 2);
+    /** 16x16 */ public static final @NotNull Icon ReaderMode = load("expui/general/readerMode.svg", 502859390, 2);
     /** 16x16 */ public static final @NotNull Icon Redo = load("expui/general/redo.svg", -765720439, 2);
     /** 16x16 */ public static final @NotNull Icon Refresh = load("expui/general/refresh.svg", 323445437, 2);
     /** 16x16 */ public static final @NotNull Icon Remove = load("expui/general/remove.svg", 288478484, 2);
@@ -338,7 +368,7 @@ public final class ExpUiIcons {
     /** 16x16 */ public static final @NotNull Icon SoftWrap = load("expui/general/softWrap.svg", 1261736010, 2);
     /** 16x16 */ public static final @NotNull Icon SplitHorizontally = load("expui/general/splitHorizontally.svg", -79366107, 2);
     /** 16x16 */ public static final @NotNull Icon SplitVertically = load("expui/general/splitVertically.svg", -61631069, 2);
-    /** 28x28 */ public static final @NotNull Icon SuccessDialog = load("expui/general/successDialog.svg", 319586180, 2);
+    /** 28x28 */ public static final @NotNull Icon SuccessDialog = load("expui/general/successDialog.svg", -703647226, 2);
     /** 48x48 */ public static final @NotNull Icon SuccessLogin = load("expui/general/successLogin.svg", -1600608774, 2);
     /** 16x16 */ public static final @NotNull Icon Undo = load("expui/general/undo.svg", 1388909186, 2);
     /** 16x16 */ public static final @NotNull Icon Unlocked = load("expui/general/unlocked.svg", -1889256406, 2);
@@ -346,7 +376,7 @@ public final class ExpUiIcons {
     /** 16x16 */ public static final @NotNull Icon Upload = load("expui/general/upload.svg", 600163934, 2);
     /** 16x16 */ public static final @NotNull Icon User = load("expui/general/user.svg", 1868835079, 2);
     /** 16x16 */ public static final @NotNull Icon Vcs = load("expui/general/vcs.svg", 1023462254, 2);
-    /** 28x28 */ public static final @NotNull Icon WarningDialog = load("expui/general/warningDialog.svg", 151050177, 2);
+    /** 28x28 */ public static final @NotNull Icon WarningDialog = load("expui/general/warningDialog.svg", 1404992157, 2);
     /** 20x20 */ public static final @NotNull Icon WindowsMenu_20x20 = load("expui/general/windowsMenu@20x20.svg", 2146328371, 2);
   }
 
@@ -384,6 +414,7 @@ public final class ExpUiIcons {
   }
 
   public static final class Hierarchy {
+    /** 16x16 */ public static final @NotNull Icon ClassHierarchy = load("expui/hierarchy/classHierarchy.svg", -2076359177, 2);
     /** 16x16 */ public static final @NotNull Icon Subtypes = load("expui/hierarchy/subtypes.svg", -1158046965, 2);
     /** 16x16 */ public static final @NotNull Icon Supertypes = load("expui/hierarchy/supertypes.svg", 916048497, 2);
   }
@@ -573,14 +604,14 @@ public final class ExpUiIcons {
     /** 16x16 */ public static final @NotNull Icon StepOver = load("expui/run/stepOver.svg", -1962436714, 2);
     /** 16x16 */ public static final @NotNull Icon Stop = load("expui/run/stop.svg", 1749021823, 10);
     /** 16x16 */ public static final @NotNull Icon TestCustom = load("expui/run/testCustom.svg", -1282705019, 2);
-    /** 16x16 */ public static final @NotNull Icon TestError = load("expui/run/testError.svg", -395679554, 2);
-    /** 16x16 */ public static final @NotNull Icon TestFailed = load("expui/run/testFailed.svg", -721083451, 2);
+    /** 16x16 */ public static final @NotNull Icon TestError = load("expui/run/testError.svg", 1371661315, 2);
+    /** 16x16 */ public static final @NotNull Icon TestFailed = load("expui/run/testFailed.svg", -343958905, 2);
     /** 16x16 */ public static final @NotNull Icon TestIgnored = load("expui/run/testIgnored.svg", 1363493756, 2);
     /** 16x16 */ public static final @NotNull Icon TestNotRunYet = load("expui/run/testNotRunYet.svg", 328670944, 2);
-    /** 16x16 */ public static final @NotNull Icon TestPassed = load("expui/run/testPassed.svg", 480210793, 2);
+    /** 16x16 */ public static final @NotNull Icon TestPassed = load("expui/run/testPassed.svg", -1947435834, 2);
     /** 16x16 */ public static final @NotNull Icon TestPassedIgnored = load("expui/run/testPassedIgnored.svg", -291968708, 2);
     /** 16x16 */ public static final @NotNull Icon TestPaused = load("expui/run/testPaused.svg", 820702611, 2);
-    /** 16x16 */ public static final @NotNull Icon TestSkipped = load("expui/run/testSkipped.svg", -1005073221, 2);
+    /** 16x16 */ public static final @NotNull Icon TestSkipped = load("expui/run/testSkipped.svg", 1242536403, 2);
     /** 16x16 */ public static final @NotNull Icon TestTerminated = load("expui/run/testTerminated.svg", -2033175435, 2);
     /** 16x16 */ public static final @NotNull Icon TestUnknown = load("expui/run/testUnknown.svg", -611982271, 2);
     /** 16x16 */ public static final @NotNull Icon ViewBreakpoints = load("expui/run/viewBreakpoints.svg", -924866217, 2);
@@ -595,22 +626,24 @@ public final class ExpUiIcons {
     /** 16x16 */ public static final @NotNull Icon Application = load("expui/runConfigurations/application.svg", 78355938, 2);
     /** 16x16 */ public static final @NotNull Icon ApplicationRemote = load("expui/runConfigurations/applicationRemote.svg", -1635441753, 2);
     /** 16x16 */ public static final @NotNull Icon Compound = load("expui/runConfigurations/compound.svg", 865718018, 2);
+    /** 16x16 */ public static final @NotNull Icon IgnoredTest = load("expui/runConfigurations/ignoredTest.svg", -2035507634, 2);
     /** 16x16 */ public static final @NotNull Icon InvalidConfigurationLayer = load("expui/runConfigurations/invalidConfigurationLayer.svg", 388730648, 2);
     /** 16x16 */ public static final @NotNull Icon Junit = load("expui/runConfigurations/junit.svg", 1991312793, 2);
     /** 16x16 */ public static final @NotNull Icon JunitTestMark = load("expui/runConfigurations/junitTestMark.svg", 443577354, 2);
+    /** 16x16 */ public static final @NotNull Icon MultiLaunch = load("expui/runConfigurations/multiLaunch.svg", -1888357590, 2);
     /** 16x16 */ public static final @NotNull Icon SortByDuration = load("expui/runConfigurations/sortByDuration.svg", 1598664663, 2);
     /** 16x16 */ public static final @NotNull Icon WebApp = load("expui/runConfigurations/webApp.svg", 1312982107, 2);
   }
 
   public static final class Status {
-    /** 16x16 */ public static final @NotNull Icon Error = load("expui/status/error.svg", 2027223231, 2);
-    /** 16x16 */ public static final @NotNull Icon ErrorOutline = load("expui/status/errorOutline.svg", -528038395, 2);
-    /** 16x16 */ public static final @NotNull Icon FailedInProgress = load("expui/status/failedInProgress.svg", 8468379, 2);
-    /** 16x16 */ public static final @NotNull Icon Info = load("expui/status/info.svg", -1198937638, 2);
-    /** 16x16 */ public static final @NotNull Icon InfoOutline = load("expui/status/infoOutline.svg", 384779684, 2);
-    /** 16x16 */ public static final @NotNull Icon Success = load("expui/status/success.svg", -1623423182, 2);
-    /** 16x16 */ public static final @NotNull Icon Warning = load("expui/status/warning.svg", 2102752571, 2);
-    /** 16x16 */ public static final @NotNull Icon WarningOutline = load("expui/status/warningOutline.svg", -835193201, 2);
+    /** 16x16 */ public static final @NotNull Icon Error = load("expui/status/error.svg", -143235814, 2);
+    /** 16x16 */ public static final @NotNull Icon ErrorOutline = load("expui/status/errorOutline.svg", -281923861, 2);
+    /** 16x16 */ public static final @NotNull Icon FailedInProgress = load("expui/status/failedInProgress.svg", -821599555, 2);
+    /** 16x16 */ public static final @NotNull Icon Info = load("expui/status/info.svg", 370358095, 2);
+    /** 16x16 */ public static final @NotNull Icon InfoOutline = load("expui/status/infoOutline.svg", -1701696200, 2);
+    /** 16x16 */ public static final @NotNull Icon Success = load("expui/status/success.svg", 282847188, 2);
+    /** 16x16 */ public static final @NotNull Icon Warning = load("expui/status/warning.svg", -2099948057, 2);
+    /** 16x16 */ public static final @NotNull Icon WarningOutline = load("expui/status/warningOutline.svg", -235105415, 2);
   }
 
   /** 16x16 */ public static final @NotNull Icon Stub = load("expui/stub.svg", -784127213, 2);
@@ -636,8 +669,8 @@ public final class ExpUiIcons {
     /** 20x20 */ public static final @NotNull Icon Changes_20x20 = load("expui/toolwindow/changes@20x20.svg", 1768066093, 2);
     /** 16x16 */ public static final @NotNull Icon Commit = load("expui/toolwindow/commit.svg", -441038154, 2);
     /** 20x20 */ public static final @NotNull Icon Commit_20x20 = load("expui/toolwindow/commit@20x20.svg", 93507568, 2);
-    /** 16x16 */ public static final @NotNull Icon Coverage = load("expui/toolwindow/coverage.svg", 1142310710, 2);
-    /** 20x20 */ public static final @NotNull Icon Coverage_20x20 = load("expui/toolwindow/coverage@20x20.svg", -1549838003, 2);
+    /** 16x16 */ public static final @NotNull Icon Coverage = load("expui/toolwindow/coverage.svg", 211150817, 2);
+    /** 20x20 */ public static final @NotNull Icon Coverage_20x20 = load("expui/toolwindow/coverage@20x20.svg", 1415215084, 2);
     /** 16x16 */ public static final @NotNull Icon Debug = load("expui/toolwindow/debug.svg", -1538863538, 2);
     /** 20x20 */ public static final @NotNull Icon Debug_20x20 = load("expui/toolwindow/debug@20x20.svg", 1669427222, 2);
     /** 16x16 */ public static final @NotNull Icon Dependencies = load("expui/toolwindow/dependencies.svg", -2145342262, 2);
@@ -658,6 +691,8 @@ public final class ExpUiIcons {
     /** 20x20 */ public static final @NotNull Icon Problems_20x20 = load("expui/toolwindow/problems@20x20.svg", 1864041050, 2);
     /** 16x16 */ public static final @NotNull Icon Profiler = load("expui/toolwindow/profiler.svg", -2026725006, 2);
     /** 20x20 */ public static final @NotNull Icon Profiler_20x20 = load("expui/toolwindow/profiler@20x20.svg", -700074637, 2);
+    /** 16x16 */ public static final @NotNull Icon ProfilerAndroid = load("expui/toolwindow/profilerAndroid.svg", -926134973, 2);
+    /** 20x20 */ public static final @NotNull Icon ProfilerAndroid_20x20 = load("expui/toolwindow/profilerAndroid@20x20.svg", 1803916653, 2);
     /** 16x16 */ public static final @NotNull Icon Project = load("expui/toolwindow/project.svg", 566177333, 2);
     /** 20x20 */ public static final @NotNull Icon Project_20x20 = load("expui/toolwindow/project@20x20.svg", 268424096, 2);
     /** 16x16 */ public static final @NotNull Icon Repositories = load("expui/toolwindow/repositories.svg", 974555029, 2);
@@ -678,12 +713,18 @@ public final class ExpUiIcons {
     /** 20x20 */ public static final @NotNull Icon ToolWindowInternal_20x20 = load("expui/toolwindow/toolWindowInternal@20x20.svg", -82643488, 2);
     /** 16x16 */ public static final @NotNull Icon ToolWindowJsonPath = load("expui/toolwindow/toolWindowJsonPath.svg", -522669516, 2);
     /** 20x20 */ public static final @NotNull Icon ToolWindowJsonPath_20x20 = load("expui/toolwindow/toolWindowJsonPath@20x20.svg", 267975089, 2);
+    /** 16x16 */ public static final @NotNull Icon ToolWindowRunWithCoverage = load("expui/toolwindow/toolWindowRunWithCoverage.svg", 1004559629, 2);
+    /** 20x20 */ public static final @NotNull Icon ToolWindowRunWithCoverage_20x20 = load("expui/toolwindow/toolWindowRunWithCoverage@20x20.svg", -1437888707, 2);
     /** 16x16 */ public static final @NotNull Icon ToolWindowVariableView = load("expui/toolwindow/toolWindowVariableView.svg", 1128504186, 2);
     /** 20x20 */ public static final @NotNull Icon ToolWindowVariableView_20x20 = load("expui/toolwindow/toolWindowVariableView@20x20.svg", 1905460077, 2);
     /** 16x16 */ public static final @NotNull Icon Vcs = load("expui/toolwindow/vcs.svg", 1023462254, 2);
     /** 20x20 */ public static final @NotNull Icon Vcs_20x20 = load("expui/toolwindow/vcs@20x20.svg", -2093474109, 2);
     /** 16x16 */ public static final @NotNull Icon Web = load("expui/toolwindow/web.svg", 1416810362, 2);
     /** 20x20 */ public static final @NotNull Icon Web_20x20 = load("expui/toolwindow/web@20x20.svg", 1824952426, 2);
+  }
+
+  public static final class Ultimate {
+    /** 16x16 */ public static final @NotNull Icon Lock = load("expui/ultimate/lock.svg", 26662807, 2);
   }
 
   public static final class Vcs {
@@ -698,19 +739,16 @@ public final class ExpUiIcons {
     /** 16x16 */ public static final @NotNull Icon CurrentBranchLabel = load("expui/vcs/currentBranchLabel.svg", 1396233135, 2);
     /** 16x16 */ public static final @NotNull Icon Diff = load("expui/vcs/diff.svg", -1088936383, 2);
     /** 16x16 */ public static final @NotNull Icon Fetch = load("expui/vcs/fetch.svg", -731710935, 2);
-    /** 20x20 */ public static final @NotNull Icon Fetch_20x20 = load("expui/vcs/fetch@20x20.svg", 686195788, 2);
     /** 16x16 */ public static final @NotNull Icon IncomingUpdate = load("expui/vcs/incomingUpdate.svg", -1410651252, 2);
     /** 16x16 */ public static final @NotNull Icon IntelliSort = load("expui/vcs/intelliSort.svg", -392506529, 2);
     /** 16x16 */ public static final @NotNull Icon Merge = load("expui/vcs/merge.svg", 666256058, 2);
     /** 16x16 */ public static final @NotNull Icon OutgoingPush = load("expui/vcs/outgoingPush.svg", 1327071653, 2);
     /** 16x16 */ public static final @NotNull Icon Patch = load("expui/vcs/patch.svg", -1862136134, 2);
     /** 16x16 */ public static final @NotNull Icon Push = load("expui/vcs/push.svg", 310167329, 2);
-    /** 20x20 */ public static final @NotNull Icon Push_20x20 = load("expui/vcs/push@20x20.svg", 43978935, 2);
     /** 16x16 */ public static final @NotNull Icon Revert = load("expui/vcs/revert.svg", 1003761112, 2);
     /** 16x16 */ public static final @NotNull Icon Stash = load("expui/vcs/stash.svg", -380414361, 2);
     /** 16x16 */ public static final @NotNull Icon Unshelve = load("expui/vcs/unshelve.svg", 2111312416, 2);
     /** 16x16 */ public static final @NotNull Icon Update = load("expui/vcs/update.svg", -127818827, 2);
-    /** 20x20 */ public static final @NotNull Icon Update_20x20 = load("expui/vcs/update@20x20.svg", 1963254904, 2);
     /** 16x16 */ public static final @NotNull Icon Vcs = load("expui/vcs/vcs.svg", 1023462254, 2);
   }
 

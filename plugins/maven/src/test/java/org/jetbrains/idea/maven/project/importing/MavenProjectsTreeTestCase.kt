@@ -3,11 +3,12 @@ package org.jetbrains.idea.maven.project.importing
 
 import com.intellij.maven.testFramework.MavenMultiVersionImportingTestCase
 import com.intellij.openapi.application.WriteAction
-import com.intellij.openapi.progress.RawProgressReporter
 import com.intellij.openapi.progress.runBlockingMaybeCancellable
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Pair
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.platform.util.progress.RawProgressReporter
+import org.jetbrains.idea.maven.buildtool.MavenLogEventHandler
 import org.jetbrains.idea.maven.model.MavenExplicitProfiles
 import org.jetbrains.idea.maven.project.*
 import org.jetbrains.idea.maven.project.MavenProjectResolver.Companion.getInstance
@@ -105,7 +106,6 @@ abstract class MavenProjectsTreeTestCase : MavenMultiVersionImportingTestCase() 
                         mavenProject: MavenProject,
                         generalSettings: MavenGeneralSettings,
                         embeddersManager: MavenEmbeddersManager,
-                        console: MavenConsole,
                         process: MavenProgressIndicator) {
     val resolver = getInstance(project)
     val progressReporter = object : RawProgressReporter {}
@@ -114,9 +114,8 @@ abstract class MavenProjectsTreeTestCase : MavenMultiVersionImportingTestCase() 
                        myTree!!,
                        generalSettings,
                        embeddersManager,
-                       console,
                        progressReporter,
-                       process.syncConsole)
+                       MavenLogEventHandler)
     }
   }
 

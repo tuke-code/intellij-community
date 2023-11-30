@@ -17,17 +17,22 @@ import com.intellij.openapi.diagnostic.debug
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.extensions.ExtensionNotApplicableException
 import com.intellij.openapi.extensions.PluginId
+import com.intellij.openapi.progress.blockingContext
 import com.intellij.openapi.progress.runBlockingMaybeCancellable
-import com.intellij.openapi.progress.withBackgroundProgress
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.startup.ProjectActivity
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.util.ShutDownTracker
+import com.intellij.openapi.util.registry.RegistryValue
+import com.intellij.openapi.util.registry.RegistryValueListener
 import com.intellij.openapi.vcs.ProjectLevelVcsManager
 import com.intellij.openapi.vcs.VcsMappingListener
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.platform.backend.observation.trackActivity
+import com.intellij.platform.ide.progress.withBackgroundProgress
+import com.intellij.platform.util.coroutines.childScope
 import com.intellij.util.awaitCancellationAndInvoke
-import com.intellij.util.childScope
+import com.intellij.util.concurrency.ThreadingAssertions
 import com.intellij.util.concurrency.annotations.RequiresBackgroundThread
 import com.intellij.util.concurrency.annotations.RequiresEdt
 import com.intellij.util.messages.Topic
@@ -73,13 +78,22 @@ class VcsProjectLog(private val project: Project, private val coroutineScope: Co
   val mainLogUi: VcsLogUiImpl?
     get() = getVcsLogContentProvider(project)?.ui as VcsLogUiImpl?
 
-  private val busConnection = project.messageBus.connect(coroutineScope)
+  private val listenersDisposable = Disposer.newDisposable()
 
   init {
+    val busConnection = project.messageBus.connect(listenersDisposable)
     busConnection.subscribe(ProjectLevelVcsManager.VCS_CONFIGURATION_CHANGED, VcsMappingListener {
       launchWithAnyModality { disposeLog(recreate = true) }
     })
     busConnection.subscribe(DynamicPluginListener.TOPIC, MyDynamicPluginUnloader())
+    VcsLogData.getIndexingRegistryValue().addListener(object : RegistryValueListener {
+      override fun afterValueChanged(value: RegistryValue) {
+        launchWithAnyModality { disposeLog(recreate = true) }
+      }
+    }, listenersDisposable)
+    project.service<VcsLogSharedSettings>().addListener(VcsLogSharedSettings.Listener {
+      launchWithAnyModality { disposeLog(recreate = true) }
+    }, listenersDisposable)
 
     @Suppress("SSBasedInspection", "ObjectLiteralToLambda") val shutdownTask = object : Runnable {
       override fun run() {
@@ -104,7 +118,7 @@ class VcsProjectLog(private val project: Project, private val coroutineScope: Co
   private suspend fun shutDown(useRawSwingDispatcher: Boolean) {
     if (!disposeStarted.compareAndSet(false, true)) return
 
-    busConnection.disconnect()
+    Disposer.dispose(listenersDisposable)
 
     try {
       withTimeout(CLOSE_LOG_TIMEOUT) {
@@ -181,8 +195,10 @@ class VcsProjectLog(private val project: Project, private val coroutineScope: Co
     val logProviders = VcsLogManager.findLogProviders(projectLevelVcsManager.allVcsRoots.toList(), project)
     if (logProviders.isEmpty()) return null
 
-    val logManager = getOrCreateLogManager(logProviders)
-    logManager.initialize(force = forceInit)
+    project.trackActivity(VcsActivityKey) {
+      val logManager = getOrCreateLogManager(logProviders)
+      logManager.initialize(force = forceInit)
+    }
     return logManager
   }
 
@@ -206,7 +222,7 @@ class VcsProjectLog(private val project: Project, private val coroutineScope: Co
 
   @RequiresEdt
   private fun dropLogManager(): VcsLogManager? {
-    ApplicationManager.getApplication().assertIsDispatchThread()
+    ThreadingAssertions.assertEventDispatchThread()
     val oldValue = cachedLogManager ?: return null
     cachedLogManager = null
     LOG.debug { "Disposing Vcs Log for ${VcsLogUtil.getProvidersMapText(oldValue.dataManager.logProviders)}" }
@@ -227,7 +243,7 @@ class VcsProjectLog(private val project: Project, private val coroutineScope: Co
   internal class InitLogStartupActivity : ProjectActivity {
     init {
       val app = ApplicationManager.getApplication()
-      if (app.isUnitTestMode || app.isHeadlessEnvironment) {
+      if (app.isUnitTestMode) {
         throw ExtensionNotApplicableException.create()
       }
     }
@@ -354,21 +370,27 @@ class VcsProjectLog(private val project: Project, private val coroutineScope: Co
 
 private suspend fun VcsLogManager.initialize(force: Boolean) {
   if (force) {
-    scheduleInitialization()
+    blockingContext {
+      scheduleInitialization()
+    }
     return
   }
 
   if (PostponableLogRefresher.keepUpToDate()) {
     val invalidator = CachesInvalidator.EP_NAME.findExtensionOrFail(VcsLogCachesInvalidator::class.java)
     if (invalidator.isValid) {
-      scheduleInitialization()
+      blockingContext {
+        scheduleInitialization()
+      }
       return
     }
   }
 
   withContext(Dispatchers.EDT) {
     if (isLogVisible) {
-      scheduleInitialization()
+      blockingContext {
+        scheduleInitialization()
+      }
     }
   }
 }

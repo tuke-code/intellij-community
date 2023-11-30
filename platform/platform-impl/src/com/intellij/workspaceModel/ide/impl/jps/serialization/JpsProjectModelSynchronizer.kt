@@ -28,25 +28,27 @@ import com.intellij.openapi.vfs.newvfs.events.VFileContentChangeEvent
 import com.intellij.openapi.vfs.newvfs.events.VFileCreateEvent
 import com.intellij.openapi.vfs.newvfs.events.VFileDeleteEvent
 import com.intellij.openapi.vfs.newvfs.events.VFileEvent
-import com.intellij.workspaceModel.ide.EntitiesOrphanage
 import com.intellij.platform.backend.workspace.WorkspaceModel
 import com.intellij.platform.backend.workspace.WorkspaceModelChangeListener
 import com.intellij.platform.backend.workspace.WorkspaceModelTopics
+import com.intellij.platform.backend.workspace.WorkspaceModelUnloadedStorageChangeListener
 import com.intellij.platform.diagnostic.telemetry.helpers.addElapsedTimeMs
 import com.intellij.platform.workspace.jps.*
+import com.intellij.platform.workspace.jps.entities.ModuleEntity
 import com.intellij.platform.workspace.jps.serialization.impl.*
-import com.intellij.project.stateStore
-import com.intellij.workspaceModel.ide.*
 import com.intellij.platform.workspace.jps.serialization.impl.JpsProjectEntitiesLoader.createProjectSerializers
-import com.intellij.workspaceModel.ide.legacyBridge.GlobalLibraryTableBridge
 import com.intellij.platform.workspace.storage.DummyParentEntitySource
 import com.intellij.platform.workspace.storage.EntitySource
 import com.intellij.platform.workspace.storage.MutableEntityStorage
 import com.intellij.platform.workspace.storage.VersionedStorageChange
-import com.intellij.platform.workspace.jps.entities.ModuleEntity
 import com.intellij.platform.workspace.storage.url.VirtualFileUrlManager
+import com.intellij.project.stateStore
 import com.intellij.util.PlatformUtils.*
+import com.intellij.workspaceModel.ide.EntitiesOrphanage
+import com.intellij.workspaceModel.ide.getInstance
+import com.intellij.workspaceModel.ide.getJpsProjectConfigLocation
 import com.intellij.workspaceModel.ide.impl.*
+import com.intellij.workspaceModel.ide.legacyBridge.GlobalLibraryTableBridge
 import io.opentelemetry.api.metrics.Meter
 import org.jetbrains.annotations.TestOnly
 import org.jetbrains.jps.util.JpsPathUtil
@@ -178,7 +180,6 @@ class JpsProjectModelSynchronizer(private val project: Project) : Disposable {
       addUnloadedModuleEntities(unloadedBuilder)
       sourcesToSave.removeAll(reloadingResult.affectedSources)
 
-      // Update orphanage storage
       if (reloadingResult.orphanageBuilder.hasChanges()) {
         EntitiesOrphanage.getInstance(project).update { it.addDiff(reloadingResult.orphanageBuilder) }
       }
@@ -273,7 +274,11 @@ class JpsProjectModelSynchronizer(private val project: Project) : Disposable {
       }
     }
     connection.subscribe(WorkspaceModelTopics.CHANGED, listener)
-    connection.subscribe(WorkspaceModelTopics.UNLOADED_ENTITIES_CHANGED, listener)
+    connection.subscribe(WorkspaceModelTopics.UNLOADED_ENTITIES_CHANGED, object : WorkspaceModelUnloadedStorageChangeListener {
+      override fun changed(event: VersionedStorageChange) {
+        listener.changed(event)
+      }
+    })
   }
 
   suspend fun loadProjectToEmptyStorage(project: Project): LoadedProjectEntities? {

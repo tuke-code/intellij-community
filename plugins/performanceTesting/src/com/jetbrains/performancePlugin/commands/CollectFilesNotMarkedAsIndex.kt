@@ -2,6 +2,7 @@ package com.jetbrains.performancePlugin.commands
 
 import com.intellij.find.ngrams.TrigramIndex
 import com.intellij.openapi.application.ReadAction
+import com.intellij.openapi.components.service
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.ProjectCoreUtil
 import com.intellij.openapi.roots.ContentIterator
@@ -19,6 +20,7 @@ import com.intellij.util.indexing.FileBasedIndex
 import com.intellij.util.indexing.FileBasedIndexImpl
 import com.intellij.util.indexing.IndexingFlag
 import com.intellij.util.indexing.IndexingStamp
+import com.intellij.util.indexing.dependencies.ProjectIndexingDependenciesService
 import com.intellij.util.indexing.roots.IndexableFilesIterator
 import com.intellij.util.indexing.roots.kind.SdkOrigin
 import org.jetbrains.annotations.NonNls
@@ -27,8 +29,6 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.util.function.Consumer
 import java.util.function.Predicate
-import java.util.function.Supplier
-import java.util.stream.Collectors
 import kotlin.io.path.Path
 import kotlin.io.path.writeText
 
@@ -63,6 +63,7 @@ class CollectFilesNotMarkedAsIndex(text: String, line: Int) : PerformanceCommand
     }
 
     Files.newBufferedWriter(fullLogPath).use { writer ->
+      val indexingRequest = project.service<ProjectIndexingDependenciesService>().getReadOnlyTokenForTest()
       val iterator = object : ContentIterator {
         var number = 0
 
@@ -83,17 +84,16 @@ class CollectFilesNotMarkedAsIndex(text: String, line: Int) : PerformanceCommand
             return true
           }
 
-          if (VfsData.isIsIndexedFlagDisabled()) {
-            checkIndexed(fileOrDir, false, "has no indexing timestamp") {
-              IndexingStamp.hasIndexingTimeStamp(it.id) ||
-              // com.intellij.util.indexing.FileBasedIndexImpl.getAffectedIndexCandidates returns empty list for such files
-              ProjectCoreUtil.isProjectOrWorkspaceFile(it, it.fileType)
-            }
-          }
-          else {
-            checkIndexed(fileOrDir, true, "not marked as indexed") {
-              it.isFileIndexed
-            }
+          checkIndexed(fileOrDir, false, "has no indexing timestamp") {
+            val indexedFlagSetOrDisabled = VfsData.isIsIndexedFlagDisabled() || IndexingFlag.isFileIndexed(it, indexingRequest.getFileIndexingStamp(fileOrDir))
+            val hasIndexingStamp = IndexingStamp.hasIndexingTimeStamp(it.id)
+
+            // TODO-ank: should be (indexedFlagSetOrDisabled && hasIndexingStamp) || ProjectCoreUtil.isProjectOrWorkspaceFile(it, it.fileType)
+            //  Currently not true, because STUB indexes invalidate file stamp when writing debug info, Subindexers via subindexing stamp, etc.
+            //  See com.intellij.integration.kotlingPlugin.tests.highlight.AcceptanceMppProjectIntegrationTest for reproducer
+            hasIndexingStamp ||
+            // com.intellij.util.indexing.FileBasedIndexImpl.getAffectedIndexCandidates returns an empty list for such files
+            ProjectCoreUtil.isProjectOrWorkspaceFile(it, it.fileType)
           }
           return true
         }
@@ -114,10 +114,10 @@ class CollectFilesNotMarkedAsIndex(text: String, line: Int) : PerformanceCommand
             try {
               fileOrDir.contentsToByteArray()
               if (fbi.changedFilesCollector.containsFileId(fileOrDir.id)) {
-                logIndexingIssue("$fileOrDir $errorMessagePart because is changed\n")
+                logIndexingIssue("$fileOrDir (id=${fileOrDir.id}) $errorMessagePart because is changed\n")
               }
               else {
-                logIndexingIssue("$fileOrDir $errorMessagePart\n")
+                logIndexingIssue("$fileOrDir (id=${fileOrDir.id}) $errorMessagePart\n")
               }
             }
             catch (e: IOException) {
@@ -129,16 +129,14 @@ class CollectFilesNotMarkedAsIndex(text: String, line: Int) : PerformanceCommand
 
       val originalOrderedProviders: List<IndexableFilesIterator> = fbi.getIndexableFilesProviders(project)
 
-      val orderedProviders: List<IndexableFilesIterator> = ArrayList()
-      originalOrderedProviders.stream()
+      val orderedProviders: MutableList<IndexableFilesIterator> = ArrayList()
+      originalOrderedProviders
         .filter { p: IndexableFilesIterator -> p.origin !is SdkOrigin }
-        .collect(Collectors.toCollection(
-          Supplier { orderedProviders }))
+        .toCollection(orderedProviders)
 
-      originalOrderedProviders.stream()
+      originalOrderedProviders
         .filter { p: IndexableFilesIterator -> p.origin is SdkOrigin }
-        .collect(Collectors.toCollection(
-          Supplier { orderedProviders }))
+        .toCollection(orderedProviders )
 
       for (provider in orderedProviders) {
         provider.iterateFiles(project, iterator, VirtualFileFilter.ALL)

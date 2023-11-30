@@ -3,12 +3,14 @@ package org.jetbrains.plugins.gitlab.mergerequest.data
 
 import com.intellij.collaboration.ui.codereview.details.data.ReviewRequestState
 import com.intellij.openapi.util.NlsSafe
+import git4idea.remote.hosting.HostedGitRepositoryRemote
+import org.jetbrains.plugins.gitlab.api.GitLabServerPath
 import org.jetbrains.plugins.gitlab.api.dto.*
 import org.jetbrains.plugins.gitlab.mergerequest.api.dto.GitLabMergeRequestDTO
 import java.util.*
 
 data class GitLabMergeRequestFullDetails(
-  override val iid: String,
+  val iid: String,
   val title: @NlsSafe String,
   val createdAt: Date,
   val author: GitLabUserDTO,
@@ -26,23 +28,30 @@ data class GitLabMergeRequestFullDetails(
   val approvedBy: List<GitLabUserDTO>,
   val targetBranch: String,
   val sourceBranch: String,
-  val isApproved: Boolean,
+  val approvalsRequired: Int,
   val conflicts: Boolean,
-  val commits: List<GitLabCommitDTO>,
-  val diffRefs: GitLabDiffRefs,
+  val onlyAllowMergeIfAllDiscussionsAreResolved: Boolean,
+  val onlyAllowMergeIfPipelineSucceeds: Boolean,
+  val allowMergeOnSkippedPipeline: Boolean,
+  val commits: List<GitLabCommit>,
+  val diffRefs: GitLabDiffRefs?,
   val headPipeline: GitLabPipelineDTO?,
   val userPermissions: GitLabMergeRequestPermissionsDTO,
   val shouldBeRebased: Boolean,
   val rebaseInProgress: Boolean
-) : GitLabMergeRequestId {
+) {
 
   companion object {
-    fun fromGraphQL(dto: GitLabMergeRequestDTO) = GitLabMergeRequestFullDetails(
+    /**
+     * @param backupCommits The list of commits in case the DTO contains no such list
+     * (solution for compatibility issues with GitLab <=14.7
+     */
+    fun fromGraphQL(dto: GitLabMergeRequestDTO, backupCommits: List<GitLabCommitRestDTO>) = GitLabMergeRequestFullDetails(
       iid = dto.iid,
       title = dto.title,
       createdAt = dto.createdAt,
       author = dto.author,
-      mergeStatus = dto.mergeStatusEnum,
+      mergeStatus = dto.mergeStatusEnum ?: GitLabMergeStatus.UNCHECKED,
       isMergeable = dto.mergeable,
       state = dto.state,
       draft = dto.draft,
@@ -51,13 +60,17 @@ data class GitLabMergeRequestFullDetails(
       webUrl = dto.webUrl,
       targetProject = dto.targetProject,
       sourceProject = dto.sourceProject,
-      description = dto.description,
+      description = dto.description.orEmpty(),
       approvedBy = dto.approvedBy,
       targetBranch = dto.targetBranch,
       sourceBranch = dto.sourceBranch,
-      isApproved = dto.approved ?: true,
+      approvalsRequired = dto.approvalsRequired ?: 0,
       conflicts = dto.conflicts,
-      commits = dto.commits,
+      onlyAllowMergeIfAllDiscussionsAreResolved = dto.targetProject.onlyAllowMergeIfAllDiscussionsAreResolved,
+      onlyAllowMergeIfPipelineSucceeds = dto.targetProject.onlyAllowMergeIfPipelineSucceeds,
+      allowMergeOnSkippedPipeline = dto.targetProject.allowMergeOnSkippedPipeline,
+      commits = dto.commits?.map(GitLabCommit.Companion::fromGraphQLDTO)
+                ?: backupCommits.map(GitLabCommit.Companion::fromRestDTO),
       diffRefs = dto.diffRefs,
       headPipeline = dto.headPipeline,
       userPermissions = dto.userPermissions,
@@ -79,3 +92,14 @@ val GitLabMergeRequestFullDetails.reviewState: ReviewRequestState
       GitLabMergeRequestState.OPENED -> ReviewRequestState.OPENED
       else -> ReviewRequestState.OPENED // to avoid null state
     }
+
+fun GitLabMergeRequestFullDetails.getRemoteDescriptor(server: GitLabServerPath): HostedGitRepositoryRemote? =
+  sourceProject?.let {
+    HostedGitRepositoryRemote(
+      it.ownerPath,
+      server.toURI(),
+      it.path,
+      it.httpUrlToRepo,
+      it.sshUrlToRepo
+    )
+  }

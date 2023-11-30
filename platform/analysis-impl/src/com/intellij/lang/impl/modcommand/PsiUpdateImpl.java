@@ -5,6 +5,7 @@ import com.intellij.codeInsight.template.Expression;
 import com.intellij.codeInsight.template.ExpressionContext;
 import com.intellij.codeInsight.template.Result;
 import com.intellij.codeInsight.template.TextResult;
+import com.intellij.injected.editor.DocumentWindow;
 import com.intellij.injected.editor.InjectionEditService;
 import com.intellij.lang.Language;
 import com.intellij.lang.injection.InjectedLanguageManager;
@@ -25,7 +26,6 @@ import com.intellij.psi.impl.file.PsiFileImplUtil;
 import com.intellij.psi.impl.source.PostprocessReformattingAspect;
 import com.intellij.psi.util.PsiTreeUtil;
 import com.intellij.testFramework.LightVirtualFile;
-import com.intellij.util.LocalTimeCounter;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -74,6 +74,7 @@ final class PsiUpdateImpl {
     private final @NotNull PsiFile myOrigFile;
     private final @NotNull PsiFile myCopyFile;
     private final @NotNull PsiDocumentManager myManager;
+    private final @Nullable PsiFile myInjectedFileCopy;
     private boolean myDeleted;
 
     FileTracker(@NotNull PsiFile origFile) {
@@ -87,10 +88,10 @@ final class PsiUpdateImpl {
         PsiLanguageInjectionHost host = Objects.requireNonNull(injectionManager.getInjectionHost(origFile));
         PsiFile hostFile = host.getContainingFile();
         PsiFile hostFileCopy = (PsiFile)hostFile.copy();
-        PsiFile injectedFileCopy = getInjectedFileCopy(host, hostFileCopy, origFile.getLanguage());
-        myHostCopy = injectionManager.getInjectionHost(injectedFileCopy);
+        myInjectedFileCopy = getInjectedFileCopy(host, hostFileCopy, origFile.getLanguage());
+        myHostCopy = injectionManager.getInjectionHost(myInjectedFileCopy);
         Disposable disposable = ApplicationManager.getApplication().getService(InjectionEditService.class)
-          .synchronizeWithFragment(injectedFileCopy, myDocument);
+          .synchronizeWithFragment(myInjectedFileCopy, myDocument);
         Disposer.register(this, disposable);
         myTargetFile = hostFileCopy;
         origFile = hostFile;
@@ -100,6 +101,7 @@ final class PsiUpdateImpl {
         myHostCopy = null;
         myTargetFile = myCopyFile;
         myPositionDocument = myDocument;
+        myInjectedFileCopy = null;
       }
       myPositionDocument.addDocumentListener(this, this);
       myOrigText = myTargetFile.getText();
@@ -204,13 +206,13 @@ final class PsiUpdateImpl {
     }
     else {
       return PsiFileFactory.getInstance(project).createFileFromText(
-        origFile.getName(), origFile.getFileType(), manager.getUnescapedText(origFile),
-        LocalTimeCounter.currentTime(), false);
+        origFile.getName(), origFile.getLanguage(), manager.getUnescapedText(origFile),
+        false, true, true, origFile.getVirtualFile());
     }
   }
 
   private static class ModPsiUpdaterImpl implements ModPsiUpdater, DocumentListener, Disposable {
-    private final @NotNull FileTracker myTracker;
+    private @NotNull FileTracker myTracker;
     private final @NotNull Map<PsiFile, FileTracker> myChangedFiles = new LinkedHashMap<>();
     private final @NotNull Map<VirtualFile, ModPsiUpdaterImpl.ChangedDirectoryInfo> myChangedDirectories = new LinkedHashMap<>();
     private @NotNull VirtualFile myNavigationFile;
@@ -218,7 +220,8 @@ final class PsiUpdateImpl {
     private @NotNull TextRange mySelection;
     private final List<ModHighlight.HighlightInfo> myHighlightInfos = new ArrayList<>();
     private final List<ModStartTemplate.TemplateField> myTemplateFields = new ArrayList<>();
-    private @Nullable ModRenameSymbol myRenameSymbol;
+    private @Nullable ModStartRename myRenameSymbol;
+    private final List<ModUpdateReferences> myTrackedDeclarations = new ArrayList<>();
     private boolean myPositionUpdated = false;
     private @NlsContexts.Tooltip String myErrorMessage;
     private @NlsContexts.Tooltip String myInfoMessage;
@@ -265,27 +268,27 @@ final class PsiUpdateImpl {
     }
 
     @Override
-    public <E extends PsiElement> E getWritable(E e) {
-      if (e == null) return null;
-      if (e instanceof PsiDirectory dir) {
+    public <E extends PsiElement> E getWritable(E element) {
+      if (element == null) return null;
+      if (element instanceof PsiDirectory dir) {
         VirtualFile file = dir.getVirtualFile();
-        if (file instanceof ChangedVirtualDirectory) return e;
+        if (file instanceof ChangedVirtualDirectory) return element;
         ChangedDirectoryInfo directory = myChangedDirectories.computeIfAbsent(file, f -> ChangedDirectoryInfo.create(dir));
         @SuppressWarnings("unchecked") E result = (E)directory.psiDirectory;
         return result;
       }
-      PsiFile file = e.getContainingFile();
+      PsiFile file = element.getContainingFile();
       if (file.getViewProvider().getVirtualFile() instanceof ChangedVirtualDirectory.AddedVirtualFile) {
-        return e;
+        return element;
       }
       PsiFile originalFile = file.getOriginalFile();
       if (originalFile != file) {
         FileTracker tracker = tracker(originalFile);
         if (tracker.myCopyFile == file) {
-          return e;
+          return element;
         }
       }
-      return tracker(file).getCopy(e);
+      return tracker(file).getCopy(element);
     }
 
     @Override
@@ -313,12 +316,22 @@ final class PsiUpdateImpl {
           myNavigationFile = file.getOriginalFile().getVirtualFile();
         }
         // TODO: track new file
+        myTracker.myPositionDocument.removeDocumentListener(this);
+        myTracker = tracker(file.getOriginalFile());
+        myTracker.myPositionDocument.addDocumentListener(this, this);
         return element.getTextRange();
       }
       SmartPsiElementPointer<PsiElement> pointer = SmartPointerManager.createPointer(element);
       myTracker.unblock();
       Segment range = pointer.getRange();
-      return range == null ? null : TextRange.create(range);
+      if (range == null) return null;
+      if (myTracker.myInjectedFileCopy != null) {
+        InjectedLanguageManager instance = InjectedLanguageManager.getInstance(myTracker.myProject);
+        int start = instance.mapUnescapedOffsetToInjected(myTracker.myInjectedFileCopy, range.getStartOffset());
+        int end = instance.mapUnescapedOffsetToInjected(myTracker.myInjectedFileCopy, range.getEndOffset());
+        return ((DocumentWindow)myTracker.myInjectedFileCopy.getViewProvider().getDocument()).injectedToHost(TextRange.create(start, end));
+      }
+      return TextRange.create(range);
     }
 
     @Override
@@ -413,6 +426,11 @@ final class PsiUpdateImpl {
 
     @Override
     public void rename(@NotNull PsiNameIdentifierOwner element, @NotNull List<@NotNull String> suggestedNames) {
+      rename(element, element.getNameIdentifier(), suggestedNames);
+    }
+
+    @Override
+    public void rename(@NotNull PsiNamedElement element, @Nullable PsiElement nameIdentifier, @NotNull List<@NotNull String> suggestedNames) {
       if (myRenameSymbol != null) {
         throw new IllegalStateException("One element is already registered for rename");
       }
@@ -420,7 +438,18 @@ final class PsiUpdateImpl {
       if (range == null) {
         throw new IllegalArgumentException("Element disappeared after postponed operations: " + element);
       }
-      myRenameSymbol = new ModRenameSymbol(myNavigationFile, range, suggestedNames);
+      TextRange identifierRange = nameIdentifier != null ? nameIdentifier.getTextRange() : null;
+      myRenameSymbol = new ModStartRename(myNavigationFile, new ModStartRename.RenameSymbolRange(range, identifierRange), suggestedNames);
+    }
+
+    @Override
+    public void trackDeclaration(@NotNull PsiElement declaration) {
+      TextRange range = getRange(declaration);
+      if (range == null) {
+        throw new IllegalArgumentException("Element disappeared after postponed operations: " + declaration);
+      }
+      String oldText = myTracker.myCopyFile.getText();
+      myTrackedDeclarations.add(new ModUpdateReferences(myNavigationFile, oldText, range, range));
     }
 
     @Override
@@ -478,9 +507,19 @@ final class PsiUpdateImpl {
       mySelection = updateRange(event, mySelection);
       myHighlightInfos.replaceAll(info -> info.withRange(updateRange(event, info.range())));
       myTemplateFields.replaceAll(info -> info.withRange(updateRange(event, info.range())));
+      myTrackedDeclarations.replaceAll(range -> range.withNewRange(updateRange(event, range.newRange())));
       if (myRenameSymbol != null) {
-        myRenameSymbol = myRenameSymbol.withRange(updateRange(event, myRenameSymbol.symbolRange()));
+        ModStartRename.RenameSymbolRange renameSymbolRange = myRenameSymbol.symbolRange();
+
+        myRenameSymbol = myRenameSymbol.withRange(updateRange(event, renameSymbolRange));
       }
+    }
+
+    private static @NotNull ModStartRename.RenameSymbolRange updateRange(@NotNull DocumentEvent event,
+                                                                         @NotNull ModStartRename.RenameSymbolRange range) {
+      TextRange idRange = range.nameIdentifierRange();
+      return new ModStartRename.RenameSymbolRange(
+        updateRange(event, range.range()), idRange != null ? updateRange(event, idRange) : null);
     }
 
     private static @NotNull TextRange updateRange(@NotNull DocumentEvent event, @NotNull TextRange range) {
@@ -510,17 +549,18 @@ final class PsiUpdateImpl {
       if (myErrorMessage != null) {
         return error(myErrorMessage);
       }
-      return myChangedFiles.values().stream().map(FileTracker::getUpdateCommand).reduce(nop(), ModCommand::andThen)
+      return myChangedFiles.values().stream()
+        .map(fileTracker -> fileTracker.getUpdateCommand()).reduce(nop(), ModCommand::andThen)
         .andThen(myChangedDirectories.values().stream()
                    .flatMap(info -> info.createFileCommands(myTracker.myProject))
                    .reduce(nop(), ModCommand::andThen))
         .andThen(getNavigateCommand()).andThen(getHighlightCommand()).andThen(getTemplateCommand())
+        .andThen(myTrackedDeclarations.stream().<ModCommand>map(c -> c).reduce(nop(), ModCommand::andThen))
         .andThen(myRenameSymbol == null ? nop() : myRenameSymbol)
         .andThen(myInfoMessage == null ? nop() : ModCommand.info(myInfoMessage));
     }
 
-    @NotNull
-    private ModCommand getNavigateCommand() {
+    private @NotNull ModCommand getNavigateCommand() {
       if (!myPositionUpdated || myRenameSymbol != null) return nop();
       int length = myTracker.myTargetFile.getTextLength();
       int start = -1, end = -1, caret = -1;
@@ -535,14 +575,12 @@ final class PsiUpdateImpl {
       return new ModNavigate(myNavigationFile, start, end, caret);
     }
 
-    @NotNull
-    private ModCommand getHighlightCommand() {
+    private @NotNull ModCommand getHighlightCommand() {
       if (myHighlightInfos.isEmpty()) return nop();
       return new ModHighlight(myNavigationFile, myHighlightInfos);
     }
 
-    @NotNull
-    private ModCommand getTemplateCommand() {
+    private @NotNull ModCommand getTemplateCommand() {
       if (myTemplateFields.isEmpty()) return nop();
       return new ModStartTemplate(myNavigationFile, myTemplateFields, f -> nop());
     }
@@ -551,7 +589,7 @@ final class PsiUpdateImpl {
       private final TextRange myRange;
       private final @NotNull PsiElement myElement;
 
-      public DummyContext(TextRange range, @NotNull PsiElement element) {
+      private DummyContext(TextRange range, @NotNull PsiElement element) {
         myRange = range;
         myElement = element;
       }

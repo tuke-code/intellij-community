@@ -1,5 +1,5 @@
 // FIR_IDENTICAL
-// IGNORE_FE10
+// IGNORE_K1
 package a.b.c
 
 sealed class SEALED {
@@ -14,9 +14,9 @@ fun foo(e: SEALED) {
     }
 }
 
+// WITH_ORDER
 // EXIST: is SEALED.AAAA
 // EXIST: SEALED.BBBB
 // EXIST: is SEALED.CCCC
 // EXIST: { lookupString: "else -> "}
-// NOTHING_ELSE
 // FIR_COMPARISON

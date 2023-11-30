@@ -2,18 +2,7 @@
 package com.intellij.platform.workspace.storage.testEntities.entities
 
 import com.intellij.platform.workspace.storage.*
-import com.intellij.platform.workspace.storage.WorkspaceEntity
-import kotlin.jvm.JvmName
-import kotlin.jvm.JvmOverloads
-import kotlin.jvm.JvmStatic
-import com.intellij.platform.workspace.storage.EntityType
 import com.intellij.platform.workspace.storage.annotations.Child
-import com.intellij.platform.workspace.storage.EntitySource
-import com.intellij.platform.workspace.storage.GeneratedCodeApiVersion
-
-import com.intellij.platform.workspace.storage.MutableEntityStorage
-
-
 
 
 interface XParentEntity : WorkspaceEntity {
@@ -50,7 +39,7 @@ interface XParentEntity : WorkspaceEntity {
 }
 
 //region generated code
-fun MutableEntityStorage.modifyEntity(entity: XParentEntity, modification: XParentEntity.Builder.() -> Unit) = modifyEntity(
+fun MutableEntityStorage.modifyEntity(entity: XParentEntity, modification: XParentEntity.Builder.() -> Unit): XParentEntity = modifyEntity(
   XParentEntity.Builder::class.java, entity, modification)
 //endregion
 
@@ -91,7 +80,7 @@ interface XChildEntity : WorkspaceEntity {
 }
 
 //region generated code
-fun MutableEntityStorage.modifyEntity(entity: XChildEntity, modification: XChildEntity.Builder.() -> Unit) = modifyEntity(
+fun MutableEntityStorage.modifyEntity(entity: XChildEntity, modification: XChildEntity.Builder.() -> Unit): XChildEntity = modifyEntity(
   XChildEntity.Builder::class.java, entity, modification)
 //endregion
 
@@ -127,7 +116,7 @@ interface XChildWithOptionalParentEntity : WorkspaceEntity {
 
 //region generated code
 fun MutableEntityStorage.modifyEntity(entity: XChildWithOptionalParentEntity,
-                                      modification: XChildWithOptionalParentEntity.Builder.() -> Unit) = modifyEntity(
+                                      modification: XChildWithOptionalParentEntity.Builder.() -> Unit): XChildWithOptionalParentEntity = modifyEntity(
   XChildWithOptionalParentEntity.Builder::class.java, entity, modification)
 //endregion
 
@@ -159,6 +148,7 @@ interface XChildChildEntity : WorkspaceEntity {
 }
 
 //region generated code
-fun MutableEntityStorage.modifyEntity(entity: XChildChildEntity, modification: XChildChildEntity.Builder.() -> Unit) = modifyEntity(
+fun MutableEntityStorage.modifyEntity(entity: XChildChildEntity,
+                                      modification: XChildChildEntity.Builder.() -> Unit): XChildChildEntity = modifyEntity(
   XChildChildEntity.Builder::class.java, entity, modification)
 //endregion

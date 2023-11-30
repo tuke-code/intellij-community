@@ -1,20 +1,11 @@
 // Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.platform.workspace.storage.testEntities.entities
 
-import com.intellij.platform.workspace.storage.WorkspaceEntity
-import com.intellij.platform.workspace.storage.url.VirtualFileUrl
-import com.intellij.platform.workspace.storage.url.VirtualFileUrlManager
-import kotlin.jvm.JvmName
-import kotlin.jvm.JvmOverloads
-import kotlin.jvm.JvmStatic
-import com.intellij.platform.workspace.storage.EntityType
-import com.intellij.platform.workspace.storage.EntitySource
-import com.intellij.platform.workspace.storage.GeneratedCodeApiVersion
-import com.intellij.platform.workspace.storage.MutableEntityStorage
+import com.intellij.platform.workspace.storage.*
 import com.intellij.platform.workspace.storage.impl.containers.toMutableWorkspaceList
 import com.intellij.platform.workspace.storage.impl.containers.toMutableWorkspaceSet
-
-
+import com.intellij.platform.workspace.storage.url.VirtualFileUrl
+import com.intellij.platform.workspace.storage.url.VirtualFileUrlManager
 
 
 interface VFUEntity : WorkspaceEntity {
@@ -50,7 +41,7 @@ interface VFUEntity : WorkspaceEntity {
 }
 
 //region generated code
-fun MutableEntityStorage.modifyEntity(entity: VFUEntity, modification: VFUEntity.Builder.() -> Unit) = modifyEntity(
+fun MutableEntityStorage.modifyEntity(entity: VFUEntity, modification: VFUEntity.Builder.() -> Unit): VFUEntity = modifyEntity(
   VFUEntity.Builder::class.java, entity, modification)
 //endregion
 
@@ -92,7 +83,7 @@ interface VFUWithTwoPropertiesEntity : WorkspaceEntity {
 
 //region generated code
 fun MutableEntityStorage.modifyEntity(entity: VFUWithTwoPropertiesEntity,
-                                      modification: VFUWithTwoPropertiesEntity.Builder.() -> Unit) = modifyEntity(
+                                      modification: VFUWithTwoPropertiesEntity.Builder.() -> Unit): VFUWithTwoPropertiesEntity = modifyEntity(
   VFUWithTwoPropertiesEntity.Builder::class.java, entity, modification)
 //endregion
 
@@ -125,7 +116,8 @@ interface NullableVFUEntity : WorkspaceEntity {
 }
 
 //region generated code
-fun MutableEntityStorage.modifyEntity(entity: NullableVFUEntity, modification: NullableVFUEntity.Builder.() -> Unit) = modifyEntity(
+fun MutableEntityStorage.modifyEntity(entity: NullableVFUEntity,
+                                      modification: NullableVFUEntity.Builder.() -> Unit): NullableVFUEntity = modifyEntity(
   NullableVFUEntity.Builder::class.java, entity, modification)
 //endregion
 
@@ -162,7 +154,7 @@ interface ListVFUEntity : WorkspaceEntity {
 }
 
 //region generated code
-fun MutableEntityStorage.modifyEntity(entity: ListVFUEntity, modification: ListVFUEntity.Builder.() -> Unit) = modifyEntity(
+fun MutableEntityStorage.modifyEntity(entity: ListVFUEntity, modification: ListVFUEntity.Builder.() -> Unit): ListVFUEntity = modifyEntity(
   ListVFUEntity.Builder::class.java, entity, modification)
 //endregion
 
@@ -198,7 +190,7 @@ interface SetVFUEntity : WorkspaceEntity {
 }
 
 //region generated code
-fun MutableEntityStorage.modifyEntity(entity: SetVFUEntity, modification: SetVFUEntity.Builder.() -> Unit) = modifyEntity(
+fun MutableEntityStorage.modifyEntity(entity: SetVFUEntity, modification: SetVFUEntity.Builder.() -> Unit): SetVFUEntity = modifyEntity(
   SetVFUEntity.Builder::class.java, entity, modification)
 //endregion
 

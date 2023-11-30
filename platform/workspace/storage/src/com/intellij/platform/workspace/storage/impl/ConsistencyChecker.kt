@@ -3,10 +3,11 @@ package com.intellij.platform.workspace.storage.impl
 
 import com.intellij.openapi.diagnostic.trace
 import com.intellij.platform.workspace.storage.EntityStorage
-import com.intellij.platform.workspace.storage.WorkspaceEntity
 import it.unimi.dsi.fastutil.ints.IntSet
+import org.jetbrains.annotations.ApiStatus
 
-fun EntityStorage.assertConsistency() {
+@ApiStatus.Internal
+public fun EntityStorage.assertConsistency() {
   (this as AbstractEntityStorage).assertConsistency()
 }
 
@@ -34,6 +35,8 @@ internal fun AbstractEntityStorage.assertConsistency() {
     if (!connectionId.isParentNullable) {
       checkStrongConnection(this, map.keys, connectionId.childClass, connectionId.parentClass, connectionId)
     }
+
+    map.assertConsistency()
   }
 
   refs.oneToOneContainer.forEach { (connectionId, map) ->

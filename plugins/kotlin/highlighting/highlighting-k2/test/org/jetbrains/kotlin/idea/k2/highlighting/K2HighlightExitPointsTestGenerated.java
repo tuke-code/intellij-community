@@ -33,6 +33,16 @@ public class K2HighlightExitPointsTestGenerated extends AbstractK2HighlightExitP
         runTest("../../idea/tests/testData/exitPoints/anonymousFunction2.kt");
     }
 
+    @TestMetadata("doWhileLoopBreak.kt")
+    public void testDoWhileLoopBreak() throws Exception {
+        runTest("../../idea/tests/testData/exitPoints/doWhileLoopBreak.kt");
+    }
+
+    @TestMetadata("doWhileLoopBreak2.kt")
+    public void testDoWhileLoopBreak2() throws Exception {
+        runTest("../../idea/tests/testData/exitPoints/doWhileLoopBreak2.kt");
+    }
+
     @TestMetadata("forLoopBreak.kt")
     public void testForLoopBreak() throws Exception {
         runTest("../../idea/tests/testData/exitPoints/forLoopBreak.kt");
@@ -148,6 +158,11 @@ public class K2HighlightExitPointsTestGenerated extends AbstractK2HighlightExitP
         runTest("../../idea/tests/testData/exitPoints/inLambdaLastStatement6.kt");
     }
 
+    @TestMetadata("inUnitLambdaLastStatement.kt")
+    public void testInUnitLambdaLastStatement() throws Exception {
+        runTest("../../idea/tests/testData/exitPoints/inUnitLambdaLastStatement.kt");
+    }
+
     @TestMetadata("inline1.kt")
     public void testInline1() throws Exception {
         runTest("../../idea/tests/testData/exitPoints/inline1.kt");
@@ -256,5 +271,10 @@ public class K2HighlightExitPointsTestGenerated extends AbstractK2HighlightExitP
     @TestMetadata("throw2.kt")
     public void testThrow2() throws Exception {
         runTest("../../idea/tests/testData/exitPoints/throw2.kt");
+    }
+
+    @TestMetadata("whileLoopBreak.kt")
+    public void testWhileLoopBreak() throws Exception {
+        runTest("../../idea/tests/testData/exitPoints/whileLoopBreak.kt");
     }
 }

@@ -484,7 +484,7 @@ private class ConversionsHolder(private val symbolProvider: JKSymbolProvider, pr
                 val secondArgument = expression.arguments.arguments.first()::value.detached()
 
                 // Drop the line break to avoid awkward formatting of binary expression with operator on next line
-                firstArgument.hasLineBreakAfter = false
+                firstArgument.lineBreaksAfter = 0
 
                 JKBinaryExpression(
                     firstArgument,
@@ -834,7 +834,4 @@ private class ConversionsHolder(private val symbolProvider: JKSymbolProvider, pr
 
     private fun List<JKLiteralExpression>.containsNull(): Boolean =
         any { it.isNull() }
-
-    private fun JKExpression?.isDoubleType(): Boolean =
-        this?.calculateType(typeFactory) == JKJavaPrimitiveType.DOUBLE
 }

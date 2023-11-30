@@ -2,18 +2,35 @@ package com.intellij.searchEverywhereMl.semantics.providers
 
 import com.intellij.ide.actions.searcheverywhere.FoundItemDescriptor
 import com.intellij.ide.util.gotoByName.GotoActionModel
-import com.intellij.searchEverywhereMl.semantics.services.ActionEmbeddingsStorage
+import com.intellij.openapi.actionSystem.AnAction
+import com.intellij.openapi.actionSystem.Presentation
+import com.intellij.platform.ml.embeddings.search.services.ActionEmbeddingsStorage
+import com.intellij.platform.ml.embeddings.search.settings.SemanticSearchSettings
 
-class LocalSemanticActionsProvider(private val model: GotoActionModel) : SemanticActionsProvider() {
-  override fun search(pattern: String): List<FoundItemDescriptor<GotoActionModel.MatchedValue>> {
+class LocalSemanticActionsProvider(model: GotoActionModel, presentationProvider: suspend (AnAction) -> Presentation) :
+  SemanticActionsProvider(model, presentationProvider) {
+
+  override suspend fun search(pattern: String, similarityThreshold: Double?): List<FoundItemDescriptor<GotoActionModel.MatchedValue>> {
     if (pattern.isBlank()) return emptyList()
-    return ActionEmbeddingsStorage.getInstance().searchNeighbours(pattern, ITEMS_LIMIT, SIMILARITY_THRESHOLD).mapNotNull {
-      createItemDescriptor(it.text, it.similarity, pattern, model)
-    }
+    return ActionEmbeddingsStorage.getInstance()
+      .searchNeighboursIfEnabled(pattern, ITEMS_LIMIT, similarityThreshold)
+      .mapNotNull { createItemDescriptor(it.text, it.similarity, pattern) }
+  }
+
+  override suspend fun streamSearch(pattern: String, similarityThreshold: Double?): Sequence<FoundItemDescriptor<GotoActionModel.MatchedValue>> {
+    if (pattern.isBlank()) return emptySequence()
+    val list = ActionEmbeddingsStorage.getInstance()
+      .streamSearchNeighbours(pattern, similarityThreshold)
+      .toList()
+      .mapNotNull { createItemDescriptor(it.text, it.similarity, pattern) }
+    return list.asSequence()
+  }
+
+  override fun isEnabled(): Boolean {
+    return SemanticSearchSettings.getInstance().enabledInActionsTab
   }
 
   companion object {
     private const val ITEMS_LIMIT = 10
-    private const val SIMILARITY_THRESHOLD = 0.5
   }
 }

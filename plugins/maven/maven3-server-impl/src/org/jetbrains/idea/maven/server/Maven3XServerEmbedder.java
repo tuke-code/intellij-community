@@ -203,7 +203,8 @@ public abstract class Maven3XServerEmbedder extends Maven3ServerEmbedder {
         if (((InvocationTargetException)e).getTargetException().getClass().getCanonicalName()
           .equals("org.apache.maven.cli.internal.ExtensionResolutionException")) {
           MavenId id = extractIdFromException(((InvocationTargetException)e).getTargetException());
-          throw new MavenCoreInitializationException(wrapToSerializableRuntimeException(((InvocationTargetException)e).getTargetException()), id);
+          throw new MavenCoreInitializationException(
+            wrapToSerializableRuntimeException(((InvocationTargetException)e).getTargetException()), id);
         }
       }
       throw wrapToSerializableRuntimeException(e);
@@ -285,7 +286,7 @@ public abstract class Maven3XServerEmbedder extends Maven3ServerEmbedder {
     return commandLineOptions;
   }
 
-  private MavenId extractIdFromException(Throwable exception) {
+  private static MavenId extractIdFromException(Throwable exception) {
     try {
       Field field = exception.getClass().getDeclaredField("extension");
       field.setAccessible(true);
@@ -423,7 +424,6 @@ public abstract class Maven3XServerEmbedder extends Maven3ServerEmbedder {
 
       ((CustomMaven3ArtifactResolver)getComponent(ArtifactResolver.class)).customize(workspaceMap);
       ((CustomMaven3RepositoryMetadataManager)getComponent(RepositoryMetadataManager.class)).customize(workspaceMap);
-
     }
     catch (Exception e) {
       throw wrapToSerializableRuntimeException(e);
@@ -504,8 +504,9 @@ public abstract class Maven3XServerEmbedder extends Maven3ServerEmbedder {
 
   @NotNull
   @Override
-  public ArrayList<MavenServerExecutionResult> resolveProjects(@NotNull String longRunningTaskId,
-                                                                @NotNull ProjectResolutionRequest request, MavenToken token) {
+  public MavenServerResponse<ArrayList<MavenServerExecutionResult>> resolveProjects(@NotNull String longRunningTaskId,
+                                                                                    @NotNull ProjectResolutionRequest request,
+                                                                                    MavenToken token) {
     MavenServerUtil.checkToken(token);
     List<File> files = request.getPomFiles();
     List<String> activeProfiles = request.getActiveProfiles();
@@ -521,11 +522,13 @@ public abstract class Maven3XServerEmbedder extends Maven3ServerEmbedder {
         workspaceMap,
         myConsoleWrapper,
         myLocalRepository,
+        request.getUserProperties(),
         canResolveDependenciesInParallel()
       );
       try {
         customizeComponents(workspaceMap);
-        return projectResolver.resolveProjects(task, files, activeProfiles, inactiveProfiles);
+        ArrayList<MavenServerExecutionResult> result = projectResolver.resolveProjects(task, files, activeProfiles, inactiveProfiles);
+        return new MavenServerResponse(result, getLongRunningTaskStatus(longRunningTaskId, token));
       }
       finally {
         resetComponents();
@@ -554,7 +557,8 @@ public abstract class Maven3XServerEmbedder extends Maven3ServerEmbedder {
   @Override
   public MavenExecutionRequest createRequest(@Nullable File file,
                                              @Nullable List<String> activeProfiles,
-                                             @Nullable List<String> inactiveProfiles) {
+                                             @Nullable List<String> inactiveProfiles,
+                                             @NotNull Properties customProperties) {
 
     MavenExecutionRequest result = new DefaultMavenExecutionRequest();
 
@@ -568,8 +572,9 @@ public abstract class Maven3XServerEmbedder extends Maven3ServerEmbedder {
       result.setSystemProperties(mySystemProperties);
       Properties userProperties = new Properties();
       if (file != null) {
-        userProperties.putAll(MavenServerConfigUtil.getMavenAndJvmConfigProperties(file.getParentFile()));
+        userProperties.putAll(MavenServerConfigUtil.getMavenAndJvmConfigPropertiesForNestedProjectDir(file.getParentFile()));
       }
+      userProperties.putAll(customProperties);
       result.setUserProperties(userProperties);
 
       result.setActiveProfiles(collectActiveProfiles(result.getActiveProfiles(), activeProfiles, inactiveProfiles));
@@ -837,9 +842,10 @@ public abstract class Maven3XServerEmbedder extends Maven3ServerEmbedder {
   }
 
   @Override
-  public ArrayList<PluginResolutionResponse> resolvePlugins(@NotNull String longRunningTaskId,
-                                                            @NotNull ArrayList<PluginResolutionRequest> pluginResolutionRequests,
-                                                       MavenToken token) {
+  public MavenServerResponse<ArrayList<PluginResolutionResponse>> resolvePlugins(@NotNull String longRunningTaskId,
+                                                                                 @NotNull ArrayList<PluginResolutionRequest> pluginResolutionRequests,
+                                                                                 boolean forceUpdateSnapshots,
+                                                                                 MavenToken token) {
     MavenServerUtil.checkToken(token);
 
     String mavenVersion = System.getProperty(MAVEN_EMBEDDER_VERSION);
@@ -847,6 +853,7 @@ public abstract class Maven3XServerEmbedder extends Maven3ServerEmbedder {
     try (LongRunningTask task = newLongRunningTask(longRunningTaskId, pluginResolutionRequests.size(), myConsoleWrapper)) {
       MavenExecutionRequest request = createRequest(null, null, null);
       request.setTransferListener(new Maven3TransferListenerAdapter(task.getIndicator()));
+      request.setUpdateSnapshots(myAlwaysUpdateSnapshots || forceUpdateSnapshots);
 
       DefaultMaven maven = (DefaultMaven)getComponent(Maven.class);
       RepositorySystemSession session = maven.newRepositorySession(request);
@@ -874,7 +881,7 @@ public abstract class Maven3XServerEmbedder extends Maven3ServerEmbedder {
       List<PluginResolutionResponse> results = ParallelRunner.execute(runInParallel, resolutions, resolution ->
         resolvePlugin(task, resolution.mavenPluginId, resolution.pluginDependencies, resolution.remoteRepos, session)
       );
-      return new ArrayList<>(results);
+      return new MavenServerResponse<>(new ArrayList<>(results), getLongRunningTaskStatus(longRunningTaskId, token));
     }
   }
 
@@ -898,6 +905,8 @@ public abstract class Maven3XServerEmbedder extends Maven3ServerEmbedder {
                                                  List<Dependency> pluginDependencies,
                                                  List<RemoteRepository> remoteRepos,
                                                  RepositorySystemSession session) {
+    MavenServerStatsCollector.pluginResolve(mavenPluginId.toString());
+    long startTime = System.currentTimeMillis();
     List<MavenArtifact> artifacts = new ArrayList<>();
     if (task.isCanceled()) return new PluginResolutionResponse(mavenPluginId, false, artifacts);
 
@@ -932,6 +941,10 @@ public abstract class Maven3XServerEmbedder extends Maven3ServerEmbedder {
     catch (Exception e) {
       MavenServerGlobals.getLogger().warn(e);
       return new PluginResolutionResponse(mavenPluginId, false, artifacts);
+    }
+    finally {
+      long totalTime = System.currentTimeMillis() - startTime;
+      MavenServerGlobals.getLogger().debug("Resolved plugin " + mavenPluginId + " in " + totalTime + " ms");
     }
   }
 
@@ -984,15 +997,18 @@ public abstract class Maven3XServerEmbedder extends Maven3ServerEmbedder {
 
   @NotNull
   @Override
-  public ArrayList<MavenArtifact> resolveArtifacts(@NotNull String longRunningTaskId, @NotNull ArrayList<MavenArtifactResolutionRequest> requests, MavenToken token) {
+  public MavenServerResponse<ArrayList<MavenArtifact>> resolveArtifacts(@NotNull String longRunningTaskId,
+                                                                        @NotNull ArrayList<MavenArtifactResolutionRequest> requests,
+                                                                        MavenToken token) {
     MavenServerUtil.checkToken(token);
     try (LongRunningTask task = newLongRunningTask(longRunningTaskId, requests.size(), myConsoleWrapper)) {
-      return doResolveArtifacts(task, requests);
+      return new MavenServerResponse<>(doResolveArtifacts(task, requests), getLongRunningTaskStatus(longRunningTaskId, token));
     }
   }
 
   @NotNull
-  private ArrayList<MavenArtifact> doResolveArtifacts(@NotNull LongRunningTask task, @NotNull Collection<MavenArtifactResolutionRequest> requests) {
+  private ArrayList<MavenArtifact> doResolveArtifacts(@NotNull LongRunningTask task,
+                                                      @NotNull Collection<MavenArtifactResolutionRequest> requests) {
     try {
       ArrayList<MavenArtifact> artifacts = new ArrayList<>();
       for (MavenArtifactResolutionRequest request : requests) {
@@ -1101,19 +1117,19 @@ public abstract class Maven3XServerEmbedder extends Maven3ServerEmbedder {
 
   @NotNull
   @Override
-  public ArrayList<MavenGoalExecutionResult> executeGoal(@NotNull String longRunningTaskId,
-                                                    @NotNull ArrayList<MavenGoalExecutionRequest> requests,
-                                                    @NotNull String goal,
-                                                    MavenToken token) {
+  public MavenServerResponse<ArrayList<MavenGoalExecutionResult>> executeGoal(@NotNull String longRunningTaskId,
+                                                                              @NotNull ArrayList<MavenGoalExecutionRequest> requests,
+                                                                              @NotNull String goal,
+                                                                              MavenToken token) {
     MavenServerUtil.checkToken(token);
     try (LongRunningTask task = newLongRunningTask(longRunningTaskId, requests.size(), myConsoleWrapper)) {
-      return executeGoal(task, requests, goal);
+      return new MavenServerResponse<>(executeGoal(task, requests, goal), getLongRunningTaskStatus(longRunningTaskId, token));
     }
   }
 
   private ArrayList<MavenGoalExecutionResult> executeGoal(@NotNull LongRunningTask task,
-                                                     @NotNull Collection<MavenGoalExecutionRequest> requests,
-                                                     @NotNull String goal) {
+                                                          @NotNull Collection<MavenGoalExecutionRequest> requests,
+                                                          @NotNull String goal) {
     try {
       ArrayList<MavenGoalExecutionResult> results = new ArrayList<>();
       for (MavenGoalExecutionRequest request : requests) {
@@ -1144,7 +1160,7 @@ public abstract class Maven3XServerEmbedder extends Maven3ServerEmbedder {
     return createEmbedderExecutionResult(file, result);
   }
 
-  private MavenExecutionResult safeExecute(MavenExecutionRequest request, Maven maven) {
+  private static MavenExecutionResult safeExecute(MavenExecutionRequest request, Maven maven) {
     MavenLeakDetector detector = new MavenLeakDetector().mark();
     MavenExecutionResult result = maven.execute(request);
     detector.check();

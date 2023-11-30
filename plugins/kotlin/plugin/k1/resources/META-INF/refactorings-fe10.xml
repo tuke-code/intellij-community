@@ -8,6 +8,10 @@
             qualifiedName="org.jetbrains.kotlin.foreignUsagesRenameProcessor"
             interface="org.jetbrains.kotlin.idea.refactoring.rename.ForeignUsagesRenameProcessor"
             dynamic="true"/>
+    <extensionPoint
+            qualifiedName="org.jetbrains.kotlin.postInsertDeclarationCallback"
+            interface="org.jetbrains.kotlin.idea.refactoring.introduce.extractionEngine.PostInsertDeclarationCallback"
+            dynamic="true"/>
   </extensionPoints>
 
   <extensions defaultExtensionNs="com.intellij">
@@ -20,11 +24,13 @@
 
     <nameSuggestionProvider implementation="org.jetbrains.kotlin.idea.base.fe10.codeInsight.newDeclaration.Fe10KotlinNameSuggestionProvider"/>
 
-    <lang.floatingToolbarCustomizer language="kotlin" implementationClass="com.intellij.ui.codeFloatingToolbar.FloatingToolbarCustomizer$DefaultGroup"/>
-
     <lang.refactoringSupport
             language="kotlin"
             implementationClass="org.jetbrains.kotlin.idea.refactoring.KotlinRefactoringSupportProvider"/>
+
+    <projectService serviceInterface="org.jetbrains.kotlin.idea.refactoring.introduce.KotlinIntroduceVariableService"
+                    serviceImplementation="org.jetbrains.kotlin.idea.refactoring.introduce.introduceVariable.KotlinIntroduceVariableServiceK1Impl"
+    />
 
     <lang.refactoringSupport.classMembersRefactoringSupport
             language="kotlin"
@@ -38,11 +44,6 @@
 
     <applicationService serviceImplementation="org.jetbrains.kotlin.idea.refactoring.memberInfo.K1MemberInfoSupport"
                         serviceInterface="org.jetbrains.kotlin.idea.refactoring.memberInfo.KotlinMemberInfoSupport"/>
-
-    <applicationService serviceImplementation="org.jetbrains.kotlin.idea.refactoring.move.K1MoveRefactoringSupport"
-                        serviceInterface="org.jetbrains.kotlin.idea.refactoring.move.KotlinMoveRefactoringSupport"/>
-    <applicationService serviceImplementation="org.jetbrains.kotlin.idea.refactoring.move.K1MoveConflictCheckerSupport"
-                        serviceInterface="org.jetbrains.kotlin.idea.refactoring.move.KotlinMoveConflictCheckerSupport"/>
 
     <refactoring.moveHandler
             id="kotlin.moveMethod"
@@ -83,8 +84,6 @@
     <refactoring.inlineHandler
             language="JAVA"
             implementationClass="org.jetbrains.kotlin.idea.refactoring.inline.KotlinToJavaInlineHandler"/>
-
-    <refactoring.overrideMethodProcessor implementation="org.jetbrains.kotlin.idea.refactoring.inline.KotlinOverrideMethodsProcessor"/>
 
     <refactoring.safeDeleteProcessor
             id="kotlinProcessor"

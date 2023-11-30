@@ -10,6 +10,7 @@ import com.intellij.ide.palette.impl.PaletteToolWindowManager;
 import com.intellij.lang.properties.psi.PropertiesFile;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.actionSystem.*;
+import com.intellij.openapi.actionSystem.ex.ActionUtil;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ModalityState;
 import com.intellij.openapi.command.CommandProcessor;
@@ -60,6 +61,7 @@ import com.intellij.uiDesigner.radComponents.RadContainer;
 import com.intellij.uiDesigner.radComponents.RadRootContainer;
 import com.intellij.uiDesigner.radComponents.RadTabbedPane;
 import com.intellij.util.Alarm;
+import com.intellij.util.concurrency.ThreadingAssertions;
 import com.intellij.util.ui.UIUtil;
 import org.jetbrains.annotations.NonNls;
 import org.jetbrains.annotations.NotNull;
@@ -345,12 +347,12 @@ public final class GuiEditor extends JPanel implements DesignerEditorPanelFacade
 
     myActiveDecorationLayer.installSelectionWatcher();
 
-    EmptyAction.registerWithShortcutSet("GuiDesigner.IncreaseIndent",
-                                        new CustomShortcutSet(KeyStroke.getKeyStroke(KeyEvent.VK_TAB, 0)),
-                                        myGlassLayer);
-    EmptyAction.registerWithShortcutSet("GuiDesigner.DecreaseIndent",
-                                        new CustomShortcutSet(KeyStroke.getKeyStroke(KeyEvent.VK_TAB, InputEvent.SHIFT_MASK)),
-                                        myGlassLayer);
+    ActionUtil.wrap("GuiDesigner.IncreaseIndent").registerCustomShortcutSet(
+      new CustomShortcutSet(KeyStroke.getKeyStroke(KeyEvent.VK_TAB, 0)),
+      myGlassLayer);
+    ActionUtil.wrap("GuiDesigner.DecreaseIndent").registerCustomShortcutSet(
+      new CustomShortcutSet(KeyStroke.getKeyStroke(KeyEvent.VK_TAB, InputEvent.SHIFT_MASK)),
+      myGlassLayer);
 
     if (!ApplicationManager.getApplication().isUnitTestMode()) {
       UIUtil.invokeLaterIfNeeded(() -> {
@@ -377,7 +379,7 @@ public final class GuiEditor extends JPanel implements DesignerEditorPanelFacade
 
   @Override
   public void dispose() {
-    ApplicationManager.getApplication().assertIsDispatchThread();
+    ThreadingAssertions.assertEventDispatchThread();
 
     if (myWhere != null) {
       LOG.error("Already disposed: old trace: ", myWhere);

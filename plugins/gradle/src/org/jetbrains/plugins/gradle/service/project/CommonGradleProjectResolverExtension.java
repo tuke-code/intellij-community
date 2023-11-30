@@ -3,7 +3,9 @@ package org.jetbrains.plugins.gradle.service.project;
 
 import com.intellij.build.events.MessageEvent;
 import com.intellij.build.issue.BuildIssue;
-import com.intellij.gradle.toolingExtension.impl.modelProvider.GradleExternalProjectModelProvider;
+import com.intellij.gradle.toolingExtension.impl.model.projectModel.GradleExternalProjectModelProvider;
+import com.intellij.gradle.toolingExtension.impl.model.sourceSetModel.GradleSourceSetModelProvider;
+import com.intellij.gradle.toolingExtension.impl.model.taskModel.GradleTaskModelProvider;
 import com.intellij.openapi.application.ApplicationNamesInfo;
 import com.intellij.openapi.application.PathManager;
 import com.intellij.openapi.diagnostic.Logger;
@@ -69,7 +71,6 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import static com.intellij.openapi.util.text.StringUtil.*;
-import static org.jetbrains.plugins.gradle.service.project.GradleProjectResolver.CONFIGURATION_ARTIFACTS;
 import static org.jetbrains.plugins.gradle.service.project.GradleProjectResolver.MODULES_OUTPUTS;
 import static org.jetbrains.plugins.gradle.service.project.GradleProjectResolverUtil.*;
 
@@ -209,7 +210,7 @@ public final class CommonGradleProjectResolverExtension extends AbstractProjectR
     return mainModuleNode;
   }
 
-  private void populateBuildScriptSource(@NotNull IdeaModule ideaModule, @NotNull DataNode<? extends ModuleData> mainModuleNode) {
+  private static void populateBuildScriptSource(@NotNull IdeaModule ideaModule, @NotNull DataNode<? extends ModuleData> mainModuleNode) {
     try {
       File buildScriptSource = ideaModule.getGradleProject().getBuildScript().getSourceFile();
       GradleProjectBuildScriptData buildProjectData = new GradleProjectBuildScriptData(buildScriptSource);
@@ -604,7 +605,7 @@ public final class CommonGradleProjectResolverExtension extends AbstractProjectR
     if (resolverCtx.isResolveModulePerSourceSet()) {
       final Map<String, Pair<DataNode<GradleSourceSetData>, ExternalSourceSet>> sourceSetMap =
         ideProject.getUserData(GradleProjectResolver.RESOLVED_SOURCE_SETS);
-      final Map<String, String> artifactsMap = ideProject.getUserData(CONFIGURATION_ARTIFACTS);
+      final ArtifactMappingService artifactsMap = resolverCtx.getArtifactsMap();
       assert sourceSetMap != null;
       assert artifactsMap != null;
       assert externalProject != null;
@@ -770,7 +771,12 @@ public final class CommonGradleProjectResolverExtension extends AbstractProjectR
 
   @Override
   public @NotNull List<ProjectImportModelProvider> getModelProviders() {
-    return ContainerUtil.prepend(super.getModelProviders(), new GradleExternalProjectModelProvider());
+    return ContainerUtil.append(
+      super.getModelProviders(),
+      new GradleSourceSetModelProvider(),
+      new GradleTaskModelProvider(),
+      new GradleExternalProjectModelProvider()
+    );
   }
 
   @Override

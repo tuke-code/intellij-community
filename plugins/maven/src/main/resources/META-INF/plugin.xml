@@ -96,7 +96,6 @@
                     serviceImplementation="org.jetbrains.idea.maven.project.MavenProjectResolverImpl"/>
 
     <projectService serviceImplementation="org.jetbrains.idea.maven.server.MavenDistributionsCache"/>
-    <projectService serviceImplementation="org.jetbrains.idea.maven.project.importing.MavenImportingManager"/>
 
     <applicationService serviceImplementation="org.jetbrains.idea.maven.utils.MavenWslCache"/>
     <applicationService serviceImplementation="org.jetbrains.idea.maven.indices.archetype.MavenCatalogManager"/>
@@ -106,6 +105,7 @@
                     serviceImplementation="org.jetbrains.idea.maven.project.MavenProjectsManagerEx" preload="true"/>
     <projectService serviceImplementation="org.jetbrains.idea.maven.navigator.MavenProjectsNavigator" preload="true"/>
     <projectService serviceImplementation="org.jetbrains.idea.maven.tasks.MavenShortcutsManager" preload="true"/>
+    <applicationService serviceImplementation="org.jetbrains.idea.maven.internal.ReadStatisticsCollector"/>
 
     <applicationService serviceInterface="com.intellij.openapi.roots.ui.configuration.actions.ModuleDeleteProvider"
                         serviceImplementation="org.jetbrains.idea.maven.project.actions.MavenModuleDeleteProvider" overrides="true"/>
@@ -305,20 +305,20 @@
     <statistics.counterUsagesCollector implementationClass="org.jetbrains.idea.maven.statistics.MavenActionsUsagesCollector"/>
     <statistics.counterUsagesCollector implementationClass="org.jetbrains.idea.maven.statistics.MavenImportCollector"/>
     <statistics.counterUsagesCollector implementationClass="org.jetbrains.idea.maven.statistics.MavenDependencyInsertionCollector"/>
+    <statistics.counterUsagesCollector implementationClass="org.jetbrains.idea.maven.statistics.MavenIndexUsageCollector"/>
     <statistics.projectUsagesCollector implementation="org.jetbrains.idea.maven.statistics.MavenPluginCollector"/>
 
-    <statistics.validation.customValidationRule implementation="org.jetbrains.idea.maven.statistics.MavenPluginCoordinatesWhitelistValidationRule"/>
-    <statistics.validation.customValidationRule implementation="org.jetbrains.idea.maven.statistics.MavenPluginVersionValidationRule"/>
+    <statistics.validation.customValidationRule
+      implementation="org.jetbrains.idea.maven.statistics.MavenPluginCoordinatesWhitelistValidationRule"/>
 
+    <registryKey key="maven.collect.local.stat" defaultValue="false"
+                 description="Collect local maven statistics. Used in Internal mode. Does not affect FUS"/>
 
     <registryKey key="maven.dedicated.indexer.vmargs" defaultValue="-Xmx1024m"
                  description="Dedicated maven indexer VM arguments, restart maven server or IDEA after changing this parameter"/>
 
     <registryKey key="maven.dedicated.indexer" defaultValue="true"
                  description="Dedicated maven indexer" restartRequired="true"/>
-
-    <registryKey key="maven.linear.import" defaultValue="false"
-                 description="Linear maven import process"/>
 
     <registryKey key="maven.plugins.use.cache" defaultValue="true"
                  description="Use cache for plugin resolving"/>
@@ -332,8 +332,20 @@
     <registryKey key="maven.import.compiler.arguments" defaultValue="true"
                  description="Enable importing of the maven compiler plugin arguments"/>
 
+    <registryKey key="maven.import.keep.existing.module.names" defaultValue="true"
+                 description="Keep existing module names after maven project reimport"/>
+
+    <registryKey key="maven.import.module.name.template" defaultValue="artifactId"
+                 description="Defines how IntelliJ IDEA modules are named. Possible values: artifactId, groupId.artifactId, folderName. Other values default to artifactId"/>
+
     <registryKey key="maven.create.dummy.module.on.first.import" defaultValue="true"
                  description="Create maven dummy module on import"/>
+
+    <registryKey key="maven.preimport.project" defaultValue="true"
+                 description="Make fast project preimport"/>
+
+    <registryKey key="maven.preimport.only" defaultValue="false"
+                 description="Make fast project preimport only, without running maven import"/>
 
     <registryKey key="maven.server.per.idea.project" defaultValue="false"
                  description="Single Maven server per idea project, .mvn could be ignored"/>
@@ -635,9 +647,6 @@
     <action id="Maven.OpenSettingsXml"
             class="org.jetbrains.idea.maven.project.actions.OpenOrCreateSettingsXmlAction"/>
 
-    <action id="Maven.OpenProfilesXml"
-            class="org.jetbrains.idea.maven.project.actions.OpenOrCreateProfilesXmlAction"/>
-
     <action id="Maven.IgnoreProjects"
             class="org.jetbrains.idea.maven.project.actions.ToggleIgnoredProjectsAction">
     </action>
@@ -715,6 +724,14 @@
       <add-to-group group-id="ExternalSystem.DependencyAnalyzer.UsagesTreeGroup"/>
     </action>
 
+    <group id="Maven.Internal" internal="true" popup="true">
+      <action id="Maven.PrintStatistics" class="org.jetbrains.idea.maven.internal.MavenShowReadStatisticsAction"/>
+      <action id="Maven.ResetReadStatistic" class="org.jetbrains.idea.maven.internal.MavenResetStatisticsAction"/>
+      <action id="Maven.Killall" class="org.jetbrains.idea.maven.internal.MavenKillallConnectors"/>
+      <action id="Maven.ShowConnectors" class="org.jetbrains.idea.maven.server.ui.ShowMavenConnectorsAction"/>
+      <add-to-group group-id="Internal" anchor="last"/>
+    </group>
+
     <group id="Maven.TasksGroup">
       <action id="Maven.BeforeCompile"
               class="org.jetbrains.idea.maven.tasks.actions.ToggleBeforeCompileTasksAction">
@@ -781,7 +798,6 @@
       <reference id="Maven.RemoveManagedFiles"/>
       <separator/>
       <reference id="Maven.OpenSettingsXml"/>
-      <reference id="Maven.OpenProfilesXml"/>
       <separator/>
       <reference id="Maven.DownloadAllGroup"/>
       <separator/>
@@ -799,10 +815,24 @@
       <reference id="EditSource"/>
     </group>
 
+    <group id="Maven.ProfilesMenu" popup="true">
+      <action id="Maven.ResetProfiles"
+              class="org.jetbrains.idea.maven.project.actions.ResetProfilesAction"/>
+    </group>
+
+    <group id="Maven.ProfileMenu" popup="true">
+      <reference ref="Maven.ToggleProfile"/>
+    </group>
+
     <group id="Maven.BuildMenu" popup="true" class="org.jetbrains.idea.maven.navigator.actions.MavenBuildMenu">
       <group id="Maven.CreateRunConfiguration" class="com.intellij.execution.actions.CreateAction"/>
       <separator/>
       <reference ref="Maven.TasksGroup"/>
+    </group>
+
+    <group id="Maven.RepositoryMenu" class="org.jetbrains.idea.maven.navigator.actions.RepositoryMenu" popup="true">
+      <action id="Maven.UpdateLocalIndex" class="org.jetbrains.idea.maven.navigator.actions.UpdateLocalIndexAction"/>
+      <action id="Maven.ShowIndexData" class="org.jetbrains.idea.maven.navigator.actions.ShowIndexAction"/>
     </group>
 
     <group id="Maven.GlobalProjectMenu" class="org.jetbrains.idea.maven.utils.actions.MavenActionGroup" popup="true"
@@ -812,7 +842,6 @@
       <reference ref="Maven.BaseProjectMenu"/>
     </group>
 
-    <action id="Maven.ShowConnectors" class="org.jetbrains.idea.maven.server.ui.ShowMavenConnectorsAction"/>
     <group id="Maven.GenerateGroup" class="org.jetbrains.idea.maven.dom.generate.MavenGenerateDomActionGroup">
       <add-to-group group-id="GenerateGroup" anchor="first"/>
     </group>

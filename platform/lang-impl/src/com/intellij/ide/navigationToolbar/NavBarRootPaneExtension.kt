@@ -3,7 +3,6 @@ package com.intellij.ide.navigationToolbar
 
 import com.intellij.ide.navbar.ide.NavBarService
 import com.intellij.ide.navbar.ide.isNavbarShown
-import com.intellij.ide.navbar.ide.isNavbarV2Enabled
 import com.intellij.ide.navigationToolbar.NavBarRootPaneExtension.NavBarWrapperPanel
 import com.intellij.ide.ui.NavBarLocation
 import com.intellij.ide.ui.ToolbarSettings
@@ -73,9 +72,7 @@ internal class NavBarRootPaneExtension : IdeRootPaneNorthExtension {
 
       project.messageBus.connect(this@channelFlow).subscribe(UISettingsListener.TOPIC, UISettingsListener { uiSettings ->
         trySendBlocking(createPanelIfApplicable(uiSettings))
-        if (isNavbarV2Enabled) {
-          NavBarService.getInstance(project).uiSettingsChanged(uiSettings)
-        }
+        NavBarService.getInstance(project).uiSettingsChanged(uiSettings)
       })
       awaitClose()
     }
@@ -83,9 +80,7 @@ internal class NavBarRootPaneExtension : IdeRootPaneNorthExtension {
       .map {
         val uiSettings = UISettings.getInstance()
         val result = it.configure(project, statusBar, uiSettings)
-        if (isNavbarV2Enabled) {
-          NavBarService.getInstance(project).uiSettingsChanged(uiSettings)
-        }
+        NavBarService.getInstance(project).uiSettingsChanged(uiSettings)
         result
       }
       .buffer(Channel.UNLIMITED)
@@ -115,7 +110,7 @@ private fun createNavBarPanel(scrollPane: JScrollPane, navigationBar: JComponent
   navBarPanel.add(scrollPane, BorderLayout.CENTER)
   navBarPanel.isOpaque = !ExperimentalUI.isNewUI()
   navBarPanel.updateUI()
-  if (ExperimentalUI.isNewNavbar()) {
+  if (ExperimentalUI.isNewNavbar) {
     val hoverListener: HoverListener = object : HoverListener() {
       override fun mouseEntered(component: Component, x: Int, y: Int) {
         toggleScrollBar(true, scrollPane)
@@ -150,17 +145,7 @@ internal class MyNavBarWrapperPanel(private val project: Project, useAsComponent
     navBarPanel?.let {
       return it
     }
-
-    val navigationBar: JComponent
-    if (isNavbarV2Enabled) {
-      navigationBar = NavBarService.getInstance(project).createNavBarPanel()
-    }
-    else {
-      @Suppress("DEPRECATION")
-      navigationBar = ReusableNavBarPanel(project, true)
-      @Suppress("DEPRECATION")
-      (navigationBar as NavBarPanel).model.setFixedComponent(true)
-    }
+    val navigationBar: JComponent = NavBarService.getInstance(project).createNavBarPanel()
     this.navigationBar = navigationBar
 
     putClientProperty(NavBarRootPaneExtension.PANEL_KEY, navigationBar)
@@ -179,9 +164,7 @@ internal class MyNavBarWrapperPanel(private val project: Project, useAsComponent
 
     toggleRunPanel(isShowToolPanel(uiSettings))
     toggleNavPanel(uiSettings)
-    if (isNavbarV2Enabled) {
-      NavBarService.getInstance(project).uiSettingsChanged(uiSettings)
-    }
+    NavBarService.getInstance(project).uiSettingsChanged(uiSettings)
 
     val navigationBar = navigationBar ?: return
     @Suppress("DEPRECATION")
@@ -289,7 +272,7 @@ internal class MyNavBarWrapperPanel(private val project: Project, useAsComponent
 }
 
 private fun updateScrollBarFlippedState(location: NavBarLocation?, scrollPane: JScrollPane) {
-  if (ExperimentalUI.isNewNavbar()) {
+  if (ExperimentalUI.isNewNavbar) {
     val effectiveLocation = location ?: UISettings.getInstance().navBarLocation
     val flipState = if (effectiveLocation === NavBarLocation.BOTTOM) JBScrollPane.Flip.VERTICAL else JBScrollPane.Flip.NONE
     scrollPane.putClientProperty(JBScrollPane.Flip::class.java, flipState)
@@ -380,7 +363,7 @@ private class NavBarContainer(layout: LayoutManager,
     @Suppress("UNNECESSARY_SAFE_CALL")
     val scrollPane = scrollPane?.takeIf { it.isVisible } ?: return
     var navBarHeight = scrollPane.preferredSize.height
-    if (ExperimentalUI.isNewNavbar()) {
+    if (ExperimentalUI.isNewNavbar) {
       navBarHeight = r.height
     }
     scrollPane.setBounds(x, (r.height - navBarHeight) / 2, r.width - insets.left - insets.right, navBarHeight)
@@ -397,7 +380,7 @@ private class NavBarContainer(layout: LayoutManager,
 
     val settings = UISettings.getInstance()
     val border = if (!ExperimentalUI.isNewUI() || settings.showNavigationBar) NavBarBorder() else JBUI.Borders.empty()
-    if (ExperimentalUI.isNewNavbar()) {
+    if (ExperimentalUI.isNewNavbar) {
       scrollPane.horizontalScrollBar = JBThinOverlappingScrollBar(Adjustable.HORIZONTAL)
       if (scrollPane is JBScrollPane) {
         scrollPane.setOverlappingScrollBar(true)

@@ -3,12 +3,13 @@ package com.intellij.ui.dsl.listCellRenderer.impl
 
 import com.intellij.ui.ExperimentalUI
 import com.intellij.ui.dsl.gridLayout.GridLayout
+import com.intellij.ui.dsl.gridLayout.HorizontalAlign
 import com.intellij.ui.dsl.gridLayout.UnscaledGaps
+import com.intellij.ui.dsl.gridLayout.VerticalAlign
 import com.intellij.ui.dsl.gridLayout.builders.RowsGridBuilder
-import com.intellij.ui.dsl.listCellRenderer.LcrIconInitParams
-import com.intellij.ui.dsl.listCellRenderer.LcrRow
-import com.intellij.ui.dsl.listCellRenderer.LcrTextInitParams
+import com.intellij.ui.dsl.listCellRenderer.*
 import com.intellij.ui.popup.list.SelectablePanel
+import com.intellij.ui.render.RenderingUtil
 import com.intellij.util.ui.JBInsets
 import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.UIUtil
@@ -18,19 +19,67 @@ import java.awt.BorderLayout
 import java.awt.Color
 import java.awt.Component
 import java.util.function.Supplier
-import javax.swing.Icon
-import javax.swing.JList
-import javax.swing.JPanel
-import javax.swing.ListCellRenderer
+import javax.accessibility.Accessible
+import javax.accessibility.AccessibleContext
+import javax.accessibility.AccessibleRole
+import javax.swing.*
 import javax.swing.plaf.basic.BasicComboPopup
-
-private const val HORIZONTAL_GAP = 4
+import kotlin.math.max
 
 @ApiStatus.Internal
-internal class LcrRowImpl<T>(private val renderer: LcrRow<T>.() -> Unit) : LcrRow<T>, ListCellRenderer<T> {
+public open class LcrRowImpl<T>(private val renderer: LcrRow<T>.() -> Unit) : LcrRow<T>, ListCellRenderer<T>, ExperimentalUI.NewUIComboBoxRenderer {
 
   private var listCellRendererParams: ListCellRendererParams<T>? = null
-  private val selectablePanel = SelectablePanel()
+
+  private val selectablePanel = object : SelectablePanel(), KotlinUIDslRenderer {
+
+    override fun getBaseline(width: Int, height: Int): Int {
+      val baselineComponents = cells.filter { it.baselineAlign }.map { it.lcrCell.component }
+
+      // JLabel doesn't have baseline if empty. Workaround similar like in BasicComboBoxUI.getBaseline method
+      for (component in baselineComponents) {
+        if (component is JLabel && component.text.isNullOrEmpty()) {
+          component.text = " "
+        }
+      }
+      setSize(width, height)
+      doLayout()
+      content.doLayout()
+      var result = -1
+      for (component in baselineComponents) {
+        val componentBaseline = component.getBaseline(component.width, component.height)
+        if (componentBaseline >= 0) {
+          result = max(result, content.y + component.y + componentBaseline)
+        }
+      }
+      return result
+    }
+
+    // Support disabled combobox color. Can be reworked later
+    override fun setForeground(fg: Color?) {
+      super.setForeground(fg)
+
+      @Suppress("SENSELESS_COMPARISON")
+      if (cells == null) {
+        // Called while initialization
+        return
+      }
+
+      for (cell in cells) {
+        cell.lcrCell.component.foreground = fg
+      }
+    }
+
+    override fun getAccessibleContext(): AccessibleContext {
+      if (accessibleContext == null) {
+        accessibleContext = object : AccessibleJPanel() {
+          override fun getAccessibleRole(): AccessibleRole = AccessibleRole.LABEL
+        }
+      }
+      return accessibleContext
+    }
+  }
+
   private val lcrCellCache = LcrCellCache()
 
   /**
@@ -38,6 +87,7 @@ internal class LcrRowImpl<T>(private val renderer: LcrRow<T>.() -> Unit) : LcrRo
    */
   private val content = JPanel(GridLayout())
   private val cells = mutableListOf<CellInfo>()
+  private var gap = LcrRow.Gap.DEFAULT
 
   init {
     content.isOpaque = false
@@ -60,36 +110,63 @@ internal class LcrRowImpl<T>(private val renderer: LcrRow<T>.() -> Unit) : LcrRo
     get() = listCellRendererParams!!.hasFocus
 
   override var background: Color?
-    get() = if (ExperimentalUI.isNewUI()) selectablePanel.selectionColor else selectablePanel.background
+    get() = if (ExperimentalUI.isNewUI() || !selected) selectablePanel.background else null
     set(value) {
-      if (ExperimentalUI.isNewUI()) {
-        selectablePanel.selectionColor = value
-      }
-      else {
-        selectablePanel.background = value
+      if (ExperimentalUI.isNewUI() || !selected) selectablePanel.background = value
+    }
+
+  override var selectionColor: Color?
+    get() = if (selected) {
+      if (ExperimentalUI.isNewUI()) selectablePanel.selectionColor else selectablePanel.background
+    } else {
+      null
+    }
+    set(value) {
+      if (selected) {
+        if (ExperimentalUI.isNewUI()) {
+          selectablePanel.selectionColor = value
+        }
+        else {
+          selectablePanel.background = value
+        }
       }
     }
 
+  private var foreground: Color = JBUI.CurrentTheme.List.FOREGROUND
+
+  override fun gap(gap: LcrRow.Gap) {
+    this.gap = gap
+  }
+
   override fun icon(icon: Icon, init: (LcrIconInitParams.() -> Unit)?) {
-    val initParams = LcrIconInitParamsImpl()
+    val initParams = LcrIconInitParams()
+    initParams.accessibleName = (icon as? Accessible)?.accessibleContext?.accessibleName
     if (init != null) {
       initParams.init()
     }
 
     val result = lcrCellCache.occupyIcon()
-    result.init(icon)
-    cells.add(CellInfo(result, initParams.grow, false))
+    result.init(icon, initParams)
+    add(result, initParams, false)
   }
 
   override fun text(text: @Nls String, init: (LcrTextInitParams.() -> Unit)?) {
-    val initParams = LcrTextInitParamsImpl()
+    val initParams = LcrTextInitParams(foreground)
+    initParams.accessibleName = text
     if (init != null) {
       initParams.init()
     }
 
-    val result = lcrCellCache.occupyText()
-    result.init(text, initParams, list, selected, hasFocus)
-    cells.add(CellInfo(result, initParams.grow, true))
+    val result = if (initParams.attributes == null) {
+      lcrCellCache.occupyText().apply {
+        init(text, initParams, selected, foreground)
+      }
+    } else {
+      lcrCellCache.occupySimpleColoredText().apply {
+        init(text, initParams, selected, foreground)
+      }
+    }
+    add(result, initParams, true)
   }
 
   override fun getListCellRendererComponent(list: JList<out T>,
@@ -100,13 +177,15 @@ internal class LcrRowImpl<T>(private val renderer: LcrRow<T>.() -> Unit) : LcrRo
     cells.clear()
     content.removeAll()
     lcrCellCache.release()
+    gap = LcrRow.Gap.DEFAULT
 
-    val bg = if (isSelected) JBUI.CurrentTheme.List.Selection.background(cellHasFocus) else list.background
+    val selectionBg = if (isSelected) RenderingUtil.getSelectionBackground(list) else null
+    val isComboBox = isComboBox(list)
     if (ExperimentalUI.isNewUI()) {
       // Update height/insets every time, so IDE scaling is applied
       selectablePanel.apply {
-        if (isComboBox(list) && index == -1) {
-          // Renderer for selected item in ComboBox component
+        if (isComboBox && index == -1) {
+          // Renderer for selected item in collapsed ComboBox component
           selectablePanel.isOpaque = false
           selectionArc = 0
           selectionInsets = JBInsets.emptyInsets()
@@ -119,36 +198,69 @@ internal class LcrRowImpl<T>(private val renderer: LcrRow<T>.() -> Unit) : LcrRo
         else {
           selectablePanel.isOpaque = true
           selectionArc = 8
-          selectionInsets = JBInsets.create(0, 12)
-          border = JBUI.Borders.empty(0, 20)
+          if (isComboBox) {
+            selectionInsets = JBInsets.create(0, 12)
+            border = JBUI.Borders.empty(2, 20)
+          }
+          else {
+            selectionInsets = JBInsets.create(0, 12)
+            border = JBUI.Borders.empty(0, 20)
+          }
           preferredHeight = JBUI.CurrentTheme.List.rowHeight()
 
           background = list.background
-          selectionColor = bg
+          selectionColor = selectionBg
         }
       }
     }
     else {
       selectablePanel.apply {
-        background = bg
+        background = selectionBg ?: list.background
         border = JBUI.Borders.empty(UIUtil.getListCellVPadding(), UIUtil.getListCellHPadding())
       }
     }
 
     listCellRendererParams = ListCellRendererParams(list, value, index, isSelected, cellHasFocus)
+    foreground = if (selected) RenderingUtil.getSelectionForeground(list) else RenderingUtil.getForeground(list)
+
     renderer()
 
     val builder = RowsGridBuilder(content)
     builder.resizableRow()
 
     for (cell in cells) {
-      builder.cell(cell.lcrCell.component, gaps = if (builder.x == 0) UnscaledGaps.EMPTY else UnscaledGaps(left = HORIZONTAL_GAP),
-                   resizableColumn = cell.resizableColumn, baselineAlign = cell.baselineAlign)
+      // Row height is usually even. If components height is odd the component cannot be placed right in center.
+      // Because of rounding it's placed a little bit higher which looks not good, especially for text. This patch fixes that
+      val roundingTopGapPatch = cell.lcrCell.component.preferredSize.height % 2
+      val gaps = UnscaledGaps(top = roundingTopGapPatch, left = if (builder.x == 0) 0 else getGapValue(cell.gap))
+      val horizontalAlign = when (cell.align) {
+        null, LcrInitParams.Align.LEFT -> HorizontalAlign.LEFT
+        LcrInitParams.Align.CENTER -> HorizontalAlign.CENTER
+        LcrInitParams.Align.RIGHT -> HorizontalAlign.RIGHT
+      }
+
+      builder.cell(cell.lcrCell.component, gaps = gaps,
+                   horizontalAlign = horizontalAlign,
+                   verticalAlign = VerticalAlign.CENTER,
+                   resizableColumn = cell.align != null,
+                   baselineAlign = cell.baselineAlign)
     }
 
     selectablePanel.accessibleContext.accessibleName = getAccessibleName()
 
     return selectablePanel
+  }
+
+  private fun add(lcrCell: LcrCellBaseImpl, initParams: LcrInitParams, baselineAlign: Boolean) {
+    cells.add(CellInfo(lcrCell, initParams.align, baselineAlign, gap))
+    gap = LcrRow.Gap.DEFAULT
+  }
+
+  private fun getGapValue(gap: LcrRow.Gap): Int {
+    return when (gap) {
+      LcrRow.Gap.DEFAULT -> 4
+      LcrRow.Gap.NONE -> 0
+    }
   }
 
   private fun isComboBox(list: JList<*>): Boolean {
@@ -158,10 +270,10 @@ internal class LcrRowImpl<T>(private val renderer: LcrRow<T>.() -> Unit) : LcrRo
   @Nls
   private fun getAccessibleName(): String {
     val names = cells
-      .map { it.lcrCell.component.accessibleContext.accessibleName.trim() }
-      .filter { it.isNotEmpty() }
+      .map { it.lcrCell.component.accessibleContext.accessibleName?.trim() }
+      .filter { !it.isNullOrEmpty() }
 
-    // Comma gives a good pause between unrelated text for readers on Windows/MacOS
+    // Comma gives a good pause between unrelated text for readers on Windows and macOS
     return names.joinToString(", ")
   }
 }
@@ -172,7 +284,7 @@ private data class ListCellRendererParams<T>(val list: JList<out T>,
                                              val selected: Boolean,
                                              val hasFocus: Boolean)
 
-private data class CellInfo(val lcrCell: LcrCellBaseImpl, val resizableColumn: Boolean, val baselineAlign: Boolean)
+private data class CellInfo(val lcrCell: LcrCellBaseImpl, val align: LcrInitParams.Align?, val baselineAlign: Boolean, val gap: LcrRow.Gap)
 
 private class LcrCellCache {
 
@@ -185,6 +297,10 @@ private class LcrCellCache {
 
   fun occupyText(): LcrTextImpl {
     return occupy { LcrTextImpl() }
+  }
+
+  fun occupySimpleColoredText(): LcrSimpleColoredTextImpl {
+    return occupy { LcrSimpleColoredTextImpl() }
   }
 
   fun release() {

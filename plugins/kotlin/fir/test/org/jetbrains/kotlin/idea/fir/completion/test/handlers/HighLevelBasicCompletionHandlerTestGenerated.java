@@ -1188,6 +1188,16 @@ public abstract class HighLevelBasicCompletionHandlerTestGenerated extends Abstr
                 runTest("../completion/testData/handlers/basic/AmbiguousSuperMethodWithArgument.kt");
             }
 
+            @TestMetadata("AnonymousFunctionAnnotation.kt")
+            public void testAnonymousFunctionAnnotation() throws Exception {
+                runTest("../completion/testData/handlers/basic/AnonymousFunctionAnnotation.kt");
+            }
+
+            @TestMetadata("AnonymousFunctionReturnType.kt")
+            public void testAnonymousFunctionReturnType() throws Exception {
+                runTest("../completion/testData/handlers/basic/AnonymousFunctionReturnType.kt");
+            }
+
             @TestMetadata("BeforeCallee.kt")
             public void testBeforeCallee() throws Exception {
                 runTest("../completion/testData/handlers/basic/BeforeCallee.kt");
@@ -1607,6 +1617,34 @@ public abstract class HighLevelBasicCompletionHandlerTestGenerated extends Abstr
             @TestMetadata("TypeInsertionOnLateinit.kt")
             public void testTypeInsertionOnLateinit() throws Exception {
                 runTest("../completion/testData/handlers/basic/variableNameAndType/TypeInsertionOnLateinit.kt");
+            }
+        }
+
+        @RunWith(JUnit3RunnerWithInners.class)
+        @TestMetadata("../completion/testData/handlers/basic/withTab")
+        public static class WithTab extends AbstractHighLevelBasicCompletionHandlerTest {
+            private void runTest(String testDataFilePath) throws Exception {
+                KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+            }
+
+            @TestMetadata("InsideBracketsClassifier.kt")
+            public void testInsideBracketsClassifier() throws Exception {
+                runTest("../completion/testData/handlers/basic/withTab/InsideBracketsClassifier.kt");
+            }
+
+            @TestMetadata("InsideBracketsFunction.kt")
+            public void testInsideBracketsFunction() throws Exception {
+                runTest("../completion/testData/handlers/basic/withTab/InsideBracketsFunction.kt");
+            }
+
+            @TestMetadata("InsideBracketsFunction2.kt")
+            public void testInsideBracketsFunction2() throws Exception {
+                runTest("../completion/testData/handlers/basic/withTab/InsideBracketsFunction2.kt");
+            }
+
+            @TestMetadata("InsideBracketsVariable.kt")
+            public void testInsideBracketsVariable() throws Exception {
+                runTest("../completion/testData/handlers/basic/withTab/InsideBracketsVariable.kt");
             }
         }
     }

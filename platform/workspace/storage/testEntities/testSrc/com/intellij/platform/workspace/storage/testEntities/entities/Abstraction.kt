@@ -2,11 +2,6 @@
 package com.intellij.platform.workspace.storage.testEntities.entities
 
 import com.intellij.platform.workspace.storage.*
-import com.intellij.platform.workspace.storage.EntitySource
-import com.intellij.platform.workspace.storage.GeneratedCodeApiVersion
-import com.intellij.platform.workspace.storage.MutableEntityStorage
-import com.intellij.platform.workspace.storage.WorkspaceEntity
-import com.intellij.platform.workspace.storage.EntityType
 import com.intellij.platform.workspace.storage.annotations.Abstract
 import com.intellij.platform.workspace.storage.annotations.Child
 
@@ -42,7 +37,8 @@ interface HeadAbstractionEntity : WorkspaceEntityWithSymbolicId {
 }
 
 //region generated code
-fun MutableEntityStorage.modifyEntity(entity: HeadAbstractionEntity, modification: HeadAbstractionEntity.Builder.() -> Unit) = modifyEntity(
+fun MutableEntityStorage.modifyEntity(entity: HeadAbstractionEntity,
+                                      modification: HeadAbstractionEntity.Builder.() -> Unit): HeadAbstractionEntity = modifyEntity(
   HeadAbstractionEntity.Builder::class.java, entity, modification)
 //endregion
 
@@ -133,7 +129,7 @@ interface MiddleEntity : BaseEntity {
 }
 
 //region generated code
-fun MutableEntityStorage.modifyEntity(entity: MiddleEntity, modification: MiddleEntity.Builder.() -> Unit) = modifyEntity(
+fun MutableEntityStorage.modifyEntity(entity: MiddleEntity, modification: MiddleEntity.Builder.() -> Unit): MiddleEntity = modifyEntity(
   MiddleEntity.Builder::class.java, entity, modification)
 //endregion
 
@@ -171,7 +167,7 @@ interface LeftEntity : CompositeBaseEntity {
 }
 
 //region generated code
-fun MutableEntityStorage.modifyEntity(entity: LeftEntity, modification: LeftEntity.Builder.() -> Unit) = modifyEntity(
+fun MutableEntityStorage.modifyEntity(entity: LeftEntity, modification: LeftEntity.Builder.() -> Unit): LeftEntity = modifyEntity(
   LeftEntity.Builder::class.java, entity, modification)
 //endregion
 
@@ -211,7 +207,7 @@ interface RightEntity : CompositeBaseEntity {
 }
 
 //region generated code
-fun MutableEntityStorage.modifyEntity(entity: RightEntity, modification: RightEntity.Builder.() -> Unit) = modifyEntity(
+fun MutableEntityStorage.modifyEntity(entity: RightEntity, modification: RightEntity.Builder.() -> Unit): RightEntity = modifyEntity(
   RightEntity.Builder::class.java, entity, modification)
 //endregion
 

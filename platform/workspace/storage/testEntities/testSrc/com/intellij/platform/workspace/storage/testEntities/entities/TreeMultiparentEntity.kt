@@ -2,15 +2,6 @@
 package com.intellij.platform.workspace.storage.testEntities.entities
 
 import com.intellij.platform.workspace.storage.*
-import com.intellij.platform.workspace.storage.EntitySource
-import com.intellij.platform.workspace.storage.GeneratedCodeApiVersion
-
-import com.intellij.platform.workspace.storage.MutableEntityStorage
-import com.intellij.platform.workspace.storage.WorkspaceEntity
-import kotlin.jvm.JvmName
-import kotlin.jvm.JvmOverloads
-import kotlin.jvm.JvmStatic
-import com.intellij.platform.workspace.storage.EntityType
 import com.intellij.platform.workspace.storage.annotations.Child
 
 interface TreeMultiparentRootEntity : WorkspaceEntityWithSymbolicId {
@@ -46,7 +37,7 @@ interface TreeMultiparentRootEntity : WorkspaceEntityWithSymbolicId {
 
 //region generated code
 fun MutableEntityStorage.modifyEntity(entity: TreeMultiparentRootEntity,
-                                      modification: TreeMultiparentRootEntity.Builder.() -> Unit) = modifyEntity(
+                                      modification: TreeMultiparentRootEntity.Builder.() -> Unit): TreeMultiparentRootEntity = modifyEntity(
   TreeMultiparentRootEntity.Builder::class.java, entity, modification)
 //endregion
 
@@ -84,7 +75,7 @@ interface TreeMultiparentLeafEntity : WorkspaceEntity {
 
 //region generated code
 fun MutableEntityStorage.modifyEntity(entity: TreeMultiparentLeafEntity,
-                                      modification: TreeMultiparentLeafEntity.Builder.() -> Unit) = modifyEntity(
+                                      modification: TreeMultiparentLeafEntity.Builder.() -> Unit): TreeMultiparentLeafEntity = modifyEntity(
   TreeMultiparentLeafEntity.Builder::class.java, entity, modification)
 //endregion
 

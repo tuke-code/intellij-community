@@ -90,6 +90,10 @@ public class LightPatternsForSwitchHighlightingTest extends LightJavaCodeInsight
   public void testSwitchExhaustivenessWithGenericsIn21Java() {
     IdeaTestUtil.withLevel(getModule(), LanguageLevel.JDK_21, this::doTest);
   }
+  
+  public void testSwitchSeveralPatternsUnnamed() {
+    IdeaTestUtil.withLevel(getModule(), LanguageLevel.JDK_21_PREVIEW, this::doTest);
+  }
 
   public void testSwitchDominanceIn21Java() {
     IdeaTestUtil.withLevel(getModule(), LanguageLevel.JDK_21, this::doTest);
@@ -201,6 +205,10 @@ public class LightPatternsForSwitchHighlightingTest extends LightJavaCodeInsight
     doTest();
   }
   public void testNullSelectorType() {
+    doTest();
+  }
+
+  public void testSealedWithLocalAndAnonymousClasses() {
     doTest();
   }
 

@@ -7,20 +7,24 @@ import com.intellij.ide.plugins.IdeaPluginDescriptor;
 import com.intellij.ide.plugins.IdeaPluginDescriptorImpl;
 import com.intellij.ide.plugins.PluginContentDescriptor;
 import com.intellij.ide.plugins.PluginManagerCore;
+import com.intellij.openapi.application.Application;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.application.WriteAction;
+import com.intellij.openapi.application.ex.ApplicationEx;
 import com.intellij.openapi.application.impl.ApplicationInfoImpl;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.extensions.PluginId;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.BuildNumber;
+import com.intellij.openapi.util.ClearableLazyValue;
 import com.intellij.platform.diagnostic.telemetry.IJTracer;
 import com.intellij.util.ExceptionUtil;
 import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.SpanBuilder;
 import io.opentelemetry.context.Context;
 import kotlin.text.StringsKt;
+import org.apache.commons.lang3.ClassUtils;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -47,12 +51,17 @@ public class Invoker implements InvokerMBean {
 
   private final Map<Integer, WeakReference<Object>> adhocReferenceMap = new ConcurrentHashMap<>();
 
-  private final IJTracer tracer;
+  private final ClearableLazyValue<IJTracer> tracer;
   private final Supplier<? extends Context> timedContextSupplier;
 
-  public Invoker(@NotNull IJTracer tracer, @NotNull Supplier<? extends Context> timedContextSupplier) {
+  public Invoker(@NotNull Supplier<? extends IJTracer> tracerSupplier, @NotNull Supplier<? extends Context> timedContextSupplier) {
     this.timedContextSupplier = timedContextSupplier;
-    this.tracer = tracer;
+    this.tracer = new ClearableLazyValue<>() {
+      @Override
+      protected @NotNull IJTracer compute() {
+        return tracerSupplier.get();
+      }
+    };
   }
 
   @Override
@@ -65,6 +74,12 @@ public class Invoker implements InvokerMBean {
       build.getBaselineVersion(),
       build.asString()
     );
+  }
+
+  @Override
+  public boolean isApplicationInitialized() {
+    Application application = ApplicationManager.getApplication();
+    return application != null && ((ApplicationEx)application).isComponentCreated();
   }
 
   @Override
@@ -269,7 +284,7 @@ public class Invoker implements InvokerMBean {
       }
     }
     else {
-      SpanBuilder spanBuilder = tracer.spanBuilder(call.getTimedSpan())
+      SpanBuilder spanBuilder = tracer.getValue().spanBuilder(call.getTimedSpan())
         .setParent(timedContextSupplier.get());
 
       Span span = spanBuilder.startSpan();
@@ -294,14 +309,18 @@ public class Invoker implements InvokerMBean {
 
   private static Constructor<?> getConstructor(@NotNull RemoteCall call, @NotNull Class<?> targetClass, Object[] transformedArgs) {
     int argCount = call.getArgs().length;
-    List<Constructor<?>> constructors = Arrays.stream(targetClass.getConstructors())
+    List<Constructor<?>> availableConstructors = Arrays.stream(targetClass.getConstructors()).toList();
+    List<Constructor<?>> constructors = availableConstructors.stream()
       .filter(x -> x.getParameterCount() == argCount)
       .toList();
 
     if (constructors.isEmpty()) {
       throw new IllegalStateException(
-        "No constructor with parameter count " + argCount +
-        " in class " + call.getClassName());
+        String.format("No constructor with parameter count %s in class %s. Available constructors: %n%s",
+                      argCount, call.getClassName(),
+                      availableConstructors.stream().map(it -> it.toString())
+                        .collect(Collectors.joining(" - " + System.lineSeparator()))
+        ));
     }
 
     if (constructors.size() > 1) {
@@ -321,22 +340,19 @@ public class Invoker implements InvokerMBean {
     Class<?> clazz = getTargetClass(call);
 
     int argCount = call.getArgs().length;
-    List<Method> targetMethods = Arrays.stream(clazz.getMethods())
+
+    List<Method> availableMethods = Arrays.stream(clazz.getMethods()).toList();
+    List<Method> targetMethods = availableMethods.stream()
       .filter(m -> m.getName().equals(call.getMethodName()) && argCount == m.getParameterCount())
       .toList();
 
     if (targetMethods.isEmpty()) {
-      // try to find protected/private ones
-      targetMethods = Arrays.stream(clazz.getDeclaredMethods())
-        .filter(m -> m.getName().equals(call.getMethodName()) && argCount == m.getParameterCount())
-        .toList();
-    }
-
-    if (targetMethods.isEmpty()) {
       throw new IllegalStateException(
-        "No method " + call.getMethodName() +
-        " with parameter count " + argCount +
-        " in class " + clazz);
+        String.format("No method '%s' with parameter count %s in class %s. Available methods: %n%s",
+                      call.getMethodName(), argCount, call.getClassName(),
+                      availableMethods.stream().map(it -> it.toString())
+                        .collect(Collectors.joining(" - " + System.lineSeparator()))
+        ));
     }
 
     if (targetMethods.size() > 1) {
@@ -372,7 +388,7 @@ public class Invoker implements InvokerMBean {
       if (argType == null) continue;
 
       Class<?> parameterType = parameterTypes[i];
-      if (!parameterType.isAssignableFrom(argType)) return false;
+      if (!ClassUtils.isAssignable(argType, parameterType)) return false;
     }
     return true;
   }

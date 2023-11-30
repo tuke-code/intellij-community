@@ -1,5 +1,5 @@
 // FIR_IDENTICAL
-// IGNORE_FE10
+// IGNORE_K1
 sealed class SEALED
 class AAAA: SEALED()
 object BBBB: SEALED()
@@ -12,7 +12,7 @@ fun foo(e: SEALED) {
     }
 }
 
+// WITH_ORDER
 // EXIST: BBBB
 // EXIST: { lookupString: "else -> "}
-// NOTHING_ELSE
 // FIR_COMPARISON

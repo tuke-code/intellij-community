@@ -46,7 +46,7 @@ impl<'a> TestEnvironment<'a> {
 
     pub fn create_temp_dir(&self, relative_path: &str) -> PathBuf {
         let temp_dir = self.test_root_dir.path().join(relative_path);
-        fs::create_dir_all(&temp_dir).expect(&format!("Cannot create: {:?}", temp_dir));
+        fs::create_dir_all(&temp_dir).unwrap_or_else(|_| panic!("Cannot create: {:?}", temp_dir));
         temp_dir
     }
 
@@ -56,8 +56,7 @@ impl<'a> TestEnvironment<'a> {
         temp_file
     }
 
-    pub fn create_user_config_file(&mut self, name: &str, content: &str) -> PathBuf {
-        let custom_config_dir = get_custom_config_dir();
+    pub fn create_user_config_file(&mut self, name: &str, content: &str, custom_config_dir: PathBuf) -> PathBuf {
         self.to_delete.push(custom_config_dir.clone());
         let config_file = custom_config_dir.join(name);
         Self::create_file(&config_file, content);
@@ -75,11 +74,11 @@ impl<'a> TestEnvironment<'a> {
 
     fn create_file(file: &Path, content: &str) {
         fs::create_dir_all(file.parent().unwrap())
-            .expect(&format!("Cannot create: {:?}", file));
-        OpenOptions::new().write(true).create_new(true).open(&file)
-            .expect(&format!("Cannot create {:?}", &file))
+            .unwrap_or_else(|_| panic!("Cannot create: {:?}", file));
+        OpenOptions::new().write(true).create_new(true).open(file)
+            .unwrap_or_else(|_| panic!("Cannot create {:?}", &file))
             .write_all(content.as_bytes())
-            .expect(&format!("Cannot write {:?}", &file));
+            .unwrap_or_else(|_| panic!("Cannot write {:?}", &file));
     }
 
     #[cfg(target_os = "windows")]
@@ -126,8 +125,8 @@ impl<'a> Drop for TestEnvironment<'a> {
         for path in &self.to_delete {
             debug!("Deleting {:?}", path);
             if let Ok(metadata) = path.symlink_metadata() {
-                let result = if metadata.is_dir() { fs::remove_dir_all(&path) } else { fs::remove_file(path) };
-                result.expect(&format!("cannot delete: {:?}", path))
+                let result = if metadata.is_dir() { fs::remove_dir_all(path) } else { fs::remove_file(path) };
+                result.unwrap_or_else(|_| panic!("cannot delete: {:?}", path))
             }
         }
     }
@@ -393,8 +392,12 @@ fn symlink(original: &Path, link: &Path) -> Result<()> {
     Ok(())
 }
 
-fn get_custom_config_dir() -> PathBuf {
-    get_config_home().unwrap().join("JetBrains").join("XPlatLauncherTest")
+pub fn get_custom_config_dir() -> PathBuf {
+    get_jetbrains_config_root().join("XPlatLauncherTest")
+}
+
+pub fn get_jetbrains_config_root() -> PathBuf {
+    get_config_home().unwrap().join("JetBrains")
 }
 
 pub struct LauncherRunSpec {
@@ -479,7 +482,7 @@ pub fn run_launcher(run_spec: &LauncherRunSpec) -> LauncherRunResult {
 }
 
 pub fn run_launcher_ext(test_env: &TestEnvironment, run_spec: &LauncherRunSpec) -> LauncherRunResult {
-    match run_launcher_impl(&test_env, &run_spec) {
+    match run_launcher_impl(test_env, run_spec) {
         Ok(result) => {
             if run_spec.assert_status {
                 assert!(result.exit_status.success(), "The exit status of the launcher is not successful: {:?}", result);
@@ -506,7 +509,7 @@ fn run_launcher_impl(test_env: &TestEnvironment, run_spec: &LauncherRunSpec) -> 
     if run_spec.dump {
         let dump_args = match run_spec.location {
             LauncherLocation::Standard => vec!["dump-launch-parameters", "--output", &dump_file_path_str],
-            LauncherLocation::RemoteDev => vec!["dumpLaunchParameters", &project_dir, "--output", &dump_file_path_str]
+            LauncherLocation::RemoteDev => vec!["dumpLaunchParameters", project_dir, "--output", &dump_file_path_str]
         };
         for arg in dump_args {
             full_args.push(arg);
@@ -534,7 +537,7 @@ fn run_launcher_impl(test_env: &TestEnvironment, run_spec: &LauncherRunSpec) -> 
     }
 
     let mut launcher_process = Command::new(&test_env.launcher_path)
-        .current_dir(&test_env.test_root_dir.path())
+        .current_dir(test_env.test_root_dir.path())
         .args(full_args)
         .stdout(Stdio::from(File::create(&stdout_file_path)?))
         .stderr(Stdio::from(File::create(&stderr_file_path)?))
@@ -573,9 +576,9 @@ fn read_launcher_run_result(path: &Path) -> Result<IntellijMainDumpedLaunchParam
 }
 
 pub fn test_runtime_selection(result: LauncherRunResult, expected_rt: PathBuf) {
-    let rt_line = result.stdout.lines().into_iter()
+    let rt_line = result.stdout.lines()
         .find(|line| line.contains("Resolved runtime: "))
-        .expect(&format!("The 'Resolved runtime:' line is not in the output: {}", result.stdout));
+        .unwrap_or_else(|| panic!("The 'Resolved runtime:' line is not in the output: {}", result.stdout));
     let resolved_rt = rt_line.split_once("Resolved runtime: ").unwrap().1;
     let actual_rt = &resolved_rt[1..resolved_rt.len() - 1].replace("\\\\", "\\");
 

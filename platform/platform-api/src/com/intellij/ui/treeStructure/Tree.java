@@ -1,6 +1,7 @@
 // Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.ui.treeStructure;
 
+import com.intellij.ide.ActivityTracker;
 import com.intellij.ide.IdeBundle;
 import com.intellij.ide.dnd.SmoothAutoScroller;
 import com.intellij.ide.util.treeView.*;
@@ -156,8 +157,7 @@ public class Tree extends JTree implements ComponentWithEmptyText, ComponentWith
    * @return a strategy which determines if a wide selection should be drawn for a target row (it's number is
    * {@link Condition#value(Object) given} as an argument to the strategy)
    */
-  @NotNull
-  protected Condition<Integer> getWideSelectionBackgroundCondition() {
+  protected @NotNull Condition<Integer> getWideSelectionBackgroundCondition() {
     return Conditions.alwaysTrue();
   }
 
@@ -170,15 +170,13 @@ public class Tree extends JTree implements ComponentWithEmptyText, ComponentWith
     return isEmpty();
   }
 
-  @NotNull
   @Override
-  public StatusText getEmptyText() {
+  public @NotNull StatusText getEmptyText() {
     return myEmptyText;
   }
 
   @Override
-  @NotNull
-  public ExpandableItemsHandler<Integer> getExpandableItemsHandler() {
+  public @NotNull ExpandableItemsHandler<Integer> getExpandableItemsHandler() {
     return myExpandableItemsHandler;
   }
 
@@ -391,18 +389,15 @@ public class Tree extends JTree implements ComponentWithEmptyText, ComponentWith
   }
 
   @Override
-  @Nullable
-  public Color getPathBackground(@NotNull TreePath path, int row) {
+  public @Nullable Color getPathBackground(@NotNull TreePath path, int row) {
     return isFileColorsEnabled() && !Registry.is("ide.file.colors.at.left") ? getFileColorForPath(path) : null;
   }
 
-  @Nullable
-  public Color getFileColorForRow(int row) {
+  public @Nullable Color getFileColorForRow(int row) {
     TreePath path = getPathForRow(row);
     return path != null ? getFileColorForPath(path) : null;
   }
-  @Nullable
-  public Color getFileColorForPath(@NotNull TreePath path) {
+  public @Nullable Color getFileColorForPath(@NotNull TreePath path) {
     Object component = path.getLastPathComponent();
     if (component instanceof LoadingNode) {
       Object[] pathObjects = path.getPath();
@@ -413,8 +408,7 @@ public class Tree extends JTree implements ComponentWithEmptyText, ComponentWith
     return getFileColorFor(TreeUtil.getUserObject(component));
   }
 
-  @Nullable
-  public Color getFileColorFor(Object object) {
+  public @Nullable Color getFileColorFor(Object object) {
     return null;
   }
 
@@ -669,6 +663,7 @@ public class Tree extends JTree implements ComponentWithEmptyText, ComponentWith
     @Override
     protected void fireValueChanged(TreeSelectionEvent e) {
       if (myHeldSelection == null) {
+        ActivityTracker.getInstance().inc();
         super.fireValueChanged(e);
       }
     }
@@ -915,8 +910,7 @@ public class Tree extends JTree implements ComponentWithEmptyText, ComponentWith
    * @param y vertical location in the tree
    * @return the deepest visible component of the renderer
    */
-  @Nullable
-  public Component getDeepestRendererComponentAt(int x, int y) {
+  public @Nullable Component getDeepestRendererComponentAt(int x, int y) {
     int row = getRowForLocation(x, y);
     if (row >= 0) {
       TreeCellRenderer renderer = getCellRenderer();

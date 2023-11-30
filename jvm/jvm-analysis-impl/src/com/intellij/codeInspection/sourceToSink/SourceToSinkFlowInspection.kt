@@ -19,6 +19,7 @@ import com.intellij.uast.UastHintedVisitorAdapter
 import com.siyeh.InspectionGadgetsBundle
 import com.siyeh.ig.psiutils.MethodMatcher
 import org.jdom.Element
+import org.jetbrains.annotations.TestOnly
 import org.jetbrains.uast.*
 import org.jetbrains.uast.visitor.AbstractUastNonRecursiveVisitor
 
@@ -67,6 +68,9 @@ class SourceToSinkFlowInspection : AbstractBaseUastLocalInspectionTool() {
 
   private val myUntaintedMethodMatcher: MethodMatcher = MethodMatcher().finishDefault()
 
+  @TestOnly
+  fun getUntaintedMethodMatcher() = myUntaintedMethodMatcher
+
   private val myTaintedMethodMatcher: MethodMatcher = MethodMatcher(false, "myTaintedMethodMatcher").finishDefault()
 
   @JvmField
@@ -98,7 +102,23 @@ class SourceToSinkFlowInspection : AbstractBaseUastLocalInspectionTool() {
   @JvmField
   var depthInside: Int = 5
 
+  @JvmField
+  var depthOutsideMethods: Int = 0
+
+  @JvmField
+  var depthNestedMethods: Int = 1
+
   var checkedTypes: MutableList<String?> = mutableListOf("java.lang.String")
+
+  @JvmField
+  var qualifierCleanerClass: MutableList<String?> = mutableListOf()
+
+  @JvmField
+  var qualifierCleanerMethod: MutableList<String?> = mutableListOf()
+
+  @JvmField
+  var qualifierCleanerParams: MutableList<String?> = mutableListOf()
+
   override fun getOptionsPane(): OptPane {
     return OptPane.pane(
 
@@ -157,7 +177,7 @@ class SourceToSinkFlowInspection : AbstractBaseUastLocalInspectionTool() {
         OptPane.column("untaintedParameterWithPlacePlaceMethod",
                        JvmAnalysisBundle.message("jvm.inspections.source.unsafe.to.sink.flow.place.method.column.title"),
                        RegexValidator()),
-        ).comment(
+      ).comment(
         JvmAnalysisBundle.message("jvm.inspections.source.unsafe.to.sink.flow.untainted.parameters.comment")),
 
       OptPane.checkbox("processOuterMethodAsQualifierAndArguments",
@@ -192,6 +212,20 @@ class SourceToSinkFlowInspection : AbstractBaseUastLocalInspectionTool() {
         .comment(JvmAnalysisBundle.message("jvm.inspections.source.unsafe.to.sink.flow.check.warn.if.complex.comment")),
 
       OptPane.stringList("checkedTypes", JvmAnalysisBundle.message("jvm.inspections.source.unsafe.to.sink.flow.checked.types")),
+
+      OptPane.table(
+        JvmAnalysisBundle.message("jvm.inspections.source.unsafe.to.sink.flow.qualifier.cleaner.table"),
+        OptPane.column("qualifierCleanerClass",
+                       JvmAnalysisBundle.message("jvm.inspections.source.unsafe.to.sink.flow.qualifier.cleaner.classes"),
+                       JavaClassValidator()),
+        OptPane.column("qualifierCleanerMethod",
+                       JvmAnalysisBundle.message("jvm.inspections.source.unsafe.to.sink.flow.qualifier.cleaner.methods"),
+                       RegexValidator()),
+        OptPane.column("qualifierCleanerParams",
+                       JvmAnalysisBundle.message("jvm.inspections.source.unsafe.to.sink.flow.qualifier.cleaner.arguments")),
+      ).comment(
+        JvmAnalysisBundle.message("jvm.inspections.source.unsafe.to.sink.flow.qualifier.cleaner.comment")),
+
 
       OptPane.number("depthInside",
                      JvmAnalysisBundle.message("jvm.inspections.source.unsafe.to.sink.flow.depth.inside"),
@@ -232,14 +266,17 @@ class SourceToSinkFlowInspection : AbstractBaseUastLocalInspectionTool() {
       processInnerMethodAsQualifierAndArguments = false,
       skipClasses = skipClasses,
       parameterOfPrivateMethodIsUntainted = parameterOfPrivateMethodIsUntainted,
-      depthInside = depthInside
+      depthInside = depthInside,
+      depthOutsideMethods = depthOutsideMethods,
+      depthNestedMethods = depthNestedMethods
     ).copy()
 
     val factory = TaintValueFactory(configuration).also {
+      it.addQualifierCleaner(qualifierCleanerMethod, qualifierCleanerClass, qualifierCleanerParams)
 
-      it.add(TaintValueFactory.fromMethodResult(methodNames = myTaintedMethodMatcher.methodNamePatterns,
-                                                methodClass = myTaintedMethodMatcher.classNames,
-                                                targetValue = TaintValue.TAINTED))
+      it.addReturnFactory(TaintValueFactory.fromMethodResult(methodNames = myTaintedMethodMatcher.methodNamePatterns,
+                                                             methodClass = myTaintedMethodMatcher.classNames,
+                                                             targetValue = TaintValue.TAINTED))
 
       it.add(TaintValueFactory.fromParameters(methodNames = untaintedParameterMethodName,
                                               methodClass = untaintedParameterMethodClass,
@@ -258,7 +295,8 @@ class SourceToSinkFlowInspection : AbstractBaseUastLocalInspectionTool() {
                                               targetValue = TaintValue.TAINTED))
     }
     return UastHintedVisitorAdapter.create(holder.file.language,
-                                           SourceToSinkFlowVisitor(holder, factory, warnIfComplex, showUnknownObject, showUnsafeObject, checkedTypes),
+                                           SourceToSinkFlowVisitor(holder, factory, warnIfComplex, showUnknownObject, showUnsafeObject,
+                                                                   checkedTypes),
                                            arrayOf(UCallExpression::class.java,
                                                    UReturnExpression::class.java,
                                                    UBinaryExpression::class.java,
@@ -327,9 +365,11 @@ class SourceToSinkFlowInspection : AbstractBaseUastLocalInspectionTool() {
       if (expression == null) return
       val expressionType: PsiType? = expression.getExpressionType()
 
-      if(expressionType==null ||
-        checkedTypes.filterNotNull().all { !(expressionType.equalsToText(it) ||
-                                           (it != "java.lang.String" && isInheritor(expressionType, it))) }) return
+      if (expressionType == null ||
+          checkedTypes.filterNotNull().all {
+            !(expressionType.equalsToText(it) ||
+              (it != "java.lang.String" && isInheritor(expressionType, it)))
+          }) return
       val annotationContext = AnnotationContext.fromExpression(expression)
       val contextValue: TaintValue = factory.fromAnnotationContext(annotationContext)
       if (contextValue !== TaintValue.UNTAINTED) return

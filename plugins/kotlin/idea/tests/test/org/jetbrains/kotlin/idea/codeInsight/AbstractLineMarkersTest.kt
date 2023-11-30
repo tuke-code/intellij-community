@@ -53,7 +53,7 @@ abstract class AbstractLineMarkersTest : KotlinLightCodeInsightFixtureTestCase()
 
     fun doTest(@Suppress("UNUSED_PARAMETER") unused: String, additionalCheck: () -> Unit) {
         val fileText = FileUtil.loadFile(dataFile())
-        ConfigLibraryUtil.configureLibrariesByDirective(myFixture.module, fileText)
+        ConfigLibraryUtil.configureLibrariesByDirective(myFixture.module, testDataDirectory, fileText)
         if (InTextDirectivesUtils.findStringWithPrefixes(fileText, "METHOD_SEPARATORS") != null) {
             DaemonCodeAnalyzerSettings.getInstance().SHOW_METHOD_SEPARATORS = true
         }
@@ -231,8 +231,8 @@ abstract class AbstractLineMarkersTest : KotlinLightCodeInsightFixtureTestCase()
                 } catch (failure: FileComparisonFailure) {
                     throw FileComparisonFailure(
                         error.message + "\n" + failure.message,
-                        failure.expected,
-                        failure.actual,
+                        failure.expectedStringPresentation,
+                        failure.actualStringPresentation,
                         failure.filePath
                     )
                 }

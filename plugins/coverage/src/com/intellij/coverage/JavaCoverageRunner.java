@@ -38,10 +38,6 @@ import java.util.concurrent.TimeUnit;
 public abstract class JavaCoverageRunner extends CoverageRunner {
   private static final String JAVA_COVERAGE_AGENT_AGENT_PATH = "java.test.agent.lib.path";
 
-  public boolean isJdk7Compatible() {
-    return true;
-  }
-
   @Override
   public boolean acceptsCoverageEngine(@NotNull CoverageEngine engine) {
     return engine instanceof JavaCoverageEngine;
@@ -133,7 +129,11 @@ public abstract class JavaCoverageRunner extends CoverageRunner {
     return tempFile;
   }
 
-  public boolean shouldProcessUnloadedClasses() {
+  /**
+   * @deprecated This method is not used anymore, as all the runners support JDK 7+.
+   */
+  @Deprecated
+  public boolean isJdk7Compatible() {
     return true;
   }
 }

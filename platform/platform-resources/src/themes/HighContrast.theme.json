@@ -2,10 +2,9 @@
   "name": "High Contrast",
   "dark": true,
   "author": "JetBrains",
+  "parentTheme": "Darcula",
   "nameKey": "high.contrast.theme.name",
-
-  "editorScheme": "/themes/highContrastScheme.xml",
-
+  "editorScheme": "High contrast",
   "ui": {
     "*": {
       "background": "#000000",
@@ -143,8 +142,6 @@
       "selectedForeground": "#FFFFFF",
       "selectedBackground": "#0e5d73",
       "inactiveMaskColor": "#000000FF",
-
-      "unselectedBlend": "0.7",
 
       "underlineColor": "#1AEBFF",
       "underlineHeight": 4,

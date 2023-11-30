@@ -3,20 +3,9 @@ package com.intellij.platform.workspace.storage.testEntities.entities
 
 
 import com.intellij.platform.workspace.storage.*
-import com.intellij.platform.workspace.storage.WorkspaceEntity
-import com.intellij.platform.workspace.storage.impl.containers.toMutableWorkspaceList
-import kotlin.jvm.JvmName
-import kotlin.jvm.JvmOverloads
-import kotlin.jvm.JvmStatic
-import com.intellij.platform.workspace.storage.EntityType
 import com.intellij.platform.workspace.storage.annotations.Child
 import com.intellij.platform.workspace.storage.annotations.Open
-import com.intellij.platform.workspace.storage.EntitySource
-import com.intellij.platform.workspace.storage.GeneratedCodeApiVersion
-
-import com.intellij.platform.workspace.storage.MutableEntityStorage
-
-
+import com.intellij.platform.workspace.storage.impl.containers.toMutableWorkspaceList
 
 
 data class OneSymbolicId(val name: String) : SymbolicEntityId<OneEntityWithSymbolicId> {
@@ -84,7 +73,7 @@ interface OneEntityWithSymbolicId : WorkspaceEntityWithSymbolicId {
 
 //region generated code
 fun MutableEntityStorage.modifyEntity(entity: OneEntityWithSymbolicId,
-                                      modification: OneEntityWithSymbolicId.Builder.() -> Unit) = modifyEntity(
+                                      modification: OneEntityWithSymbolicId.Builder.() -> Unit): OneEntityWithSymbolicId = modifyEntity(
   OneEntityWithSymbolicId.Builder::class.java, entity, modification)
 //endregion
 
@@ -165,7 +154,8 @@ interface EntityWithSoftLinks : WorkspaceEntity {
 }
 
 //region generated code
-fun MutableEntityStorage.modifyEntity(entity: EntityWithSoftLinks, modification: EntityWithSoftLinks.Builder.() -> Unit) = modifyEntity(
+fun MutableEntityStorage.modifyEntity(entity: EntityWithSoftLinks,
+                                      modification: EntityWithSoftLinks.Builder.() -> Unit): EntityWithSoftLinks = modifyEntity(
   EntityWithSoftLinks.Builder::class.java, entity, modification)
 //endregion
 
@@ -196,6 +186,6 @@ interface SoftLinkReferencedChild : WorkspaceEntity {
 
 //region generated code
 fun MutableEntityStorage.modifyEntity(entity: SoftLinkReferencedChild,
-                                      modification: SoftLinkReferencedChild.Builder.() -> Unit) = modifyEntity(
+                                      modification: SoftLinkReferencedChild.Builder.() -> Unit): SoftLinkReferencedChild = modifyEntity(
   SoftLinkReferencedChild.Builder::class.java, entity, modification)
 //endregion

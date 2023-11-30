@@ -1,18 +1,9 @@
 // Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.platform.workspace.storage.testEntities.entities
 
-import com.intellij.platform.workspace.storage.EntitySource
-import com.intellij.platform.workspace.storage.GeneratedCodeApiVersion
-
-import com.intellij.platform.workspace.storage.MutableEntityStorage
-import com.intellij.platform.workspace.storage.WorkspaceEntity
-import kotlin.jvm.JvmName
-import kotlin.jvm.JvmOverloads
-import kotlin.jvm.JvmStatic
-import com.intellij.platform.workspace.storage.EntityType
+import com.intellij.platform.workspace.storage.*
 import com.intellij.platform.workspace.storage.annotations.Abstract
 import com.intellij.platform.workspace.storage.annotations.Child
-
 
 
 interface ParentSingleAbEntity : WorkspaceEntity {
@@ -41,7 +32,8 @@ interface ParentSingleAbEntity : WorkspaceEntity {
 }
 
 //region generated code
-fun MutableEntityStorage.modifyEntity(entity: ParentSingleAbEntity, modification: ParentSingleAbEntity.Builder.() -> Unit) = modifyEntity(
+fun MutableEntityStorage.modifyEntity(entity: ParentSingleAbEntity,
+                                      modification: ParentSingleAbEntity.Builder.() -> Unit): ParentSingleAbEntity = modifyEntity(
   ParentSingleAbEntity.Builder::class.java, entity, modification)
 //endregion
 
@@ -111,7 +103,7 @@ interface ChildSingleFirstEntity : ChildSingleAbstractBaseEntity {
 
 //region generated code
 fun MutableEntityStorage.modifyEntity(entity: ChildSingleFirstEntity,
-                                      modification: ChildSingleFirstEntity.Builder.() -> Unit) = modifyEntity(
+                                      modification: ChildSingleFirstEntity.Builder.() -> Unit): ChildSingleFirstEntity = modifyEntity(
   ChildSingleFirstEntity.Builder::class.java, entity, modification)
 //endregion
 
@@ -149,6 +141,6 @@ interface ChildSingleSecondEntity : ChildSingleAbstractBaseEntity {
 
 //region generated code
 fun MutableEntityStorage.modifyEntity(entity: ChildSingleSecondEntity,
-                                      modification: ChildSingleSecondEntity.Builder.() -> Unit) = modifyEntity(
+                                      modification: ChildSingleSecondEntity.Builder.() -> Unit): ChildSingleSecondEntity = modifyEntity(
   ChildSingleSecondEntity.Builder::class.java, entity, modification)
 //endregion

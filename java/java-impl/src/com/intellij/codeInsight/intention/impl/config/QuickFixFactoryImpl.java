@@ -19,9 +19,8 @@ import com.intellij.codeInspection.*;
 import com.intellij.codeInspection.actions.UnimplementInterfaceAction;
 import com.intellij.codeInspection.dataFlow.fix.DeleteSwitchLabelFix;
 import com.intellij.codeInspection.ex.EntryPointsManagerBase;
-import com.intellij.codeInspection.unusedSymbol.UnusedSymbolLocalInspectionBase;
+import com.intellij.codeInspection.ex.InspectionToolWrapper;
 import com.intellij.codeInspection.util.IntentionName;
-import com.intellij.codeInspection.util.SpecialAnnotationsUtil;
 import com.intellij.diagnostic.CoreAttachmentFactory;
 import com.intellij.ide.scratch.ScratchUtil;
 import com.intellij.java.JavaBundle;
@@ -43,6 +42,7 @@ import com.intellij.openapi.util.TextRange;
 import com.intellij.openapi.vfs.NonPhysicalFileSystem;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.pom.java.LanguageLevel;
+import com.intellij.profile.codeInspection.InspectionProfileManager;
 import com.intellij.psi.*;
 import com.intellij.psi.tree.IElementType;
 import com.intellij.psi.util.ClassKind;
@@ -54,6 +54,7 @@ import com.intellij.util.DocumentUtil;
 import com.intellij.util.IncorrectOperationException;
 import com.intellij.util.ObjectUtils;
 import com.intellij.util.ThreeState;
+import com.intellij.util.concurrency.ThreadingAssertions;
 import com.siyeh.ig.controlflow.UnnecessaryDefaultInspection;
 import com.siyeh.ig.fixes.*;
 import com.siyeh.ipp.modifiers.ChangeModifierIntention;
@@ -61,10 +62,7 @@ import org.jetbrains.annotations.Nls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.Collection;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 public final class QuickFixFactoryImpl extends QuickFixFactory {
   private static final Logger LOG = Logger.getInstance(QuickFixFactoryImpl.class);
@@ -75,7 +73,8 @@ public final class QuickFixFactoryImpl extends QuickFixFactory {
                                                                            @NotNull String modifier,
                                                                            boolean shouldHave,
                                                                            boolean showContainingClass) {
-    return new ModifierFix(modifierList, modifier, shouldHave,showContainingClass);
+    return LocalQuickFixAndIntentionActionOnPsiElement.from(new ModifierFix(modifierList, modifier, shouldHave, showContainingClass),
+                                                            modifierList.getParent());
   }
 
   @NotNull
@@ -84,7 +83,7 @@ public final class QuickFixFactoryImpl extends QuickFixFactory {
                                                                            @NotNull final String modifier,
                                                                            final boolean shouldHave,
                                                                            final boolean showContainingClass) {
-    return new ModifierFix(owner, modifier, shouldHave, showContainingClass);
+    return LocalQuickFixAndIntentionActionOnPsiElement.from(new ModifierFix(owner, modifier, shouldHave, showContainingClass), owner);
   }
 
   @NotNull
@@ -214,7 +213,7 @@ public final class QuickFixFactoryImpl extends QuickFixFactory {
   @NotNull
   @Override
   public IntentionAction createAddExceptionToThrowsFix(@NotNull PsiElement element) {
-    return new AddExceptionToThrowsFix(element);
+    return new AddExceptionToThrowsFix(element).asIntention();
   }
 
   @NotNull
@@ -605,7 +604,7 @@ public final class QuickFixFactoryImpl extends QuickFixFactory {
   @NotNull
   @Override
   public IntentionAction createCreateConstructorParameterFromFieldFix(@NotNull PsiField field) {
-    return new CreateConstructorParameterFromFieldFix(field);
+    return new CreateConstructorParameterFromFieldFix(field).asIntention();
   }
 
   @NotNull
@@ -674,7 +673,7 @@ public final class QuickFixFactoryImpl extends QuickFixFactory {
   public IntentionAction createOptimizeImportsFix(final boolean onTheFly, @NotNull PsiFile file) {
     ApplicationManager.getApplication().assertIsNonDispatchThread();
     VirtualFile virtualFile = file.getVirtualFile();
-    boolean isInContent = virtualFile != null && ModuleUtilCore.projectContainsFile(file.getProject(), virtualFile, false);
+    boolean isInContent = virtualFile != null && (ModuleUtilCore.projectContainsFile(file.getProject(), virtualFile, false) || ScratchUtil.isScratch(virtualFile));
     return new OptimizeImportsFix(onTheFly, isInContent, virtualFile == null ? ThreeState.UNSURE : SilentChangeVetoer.extensionsAllowToChangeFileSilently(file.getProject(), virtualFile));
   }
 
@@ -704,7 +703,10 @@ public final class QuickFixFactoryImpl extends QuickFixFactory {
 
     @Override
     public boolean isAvailable(@NotNull Project project, Editor editor, PsiFile file) {
-      if (myOnTheFly && !timeToOptimizeImports(file, myInContent, extensionsAllowToChangeFileSilently) || !(file instanceof PsiJavaFile)) {
+      if (!(file instanceof PsiJavaFile)) {
+        return false;
+      }
+      if (ApplicationManager.getApplication().isDispatchThread() && myOnTheFly && !timeToOptimizeImports(file, myInContent, extensionsAllowToChangeFileSilently)) {
         return false;
       }
       VirtualFile virtualFile = file.getViewProvider().getVirtualFile();
@@ -728,8 +730,11 @@ public final class QuickFixFactoryImpl extends QuickFixFactory {
   public @NotNull IntentionAction createSafeDeleteUnusedParameterInHierarchyFix(@NotNull PsiParameter parameter,
                                                                                 boolean excludingHierarchy) {
     if (excludingHierarchy) {
-      return new UpdateInspectionOptionFix(new UnusedSymbolLocalInspectionBase(), "myCheckParameterExcludingHierarchy",
-                                           JavaErrorBundle.message("parameter.excluding.hierarchy.disable.text"), false).asIntention();
+      InspectionToolWrapper<?, ?> toolWrapper = Objects.requireNonNull(InspectionProfileManager.getInstance(parameter.getProject())
+                                                                         .getCurrentProfile().getInspectionTool("unused", parameter));
+      InspectionProfileEntry tool = toolWrapper.getTool();
+      return new UpdateInspectionOptionFix(tool, "members.myCheckParameterExcludingHierarchy",
+        JavaErrorBundle.message("parameter.excluding.hierarchy.disable.text"), false).asIntention();
     }
     else {
       return new SafeDeleteFix(parameter);
@@ -740,18 +745,13 @@ public final class QuickFixFactoryImpl extends QuickFixFactory {
   @Override
   public IntentionAction createAddToDependencyInjectionAnnotationsFix(@NotNull Project project,
                                                                       @NotNull String qualifiedName) {
-    final EntryPointsManagerBase entryPointsManager = EntryPointsManagerBase.getInstance(project);
-    return SpecialAnnotationsUtil.createAddToSpecialAnnotationsListIntentionAction(
-      QuickFixBundle.message("fix.unused.symbol.injection.text", qualifiedName),
-      QuickFixBundle.message("fix.unused.symbol.injection.family"),
-      JavaBundle.message("separator.mark.as.entry.point.if.annotated.by"), entryPointsManager.ADDITIONAL_ANNOTATIONS, qualifiedName);
+    return EntryPointsManagerBase.createAddEntryPointAnnotation(qualifiedName).asIntention();
   }
 
   @NotNull
   @Override
   public IntentionAction createAddToImplicitlyWrittenFieldsFix(@NotNull Project project, @NotNull final String qualifiedName) {
-    EntryPointsManagerBase entryPointsManagerBase = EntryPointsManagerBase.getInstance(project);
-    return entryPointsManagerBase.new AddImplicitlyWriteAnnotation(qualifiedName);
+    return EntryPointsManagerBase.createAddImplicitWriteAnnotation(qualifiedName).asIntention();
   }
 
   @NotNull
@@ -770,7 +770,7 @@ public final class QuickFixFactoryImpl extends QuickFixFactory {
   @NotNull
   @Override
   public IntentionAction createEnableOptimizeImportsOnTheFlyFix() {
-    return new EnableOptimizeImportsOnTheFlyFix();
+    return new EnableOptimizeImportsOnTheFlyFix().asIntention();
   }
 
   @NotNull
@@ -866,7 +866,7 @@ public final class QuickFixFactoryImpl extends QuickFixFactory {
   }
 
   private static boolean timeToOptimizeImports(@NotNull PsiFile file, boolean isInContent, @NotNull ThreeState extensionsAllowToChangeFileSilently) {
-    ApplicationManager.getApplication().assertIsDispatchThread();
+    ThreadingAssertions.assertEventDispatchThread();
     if (!CodeInsightWorkspaceSettings.getInstance(file.getProject()).isOptimizeImportsOnTheFly()) {
       return false;
     }
@@ -955,7 +955,7 @@ public final class QuickFixFactoryImpl extends QuickFixFactory {
   @NotNull
   @Override
   public IntentionAction createSameErasureButDifferentMethodsFix(@NotNull PsiMethod method, @NotNull PsiMethod superMethod) {
-    return new SameErasureButDifferentMethodsFix(method, superMethod);
+    return new SameErasureButDifferentMethodsFix(method, superMethod).asIntention();
   }
 
   @NotNull
@@ -1212,5 +1212,20 @@ public final class QuickFixFactoryImpl extends QuickFixFactory {
   @Override
   public @NotNull IntentionAction createDeleteFix(@NotNull PsiElement @NotNull [] elements, @NotNull @Nls String text) {
     return new DeleteElementFix.DeleteMultiFix(elements, text).asIntention();
+  }
+
+  @Override
+  public @NotNull ModCommandAction createReplaceCaseDefaultWithDefaultFix(@NotNull PsiCaseLabelElementList list){
+    return new ReplaceCaseDefaultWithDefaultFix(list);
+  }
+
+  @Override
+  public @NotNull ModCommandAction createReverseCaseDefaultNullFixFix(@NotNull PsiCaseLabelElementList list){
+    return new ReverseCaseDefaultNullFix(list);
+  }
+
+  @Override
+  public @NotNull IntentionAction createAddMainMethodFix(@NotNull PsiUnnamedClass unnamedClass) {
+    return new AddMainMethodFix(unnamedClass).asIntention();
   }
 }

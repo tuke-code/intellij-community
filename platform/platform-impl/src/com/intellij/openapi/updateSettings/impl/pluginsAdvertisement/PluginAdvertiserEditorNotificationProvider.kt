@@ -31,6 +31,7 @@ import com.intellij.ui.HyperlinkLabel
 import kotlinx.coroutines.*
 import org.jetbrains.annotations.VisibleForTesting
 import java.awt.BorderLayout
+import java.time.Instant
 import java.util.function.Function
 import javax.swing.JComponent
 import javax.swing.JLabel
@@ -94,8 +95,11 @@ class PluginAdvertiserEditorNotificationProvider : EditorNotificationProvider, D
     }
 
     override fun apply(fileEditor: FileEditor): EditorNotificationPanel? {
+      val hasSuggestedIde = isCommunityIde() && isDefaultTextMatePlugin(extensionOrFileName) && suggestedIdes.isNotEmpty()
+
       lateinit var label: JLabel
-      val panel = object : EditorNotificationPanel(fileEditor, Status.Info) {
+      val status = if (hasSuggestedIde) EditorNotificationPanel.Status.Promo else EditorNotificationPanel.Status.Info
+      val panel = object : EditorNotificationPanel(fileEditor, status) {
         init {
           label = myLabel
         }
@@ -119,7 +123,7 @@ class PluginAdvertiserEditorNotificationProvider : EditorNotificationProvider, D
       }
 
       val installedPlugin = installedPlugin
-      if (isCommunityIde() && isDefaultTextMatePlugin(extensionOrFileName) && suggestedIdes.isNotEmpty()) {
+      if (hasSuggestedIde) {
         addSuggestedIdes(panel, label, pluginAdvertiserExtensionsState)
         return panel    // Don't show the "Ignore extension" label
       }
@@ -287,10 +291,14 @@ internal class AdvertiserInfoUpdateService(
   private val project: Project,
   private val coroutineScope: CoroutineScope
 ) {
+  private val firstRequestTs: Instant = Instant.now()
+
   fun scheduleAdvertiserUpdate(file: VirtualFile) {
     val fileName = file.name
     coroutineScope.launch {
-      delay(30.seconds) // no hurry, let's think that the network is really slow anyway
+      if (Instant.now().isBefore(firstRequestTs.plusSeconds(30))) {
+        delay(30.seconds) // no hurry, let's think that the network is really slow anyway
+      }
 
       MarketplaceRequests.getInstance().updatePluginIdsAndExtensionData()
 

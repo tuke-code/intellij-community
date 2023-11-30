@@ -2,9 +2,7 @@
 
 package org.jetbrains.kotlin.idea.base.analysis
 
-import com.intellij.ProjectTopics
 import com.intellij.openapi.Disposable
-import com.intellij.openapi.application.runReadAction
 import com.intellij.openapi.components.service
 import com.intellij.openapi.module.Module
 import com.intellij.openapi.progress.ProgressManager.checkCanceled
@@ -19,12 +17,10 @@ import com.intellij.platform.backend.workspace.WorkspaceModelTopics
 import com.intellij.platform.workspace.jps.entities.ModuleEntity
 import com.intellij.platform.workspace.storage.EntityStorage
 import com.intellij.platform.workspace.storage.VersionedStorageChange
-import com.intellij.psi.util.CachedValueProvider
-import com.intellij.psi.util.CachedValuesManager
 import com.intellij.util.concurrency.ThreadingAssertions
 import com.intellij.util.concurrency.annotations.RequiresReadLock
-import com.intellij.util.containers.MultiMap
 import com.intellij.workspaceModel.ide.impl.legacyBridge.module.findModule
+import org.jetbrains.annotations.TestOnly
 import org.jetbrains.kotlin.idea.base.analysis.libraries.LibraryDependencyCandidate
 import org.jetbrains.kotlin.idea.base.projectStructure.*
 import org.jetbrains.kotlin.idea.base.projectStructure.LibraryDependenciesCache.LibraryDependencies
@@ -85,6 +81,13 @@ private class LibraryDependencyCandidatesAndSdkInfosBuilder(
 class LibraryDependenciesCacheImpl(private val project: Project) : LibraryDependenciesCache, Disposable {
     companion object {
         fun getInstance(project: Project): LibraryDependenciesCache = project.service()
+
+        /**
+         * @see filterForBuiltins
+         */
+        internal fun LibraryInfo.isSpecialKotlinCoreLibrary(project: Project): Boolean {
+            return !IdeBuiltInsLoadingState.isFromClassLoader && isCoreKotlinLibrary(project)
+        }
     }
 
     private val cache = LibraryDependenciesInnerCache()
@@ -99,6 +102,11 @@ class LibraryDependenciesCacheImpl(private val project: Project) : LibraryDepend
     override fun getLibraryDependencies(library: LibraryInfo): LibraryDependencies = cache[library]
 
     override fun dispose() = Unit
+
+    @TestOnly
+    fun getCacheContentForTests(): Map<LibraryInfo, LibraryDependencies> {
+        return cache.getCacheContentForTests().toMap()
+    }
 
     private fun computeLibrariesAndSdksUsedWith(libraryInfo: LibraryInfo): LibraryDependencies {
         val libraryDependencyCandidatesAndSdkInfos = computeLibrariesAndSdksUsedWithNoFilter(libraryInfo)
@@ -185,7 +193,7 @@ class LibraryDependenciesCacheImpl(private val project: Project) : LibraryDepend
         libraryInfo: LibraryInfo,
         dependencyLibraries: MutableSet<LibraryDependencyCandidate>
     ): MutableSet<LibraryDependencyCandidate> {
-        return if (!IdeBuiltInsLoadingState.isFromClassLoader && libraryInfo.isCoreKotlinLibrary(project)) {
+        return if (libraryInfo.isSpecialKotlinCoreLibrary(project)) {
             dependencyLibraries.filterTo(mutableSetOf()) { dep ->
                 dep.libraries.any { it.isCoreKotlinLibrary(project) }
             }
@@ -203,7 +211,7 @@ class LibraryDependenciesCacheImpl(private val project: Project) : LibraryDepend
         override fun subscribe() {
             val connection = project.messageBus.connect(this)
             connection.subscribe(LibraryInfoListener.TOPIC, this)
-            connection.subscribe(ProjectTopics.PROJECT_ROOTS, this)
+            connection.subscribe(ModuleRootListener.TOPIC, this)
             connection.subscribe(WorkspaceModelTopics.CHANGED, ModelChangeListener())
             connection.subscribe(ProjectJdkTable.JDK_TABLE_TOPIC, this)
         }
@@ -252,6 +260,9 @@ class LibraryDependenciesCacheImpl(private val project: Project) : LibraryDepend
             }
         }
 
+        @TestOnly
+        @Suppress("deprecation_error")
+        fun getCacheContentForTests() = cache
     }
 
     private inner class ModuleDependenciesCache :
@@ -266,7 +277,7 @@ class LibraryDependenciesCacheImpl(private val project: Project) : LibraryDepend
         connection.subscribe(WorkspaceModelTopics.CHANGED, this)
         connection.subscribe(LibraryInfoListener.TOPIC, this)
         connection.subscribe(ProjectJdkTable.JDK_TABLE_TOPIC, this)
-        connection.subscribe(ProjectTopics.PROJECT_ROOTS, this)
+        connection.subscribe(ModuleRootListener.TOPIC, this)
       }
 
       @RequiresReadLock

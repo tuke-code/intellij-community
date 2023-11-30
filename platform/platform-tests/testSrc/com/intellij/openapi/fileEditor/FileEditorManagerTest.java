@@ -11,17 +11,13 @@ import com.intellij.openapi.fileTypes.UnknownFileType;
 import com.intellij.openapi.options.advanced.AdvancedSettings;
 import com.intellij.openapi.options.advanced.AdvancedSettingsImpl;
 import com.intellij.openapi.project.DumbAware;
-import com.intellij.openapi.project.DumbServiceImpl;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.io.FileUtil;
 import com.intellij.openapi.util.io.IoTestUtil;
 import com.intellij.openapi.vfs.LocalFileSystem;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.pom.Navigatable;
-import com.intellij.testFramework.EditorTestUtil;
-import com.intellij.testFramework.FileEditorManagerTestCase;
-import com.intellij.testFramework.HeavyPlatformTestCase;
-import com.intellij.testFramework.PlatformTestUtil;
+import com.intellij.testFramework.*;
 import com.intellij.util.containers.ContainerUtil;
 import org.intellij.lang.annotations.Language;
 import org.jetbrains.annotations.NotNull;
@@ -253,19 +249,16 @@ public class FileEditorManagerTest extends FileEditorManagerTestCase {
   public void testOpenInDumbMode() {
     FileEditorProvider.EP_FILE_EDITOR_PROVIDER.getPoint().registerExtension(new MyFileEditorProvider(), myFixture.getTestRootDisposable());
     FileEditorProvider.EP_FILE_EDITOR_PROVIDER.getPoint().registerExtension(new MyDumbAwareProvider(), myFixture.getTestRootDisposable());
-    try {
-      DumbServiceImpl.getInstance(getProject()).setDumb(true);
+    VirtualFile createdFile = DumbModeTestUtils.computeInDumbModeSynchronously(getProject(), () -> {
       VirtualFile file = createFile("/src/foo.bar", new byte[]{1, 0, 2, 3});
       FileEditor[] editors = manager.openFile(file, false);
       assertEquals(ContainerUtil.map(editors, ed-> ed + " of " + ed.getClass()).toString(), 1, editors.length);
-      DumbServiceImpl.getInstance(getProject()).setDumb(false);
-      manager.waitForAsyncUpdateOnDumbModeFinished();
-      executeSomeCoroutineTasksAndDispatchAllInvocationEvents(getProject());
-      assertEquals(2, manager.getAllEditors(file).length);
-    }
-    finally {
-      DumbServiceImpl.getInstance(getProject()).setDumb(false);
-    }
+      return file;
+    });
+
+    manager.waitForAsyncUpdateOnDumbModeFinished();
+    executeSomeCoroutineTasksAndDispatchAllInvocationEvents(getProject());
+    assertEquals(2, manager.getAllEditors(createdFile).length);
   }
 
   public void testOpenSpecificTextEditor() {
@@ -388,6 +381,17 @@ public class FileEditorManagerTest extends FileEditorManagerTestCase {
     // with the changed setting, we want to open the file in the current splitter (
     new OpenFileDescriptor(getProject(), file).setUseCurrentWindow(true).navigate(true);
     assertEquals(2, secondaryWindow.getTabCount());
+  }
+
+  public void testGetPreviousWindow() {
+    manager.openFile(getFile("/src/1.txt"), false);
+    EditorWindow currentWindow = manager.getCurrentWindow();
+    VirtualFile expectedFile = getFile("/src/2.txt");
+    manager.openFile(expectedFile, false);
+    manager.createSplitter(SwingConstants.VERTICAL, currentWindow);
+
+    VirtualFile actualFile = manager.getPrevWindow(currentWindow).getSelectedFile();
+    assertEquals(expectedFile, actualFile);
   }
 
   @Language("XML")

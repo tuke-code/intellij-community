@@ -111,7 +111,7 @@ private fun postProcessingChildren(completionResultData: CompletionResultData,
 }
 
 private fun proceedPyValueChildrenNames(childrenNodes: Set<String>,
-                                        stringPresentation: String,
+                                        stringPresentation: String?,
                                         ignoreML: Boolean = true): List<LookupElement> {
   return childrenNodes.map {
     val lookupElement = LookupElementBuilder.create(it).withTypeText(stringPresentation).withIcon(
@@ -241,12 +241,16 @@ fun createCompletionResultSet(retrievalService: PyRuntimeCompletionRetrievalServ
                               parameters: CompletionParameters): List<LookupElement> {
   if (!retrievalService.canComplete(parameters)) return emptyList()
   val project = parameters.editor.project ?: return emptyList()
-  val treeNodeList = runtimeService.getGlobalPythonVariables(parameters.originalFile.virtualFile, project, parameters.editor)
+  val treeNodeList = runtimeService.getGlobalPythonVariables(parameters.originalFile.virtualFile, project)
                      ?: return emptyList()
   val pyObjectCandidates = getCompleteAttribute(parameters)
 
   return ApplicationUtil.runWithCheckCanceled(Callable {
     return@Callable pyObjectCandidates.flatMap { candidate ->
+      if (candidate.psiName.delimiter == null) {
+        return@flatMap getNodesByPrefix(treeNodeList, candidate.psiName.pyQualifiedName,
+                                        parameters.completionType).flatMap { proceedPyValueChildrenNames(setOf(it), null) }
+      }
       val parentNode = getParentNodeByName(treeNodeList, candidate.psiName.pyQualifiedName, parameters.completionType)
       val valueContainer = parentNode?.valueContainer
       if (valueContainer is PyDebugValue) {
@@ -258,7 +262,7 @@ fun createCompletionResultSet(retrievalService: PyRuntimeCompletionRetrievalServ
         if (valueContainer.type == "module") return@flatMap emptyList()
         if (checkDelimiterByType(valueContainer.qualifiedType, candidate.psiName.delimiter)) return@flatMap emptyList()
       }
-      getSetOfChildrenByListOfCall(parentNode, candidate.pyQualifiedExpressionList, parameters.completionType)
+      getSetOfChildrenByListOfCall(parentNode, candidate, parameters.completionType)
         .let { retrievalService.extractItemsForCompletion(it, candidate, parameters.completionType) }
         ?.let { postProcessingChildren(it, candidate, parameters) }
       ?: emptyList()

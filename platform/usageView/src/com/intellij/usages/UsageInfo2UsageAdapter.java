@@ -30,6 +30,7 @@ import com.intellij.usages.impl.UsageViewStatisticsCollector;
 import com.intellij.usages.impl.rules.UsageType;
 import com.intellij.usages.rules.*;
 import com.intellij.util.*;
+import com.intellij.util.concurrency.ThreadingAssertions;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -113,10 +114,6 @@ public class UsageInfo2UsageAdapter implements UsageInModule, UsageInfoAdapter,
     myVirtualFile = data.virtualFile;
     myOffsetToCompareUsages = data.offsetToCompareUsages;
     myModificationStamp = getCurrentModificationStamp();
-
-    if (ApplicationManager.getApplication().isUnitTestMode() && ourAutomaticallyCalculatePresentationInTests) {
-      updateCachedPresentation();
-    }
   }
 
   @Override
@@ -145,7 +142,7 @@ public class UsageInfo2UsageAdapter implements UsageInModule, UsageInfoAdapter,
     return EditorTabPresentationUtil.getFileBackgroundColor(getProject(), file);
   }
 
-  private TextChunk @NotNull [] computeText() {
+  protected TextChunk @NotNull [] computeText() {
     TextChunk[] chunks;
     PsiFile psiFile = getPsiFile();
     boolean isNullOrBinary = psiFile == null || psiFile.getFileType().isBinary();
@@ -436,7 +433,7 @@ public class UsageInfo2UsageAdapter implements UsageInModule, UsageInfoAdapter,
 
   @Override
   public void reset() {
-    ApplicationManager.getApplication().assertIsDispatchThread();
+    ThreadingAssertions.assertEventDispatchThread();
     myMergedUsageInfos = myUsageInfo;
     resetCachedPresentation();
   }

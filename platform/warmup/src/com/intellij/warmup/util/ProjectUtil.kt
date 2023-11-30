@@ -10,16 +10,20 @@ import com.intellij.ide.impl.PatchProjectUtil
 import com.intellij.ide.impl.ProjectUtil
 import com.intellij.ide.impl.runUnderModalProgressIfIsEdt
 import com.intellij.ide.warmup.WarmupConfigurator
+import com.intellij.ide.warmup.WarmupStatus
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.EDT
 import com.intellij.openapi.application.readAction
 import com.intellij.openapi.progress.blockingContext
-import com.intellij.openapi.progress.durationStep
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.roots.JdkOrderEntry
 import com.intellij.openapi.roots.OrderRootType
 import com.intellij.openapi.roots.ProjectRootManager
+import com.intellij.openapi.util.registry.Registry
 import com.intellij.openapi.vfs.VfsUtil
 import com.intellij.openapi.vfs.VirtualFileManager
+import com.intellij.platform.backend.observation.Observation
+import com.intellij.platform.util.progress.durationStep
 import com.intellij.util.asSafely
 import com.intellij.util.indexing.FileBasedIndex
 import com.intellij.util.indexing.FileBasedIndexImpl
@@ -36,7 +40,7 @@ fun importOrOpenProject(args: OpenProjectArgs): Project {
   // most of the sensible operations would run in the same thread
   return runUnderModalProgressIfIsEdt {
     runTaskAndLogTime("open project") {
-      importOrOpenProjectImpl(args)
+      importOrOpenProjectImpl0(args)
     }
   }
 }
@@ -45,7 +49,17 @@ suspend fun importOrOpenProjectAsync(args: OpenProjectArgs): Project {
   WarmupLogger.logInfo("Opening project from ${args.projectDir}...")
   // most of the sensible operations would run in the same thread
   return runTaskAndLogTime("open project") {
-    importOrOpenProjectImpl(args)
+    importOrOpenProjectImpl0(args)
+  }
+}
+
+private suspend fun importOrOpenProjectImpl0(args: OpenProjectArgs): Project {
+  val currentStatus = WarmupStatus.currentStatus(ApplicationManager.getApplication())
+  WarmupStatus.statusChanged(ApplicationManager.getApplication(), WarmupStatus.InProgress)
+  try {
+    return importOrOpenProjectImpl(args)
+  } finally {
+    WarmupStatus.statusChanged(ApplicationManager.getApplication(), currentStatus)
   }
 }
 
@@ -65,8 +79,10 @@ private suspend fun importOrOpenProjectImpl(args: OpenProjectArgs): Project {
 
   callProjectConversion(args)
 
-  callProjectConfigurators(args) {
-    this.prepareEnvironment(args.projectDir)
+  if (!isPredicateBasedWarmup()) {
+    callProjectConfigurators(args) {
+      this.prepareEnvironment(args.projectDir)
+    }
   }
 
   val project = runTaskAndLogTime("open project") {
@@ -81,15 +97,27 @@ private suspend fun importOrOpenProjectImpl(args: OpenProjectArgs): Project {
     }
   }
 
+  if (isPredicateBasedWarmup()) {
+    runTaskAndLogTime("awaiting completion predicates") {
+      withLoggingProgressReporter {
+        Observation.awaitConfiguration(project, WarmupLogger::logInfo)
+      }
+      dumpThreadsAfterConfiguration()
+    }
+  }
+
+
   yieldAndWaitForDumbModeEnd(project)
 
-  callProjectConfigurators(args) {
-    this.runWarmup(project)
+  if (!isPredicateBasedWarmup()) {
+    callProjectConfigurators(args) {
+      this.runWarmup(project)
 
-    FileBasedIndex.getInstance().asSafely<FileBasedIndexImpl>()?.changedFilesCollector?.ensureUpToDate()
-    //the configuration may add more dumb tasks to complete
-    //we flush the queue to avoid a deadlock between a modal progress & invokeLater
-    yieldAndWaitForDumbModeEnd(project)
+      FileBasedIndex.getInstance().asSafely<FileBasedIndexImpl>()?.changedFilesCollector?.ensureUpToDate()
+      //the configuration may add more dumb tasks to complete
+      //we flush the queue to avoid a deadlock between a modal progress & invokeLater
+      yieldAndWaitForDumbModeEnd(project)
+    }
   }
 
   runTaskAndLogTime("check project roots") {
@@ -143,6 +171,7 @@ private val listener = object : ConversionListener {
     WarmupLogger.logInfo("PROGRESS: Project conversion failed for:\n" + readonlyFiles.joinToString("\n"))
   }
 }
+
 
 private suspend fun callProjectConversion(projectArgs: OpenProjectArgs) {
   if (!projectArgs.convertProject) {
@@ -218,3 +247,6 @@ private fun getAllConfigurators() : List<WarmupConfigurator> {
              nameSet.contains(it.name).not() }
            .map(::WarmupConfiguratorOfCLIConfigurator)
 }
+
+
+private fun isPredicateBasedWarmup() = Registry.`is`("ide.warmup.use.predicates")

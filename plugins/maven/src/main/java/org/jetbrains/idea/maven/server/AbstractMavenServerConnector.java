@@ -76,11 +76,12 @@ public abstract class AbstractMavenServerConnector implements MavenServerConnect
 
   @Override
   @NotNull
-  public MavenModel interpolateAndAlignModel(final MavenModel model, final Path basedir) {
+  public MavenModel interpolateAndAlignModel(@NotNull MavenModel model, @NotNull Path basedir, @NotNull Path pomDir) {
     return perform(() -> {
       RemotePathTransformerFactory.Transformer transformer = RemotePathTransformerFactory.createForProject(myProject);
       File targetBasedir = new File(transformer.toRemotePathOrSelf(basedir.toString()));
-      MavenModel m = getServer().interpolateAndAlignModel(model, targetBasedir, MavenRemoteObjectWrapper.ourToken);
+      File targetPomDir = new File(transformer.toRemotePathOrSelf(pomDir.toString()));
+      MavenModel m = getServer().interpolateAndAlignModel(model, targetBasedir, targetPomDir, MavenRemoteObjectWrapper.ourToken);
       if (transformer != RemotePathTransformerFactory.Transformer.ID) {
         new MavenBuildPathsChange((String s) -> transformer.toIdePath(s), s -> transformer.canBeRemotePath(s)).perform(m);
       }
@@ -143,8 +144,15 @@ public abstract class AbstractMavenServerConnector implements MavenServerConnect
   }
 
   @Override
+  public MavenServerStatus getDebugStatus(boolean clean) {
+    return perform( ()-> {
+      return getServer().getDebugStatus(clean);
+    });
+  }
+
+  @Override
   public String toString() {
-    return "MavenServerConnector{" +
+    return getClass().getSimpleName() + "{" +
            Integer.toHexString(this.hashCode()) +
            ", myDistribution=" + myDistribution.getMavenHome() +
            ", myJdk=" + myJdk.getName() +

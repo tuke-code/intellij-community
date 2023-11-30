@@ -26,6 +26,7 @@ import com.intellij.pom.Navigatable;
 import com.intellij.ui.ExperimentalUI;
 import com.intellij.ui.JBColor;
 import com.intellij.ui.JBSplitter;
+import com.intellij.ui.OnePixelSplitter;
 import com.intellij.ui.components.JBLayeredPane;
 import com.intellij.util.Alarm;
 import com.intellij.util.ObjectUtils;
@@ -46,6 +47,7 @@ import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.function.Supplier;
 
 import static com.intellij.openapi.actionSystem.ActionPlaces.TEXT_EDITOR_WITH_PREVIEW;
@@ -130,7 +132,7 @@ public class TextEditorWithPreview extends UserDataHolderBase implements TextEdi
   }
 
   protected @NotNull JBSplitter createSplitter() {
-    return new JBSplitter(myIsVerticalSplit, 0.5f, 0.15f, 0.85f);
+      return new OnePixelSplitter();
   }
 
   @Override
@@ -142,8 +144,8 @@ public class TextEditorWithPreview extends UserDataHolderBase implements TextEdi
     mySplitter.setSplitterProportionKey(getSplitterProportionKey());
     mySplitter.setFirstComponent(myEditor.getComponent());
     mySplitter.setSecondComponent(myPreview.getComponent());
-    mySplitter.setDividerWidth(ExperimentalUI.isNewUI() ? 1 : 2);
-    mySplitter.getDivider().setBackground(JBColor.lazy(() -> EditorColorsManager.getInstance().getGlobalScheme().getColor(EditorColors.PREVIEW_BORDER_COLOR)));
+    mySplitter.setDividerWidth(ExperimentalUI.isNewUI() ? 1 : 2); // We're using OnePixelSplitter, but it actually supports wider dividers.
+    mySplitter.getDivider().setBackground(JBColor.lazy(() -> Objects.requireNonNullElse(EditorColorsManager.getInstance().getGlobalScheme().getColor(EditorColors.PREVIEW_BORDER_COLOR), UIUtil.getPanelBackground())));
 
     myToolbarWrapper = createSplitEditorToolbar(mySplitter);
 
@@ -322,7 +324,7 @@ public class TextEditorWithPreview extends UserDataHolderBase implements TextEdi
     return myLayout;
   }
 
-  public static class MyFileEditorState implements FileEditorState {
+  public static final class MyFileEditorState implements FileEditorState {
     private final Layout mySplitLayout;
     private final FileEditorState myFirstState;
     private final FileEditorState mySecondState;
@@ -351,6 +353,16 @@ public class TextEditorWithPreview extends UserDataHolderBase implements TextEdi
              && (myFirstState == null || myFirstState.canBeMergedWith(((MyFileEditorState)otherState).myFirstState, level))
              && (mySecondState == null || mySecondState.canBeMergedWith(((MyFileEditorState)otherState).mySecondState, level));
     }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) return true;
+      if (o == null || getClass() != o.getClass()) return false;
+      MyFileEditorState state = (MyFileEditorState)o;
+      return mySplitLayout == state.mySplitLayout &&
+             Objects.equals(myFirstState, state.myFirstState) &&
+             Objects.equals(mySecondState, state.mySecondState);
+    }
   }
 
   @Override
@@ -377,7 +389,7 @@ public class TextEditorWithPreview extends UserDataHolderBase implements TextEdi
     }
   }
 
-  private class MyListenersMultimap {
+  private final class MyListenersMultimap {
     private final Map<PropertyChangeListener, Pair<Integer, DoublingEventListenerDelegate>> myMap = new HashMap<>();
 
     public @NotNull DoublingEventListenerDelegate addListenerAndGetDelegate(@NotNull PropertyChangeListener listener) {
@@ -509,7 +521,7 @@ public class TextEditorWithPreview extends UserDataHolderBase implements TextEdi
     }
   }
 
-  private class ChangeViewModeAction extends ToggleAction implements DumbAware {
+  private final class ChangeViewModeAction extends ToggleAction implements DumbAware {
     private final Layout myActionLayout;
 
     ChangeViewModeAction(Layout layout) {
@@ -546,7 +558,7 @@ public class TextEditorWithPreview extends UserDataHolderBase implements TextEdi
     }
   }
 
-  private static class ConditionalActionGroup extends ActionGroup {
+  private static final class ConditionalActionGroup extends ActionGroup {
     private final AnAction[] myActions;
     private final Supplier<Boolean> myCondition;
 
@@ -603,7 +615,7 @@ public class TextEditorWithPreview extends UserDataHolderBase implements TextEdi
     return FileEditorManager.getInstance(project).openFile(file, true);
   }
 
-  private static class MyEditorLayeredComponentWrapper extends JBLayeredPane {
+  private static final class MyEditorLayeredComponentWrapper extends JBLayeredPane {
     private final JComponent editorComponent;
 
     static final int toolbarTopPadding = 25;
@@ -640,7 +652,7 @@ public class TextEditorWithPreview extends UserDataHolderBase implements TextEdi
     }
   }
 
-  private class MyMouseListener implements AWTEventListener {
+  private final class MyMouseListener implements AWTEventListener {
     private final LayoutActionsFloatingToolbar toolbar;
     private final Alarm alarm;
 

@@ -35,6 +35,7 @@ import com.intellij.serviceContainer.emptyConstructorMethodType
 import com.intellij.serviceContainer.findConstructorOrNull
 import com.intellij.util.xmlb.annotations.MapAnnotation
 import com.intellij.util.xmlb.annotations.Property
+import kotlinx.collections.immutable.persistentListOf
 import org.jetbrains.annotations.ApiStatus
 import java.lang.invoke.MethodHandles
 import java.lang.invoke.MethodType
@@ -45,8 +46,11 @@ private val moduleMethodType = MethodType.methodType(Void.TYPE, Module::class.ja
 private val LOG: Logger
   get() = logger<ModuleImpl>()
 
-open class ModuleImpl @ApiStatus.Internal constructor(name: String, project: Project) :
-  ComponentManagerImpl(parent = project as ComponentManagerImpl, coroutineScope = null), ModuleEx, Queryable {
+open class ModuleImpl @ApiStatus.Internal constructor(
+  name: String,
+  project: Project,
+) : ComponentManagerImpl(project as ComponentManagerImpl), ModuleEx, Queryable {
+
   private val project: Project
   protected var imlFilePointer: VirtualFilePointer? = null
 
@@ -86,12 +90,17 @@ open class ModuleImpl @ApiStatus.Internal constructor(name: String, project: Pro
     this.name = name
   }
 
-  final override fun <T : Any> findConstrictorAndInstantiateClass(lookup: MethodHandles.Lookup, aClass: Class<T>): T {
+  final override fun <T : Any> findConstructorAndInstantiateClass(lookup: MethodHandles.Lookup, aClass: Class<T>): T {
     @Suppress("UNCHECKED_CAST")
     return (lookup.findConstructorOrNull(aClass, moduleMethodType)?.invoke(this)
             ?: lookup.findConstructorOrNull(aClass, emptyConstructorMethodType)?.invoke()
             ?: RuntimeException("Cannot find suitable constructor, expected (Module) or ()")) as T
   }
+
+  override val supportedSignaturesOfLightServiceConstructors: List<MethodType> = persistentListOf(
+    moduleMethodType,
+    emptyConstructorMethodType,
+  )
 
   override fun init(beforeComponentCreation: Runnable?) {
     // do not measure (activityNamePrefix method not overridden by this class)
@@ -242,6 +251,15 @@ open class ModuleImpl @ApiStatus.Internal constructor(name: String, project: Pro
   override fun putInfo(info: MutableMap<in String, in String>) {
     info.put("id", "Module")
     info.put("name", getName())
+  }
+
+  override fun debugString(short: Boolean): String {
+    return if (short) {
+      javaClass.simpleName
+    }
+    else {
+      super.debugString(short)
+    }
   }
 
   @ApiStatus.Internal

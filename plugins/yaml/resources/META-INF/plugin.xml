@@ -47,7 +47,7 @@
 
     <projectService serviceImplementation="org.jetbrains.yaml.YAMLElementGenerator"/>
 
-    <completion.contributor order="first" language="yaml" id="YamlJsonSchema"
+    <completion.contributor order="after InplaceRename" language="yaml" id="YamlJsonSchema"
                             implementationClass="org.jetbrains.yaml.schema.YamlJsonSchemaCompletionContributor"/>
     <lang.documentationProvider language="yaml" implementationClass="org.jetbrains.yaml.schema.YamlJsonSchemaDocumentationProvider"
                                 id="YamlJsonSchemaDocumentationProvider"/>
@@ -72,6 +72,8 @@
                                  id="editor.preferences.yamlOptions"
                                  bundle="messages.YAMLBundle"
                                  key="yaml.smartkeys.option.title"/>
+
+    <inspection.basicVisitor class="org.jetbrains.yaml.psi.YamlPsiElementVisitor"/>
 
     <localInspection language="yaml" bundle="messages.YAMLBundle"
                      shortName="YAMLUnresolvedAlias"
@@ -116,6 +118,8 @@
                      implementationClass="org.jetbrains.yaml.schema.YamlJsonSchemaDeprecationInspection"/>
 
     <psi.referenceContributor language="yaml" implementation="org.jetbrains.yaml.YAMLWebReferenceContributor"/>
+    <psi.referenceContributor language="yaml" implementation="org.jetbrains.yaml.YAMLJsonSchemaIdReferenceContributor"/>
+    <completion.contributor language="yaml" implementationClass="org.jetbrains.yaml.YAMLJsonSchemaInCommentCompletionContributor"/>
 
     <pluginSuggestionProvider implementation="org.jetbrains.yaml.swagger.OpenApiSuggestionProvider"/>
     <intentionAction>

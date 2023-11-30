@@ -3,6 +3,7 @@ package com.siyeh.ig.redundancy;
 
 import com.intellij.codeInsight.BlockUtils;
 import com.intellij.codeInsight.daemon.QuickFixBundle;
+import com.intellij.codeInsight.daemon.impl.analysis.HighlightingFeature;
 import com.intellij.codeInsight.daemon.impl.quickfix.DeleteElementFix;
 import com.intellij.codeInspection.*;
 import com.intellij.codeInspection.options.OptPane;
@@ -147,6 +148,28 @@ public class RedundantStringOperationInspection extends AbstractBaseJavaLocalIns
       if (descriptor != null) {
         myHolder.registerProblem(descriptor);
       }
+    }
+
+    @Override
+    public void visitTemplateExpression(@NotNull PsiTemplateExpression element) {
+      if (!HighlightingFeature.STRING_TEMPLATES.isAvailable(element) || element.getLiteralExpression() == null) {
+        return;
+      }
+      PsiExpression processor = element.getProcessor();
+      if (!(PsiUtil.skipParenthesizedExprDown(processor) instanceof PsiReferenceExpression reference)) {
+        return;
+      }
+      PsiElement target = reference.resolve();
+      if (!(target instanceof PsiField field) || !"STR".equals(field.getName())) {
+        return;
+      }
+      PsiClass containingClass = field.getContainingClass();
+      if (containingClass == null || !JAVA_LANG_STRING_TEMPLATE.equals(containingClass.getQualifiedName())) {
+        return;
+      }
+      myHolder.registerProblem(processor,
+                               InspectionGadgetsBundle.message("inspection.redundant.string.fix.remove.str.processor.description"),
+                               new RemoveStrTemplateProcessorFix());
     }
 
     private ProblemDescriptor getStringConstructorProblem(PsiNewExpression expression) {
@@ -410,6 +433,7 @@ public class RedundantStringOperationInspection extends AbstractBaseJavaLocalIns
     }
 
     private boolean lengthMatches(PsiExpression equalTo, PsiExpression from, PsiExpression to) {
+      if (!ExpressionUtils.hasStringType(equalTo)) return false;
       String str = tryCast(ExpressionUtils.computeConstantExpression(equalTo), String.class);
       PsiElementFactory factory = JavaPsiFacade.getElementFactory(myHolder.getProject());
       if (str != null) {
@@ -1156,6 +1180,23 @@ public class RedundantStringOperationInspection extends AbstractBaseJavaLocalIns
     @Override
     public void invoke(@NotNull Project project, @NotNull PsiFile file, @NotNull PsiElement startElement, @NotNull PsiElement endElement) {
       new CommentTracker().delete(startElement, endElement);
+    }
+  }
+
+  private static final class RemoveStrTemplateProcessorFix extends PsiUpdateModCommandQuickFix {
+    @Override
+    public @NotNull String getFamilyName() {
+      return QuickFixBundle.message("remove.redundant.str.processor");
+    }
+
+    @Override
+    protected void applyFix(@NotNull Project project, @NotNull PsiElement element, @NotNull ModPsiUpdater updater) {
+      if (element.getParent() instanceof PsiTemplateExpression template) {
+        final PsiLiteralExpression literal = template.getLiteralExpression();
+        if (literal != null) {
+          template.replace(literal);
+        }
+      }
     }
   }
 }

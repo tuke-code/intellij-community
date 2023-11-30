@@ -25,6 +25,7 @@ import com.intellij.platform.diagnostic.telemetry.TelemetryManager;
 import com.intellij.psi.Weigher;
 import com.intellij.util.Consumer;
 import com.intellij.util.ExceptionUtil;
+import com.intellij.util.concurrency.ThreadingAssertions;
 import com.intellij.util.messages.SimpleMessageBusConnection;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -37,13 +38,13 @@ import static com.intellij.platform.diagnostic.telemetry.helpers.TraceKt.runWith
 /**
  * @author peter
  */
-public final class CompletionServiceImpl extends BaseCompletionService {
+public class CompletionServiceImpl extends BaseCompletionService {
   private static final Logger LOG = Logger.getInstance(CompletionServiceImpl.class);
 
   private static final CompletionPhaseHolder DEFAULT_PHASE_HOLDER = new CompletionPhaseHolder(CompletionPhase.NoCompletion, null);
   private final IJTracer myCompletionTracer = TelemetryManager.getInstance().getTracer(CodeCompletion);
 
-  private static class ClientCompletionService implements Disposable {
+  private static final class ClientCompletionService implements Disposable {
     public static @Nullable ClientCompletionService tryGetInstance(@Nullable ClientAppSession session) {
       if (session == null) {
         return null;
@@ -67,7 +68,7 @@ public final class CompletionServiceImpl extends BaseCompletionService {
     public void setCompletionPhase(@NotNull CompletionPhase phase) {
       // wrap explicitly with client id for the case when some called API depends on ClientId.current
       try (AccessToken ignored = ClientId.withClientId(myAppSession.getClientId())) {
-        ApplicationManager.getApplication().assertIsDispatchThread();
+        ThreadingAssertions.assertEventDispatchThread();
         CompletionPhase oldPhase = getCompletionPhase();
         CompletionProgressIndicator oldIndicator = oldPhase.indicator;
         if (oldIndicator != null &&
@@ -187,7 +188,7 @@ public final class CompletionServiceImpl extends BaseCompletionService {
     return clientCompletionService.getCurrentCompletionProgressIndicator();
   }
 
-  private static class CompletionResultSetImpl extends BaseCompletionResultSet {
+  private static final class CompletionResultSetImpl extends BaseCompletionResultSet {
     CompletionResultSetImpl(Consumer<? super CompletionResult> consumer, PrefixMatcher prefixMatcher,
                             CompletionContributor contributor, CompletionParameters parameters,
                             @Nullable CompletionSorter sorter, @Nullable CompletionResultSetImpl original) {

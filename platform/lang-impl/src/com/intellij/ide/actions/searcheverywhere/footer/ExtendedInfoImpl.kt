@@ -8,11 +8,13 @@ import com.intellij.ide.actions.searcheverywhere.PSIPresentationBgRendererWrappe
 import com.intellij.ide.actions.searcheverywhere.SearchEverywhereContributor
 import com.intellij.ide.actions.searcheverywhere.SearchEverywhereExtendedInfoProvider
 import com.intellij.lang.LangBundle
+import com.intellij.openapi.Disposable
 import com.intellij.openapi.actionSystem.*
 import com.intellij.openapi.actionSystem.ex.ActionUtil
 import com.intellij.openapi.actionSystem.impl.SimpleDataContext
 import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.application.ReadAction
+import com.intellij.openapi.keymap.KeymapUtil
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.roots.ProjectFileIndex
 import com.intellij.openapi.util.NlsSafe
@@ -44,7 +46,8 @@ class ExtendedInfoComponent(val project: Project?, val advertisement: ExtendedIn
         .derive(StartupUiUtil.labelFont)
       foreground = JBUI.CurrentTheme.Advertiser.foreground()
     }
-  private var actionLink: ActionLink = ActionLink()
+  private var actionLink = ActionLink()
+  private val shortcutLabel = JBLabel()
 
   @JvmField
   val component: JPanel =
@@ -57,10 +60,17 @@ class ExtendedInfoComponent(val project: Project?, val advertisement: ExtendedIn
 
   init {
     component.add(text, BorderLayout.WEST)
-    component.add(actionLink, BorderLayout.EAST)
+
+    val actionPanel = JPanel(BorderLayout(2, 0))
+    shortcutLabel.foreground = JBUI.CurrentTheme.ContextHelp.FOREGROUND
+    actionPanel.add(actionLink, BorderLayout.WEST)
+    actionPanel.add(shortcutLabel, BorderLayout.EAST)
+    actionPanel.background = JBUI.CurrentTheme.Advertiser.background()
+
+    component.add(actionPanel, BorderLayout.EAST)
   }
 
-  fun updateElement(element: Any) {
+  fun updateElement(element: Any, disposable: Disposable) {
     //preserve vertical space
     text.text = DEFAULT_TEXT
     actionLink.text = DEFAULT_TEXT
@@ -70,6 +80,7 @@ class ExtendedInfoComponent(val project: Project?, val advertisement: ExtendedIn
       val actionEvent = AnActionEvent.createFromAnAction(action, null, ActionPlaces.ACTION_SEARCH, context(project))
       action.updateIt(actionEvent)
       actionLink.update(actionEvent, action)
+      shortcutLabel.updateIt(action)
     }
 
     ReadAction.nonBlocking(Callable<String> { advertisement.leftText.invoke(element) })
@@ -80,6 +91,7 @@ class ExtendedInfoComponent(val project: Project?, val advertisement: ExtendedIn
                             text.toolTipText = leftText
                           }
                         })
+      .expireWith(disposable)
       .submit(AppExecutorUtil.getAppExecutorService())
   }
 
@@ -96,6 +108,10 @@ class ExtendedInfoComponent(val project: Project?, val advertisement: ExtendedIn
       toolTipText = event.presentation.description
       actionListeners.forEach { removeActionListener(it) }
       addActionListener { _ -> ActionUtil.performActionDumbAwareWithCallbacks(action, event) }
+    }
+
+    private fun JBLabel.updateIt(action: AnAction) {
+      text = KeymapUtil.getFirstKeyboardShortcutText(action)
     }
   }
 }

@@ -25,6 +25,7 @@ import com.intellij.xdebugger.breakpoints.XBreakpoint
 import com.intellij.xdebugger.breakpoints.XLineBreakpoint
 import com.intellij.xdebugger.impl.XSourcePositionImpl
 import com.intellij.xdebugger.impl.breakpoints.XLineBreakpointImpl
+import com.intellij.xdebugger.impl.breakpoints.XLineBreakpointManager
 import org.jetbrains.java.debugger.breakpoints.properties.JavaBreakpointProperties
 import org.jetbrains.java.debugger.breakpoints.properties.JavaLineBreakpointProperties
 import org.jetbrains.kotlin.idea.base.psi.getTopmostElementAtOffset
@@ -121,14 +122,13 @@ class KotlinLineBreakpointType :
             val isLambdaResult = bodyExpression is KtLambdaExpression && bodyExpression.functionLiteral in lambdas
 
             if (!isLambdaResult) {
-                val variantElement = getTopmostElementAtOffset(elementAt, pos.offset)
-                result.add(LineKotlinBreakpointVariant(position, variantElement, -1))
+                result.add(LineKotlinBreakpointVariant(position, mainMethod, -1))
                 mainMethodAdded = true
             }
         }
 
         lambdas.forEachIndexed { ordinal, lambda ->
-            val positionImpl = XSourcePositionImpl.createByElement(lambda.bodyExpression)
+            val positionImpl = XSourcePositionImpl.createByElement(lambda)
             if (positionImpl != null) {
                 result.add(LambdaJavaBreakpointVariant(positionImpl, lambda, ordinal))
             }
@@ -180,7 +180,7 @@ class KotlinLineBreakpointType :
 
         val lambdaOrdinal = javaBreakpointProperties.lambdaOrdinal ?: return null
         val function = getLambdaByOrdinal(sourcePosition, lambdaOrdinal) ?: return null
-        val firstStatement = function.bodyBlockExpression?.statements?.firstOrNull() ?: return null
+        val firstStatement = function.bodyBlockExpression?.statements?.firstOrNull() ?: function.bodyExpression ?: return null
         return runReadAction {
             val linePosition = SourcePosition.createFromElement(firstStatement) ?: return@runReadAction null
             DebuggerUtilsEx.toXSourcePosition(

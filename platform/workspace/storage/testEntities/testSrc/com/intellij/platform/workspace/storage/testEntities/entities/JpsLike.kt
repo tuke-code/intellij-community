@@ -2,14 +2,6 @@
 package com.intellij.platform.workspace.storage.testEntities.entities
 
 import com.intellij.platform.workspace.storage.*
-import com.intellij.platform.workspace.storage.EntitySource
-import com.intellij.platform.workspace.storage.GeneratedCodeApiVersion
-import com.intellij.platform.workspace.storage.MutableEntityStorage
-import com.intellij.platform.workspace.storage.WorkspaceEntity
-import kotlin.jvm.JvmName
-import kotlin.jvm.JvmOverloads
-import kotlin.jvm.JvmStatic
-import com.intellij.platform.workspace.storage.EntityType
 import com.intellij.platform.workspace.storage.annotations.Child
 
 interface ModuleTestEntity : WorkspaceEntityWithSymbolicId {
@@ -46,7 +38,8 @@ interface ModuleTestEntity : WorkspaceEntityWithSymbolicId {
 }
 
 //region generated code
-fun MutableEntityStorage.modifyEntity(entity: ModuleTestEntity, modification: ModuleTestEntity.Builder.() -> Unit) = modifyEntity(
+fun MutableEntityStorage.modifyEntity(entity: ModuleTestEntity,
+                                      modification: ModuleTestEntity.Builder.() -> Unit): ModuleTestEntity = modifyEntity(
   ModuleTestEntity.Builder::class.java, entity, modification)
 //endregion
 
@@ -79,7 +72,8 @@ interface ContentRootTestEntity : WorkspaceEntity {
 }
 
 //region generated code
-fun MutableEntityStorage.modifyEntity(entity: ContentRootTestEntity, modification: ContentRootTestEntity.Builder.() -> Unit) = modifyEntity(
+fun MutableEntityStorage.modifyEntity(entity: ContentRootTestEntity,
+                                      modification: ContentRootTestEntity.Builder.() -> Unit): ContentRootTestEntity = modifyEntity(
   ContentRootTestEntity.Builder::class.java, entity, modification)
 
 var ContentRootTestEntity.Builder.projectModelTestEntity: ProjectModelTestEntity?
@@ -115,7 +109,7 @@ interface SourceRootTestOrderEntity : WorkspaceEntity {
 
 //region generated code
 fun MutableEntityStorage.modifyEntity(entity: SourceRootTestOrderEntity,
-                                      modification: SourceRootTestOrderEntity.Builder.() -> Unit) = modifyEntity(
+                                      modification: SourceRootTestOrderEntity.Builder.() -> Unit): SourceRootTestOrderEntity = modifyEntity(
   SourceRootTestOrderEntity.Builder::class.java, entity, modification)
 //endregion
 
@@ -147,7 +141,8 @@ interface SourceRootTestEntity : WorkspaceEntity {
 }
 
 //region generated code
-fun MutableEntityStorage.modifyEntity(entity: SourceRootTestEntity, modification: SourceRootTestEntity.Builder.() -> Unit) = modifyEntity(
+fun MutableEntityStorage.modifyEntity(entity: SourceRootTestEntity,
+                                      modification: SourceRootTestEntity.Builder.() -> Unit): SourceRootTestEntity = modifyEntity(
   SourceRootTestEntity.Builder::class.java, entity, modification)
 //endregion
 
@@ -195,6 +190,7 @@ interface FacetTestEntity : WorkspaceEntityWithSymbolicId {
 }
 
 //region generated code
-fun MutableEntityStorage.modifyEntity(entity: FacetTestEntity, modification: FacetTestEntity.Builder.() -> Unit) = modifyEntity(
+fun MutableEntityStorage.modifyEntity(entity: FacetTestEntity,
+                                      modification: FacetTestEntity.Builder.() -> Unit): FacetTestEntity = modifyEntity(
   FacetTestEntity.Builder::class.java, entity, modification)
 //endregion

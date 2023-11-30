@@ -1,5 +1,5 @@
 // FIR_IDENTICAL
-// IGNORE_FE10
+// IGNORE_K1
 package a.b.c
 
 enum class ENUM {
@@ -12,9 +12,9 @@ fun foo(e: ENUM) {
     }
 }
 
+// WITH_ORDER
 // EXIST: ENUM.AAAA
 // EXIST: ENUM.BBBB
 // EXIST: ENUM.CCCC
 // EXIST: { lookupString: "else -> "}
-// NOTHING_ELSE
 // FIR_COMPARISON

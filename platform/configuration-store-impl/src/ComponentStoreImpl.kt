@@ -22,7 +22,9 @@ import com.intellij.openapi.util.JDOMUtil
 import com.intellij.openapi.util.registry.Registry
 import com.intellij.openapi.util.use
 import com.intellij.openapi.vfs.newvfs.impl.VfsRootAccess
-import com.intellij.util.*
+import com.intellij.util.ArrayUtilRt
+import com.intellij.util.ResourceUtil
+import com.intellij.util.ThreeState
 import com.intellij.util.concurrency.annotations.RequiresEdt
 import com.intellij.util.messages.MessageBus
 import com.intellij.util.xmlb.XmlSerializerUtil
@@ -41,6 +43,8 @@ import java.util.function.Consumer
 
 internal val LOG = logger<ComponentStoreImpl>()
 private val SAVE_MOD_LOG = Logger.getInstance("#configurationStore.save.skip")
+
+private val isUseLoadedStateAsExistingVmProperty = System.getProperty("use.loaded.state.as.existing", "true").toBoolean()
 
 internal val deprecatedComparator = Comparator<Storage> { o1, o2 ->
   val w1 = if (o1.deprecated) 1 else 0
@@ -239,7 +243,7 @@ abstract class ComponentStoreImpl : IComponentStore {
               SAVE_MOD_LOG.debug(
                 "${if (isUseModificationCount) "Skip " else ""}$name: modificationCount $currentModificationCount equals to last saved")
             }
-            if (isUseModificationCount) {
+            if (isUseModificationCount && !isForce) {
               continue
             }
           }
@@ -460,7 +464,11 @@ abstract class ComponentStoreImpl : IComponentStore {
           reloadData.toBoolean()
         }
 
-        val stateGetter = doCreateStateGetter(isReloadDataForStorage, storage, info, name, stateClass)
+        val stateGetter = doCreateStateGetter(reloadData = isReloadDataForStorage,
+                                              storage = storage,
+                                              info = info,
+                                              name = name,
+                                              stateClass = stateClass)
         var state = stateGetter.getState(defaultState)
         if (state == null) {
           if (changedStorages != null && isStorageChanged(changedStorages, storage)) {
@@ -524,16 +532,18 @@ abstract class ComponentStoreImpl : IComponentStore {
                                          info: ComponentInfo,
                                          name: String,
                                          stateClass: Class<Any>): StateGetter<Any> {
-    // use.loaded.state.as.existing used in upsource
     val isUseLoadedStateAsExisting = info.stateSpec!!.useLoadedStateAsExisting && isUseLoadedStateAsExisting(storage)
     @Suppress("UNCHECKED_CAST")
-    return createStateGetter(isUseLoadedStateAsExisting, storage, info.component as PersistentStateComponent<Any>, name, stateClass,
-                             reloadData)
+    return createStateGetter(isUseLoadedStateAsExisting = isUseLoadedStateAsExisting,
+                             storage = storage,
+                             component = info.component as PersistentStateComponent<Any>,
+                             componentName = name,
+                             stateClass = stateClass,
+                             reloadData = reloadData)
   }
 
   protected open fun isUseLoadedStateAsExisting(storage: StateStorage): Boolean {
-    return (storage as? XmlElementStorage)?.roamingType != RoamingType.DISABLED
-           && SystemProperties.getBooleanProperty("use.loaded.state.as.existing", true)
+    return (storage as? XmlElementStorage)?.roamingType != RoamingType.DISABLED && isUseLoadedStateAsExistingVmProperty
   }
 
   protected open fun getPathMacroManagerForDefaults(): PathMacroManager? = null
@@ -633,6 +643,7 @@ abstract class ComponentStoreImpl : IComponentStore {
    */
   open fun reload(changedStorages: Set<StateStorage>): Collection<String>? {
     if (changedStorages.isEmpty()) {
+      LOG.debug("There is no changed storages to reload")
       return emptySet()
     }
 
@@ -648,6 +659,7 @@ abstract class ComponentStoreImpl : IComponentStore {
     if (componentNames.isEmpty()) {
       return emptySet()
     }
+    LOG.debug { "Reload components: $componentNames" }
 
     val notReloadableComponents = getNotReloadableComponents(componentNames)
     reinitComponents(componentNames, changedStorages, notReloadableComponents)
@@ -726,7 +738,7 @@ private fun notifyUnknownMacros(store: IComponentStore, project: Project, compon
     for (notification in manager.getNotificationsOfType(
       UnknownMacroNotification::class.java, project)) {
       if (notified == null) {
-        notified = SmartList()
+        notified = ArrayList()
       }
       notified.addAll(notification.macros)
     }

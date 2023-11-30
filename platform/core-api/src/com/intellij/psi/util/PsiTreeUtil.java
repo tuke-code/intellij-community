@@ -426,6 +426,7 @@ public class PsiTreeUtil {
     return result;
   }
 
+  @Contract("null, _ -> null")
   public static @Nullable <T extends PsiElement> T getStubChildOfType(@Nullable PsiElement element, @NotNull Class<T> aClass) {
     if (element == null) return null;
 
@@ -1214,27 +1215,20 @@ public class PsiTreeUtil {
     return !SyntaxTraverser.psiTraverser(element).traverse().filter(PsiErrorElement.class).isEmpty();
   }
 
-  public static PsiElement @NotNull [] filterAncestors(PsiElement @NotNull [] elements) {
-    if (LOG.isDebugEnabled()) {
-      for (PsiElement element : elements) {
-        LOG.debug("element = " + element);
-      }
-    }
-
-    ArrayList<PsiElement> filteredElements = new ArrayList<>();
+  public static @NotNull PsiElement @NotNull [] filterAncestors(@NotNull PsiElement @NotNull [] elements) {
+    List<PsiElement> filteredElements = new ArrayList<>();
     ContainerUtil.addAll(filteredElements, elements);
 
     int previousSize;
     do {
       previousSize = filteredElements.size();
       outer:
-      for (PsiElement element : filteredElements) {
-        for (PsiElement element2 : filteredElements) {
-          if (element == element2) continue;
+      for (int i = 0; i < filteredElements.size(); i++) {
+        PsiElement element = filteredElements.get(i);
+        for (int j = 0; j < filteredElements.size(); j++) {
+          PsiElement element2 = filteredElements.get(j);
+          if (i == j) continue;
           if (isAncestor(element, element2, false)) {
-            if (LOG.isDebugEnabled()) {
-              LOG.debug("removing " + element2);
-            }
             filteredElements.remove(element2);
             break outer;
           }
@@ -1242,13 +1236,6 @@ public class PsiTreeUtil {
       }
     }
     while (filteredElements.size() != previousSize);
-
-    if (LOG.isDebugEnabled()) {
-      for (PsiElement element : filteredElements) {
-        LOG.debug("filtered element = " + element);
-      }
-    }
-
     return PsiUtilCore.toPsiElementArray(filteredElements);
   }
 

@@ -1,4 +1,4 @@
-// Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.framework.detection.impl;
 
 import com.intellij.framework.detection.DetectedFrameworkDescription;
@@ -21,13 +21,9 @@ import com.intellij.openapi.components.Service;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.extensions.ExtensionPointListener;
 import com.intellij.openapi.extensions.PluginDescriptor;
-import com.intellij.openapi.project.DumbService;
-import com.intellij.openapi.project.IndexNotReadyException;
-import com.intellij.openapi.project.Project;
-import com.intellij.openapi.project.ProjectBundle;
+import com.intellij.openapi.project.*;
 import com.intellij.openapi.roots.PlatformModifiableModelsProvider;
 import com.intellij.openapi.roots.ui.configuration.DefaultModulesProvider;
-import com.intellij.openapi.startup.StartupActivity;
 import com.intellij.openapi.ui.Messages;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.openapi.vfs.VirtualFile;
@@ -91,20 +87,14 @@ public final class FrameworkDetectionManager implements FrameworkDetectionIndexL
     }, project);
   }
 
-  private void projectOpened() {
-    @NotNull Collection<String> ids = FrameworkDetectorRegistry.getInstance().getAllDetectorIds();
+  void jpsProjectLoaded(@NotNull FrameworkDetectorRegistry frameworkDetectorRegistry) {
+    LOG.debug("Queue frameworks detection after opening the project");
+    Collection<String> ids = frameworkDetectorRegistry.getAllDetectorIds();
     synchronized (myLock) {
       myDetectorsToProcess.clear();
       myDetectorsToProcess.addAll(ids);
     }
     queueDetection();
-  }
-
-  static final class MyPostStartupActivity implements StartupActivity.DumbAware {
-    @Override
-    public void runActivity(@NotNull Project project) {
-      getInstance(project).projectOpened();
-    }
   }
 
   public void doInitialize() {
@@ -250,8 +240,9 @@ public final class FrameworkDetectionManager implements FrameworkDetectionIndexL
     }
     catch (IndexNotReadyException e) {
       DumbService.getInstance(myProject)
-        .showDumbModeNotification(
-          LangBundle.message("popup.content.information.about.detected.frameworks"));
+        .showDumbModeNotificationForFunctionality(
+          LangBundle.message("popup.content.information.about.detected.frameworks"),
+          DumbModeBlockedFunctionality.FrameworkDetection);
       return;
     }
 

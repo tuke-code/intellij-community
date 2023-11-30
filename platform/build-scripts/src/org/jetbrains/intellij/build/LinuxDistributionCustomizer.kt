@@ -28,8 +28,8 @@ abstract class LinuxDistributionCustomizer {
     val basePatterns = persistentListOf(
       "bin/*.sh",
       "plugins/**/*.sh",
-      "bin/fsnotifier*",
-      "bin/*.py"
+      "bin/fsnotifier",
+      "bin/restarter"
     )
 
     val rtPatterns =
@@ -44,18 +44,13 @@ abstract class LinuxDistributionCustomizer {
   }
 
   /**
-   * If `true`, a separate *-no-jbr.tar.gz artifact without a runtime will be produced.
+   * If `true`, a separate *[org.jetbrains.intellij.build.impl.LinuxDistributionBuilder.NO_RUNTIME_SUFFIX].tar.gz artifact without a runtime will be produced.
    */
-  var buildTarGzWithoutBundledRuntime = false
-
-  /**
-   * If `true`, only the `*-no-jbr.tar.gz` will be produced, and no other Linux binaries will be built.
-   */
-  var buildOnlyBareTarGz = false
+  var buildArtifactWithoutRuntime = false
 
   /**
    * Set both properties if a .snap package should be produced.
-   * "snapName" is the name of the package (e.g. "intellij-idea-ultimate", "pycharm-community").
+   * "snapName" is the name of the package (e.g., "intellij-idea-ultimate" or "pycharm-community").
    * "snapDescription" is the plain text description of the package.
    */
   var snapName: String? = null
@@ -65,7 +60,7 @@ abstract class LinuxDistributionCustomizer {
    * Name of the root directory inside the .tar.gz archive.
    */
   open fun getRootDirectoryName(appInfo: ApplicationInfoProperties, buildNumber: String): String =
-    "${appInfo.productName}-${if (appInfo.isEAP) buildNumber else appInfo.fullVersion}"
+    "${appInfo.fullProductName}-${if (appInfo.isEAP) buildNumber else appInfo.fullVersion}"
 
   /**
    * Override this method to copy additional files to the Linux distribution of the product.

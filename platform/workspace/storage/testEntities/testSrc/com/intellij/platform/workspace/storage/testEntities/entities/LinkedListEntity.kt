@@ -2,17 +2,6 @@
 package com.intellij.platform.workspace.storage.testEntities.entities
 
 import com.intellij.platform.workspace.storage.*
-import com.intellij.platform.workspace.storage.WorkspaceEntity
-import kotlin.jvm.JvmName
-import kotlin.jvm.JvmOverloads
-import kotlin.jvm.JvmStatic
-import com.intellij.platform.workspace.storage.EntityType
-import com.intellij.platform.workspace.storage.EntitySource
-import com.intellij.platform.workspace.storage.GeneratedCodeApiVersion
-
-import com.intellij.platform.workspace.storage.MutableEntityStorage
-
-
 
 
 data class LinkedListEntityId(val name: String) : SymbolicEntityId<LinkedListEntity> {
@@ -56,7 +45,8 @@ interface LinkedListEntity : WorkspaceEntityWithSymbolicId {
 }
 
 //region generated code
-fun MutableEntityStorage.modifyEntity(entity: LinkedListEntity, modification: LinkedListEntity.Builder.() -> Unit) = modifyEntity(
+fun MutableEntityStorage.modifyEntity(entity: LinkedListEntity,
+                                      modification: LinkedListEntity.Builder.() -> Unit): LinkedListEntity = modifyEntity(
   LinkedListEntity.Builder::class.java, entity, modification)
 //endregion
 

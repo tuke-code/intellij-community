@@ -12,6 +12,7 @@ import com.intellij.psi.util.elementType
 import com.intellij.ui.JBColor
 import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.kotlin.idea.completion.handlers.WithTailInsertHandler
+import org.jetbrains.kotlin.kdoc.psi.impl.KDocLink
 import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.psi.*
@@ -31,7 +32,7 @@ tailrec fun <T : Any> LookupElement.putUserDataDeep(key: Key<T>, value: T?) {
 
 tailrec fun <T : Any> LookupElement.getUserDataDeep(key: Key<T>): T? {
     return if (this is LookupElementDecorator<*>) {
-        getDelegate().getUserDataDeep(key)
+        delegate.getUserDataDeep(key)
     } else {
         getUserData(key)
     }
@@ -212,3 +213,5 @@ fun isPositionSuitableForNull(position: PsiElement): Boolean = when {
     else -> position.context?.getPrevSiblingIgnoringWhitespaceAndComments() is KtOperationReferenceExpression
             || position.context?.getNextSiblingIgnoringWhitespaceAndComments() is KtOperationReferenceExpression
 }
+
+val KDocLink.qualifier: List<String> get() = getLinkText().split('.').dropLast(1)

@@ -68,6 +68,7 @@ import java.util.stream.Stream;
 
 import static com.intellij.openapi.externalSystem.util.ExternalSystemApiUtil.*;
 import static org.jetbrains.plugins.gradle.issue.UnsupportedGradleJvmIssueChecker.Util.isJavaHomeUnsupportedByIdea;
+import static org.jetbrains.plugins.gradle.service.project.ArtifactMappingServiceKt.OWNER_BASE_GRADLE;
 import static org.jetbrains.plugins.gradle.service.project.GradleProjectResolverUtil.getDefaultModuleTypeId;
 import static org.jetbrains.plugins.gradle.service.project.GradleProjectResolverUtil.getModuleId;
 
@@ -87,8 +88,6 @@ public class GradleProjectResolver implements ExternalSystemProjectResolver<Grad
   public static final Key<Map<String/* output path */, Pair<String /* module id*/, ExternalSystemSourceType>>> MODULES_OUTPUTS =
     Key.create("moduleOutputsMap");
   public static final Key<MultiMap<ExternalSystemSourceType, String /* output path*/>> GRADLE_OUTPUTS = Key.create("gradleOutputs");
-  public static final Key<Map<String/* artifact path */, String /* module id*/>> CONFIGURATION_ARTIFACTS =
-    Key.create("gradleArtifactsMap");
 
   private static final Key<File> GRADLE_HOME_DIR = Key.create("gradleHomeDir");
 
@@ -149,7 +148,7 @@ public class GradleProjectResolver implements ExternalSystemProjectResolver<Grad
     myCancellationMap.putValue(resolverContext.getExternalSystemTaskId(), cancellationTokenSource);
 
     final long activityId = resolverContext.getExternalSystemTaskId().getId();
-    ExternalSystemSyncActionsCollector.logSyncStarted(null, activityId);
+    ExternalSystemSyncActionsCollector.logSyncStarted(resolverContext.getExternalSystemTaskId().findProject(), activityId);
     syncMetrics.getOrStartSpan(ExternalSystemSyncDiagnostic.gradleSyncSpanName);
 
     try {
@@ -397,8 +396,8 @@ public class GradleProjectResolver implements ExternalSystemProjectResolver<Grad
     final Map<String/* output path */, Pair<String /* module id*/, ExternalSystemSourceType>> moduleOutputsMap =
       CollectionFactory.createFilePathMap();
     projectDataNode.putUserData(MODULES_OUTPUTS, moduleOutputsMap);
-    final Map<String/* artifact path */, String /* module id*/> artifactsMap = CollectionFactory.createFilePathMap();
-    projectDataNode.putUserData(CONFIGURATION_ARTIFACTS, artifactsMap);
+
+    final ArtifactMappingService artifactsMap = resolverCtx.getArtifactsMap();
 
     // import modules data
     for (IdeaModule gradleModule : ContainerUtil.concat(gradleModules, includedModules)) {
@@ -472,9 +471,20 @@ public class GradleProjectResolver implements ExternalSystemProjectResolver<Grad
 
         if (moduleData instanceof GradleSourceSetData) {
           for (File artifactFile : moduleData.getArtifacts()) {
-            artifactsMap.put(toCanonicalPath(artifactFile.getPath()), moduleData.getId());
+            artifactsMap.storeModuleId(toCanonicalPath(artifactFile.getPath()), moduleData.getId());
           }
         }
+      }
+
+      ExternalProject externalProject = resolverCtx.getExtraProject(ideaModule, ExternalProject.class);
+      if (externalProject != null) {
+        externalProject.getSourceSetModel().getAdditionalArtifacts().forEach((artifactFile) -> {
+          String path = toCanonicalPath(artifactFile.getPath());
+          ModuleMappingInfo mapping = artifactsMap.getModuleMapping(path);
+          if (mapping != null && OWNER_BASE_GRADLE.equals(mapping.getOwnerId())) {
+            artifactsMap.markArtifactPath(path, true);
+          }
+        });
       }
     }
     // reuse same gradle home (for auto-discovered buildSrc projects) also for partial imports which doesn't request BuildScriptClasspathModel
@@ -502,7 +512,6 @@ public class GradleProjectResolver implements ExternalSystemProjectResolver<Grad
 
     projectDataNode.putUserData(RESOLVED_SOURCE_SETS, null);
     projectDataNode.putUserData(MODULES_OUTPUTS, null);
-    projectDataNode.putUserData(CONFIGURATION_ARTIFACTS, null);
 
     // ensure unique library names
     Collection<DataNode<LibraryData>> libraries = getChildren(projectDataNode, ProjectKeys.LIBRARY);
@@ -557,12 +566,13 @@ public class GradleProjectResolver implements ExternalSystemProjectResolver<Grad
   private static void configureExecutionArgumentsAndVmOptions(@NotNull GradleExecutionSettings executionSettings,
                                                               @NotNull DefaultProjectResolverContext resolverCtx,
                                                               boolean isBuildSrcProject) {
-    if (!executionSettings.isDownloadSources()) {
-      executionSettings.withArgument("-Didea.gradle.download.sources=false");
-    }
+    executionSettings.withArgument("-Didea.gradle.download.sources=" + executionSettings.isDownloadSources());
     executionSettings.withArgument("-Didea.sync.active=true");
     if (resolverCtx.isResolveModulePerSourceSet()) {
       executionSettings.withArgument("-Didea.resolveSourceSetDependencies=true");
+    }
+    if (executionSettings.isParallelModelFetch() && isGradleVersionAtLeast("7.4", resolverCtx)) {
+      executionSettings.withArgument("-Didea.parallelModelFetch.enabled=true");
     }
     if (!isBuildSrcProject) {
       for (GradleBuildParticipant buildParticipant : executionSettings.getExecutionWorkspace().getBuildParticipants()) {
@@ -583,6 +593,14 @@ public class GradleProjectResolver implements ExternalSystemProjectResolver<Grad
       // collect extra command-line arguments
       executionSettings.withArguments(extension.getExtraCommandLineArgs());
     });
+  }
+
+  private static boolean isGradleVersionAtLeast(@NotNull String requiredVersion, @NotNull DefaultProjectResolverContext ctx) {
+    String versionStr = ctx.getProjectGradleVersion();
+    if (versionStr != null) {
+      return GradleVersion.version(versionStr).compareTo(GradleVersion.version(requiredVersion)) >= 0;
+    }
+    return false;
   }
 
   @NotNull
@@ -639,7 +657,7 @@ public class GradleProjectResolver implements ExternalSystemProjectResolver<Grad
       projectDataNode.getUserData(MODULES_OUTPUTS);
     assert moduleOutputsMap != null;
 
-    final Map<String, String> artifactsMap = projectDataNode.getUserData(CONFIGURATION_ARTIFACTS);
+    final ArtifactMappingService artifactsMap = context.getArtifactsMap();
     assert artifactsMap != null;
 
     final Collection<DataNode<LibraryDependencyData>> libraryDependencies =
@@ -844,9 +862,10 @@ public class GradleProjectResolver implements ExternalSystemProjectResolver<Grad
 
     @Override
     public DataNode<ProjectData> fun(ProjectConnection connection) {
-      final long activityId = myResolverContext.getExternalSystemTaskId().getId();
+      ExternalSystemTaskId taskId = myResolverContext.getExternalSystemTaskId();
+      final long activityId = taskId.getId();
       try {
-        myCancellationMap.putValue(myResolverContext.getExternalSystemTaskId(), myResolverContext.getCancellationTokenSource());
+        myCancellationMap.putValue(taskId, myResolverContext.getCancellationTokenSource());
         myResolverContext.setConnection(connection);
         return doResolveProjectInfo(myResolverContext, myProjectResolverChain, myIsBuildSrcProject);
       }
@@ -859,15 +878,15 @@ public class GradleProjectResolver implements ExternalSystemProjectResolver<Grad
         if (esException != null && esException != e) {
           LOG.info("\nCaused by: " + esException.getOriginalReason());
         }
-        ExternalSystemSyncActionsCollector.logError(null, activityId, extractCause(e));
-        ExternalSystemSyncActionsCollector.logSyncFinished(null, activityId, false);
+        ExternalSystemSyncActionsCollector.logError(taskId.findProject(), activityId, extractCause(e));
+        ExternalSystemSyncActionsCollector.logSyncFinished(taskId.findProject(), activityId, false);
         syncMetrics.endSpan(ExternalSystemSyncDiagnostic.gradleSyncSpanName, (span) -> span.setAttribute("project", ""));
 
         throw myProjectResolverChain.getUserFriendlyError(
           myResolverContext.getBuildEnvironment(), e, myResolverContext.getProjectPath(), null);
       }
       finally {
-        myCancellationMap.remove(myResolverContext.getExternalSystemTaskId(), myResolverContext.getCancellationTokenSource());
+        myCancellationMap.remove(taskId, myResolverContext.getCancellationTokenSource());
       }
     }
   }

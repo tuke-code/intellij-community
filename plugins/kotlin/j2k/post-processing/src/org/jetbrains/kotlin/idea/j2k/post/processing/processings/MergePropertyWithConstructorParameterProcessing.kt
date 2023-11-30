@@ -13,7 +13,8 @@ import org.jetbrains.kotlin.descriptors.annotations.AnnotationUseSiteTarget.FIEL
 import org.jetbrains.kotlin.idea.base.psi.KotlinPsiHeuristics.findAnnotation
 import org.jetbrains.kotlin.idea.core.setVisibility
 import org.jetbrains.kotlin.idea.intentions.addUseSiteTarget
-import org.jetbrains.kotlin.idea.j2k.post.processing.*
+import org.jetbrains.kotlin.idea.j2k.post.processing.ElementsBasedPostProcessing
+import org.jetbrains.kotlin.idea.j2k.post.processing.runUndoTransparentActionInEdt
 import org.jetbrains.kotlin.idea.util.CommentSaver
 import org.jetbrains.kotlin.lexer.KtTokens.DATA_KEYWORD
 import org.jetbrains.kotlin.name.FqName
@@ -108,6 +109,8 @@ internal class MergePropertyWithConstructorParameterProcessing : ElementsBasedPo
                 restoreCommentsTarget = property
             }
         }
+
+        initialization.assignment.getExplicitLabelComment()?.delete()
         initialization.assignment.delete()
         commentSaver.restore(restoreCommentsTarget, forceAdjustIndent = false)
     }
@@ -119,7 +122,7 @@ internal class MergePropertyWithConstructorParameterProcessing : ElementsBasedPo
         parameter.addAfter(KtPsiFactory(property.project).createWhiteSpace(), parameter.valOrVarKeyword!!)
         parameter.rename(property.name!!)
         parameter.setVisibility(property.visibilityModifierTypeOrDefault())
-        val commentSaver = CommentSaver(property, saveLineBreaks = true)
+        val commentSaver = CommentSaver(property)
 
         parameter.annotationEntries.forEach {
             if (it.useSiteTarget == null) it.addUseSiteTarget(CONSTRUCTOR_PARAMETER, property.project)

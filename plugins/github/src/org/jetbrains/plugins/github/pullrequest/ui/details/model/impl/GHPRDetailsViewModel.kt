@@ -1,21 +1,22 @@
-// Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.plugins.github.pullrequest.ui.details.model.impl
 
 import com.intellij.collaboration.async.cancelAndJoinSilently
 import com.intellij.collaboration.async.nestedDisposable
 import com.intellij.collaboration.ui.codereview.details.data.ReviewRequestState
 import com.intellij.collaboration.ui.codereview.details.model.CodeReviewDetailsViewModel
+import com.intellij.collaboration.ui.codereview.issues.processIssueIdsHtml
 import com.intellij.openapi.project.Project
-import com.intellij.util.childScope
+import com.intellij.platform.util.coroutines.childScope
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.*
 import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.plugins.github.api.data.GHCommit
 import org.jetbrains.plugins.github.api.data.pullrequest.GHPullRequest
 import org.jetbrains.plugins.github.api.data.pullrequest.GHPullRequestState
+import org.jetbrains.plugins.github.pullrequest.comment.convertToHtml
 import org.jetbrains.plugins.github.pullrequest.data.GHPRDataContext
 import org.jetbrains.plugins.github.pullrequest.data.provider.GHPRDataProvider
-import org.jetbrains.plugins.github.pullrequest.ui.GHApiLoadingErrorHandler
 import org.jetbrains.plugins.github.pullrequest.ui.GHCompletableFutureLoadingModel
 import org.jetbrains.plugins.github.pullrequest.ui.details.model.GHPRBranchesViewModel
 import org.jetbrains.plugins.github.pullrequest.ui.details.model.GHPRStatusViewModelImpl
@@ -28,7 +29,7 @@ interface GHPRDetailsViewModel : CodeReviewDetailsViewModel {
   val reviewFlowVm: GHPRReviewFlowViewModelImpl
 }
 
-internal class GHPRDetailsViewModelImpl (
+internal class GHPRDetailsViewModelImpl(
   project: Project,
   parentCs: CoroutineScope,
   dataContext: GHPRDataContext,
@@ -43,9 +44,11 @@ internal class GHPRDetailsViewModelImpl (
   override val url: String = detailsState.value.url
 
   override val title: SharedFlow<String> = detailsState.map { it.title }
+    .map { title -> title.convertToHtml(project) }
     .shareIn(cs, SharingStarted.Lazily, 1)
 
   override val description: SharedFlow<String> = detailsState.map { it.body }
+    .map { description -> processIssueIdsHtml(project, description) }
     .shareIn(cs, SharingStarted.Lazily, 1)
 
   override val reviewRequestState: SharedFlow<ReviewRequestState> = detailsState.map { details ->

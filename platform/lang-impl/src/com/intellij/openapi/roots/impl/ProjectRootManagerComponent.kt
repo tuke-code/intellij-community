@@ -1,13 +1,11 @@
 // Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.openapi.roots.impl
 
-import com.intellij.ProjectTopics
 import com.intellij.configurationStore.BatchUpdateListener
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationListener
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.readAction
-import com.intellij.openapi.components.serviceIfCreated
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.diagnostic.trace
@@ -221,7 +219,7 @@ open class ProjectRootManagerComponent(project: Project,
     if (rootPointersDisposable == oldDisposable && lastInProgressRootPointersDisposable == newDisposable) {
       rootPointersDisposable = newDisposable
       // dispose after the re-creating container to keep VFPs from disposing and re-creating back;
-      // instead, just increment/decrement their usage count
+      // instead, update their usage count
       Disposer.dispose(oldDisposable)
       rootsToWatch = LocalFileSystem.getInstance().replaceWatchedRoots(rootsToWatch, watchRoots.first, watchRoots.second)
     }
@@ -235,7 +233,7 @@ open class ProjectRootManagerComponent(project: Project,
     try {
       (DirectoryIndex.getInstance(project) as? DirectoryIndexImpl)?.reset()
       (WorkspaceFileIndex.getInstance(project) as WorkspaceFileIndexEx).indexData.resetCustomContributors()
-      project.messageBus.syncPublisher(ProjectTopics.PROJECT_ROOTS).beforeRootsChange(ModuleRootEventImpl(project, fileTypes))
+      project.messageBus.syncPublisher(ModuleRootListener.TOPIC).beforeRootsChange(ModuleRootEventImpl(project, fileTypes))
     }
     finally {
       isFiringEvent = false
@@ -249,7 +247,7 @@ open class ProjectRootManagerComponent(project: Project,
       (WorkspaceFileIndex.getInstance(project) as WorkspaceFileIndexEx).indexData.resetCustomContributors()
 
       val isFromWorkspaceOnly = EntityIndexingService.getInstance().isFromWorkspaceOnly(indexingInfos)
-      project.messageBus.syncPublisher(ProjectTopics.PROJECT_ROOTS)
+      project.messageBus.syncPublisher(ModuleRootListener.TOPIC)
         .rootsChanged(ModuleRootEventImpl(project, fileTypes, indexingInfos, isFromWorkspaceOnly))
     }
     finally {
@@ -353,8 +351,7 @@ open class ProjectRootManagerComponent(project: Project,
     settings.retainCondition = Condition<WorkspaceFileIndexContributor<out WorkspaceEntity>> {
       it.storageKind == EntityStorageKind.MAIN && it !is PlatformInternalWorkspaceFileIndexContributor && it !is SkipAddingToWatchedRoots
     }
-    val builder = WorkspaceIndexingRootsBuilder.registerEntitiesFromContributors(project,
-                                                                                 WorkspaceModel.getInstance(project).currentSnapshot,
+    val builder = WorkspaceIndexingRootsBuilder.registerEntitiesFromContributors(WorkspaceModel.getInstance(project).currentSnapshot,
                                                                                  settings)
 
     fun register(rootFiles: Collection<VirtualFile>, name: String) {
@@ -362,15 +359,18 @@ open class ProjectRootManagerComponent(project: Project,
       rootFiles.forEach { recursivePaths.add(it.path) }
     }
 
-    builder.forEachModuleContentEntitiesRoots { roots ->
+    builder.forEachModuleContentEntitiesRoots { urlRoots ->
+      val roots = urlRoots.toRootHolder()
       register(roots.roots, "module content roots")
       register(roots.nonRecursiveRoots, "module non-recursive content roots")
     }
-    builder.forEachContentEntitiesRoots { roots ->
+    builder.forEachContentEntitiesRoots { urlRoots ->
+      val roots = urlRoots.toRootHolder()
       register(roots.roots, "content roots")
       register(roots.nonRecursiveRoots, "non-recursive content roots")
     }
-    builder.forEachExternalEntitiesRoots { roots ->
+    builder.forEachExternalEntitiesRoots { urlRoots ->
+      val roots = urlRoots.toSourceRootHolder()
       register(roots.roots, "external roots")
       register(roots.sourceRoots, "external source roots")
       register(roots.nonRecursiveRoots, "non-recursive external roots")
@@ -381,7 +381,7 @@ open class ProjectRootManagerComponent(project: Project,
   override fun clearScopesCaches() {
     super.clearScopesCaches()
 
-    project.serviceIfCreated<LibraryScopeCache>()?.clear()
+    LibraryScopeCache.getInstance(project)?.clear()
   }
 
   override fun clearScopesCachesForModules() {
@@ -392,16 +392,14 @@ open class ProjectRootManagerComponent(project: Project,
     }
   }
 
-  override fun markRootsForRefresh() {
+  override fun markRootsForRefresh(): List<VirtualFile> {
     val paths = CollectionFactory.createFilePathSet()
     collectModuleWatchRoots(paths, paths, false)
-    val fs = LocalFileSystem.getInstance()
-    for (path in paths) {
-      val root = fs.findFileByPath(path)
-      if (root is NewVirtualFile) {
-        root.markDirtyRecursively()
-      }
-    }
+    val roots = paths.mapNotNull(LocalFileSystem.getInstance()::findFileByPath)
+    roots.asSequence()
+      .filterIsInstance(NewVirtualFile::class.java)
+      .forEach(NewVirtualFile::markDirtyRecursively)
+    return roots
   }
 
   override fun dispose() {}

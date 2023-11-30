@@ -118,7 +118,12 @@ public class IntentionPreviewTest extends LightJavaCodeInsightFixtureTestCase {
       }""");
     myFixture.enableInspections(new DuplicateCharacterInClassInspection());
     IntentionAction action = myFixture.findSingleIntention("Remove duplicate '1' from character class");
-    assertEquals("[\"123]", myFixture.getIntentionPreviewText(action));
+    assertEquals("""
+                   import java.util.regex.Pattern;
+                                      
+                   class Test {
+                     Pattern p = Pattern.compile("[\\"123]");
+                   }""", myFixture.getIntentionPreviewText(action));
   }
 
   public void testBindFieldsFromParameters() {
@@ -225,13 +230,6 @@ public class IntentionPreviewTest extends LightJavaCodeInsightFixtureTestCase {
     myFixture.configureByText("Test.java", "public class <caret>Best {}");
     IntentionAction action = myFixture.findSingleIntention("Rename File");
     myFixture.checkIntentionPreviewHtml(action, "<p><icon src=\"file\"/>&nbsp;Test.java &rarr; <icon src=\"file\"/>&nbsp;Best.java</p>");
-  }
-
-  public void testMoveMemberIntoClass() {
-    myFixture.configureByText("Test.java", "public class Test {} void <caret>method() {}");
-    IntentionAction action = myFixture.findSingleIntention("Move member into class");
-    myFixture.checkIntentionPreviewHtml(action,
-                                        "<p><icon src=\"source_method\"/>&nbsp;method &rarr; <icon src=\"target_Test\"/>&nbsp;Test</p>");
   }
 
   public void testNavigate() {

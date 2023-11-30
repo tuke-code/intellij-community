@@ -31,6 +31,7 @@ import com.intellij.ui.popup.PopupPositionManager.Position.LEFT
 import com.intellij.ui.popup.PopupPositionManager.Position.RIGHT
 import com.intellij.ui.popup.PopupPositionManager.PositionAdjuster
 import com.intellij.ui.popup.PopupUpdateProcessor
+import com.intellij.ui.popup.util.PopupImplUtil
 import com.intellij.util.concurrency.AppExecutorUtil
 import com.intellij.util.ui.UIUtil
 import org.jetbrains.annotations.TestOnly
@@ -38,6 +39,8 @@ import java.awt.Dimension
 import java.awt.Rectangle
 import java.awt.event.ComponentAdapter
 import java.awt.event.ComponentEvent
+import java.awt.event.HierarchyBoundsAdapter
+import java.awt.event.HierarchyEvent
 import javax.swing.JWindow
 import kotlin.math.max
 import kotlin.math.min
@@ -93,6 +96,7 @@ class IntentionPreviewPopupUpdateProcessor(private val project: Project,
         }
       })
       adjustPosition(originalPopup)
+      addMoveListener(originalPopup) { adjustPosition(originalPopup) }
     }
 
     val value = component.multiPanel.getValue(index, false)
@@ -113,10 +117,19 @@ class IntentionPreviewPopupUpdateProcessor(private val project: Project,
       .submit(AppExecutorUtil.getAppExecutorService())
   }
 
+  private fun addMoveListener(popup: JBPopup?, action: () -> Unit){
+    if (popup == null) return
+    popup.content.addHierarchyBoundsListener(object : HierarchyBoundsAdapter() {
+      override fun ancestorMoved(e: HierarchyEvent?) {
+        action.invoke()
+      }
+    })
+  }
+
   private fun adjustPosition(originalPopup: JBPopup?, checkResizing: Boolean = false) {
     if (originalPopup != null && originalPopup.content.isShowing) {
       val positionAdjuster = PositionAdjuster(originalPopup.content)
-      val previousDimension = PositionAdjuster.getPopupSize(popup)
+      val previousDimension = PopupImplUtil.getPopupSize(popup)
       val bounds: Rectangle = positionAdjuster.adjustBounds(previousDimension, arrayOf(RIGHT, LEFT))
       val popupSize = popup.size
       if (checkResizing && popupSize != null && bounds.width < MIN_WIDTH) {

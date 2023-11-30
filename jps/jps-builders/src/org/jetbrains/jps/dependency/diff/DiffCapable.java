@@ -6,5 +6,5 @@ public interface DiffCapable<T extends DiffCapable<T, D>, D extends Difference> 
 
   int diffHashCode();
   
-  D difference(T other);
+  D difference(T past);
 }

@@ -1,18 +1,23 @@
 // Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.workspaceModel.ide.impl.legacyBridge.module
 
-import com.intellij.ProjectTopics
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.debug
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.diagnostic.trace
 import com.intellij.openapi.module.Module
 import com.intellij.openapi.module.impl.ModuleEx
+import com.intellij.openapi.project.ModuleListener
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.util.SimpleModificationTracker
 import com.intellij.platform.backend.workspace.WorkspaceModel
 import com.intellij.platform.backend.workspace.WorkspaceModelChangeListener
+import com.intellij.platform.workspace.jps.entities.LibraryEntity
+import com.intellij.platform.workspace.jps.entities.ModuleEntity
+import com.intellij.platform.workspace.jps.entities.ModuleId
+import com.intellij.platform.workspace.storage.EntityChange
+import com.intellij.platform.workspace.storage.VersionedStorageChange
 import com.intellij.workspaceModel.ide.impl.legacyBridge.library.LibraryBridgeImpl
 import com.intellij.workspaceModel.ide.impl.legacyBridge.library.ProjectLibraryTableBridgeImpl.Companion.libraryMap
 import com.intellij.workspaceModel.ide.impl.legacyBridge.module.ModuleManagerBridgeImpl.Companion.filterModuleLibraryChanges
@@ -22,11 +27,6 @@ import com.intellij.workspaceModel.ide.impl.legacyBridge.module.ModuleManagerBri
 import com.intellij.workspaceModel.ide.impl.legacyBridge.module.ModuleManagerBridgeImpl.Companion.moduleMap
 import com.intellij.workspaceModel.ide.legacyBridge.ModuleBridge
 import com.intellij.workspaceModel.ide.legacyBridge.ModuleDependencyIndex
-import com.intellij.platform.workspace.storage.EntityChange
-import com.intellij.platform.workspace.storage.VersionedStorageChange
-import com.intellij.platform.workspace.jps.entities.LibraryEntity
-import com.intellij.platform.workspace.jps.entities.ModuleEntity
-import com.intellij.platform.workspace.jps.entities.ModuleId
 
 internal class LegacyProjectModelListenersBridge(
   private val project: Project,
@@ -94,7 +94,7 @@ internal class LegacyProjectModelListenersBridge(
   private fun postProcessModules(oldModuleNames: MutableMap<Module, String>) {
     if (oldModuleNames.isNotEmpty()) {
       project.messageBus
-        .syncPublisher(ProjectTopics.MODULES)
+        .syncPublisher(ModuleListener.TOPIC)
         .modulesRenamed(project, oldModuleNames.keys.toList()) { module -> oldModuleNames[module] }
     }
   }
@@ -206,12 +206,12 @@ internal class LegacyProjectModelListenersBridge(
   }
 
   private fun fireEventAndDisposeModule(module: ModuleBridge) {
-    project.messageBus.syncPublisher(ProjectTopics.MODULES).moduleRemoved(project, module)
+    project.messageBus.syncPublisher(ModuleListener.TOPIC).moduleRemoved(project, module)
     Disposer.dispose(module)
   }
 
   private fun fireBeforeModuleRemoved(module: ModuleBridge) {
-    project.messageBus.syncPublisher(ProjectTopics.MODULES).beforeModuleRemoved(project, module)
+    project.messageBus.syncPublisher(ModuleListener.TOPIC).beforeModuleRemoved(project, module)
   }
 
   companion object {

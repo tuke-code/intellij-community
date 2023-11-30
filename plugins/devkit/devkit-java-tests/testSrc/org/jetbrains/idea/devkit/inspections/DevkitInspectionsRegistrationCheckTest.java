@@ -11,20 +11,22 @@ import java.util.List;
 
 public class DevkitInspectionsRegistrationCheckTest extends BasePlatformTestCase {
 
+  /**
+   * Inspections that are finished and intentionally disabled.
+   */
   private static final List<String> DISABLED_INSPECTIONS =
     List.of("StatisticsCollectorNotRegistered",
-            "UseCouple",
-            "HighlightVisitorInternal",
             "PluginXmlI18n",
             "SerializableCtor");
 
+  /**
+   * Inspections which implementation is in progress
+   * or are finished but not battle-tested yet and may require improvements/polishing.
+   */
   private static final List<String> WIP_INSPECTIONS =
     List.of("ExtensionClassShouldBeFinalAndNonPublic",
-            "ActionPresentationInstantiatedInCtor",
             "CancellationCheckInLoops",
-            "ApplicationServiceAsStaticFinalField",
             "ThreadingConcurrency",
-            "TokenSetInParserDefinition",
             "CallingMethodShouldBeRequiresBlockingContext",
             "IncorrectProcessCanceledExceptionHandling");
 
@@ -35,7 +37,7 @@ public class DevkitInspectionsRegistrationCheckTest extends BasePlatformTestCase
     List<LocalInspectionEP> devkitInspections = ContainerUtil.filter(LocalInspectionEP.LOCAL_INSPECTION.getExtensionList(), ep -> {
       return "DevKit".equals(ep.getPluginDescriptor().getPluginId().getIdString());
     });
-    assertEquals("Mismatch in total inspections, check classpath in test run configuration (intellij.devkit.plugin)", 63,
+    assertEquals("Mismatch in total inspections, check classpath in test run configuration (intellij.devkit.plugin)", 66,
                  devkitInspections.size());
 
     List<LocalInspectionEP> disabledInspections = ContainerUtil.filter(devkitInspections, ep -> !ep.enabledByDefault);

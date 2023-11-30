@@ -29,8 +29,10 @@ import java.util.List;
 
 @RunWith(Parameterized.class)
 public abstract class MavenMultiVersionImportingTestCase extends MavenImportingTestCase {
+  @Override
+  public boolean runInDispatchThread() { return false; }
 
-  public static final String[] MAVEN_VERSIONS = new String[]{"bundled", "4.0.0-alpha-7"};
+  public static final String[] MAVEN_VERSIONS = new String[]{"bundled", "4.0.0-alpha-8"};
   @Parameterized.Parameter(0)
   public String myMavenVersion;
   @Nullable
@@ -38,25 +40,25 @@ public abstract class MavenMultiVersionImportingTestCase extends MavenImportingT
 
   protected void assumeVersionMoreThan(String version) {
     Assume.assumeTrue("Version should be more than " + version,
-                      VersionComparatorUtil.compare(getActualVersion(myMavenVersion), version) > 0);
+                      VersionComparatorUtil.compare(getActualVersion(myMavenVersion), getActualVersion(version)) > 0);
   }
 
   protected void assumeVersionAtLeast(String version) {
     Assume.assumeTrue("Version should be " + version + " or more",
-                      VersionComparatorUtil.compare(getActualVersion(myMavenVersion), version) >= 0);
+                      VersionComparatorUtil.compare(getActualVersion(myMavenVersion), getActualVersion(version)) >= 0);
   }
 
   protected void assumeVersionLessThan(String version) {
     Assume.assumeTrue("Version should be less than " + version,
-                      VersionComparatorUtil.compare(getActualVersion(myMavenVersion), version) < 0);
+                      VersionComparatorUtil.compare(getActualVersion(myMavenVersion), getActualVersion(version)) < 0);
   }
 
   protected void assumeVersionNot(String version) {
-    Assume.assumeTrue("Version " + version + " skipped", VersionComparatorUtil.compare(getActualVersion(myMavenVersion), version) != 0);
+    Assume.assumeTrue("Version " + version + " skipped", VersionComparatorUtil.compare(getActualVersion(myMavenVersion), getActualVersion(version)) != 0);
   }
 
   protected void assumeVersion(String version) {
-    Assume.assumeTrue("Version " + version + " skipped", VersionComparatorUtil.compare(getActualVersion(myMavenVersion), version) == 0);
+    Assume.assumeTrue("Version " + myMavenVersion + " is not " + version + ", therefore skipped", VersionComparatorUtil.compare(getActualVersion(myMavenVersion), getActualVersion(version)) == 0);
   }
 
   @Before

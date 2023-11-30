@@ -3,7 +3,8 @@ package com.intellij.java.codeInsight.completion;
 
 import com.intellij.codeInsight.completion.CompletionType;
 import com.intellij.codeInsight.lookup.LookupElement;
-import com.intellij.openapi.util.registry.Registry;
+import com.intellij.openapi.options.advanced.AdvancedSettings;
+import com.intellij.openapi.options.advanced.AdvancedSettingsImpl;
 import com.intellij.testFramework.LightProjectDescriptor;
 import com.intellij.testFramework.NeedsIndex;
 import org.jetbrains.annotations.NotNull;
@@ -18,7 +19,39 @@ public class QualifierCompletionTest extends NormalCompletionTestCase {
 
   @NeedsIndex.Full
   public void testSimple() {
-    Registry.get("java.completion.qualifier.as.argument").setValue(true, getTestRootDisposable());
+    ((AdvancedSettingsImpl)AdvancedSettings.getInstance()).setSetting("java.completion.qualifier.as.argument", true, getTestRootDisposable());
+    myFixture.configureByText("Test.java", """
+      package org.test;
+                                        
+      public abstract class Test {
+            
+          void run() {
+              "test".test3<caret>
+          }
+          
+          public static  <T extends String> void test3(T t, T t2) { }
+          public static  <T extends String> void test3(T t) { }
+      }
+      """);
+    myFixture.complete(CompletionType.BASIC, 3);
+    myFixture.checkResult("""
+                            package org.test;
+                                                        
+                            public abstract class Test {
+                                                        
+                                void run() {
+                                    test3("test"<caret>);
+                                }
+                                                        
+                                public static  <T extends String> void test3(T t, T t2) { }
+                                public static  <T extends String> void test3(T t) { }
+                            }
+                            """);
+  }
+
+  @NeedsIndex.Full
+  public void testSimpleDoubleInvocation() {
+    ((AdvancedSettingsImpl)AdvancedSettings.getInstance()).setSetting("java.completion.qualifier.as.argument", true, getTestRootDisposable());
     myFixture.configureByText("Test.java", """
       package org.test;
                                         
@@ -50,7 +83,7 @@ public class QualifierCompletionTest extends NormalCompletionTestCase {
 
   @NeedsIndex.Full
   public void testSeveralArguments() {
-    Registry.get("java.completion.qualifier.as.argument").setValue(true, getTestRootDisposable());
+    ((AdvancedSettingsImpl)AdvancedSettings.getInstance()).setSetting("java.completion.qualifier.as.argument", true, getTestRootDisposable());
     myFixture.configureByText("Test.java", """
       package org.test;
                                         
@@ -63,7 +96,7 @@ public class QualifierCompletionTest extends NormalCompletionTestCase {
           public static  <T extends String> void test4(T t, T t2) { }
       }
       """);
-    myFixture.complete(CompletionType.BASIC, 2);
+    myFixture.complete(CompletionType.BASIC, 3);
     myFixture.type('\n');
     myFixture.checkResult("""
                             package org.test;
@@ -81,7 +114,7 @@ public class QualifierCompletionTest extends NormalCompletionTestCase {
 
   @NeedsIndex.Full
   public void testAnotherFile() {
-    Registry.get("java.completion.qualifier.as.argument").setValue(true, getTestRootDisposable());
+    ((AdvancedSettingsImpl)AdvancedSettings.getInstance()).setSetting("java.completion.qualifier.as.argument", true, getTestRootDisposable());
     myFixture.addClass( """
       package org.test2;
                                         
@@ -102,7 +135,7 @@ public class QualifierCompletionTest extends NormalCompletionTestCase {
           public static  <T extends String> void test4(T t, T t2) { }
       }
       """);
-    myFixture.complete(CompletionType.BASIC, 2);
+    myFixture.complete(CompletionType.BASIC, 3);
     myFixture.type('\n');
     myFixture.checkResult("""
                             package org.test;
@@ -121,7 +154,7 @@ public class QualifierCompletionTest extends NormalCompletionTestCase {
   }
   @NeedsIndex.Full
   public void testPrimitiveLong() {
-    Registry.get("java.completion.qualifier.as.argument").setValue(true, getTestRootDisposable());
+    ((AdvancedSettingsImpl)AdvancedSettings.getInstance()).setSetting("java.completion.qualifier.as.argument", true, getTestRootDisposable());
     myFixture.configureByText("Test.java", """
       package org.test;
                                         
@@ -134,7 +167,7 @@ public class QualifierCompletionTest extends NormalCompletionTestCase {
           public static void test4(Long t) { }
       }
       """);
-    myFixture.complete(CompletionType.BASIC, 2);
+    myFixture.complete(CompletionType.BASIC, 3);
     myFixture.type('\n');
     myFixture.checkResult("""
       package org.test;
@@ -152,7 +185,7 @@ public class QualifierCompletionTest extends NormalCompletionTestCase {
 
   @NeedsIndex.Full
   public void testPrimitiveReferenceInt() {
-    Registry.get("java.completion.qualifier.as.argument").setValue(true, getTestRootDisposable());
+    ((AdvancedSettingsImpl)AdvancedSettings.getInstance()).setSetting("java.completion.qualifier.as.argument", true, getTestRootDisposable());
     myFixture.configureByText("Test.java", """
       package org.test;
                                         
@@ -166,7 +199,7 @@ public class QualifierCompletionTest extends NormalCompletionTestCase {
           public static void test4(Integer t) { }
       }
       """);
-    myFixture.complete(CompletionType.BASIC, 2);
+    myFixture.complete(CompletionType.BASIC, 3);
     myFixture.type('\n');
     myFixture.checkResult("""
       package org.test;
@@ -185,7 +218,7 @@ public class QualifierCompletionTest extends NormalCompletionTestCase {
 
   @NeedsIndex.Full
   public void testNull() {
-    Registry.get("java.completion.qualifier.as.argument").setValue(true, getTestRootDisposable());
+    ((AdvancedSettingsImpl)AdvancedSettings.getInstance()).setSetting("java.completion.qualifier.as.argument", true, getTestRootDisposable());
     myFixture.configureByText("Test.java", """
       package org.test;
                                         
@@ -198,7 +231,7 @@ public class QualifierCompletionTest extends NormalCompletionTestCase {
           public static void test4(Integer t) { }
       }
       """);
-    myFixture.complete(CompletionType.BASIC, 2);
+    myFixture.complete(CompletionType.BASIC, 3);
     myFixture.type('\n');
     myFixture.checkResult("""
       package org.test;
@@ -216,7 +249,7 @@ public class QualifierCompletionTest extends NormalCompletionTestCase {
 
   @NeedsIndex.Full
   public void testNullForNotNull() {
-    Registry.get("java.completion.qualifier.as.argument").setValue(true, getTestRootDisposable());
+    ((AdvancedSettingsImpl)AdvancedSettings.getInstance()).setSetting("java.completion.qualifier.as.argument", true, getTestRootDisposable());
     myFixture.configureByText("Test.java", """
       package org.test;
       import org.jetbrains.annotations.NotNull;
@@ -230,13 +263,13 @@ public class QualifierCompletionTest extends NormalCompletionTestCase {
           public static void test4(@NotNull Integer t) { }
       }
       """);
-    LookupElement[] complete = myFixture.complete(CompletionType.BASIC, 2);
+    LookupElement[] complete = myFixture.complete(CompletionType.BASIC, 3);
     assertEmpty(complete);
   }
 
   @NeedsIndex.Full
   public void testIntersectionType() {
-    Registry.get("java.completion.qualifier.as.argument").setValue(true, getTestRootDisposable());
+    ((AdvancedSettingsImpl)AdvancedSettings.getInstance()).setSetting("java.completion.qualifier.as.argument", true, getTestRootDisposable());
     myFixture.configureByText("Test.java", """
       package org.test;
                                         
@@ -249,7 +282,7 @@ public class QualifierCompletionTest extends NormalCompletionTestCase {
           public static <T extends CharSequence & Comparable<String>> void test4(T t) { }
       }
       """);
-    myFixture.complete(CompletionType.BASIC, 2);
+    myFixture.complete(CompletionType.BASIC, 3);
     myFixture.type('\n');
     myFixture.checkResult("""
       package org.test;
@@ -267,7 +300,7 @@ public class QualifierCompletionTest extends NormalCompletionTestCase {
 
   @NeedsIndex.Full
   public void testIntersectionTypeNotFound() {
-    Registry.get("java.completion.qualifier.as.argument").setValue(true, getTestRootDisposable());
+    ((AdvancedSettingsImpl)AdvancedSettings.getInstance()).setSetting("java.completion.qualifier.as.argument", true, getTestRootDisposable());
     myFixture.configureByText("Test.java", """
       package org.test;
                                         
@@ -280,12 +313,12 @@ public class QualifierCompletionTest extends NormalCompletionTestCase {
           public static <T extends CharSequence & Comparable<Integer>> void test4(T t) { }
       }
       """);
-    LookupElement[] completed = myFixture.complete(CompletionType.BASIC, 2);
+    LookupElement[] completed = myFixture.complete(CompletionType.BASIC, 3);
     assertEmpty(completed);
   }
   @NeedsIndex.Full
   public void testCaptureType() {
-    Registry.get("java.completion.qualifier.as.argument").setValue(true, getTestRootDisposable());
+    ((AdvancedSettingsImpl)AdvancedSettings.getInstance()).setSetting("java.completion.qualifier.as.argument", true, getTestRootDisposable());
     myFixture.configureByText("Test.java", """
       package org.test;
       import java.util.ArrayList;
@@ -300,7 +333,7 @@ public class QualifierCompletionTest extends NormalCompletionTestCase {
         public static void testPrint(CharSequence charSequence) {}
       }
       """);
-    myFixture.complete(CompletionType.BASIC, 2);
+    myFixture.complete(CompletionType.BASIC, 3);
     myFixture.type('\n');
     myFixture.checkResult("""
       package org.test;
@@ -320,7 +353,7 @@ public class QualifierCompletionTest extends NormalCompletionTestCase {
 
   @NeedsIndex.Full
   public void testSimpleGeneric() {
-    Registry.get("java.completion.qualifier.as.argument").setValue(true, getTestRootDisposable());
+    ((AdvancedSettingsImpl)AdvancedSettings.getInstance()).setSetting("java.completion.qualifier.as.argument", true, getTestRootDisposable());
     myFixture.configureByText("Test.java", """
       package org.test;
       import java.util.ArrayList;
@@ -336,7 +369,7 @@ public class QualifierCompletionTest extends NormalCompletionTestCase {
         public static <T extends CharSequence> void testPrint(List<T> l) {}
       }
       """);
-    myFixture.complete(CompletionType.BASIC, 2);
+    myFixture.complete(CompletionType.BASIC, 3);
     myFixture.type('\n');
     myFixture.checkResult("""
       package org.test;
@@ -357,7 +390,7 @@ public class QualifierCompletionTest extends NormalCompletionTestCase {
 
   @NeedsIndex.Full
   public void testSimpleGenericNotFound() {
-    Registry.get("java.completion.qualifier.as.argument").setValue(true, getTestRootDisposable());
+    ((AdvancedSettingsImpl)AdvancedSettings.getInstance()).setSetting("java.completion.qualifier.as.argument", true, getTestRootDisposable());
     myFixture.configureByText("Test.java", """
       package org.test;
       import java.util.ArrayList;
@@ -373,13 +406,13 @@ public class QualifierCompletionTest extends NormalCompletionTestCase {
         public static <T extends CharSequence> void testPrint(List<T> l) {}
       }
       """);
-    LookupElement[] completed = myFixture.complete(CompletionType.BASIC, 2);
+    LookupElement[] completed = myFixture.complete(CompletionType.BASIC, 3);
     assertEmpty(completed);
   }
 
   @NeedsIndex.Full
   public void testAnotherFileWithStaticImport() {
-    Registry.get("java.completion.qualifier.as.argument").setValue(true, getTestRootDisposable());
+    ((AdvancedSettingsImpl)AdvancedSettings.getInstance()).setSetting("java.completion.qualifier.as.argument", true, getTestRootDisposable());
     myFixture.addClass( """
       package org.test2;
                                         
@@ -401,7 +434,7 @@ public class QualifierCompletionTest extends NormalCompletionTestCase {
           public static  <T extends String> void test4(T t, T t2) { }
       }
       """);
-    myFixture.complete(CompletionType.BASIC, 2);
+    myFixture.complete(CompletionType.BASIC, 3);
     myFixture.type('\n');
     myFixture.checkResult("""
       package org.test;
@@ -420,7 +453,7 @@ public class QualifierCompletionTest extends NormalCompletionTestCase {
 
   @NeedsIndex.Full
   public void testSmartSimple() {
-    Registry.get("java.completion.qualifier.as.argument").setValue(true, getTestRootDisposable());
+    ((AdvancedSettingsImpl)AdvancedSettings.getInstance()).setSetting("java.completion.qualifier.as.argument", true, getTestRootDisposable());
     myFixture.configureByText("Test.java", """
       package org.test;
                                         
@@ -433,7 +466,7 @@ public class QualifierCompletionTest extends NormalCompletionTestCase {
           public static Integer test3(String t) { return 0; }
       }
       """);
-    myFixture.complete(CompletionType.SMART, 2);
+    myFixture.complete(CompletionType.SMART, 3);
     myFixture.type('\n');
     myFixture.checkResult("""
                             package org.test;
@@ -451,7 +484,7 @@ public class QualifierCompletionTest extends NormalCompletionTestCase {
 
   @NeedsIndex.Full
   public void testSmartSimpleNotFound() {
-    Registry.get("java.completion.qualifier.as.argument").setValue(true, getTestRootDisposable());
+    ((AdvancedSettingsImpl)AdvancedSettings.getInstance()).setSetting("java.completion.qualifier.as.argument", true, getTestRootDisposable());
     myFixture.configureByText("Test.java", """
       package org.test;
                                         
@@ -464,13 +497,13 @@ public class QualifierCompletionTest extends NormalCompletionTestCase {
           public static String test3(String t) { return 0; }
       }
       """);
-    LookupElement[] completed = myFixture.complete(CompletionType.SMART, 2);
+    LookupElement[] completed = myFixture.complete(CompletionType.SMART, 3);
     assertEmpty(completed);
   }
 
   @NeedsIndex.Full
   public void testSmartGenericsSimple() {
-    Registry.get("java.completion.qualifier.as.argument").setValue(true, getTestRootDisposable());
+    ((AdvancedSettingsImpl)AdvancedSettings.getInstance()).setSetting("java.completion.qualifier.as.argument", true, getTestRootDisposable());
     myFixture.configureByText("Test.java", """
       package org.test;
                                         
@@ -483,7 +516,7 @@ public class QualifierCompletionTest extends NormalCompletionTestCase {
           public static <T> T test3(T t) { return null; }
       }
       """);
-    myFixture.complete(CompletionType.SMART, 2);
+    myFixture.complete(CompletionType.SMART, 3);
     myFixture.type('\n');
     myFixture.checkResult("""
                             package org.test;
@@ -501,7 +534,7 @@ public class QualifierCompletionTest extends NormalCompletionTestCase {
 
   @NeedsIndex.Full
   public void testSmartGenericsSimpleNotFound() {
-    Registry.get("java.completion.qualifier.as.argument").setValue(true, getTestRootDisposable());
+    ((AdvancedSettingsImpl)AdvancedSettings.getInstance()).setSetting("java.completion.qualifier.as.argument", true, getTestRootDisposable());
     myFixture.configureByText("Test.java", """
       package org.test;
                                         
@@ -514,13 +547,13 @@ public class QualifierCompletionTest extends NormalCompletionTestCase {
           public static <T> T test3(T t) { return null; }
       }
       """);
-    LookupElement[] completed = myFixture.complete(CompletionType.SMART, 2);
+    LookupElement[] completed = myFixture.complete(CompletionType.SMART, 3);
     assertEmpty(completed);
   }
 
   @NeedsIndex.Full
   public void testSmartGenericsIndependent() {
-    Registry.get("java.completion.qualifier.as.argument").setValue(true, getTestRootDisposable());
+    ((AdvancedSettingsImpl)AdvancedSettings.getInstance()).setSetting("java.completion.qualifier.as.argument", true, getTestRootDisposable());
     myFixture.configureByText("Test.java", """
       package org.test;
                                         
@@ -533,7 +566,7 @@ public class QualifierCompletionTest extends NormalCompletionTestCase {
           public static <T, K extends Runnable> K test3(T t) { return null; }
       }
       """);
-    myFixture.complete(CompletionType.SMART, 2);
+    myFixture.complete(CompletionType.SMART, 3);
     myFixture.type('\n');
     myFixture.checkResult("""
                             package org.test;

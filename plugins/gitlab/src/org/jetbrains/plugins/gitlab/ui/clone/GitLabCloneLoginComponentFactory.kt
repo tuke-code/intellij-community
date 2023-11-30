@@ -2,6 +2,7 @@
 package org.jetbrains.plugins.gitlab.ui.clone
 
 import com.intellij.collaboration.async.nestedDisposable
+import com.intellij.collaboration.auth.ui.AccountsPanelFactory.Companion.addWarningForMemoryOnlyPasswordSafe
 import com.intellij.collaboration.auth.ui.login.LoginModel
 import com.intellij.collaboration.auth.ui.login.TokenLoginInputPanelFactory
 import com.intellij.collaboration.messages.CollaborationToolsBundle
@@ -12,6 +13,7 @@ import com.intellij.collaboration.ui.codereview.list.error.ErrorStatusPanelFacto
 import com.intellij.collaboration.ui.util.bindDisabledIn
 import com.intellij.collaboration.ui.util.bindVisibilityIn
 import com.intellij.ide.IdeBundle
+import com.intellij.openapi.components.service
 import com.intellij.openapi.ui.DialogPanel
 import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.labels.LinkLabel
@@ -26,6 +28,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.transformLatest
 import kotlinx.coroutines.launch
 import org.jetbrains.plugins.gitlab.authentication.GitLabSecurityUtil
+import org.jetbrains.plugins.gitlab.authentication.accounts.GitLabAccountManager
 import org.jetbrains.plugins.gitlab.ui.clone.model.GitLabCloneLoginViewModel
 import org.jetbrains.plugins.gitlab.ui.clone.model.GitLabCloneViewModel
 import org.jetbrains.plugins.gitlab.util.GitLabBundle
@@ -49,13 +52,20 @@ internal object GitLabCloneLoginComponentFactory {
     val backLink = LinkLabel<Unit>(IdeBundle.message("button.back"), null) { _, _ -> cloneVm.switchToRepositoryList() }.apply {
       bindVisibilityIn(cs, loginVm.accounts.map { it.isNotEmpty() })
     }
-    val loginInputPanel = TokenLoginInputPanelFactory(loginModel).create(
+    val loginInputPanel = TokenLoginInputPanelFactory(loginModel).createIn(
+      cs,
       serverFieldDisabled = false,
       tokenNote = CollaborationToolsBundle.message("clone.dialog.insufficient.scopes", GitLabSecurityUtil.MASTER_SCOPES),
       footer = {
         row("") {
           cell(loginButton)
           cell(backLink)
+
+          addWarningForMemoryOnlyPasswordSafe(
+            cs,
+            service<GitLabAccountManager>().canPersistCredentials,
+            ::panel
+          )
         }
       }
     ).apply {

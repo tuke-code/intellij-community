@@ -1,11 +1,7 @@
 // Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.platform.workspace.storage.testEntities.entities
 
-import com.intellij.platform.workspace.storage.EntitySource
-import com.intellij.platform.workspace.storage.GeneratedCodeApiVersion
-import com.intellij.platform.workspace.storage.MutableEntityStorage
-import com.intellij.platform.workspace.storage.WorkspaceEntity
-import com.intellij.platform.workspace.storage.EntityType
+import com.intellij.platform.workspace.storage.*
 import com.intellij.platform.workspace.storage.annotations.Child
 
 
@@ -34,7 +30,8 @@ interface ChainedParentEntity : WorkspaceEntity {
 }
 
 //region generated code
-fun MutableEntityStorage.modifyEntity(entity: ChainedParentEntity, modification: ChainedParentEntity.Builder.() -> Unit) = modifyEntity(
+fun MutableEntityStorage.modifyEntity(entity: ChainedParentEntity,
+                                      modification: ChainedParentEntity.Builder.() -> Unit): ChainedParentEntity = modifyEntity(
   ChainedParentEntity.Builder::class.java, entity, modification)
 //endregion
 
@@ -70,6 +67,6 @@ interface ChainedEntity : WorkspaceEntity {
 }
 
 //region generated code
-fun MutableEntityStorage.modifyEntity(entity: ChainedEntity, modification: ChainedEntity.Builder.() -> Unit) = modifyEntity(
+fun MutableEntityStorage.modifyEntity(entity: ChainedEntity, modification: ChainedEntity.Builder.() -> Unit): ChainedEntity = modifyEntity(
   ChainedEntity.Builder::class.java, entity, modification)
 //endregion

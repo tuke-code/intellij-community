@@ -22,12 +22,17 @@ interface ExternalEntityOrigin : IndexableSetOrigin {
   val rootHolder: IndexingSourceRootHolder
 }
 
+interface CustomKindEntityOrigin : IndexableSetOrigin {
+  val reference: EntityReference<*>
+  val rootHolder: IndexingRootHolder
+}
+
 interface IndexingRootHolder {
   val roots: List<VirtualFile>
   val nonRecursiveRoots: List<VirtualFile>
   val rootUrls: Set<String>
   fun immutableCopyOf(): IndexingRootHolder
-  fun getRootsDebugStr(): String
+  fun getDebugDescription(): String
   fun isEmpty(): Boolean
   fun size(): Int
   fun split(maxSizeOfHolder: Int): Collection<IndexingRootHolder>

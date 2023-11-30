@@ -19,7 +19,6 @@ import com.intellij.openapi.roots.libraries.LibraryTable;
 import com.intellij.openapi.roots.libraries.LibraryTablesRegistrar;
 import com.intellij.openapi.util.Pair;
 import com.intellij.openapi.util.Ref;
-import com.intellij.openapi.util.SystemInfo;
 import com.intellij.openapi.util.io.FileUtil;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.util.ArrayUtil;
@@ -39,7 +38,6 @@ import org.jetbrains.plugins.gradle.settings.GradleExecutionSettings;
 import org.jetbrains.plugins.gradle.settings.GradleSettings;
 import org.jetbrains.plugins.gradle.tooling.annotation.TargetVersions;
 import org.jetbrains.plugins.gradle.util.GradleConstants;
-import org.junit.Assume;
 import org.junit.Test;
 
 import java.io.File;
@@ -638,6 +636,7 @@ public class GradleDependenciesImportingTest extends GradleImportingTestCase {
 
     String[] excludedRoots = isNewDependencyResolutionApplicable() ? new String[]{root} : ArrayUtil.EMPTY_STRING_ARRAY;
     assertLibraryExcludedRoots("project.main", depName, excludedRoots);
+    assertLibraryExcludedRoots("project.test", depName, excludedRoots);
 
     VirtualFile depJar = createProjectJarSubFile("lib/dep.jar");
     TestGradleBuildScriptBuilder builder = createBuildScriptBuilder();
@@ -651,6 +650,7 @@ public class GradleDependenciesImportingTest extends GradleImportingTestCase {
     );
 
     assertLibraryExcludedRoots("project.main", depName, excludedRoots);
+    assertLibraryExcludedRoots("project.test", depName, excludedRoots);
     assertLibraryExcludedRoots("project.main", depJar.getPresentableUrl(), ArrayUtil.EMPTY_STRING_ARRAY);
     assertLibraryExcludedRoots("project.main", "Gradle: junit:junit:4.11", ArrayUtil.EMPTY_STRING_ARRAY);
   }
@@ -931,15 +931,9 @@ public class GradleDependenciesImportingTest extends GradleImportingTestCase {
     assertModules("project", "project.main", "project.test");
   }
 
-  /**
-   * At the moment, IDEA does not support depending on an artifact containing output of multiple source sets.
-   * There is only one source set to choose as the module dependency.
-   * "Owning" sourceSet should be preferred for a jar task with name equal to sourceSet.getJarTaskName()
-   */
   @Test
-  public void testProjectDependencyOnArtifactsContainingMultipleSourceSets() throws Exception {
+  public void testProjectDependencyOnArtifactsContainingOnlySourceSetsOutputs() throws Exception {
     createSettingsFile("include 'api', 'impl' ");
-    String archiveBaseName = (isGradleOlderThan("7.0") ? "baseName" : "archiveBaseName") + " = 'my-archive'\n";
 
     importProject(
       createBuildScriptBuilder()
@@ -947,29 +941,57 @@ public class GradleDependenciesImportingTest extends GradleImportingTestCase {
         .project(":api", it -> {
           it
             .addPostfix("""
-                          configurations { myConfig }
-                          sourceSets { mainX }
-                          jar { from sourceSets.mainX.output }
-                          def mainXJarTask = tasks.create(sourceSets.mainX.getJarTaskName(), Jar) {
-                            """ +  archiveBaseName + """
-                            from sourceSets.mainX.output
-                          }
-                          artifacts { myConfig mainXJarTask }
+                          sourceSets { extraSourceSet }
+                          jar { from sourceSets.extraSourceSet.output }
                           """);
         })
         .project(":impl", it -> {
           it.addImplementationDependency(it.project(":api"));
-          it.addTestImplementationDependency(it.project(":api", "myConfig"));
         })
         .generate()
     );
 
     assertModules("project", "project.main", "project.test",
-                  "project.api", "project.api.main", "project.api.test", "project.api.mainX",
+                  "project.api", "project.api.main", "project.api.test", "project.api.extraSourceSet",
                   "project.impl", "project.impl.main", "project.impl.test");
 
-    assertModuleModuleDeps("project.impl.main", "project.api.main"); // does not depend on mainX
-    assertModuleModuleDeps("project.impl.test", "project.impl.main", "project.api.main", "project.api.mainX");
+    assertModuleModuleDeps("project.impl.main",  "project.api.extraSourceSet", "project.api.main");
+    assertModuleLibDeps("project.impl.main");
+    assertModuleModuleDeps("project.impl.test", "project.impl.main", "project.api.extraSourceSet", "project.api.main");
+  }
+
+
+  @Test
+  @TargetVersions("5.0+")
+  public void testProjectDependencyOnShadowedArtifacts() throws Exception {
+    String shadowVersion = isGradleNewerOrSameAs("8.0") ? "8.1.1" : "5.2.0";
+    createSettingsFile("include 'moduleA', 'moduleB' ");
+    createProjectSubFile("moduleA/build.gradle",  script(it -> {
+      it.withPlugin("com.github.johnrengelman.shadow", shadowVersion);
+      it.withJavaLibraryPlugin();
+      it.withMavenCentral();
+      it.addApiDependency("org.apache.commons:commons-lang3:3.12.0");
+      it.addPostfix("""
+                      sourceSets { extraSourceSet }
+                      shadowJar {
+                        from sourceSets.extraSourceSet.output
+                      }
+                      """); }));
+
+    createProjectSubFile("moduleB/build.gradle",
+                         script( it -> {
+                           it.withJavaPlugin();
+                           it.addImplementationDependency(it.project(":moduleA", "shadow")); }));
+
+    importProject("");
+
+    assertModules("project",
+                  "project.moduleA", "project.moduleA.main", "project.moduleA.test", "project.moduleA.extraSourceSet",
+                  "project.moduleB", "project.moduleB.main", "project.moduleB.test");
+
+    assertModuleModuleDeps("project.moduleB.main", "project.moduleA.extraSourceSet", "project.moduleA.main");
+    assertModuleLibDeps((actual, expected) -> actual.endsWith(expected), "project.moduleB.main", "moduleA-all.jar");
+    assertModuleModuleDeps("project.moduleB.test", "project.moduleB.main", "project.moduleA.extraSourceSet", "project.moduleA.main");
   }
 
   @Test
@@ -1961,82 +1983,6 @@ public class GradleDependenciesImportingTest extends GradleImportingTestCase {
   }
 
   @Test
-  public void testSourcesExcludedFromGradleCacheOnDisabledFlag() throws Exception {
-    Assume.assumeFalse("Can not run on Windows. " +
-                       "The test locks native library files in test directory and can not be torn down properly.", SystemInfo.isWindows);
-    overrideGradleUserHome("project/cache");
-    var dependency = "junit:junit:4.12";
-    var dependencyName = "Gradle: junit:junit:4.12";
-    var dependencyJar = "junit-4.12.jar";
-
-    importProject(script(it -> {
-      it
-        .withJavaPlugin()
-        .withMavenCentral()
-        .addTestImplementationDependency(dependency);
-    }));
-
-    LibraryOrderEntry regularLibFromGradleCache = assertSingleLibraryOrderEntry("project.test", dependencyName);
-    assertNoSourcesAndDocsInGradleCache(dependencyJar, regularLibFromGradleCache);
-  }
-
-  @Test
-  public void testSourcesExcludedFromGradleCacheOnDisabledFlagWithIdeaPlugin() throws Exception {
-    Assume.assumeFalse("Can not run on Windows. " +
-                       "The test locks native library files in test directory and can not be torn down properly.", SystemInfo.isWindows);
-    overrideGradleUserHome("project/cache");
-    var dependency = "junit:junit:4.12";
-    var dependencyName = "Gradle: junit:junit:4.12";
-    var dependencyJar = "junit-4.12.jar";
-
-    importProject(script(it -> {
-      it
-        .withJavaPlugin()
-        .withIdeaPlugin()
-        .withMavenCentral()
-        .addTestImplementationDependency(dependency);
-    }));
-
-    LibraryOrderEntry regularLibFromGradleCache = assertSingleLibraryOrderEntry("project.test", dependencyName);
-    assertNoSourcesAndDocsInGradleCache(dependencyJar, regularLibFromGradleCache);
-  }
-
-  @Test
-  public void testSourcesExcludedFromGradleMultiModuleProjectCacheOnDisabledFlag() throws Exception {
-    Assume.assumeFalse("Can not run on Windows. " +
-                       "The test locks native library files in test directory and can not be torn down properly.", SystemInfo.isWindows);
-    overrideGradleUserHome("project/cache");
-    var dependency = "junit:junit:4.12";
-    var dependencyName = "Gradle: junit:junit:4.12";
-    var dependencyJar = "junit-4.12.jar";
-
-    createSettingsFile("include 'projectA', 'projectB' ");
-    importProject(
-      createBuildScriptBuilder()
-        .project(":projectA", it -> {
-          it
-            .withJavaPlugin()
-            .withIdeaPlugin()
-            .withMavenCentral()
-            .addTestImplementationDependency(dependency);
-        })
-        .project(":projectB", it -> {
-          it
-            .withJavaPlugin()
-            .withMavenCentral()
-            .addTestImplementationDependency(dependency);
-        })
-        .generate()
-    );
-
-    LibraryOrderEntry projectADependencyEntry = assertSingleLibraryOrderEntry("project.projectA.test", dependencyName);
-    assertNoSourcesAndDocsInGradleCache(dependencyJar, projectADependencyEntry);
-
-    LibraryOrderEntry projectBDependencyEntry = assertSingleLibraryOrderEntry("project.projectB.test", dependencyName);
-    assertNoSourcesAndDocsInGradleCache(dependencyJar, projectBDependencyEntry);
-  }
-
-  @Test
   public void testSourcesJavadocAttachmentFromGradleCache() throws Exception {
     var dependency = "junit:junit:4.12";
     var dependencyName = "Gradle: junit:junit:4.12";
@@ -2331,24 +2277,6 @@ public class GradleDependenciesImportingTest extends GradleImportingTestCase {
           }
         }
       });
-  }
-
-  private void assertNoSourcesAndDocsInGradleCache(String dependencyJar, LibraryOrderEntry regularLibFromGradleCache) {
-    assertThat(regularLibFromGradleCache.getRootFiles(OrderRootType.CLASSES))
-      .hasSize(1)
-      .allSatisfy(file -> assertEquals(dependencyJar, file.getName()));
-
-    String binaryPath = PathUtil.getLocalPath(regularLibFromGradleCache.getRootFiles(OrderRootType.CLASSES)[0]);
-    Ref<Boolean> sourceFound = Ref.create(false);
-    Ref<Boolean> docFound = Ref.create(false);
-    try {
-      checkIfSourcesOrJavadocsCanBeAttached(binaryPath, sourceFound, docFound);
-    }
-    catch (IOException e) {
-      throw new IllegalStateException("Unable to lookup dependency artifacts in " + binaryPath);
-    }
-    assertFalse(sourceFound.get());
-    assertFalse(docFound.get());
   }
 
   private static void checkIfSourcesOrJavadocsCanBeAttached(String binaryPath,

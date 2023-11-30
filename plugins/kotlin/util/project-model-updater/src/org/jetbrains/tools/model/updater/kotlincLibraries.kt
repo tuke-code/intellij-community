@@ -5,7 +5,7 @@ import org.jetbrains.tools.model.updater.GeneratorPreferences.ArtifactMode
 import org.jetbrains.tools.model.updater.impl.*
 
 private const val ktGroup = "org.jetbrains.kotlin"
-private const val BOOTSTRAP_VERSION = "1.9.255"
+private const val BOOTSTRAP_VERSION = "2.0.255-dev-255"
 
 // see .idea/jarRepositories.xml
 private val KOTLIN_IDE_DEPS_REPOSITORY = JpsRemoteRepository(
@@ -62,7 +62,6 @@ internal fun generateKotlincLibraries(preferences: GeneratorPreferences, isCommu
         kotlincForIdeWithStandardNaming("kotlinc.kotlin-compiler-fir", kotlincCoordinates)
         kotlincForIdeWithStandardNaming("kotlinc.kotlin-compiler-ir", kotlincCoordinates)
         kotlincForIdeWithStandardNaming("kotlinc.kotlin-gradle-statistics", kotlincCoordinates)
-        kotlincForIdeWithStandardNaming("kotlinc.kotlin-stdlib-minimal-for-test", kotlincCoordinates)
         kotlincForIdeWithStandardNaming("kotlinc.kotlinx-serialization-compiler-plugin", kotlincCoordinates)
         kotlincForIdeWithStandardNaming("kotlinc.lombok-compiler-plugin", kotlincCoordinates)
         kotlincForIdeWithStandardNaming("kotlinc.low-level-api-fir", kotlincCoordinates)
@@ -85,26 +84,6 @@ internal fun generateKotlincLibraries(preferences: GeneratorPreferences, isCommu
         kotlincForIdeWithStandardNaming("kotlinc.kotlin-jps-plugin-tests", jpsPluginCoordinates)
         kotlincWithStandardNaming("kotlinc.kotlin-dist", jpsPluginCoordinates, postfix = "-for-ide")
         kotlincWithStandardNaming("kotlinc.kotlin-jps-plugin-classpath", jpsPluginCoordinates)
-
-        run {
-            val mavenIds = listOf(
-                MavenId.parse("$ktGroup:kotlin-stdlib:${kotlincCoordinates.version}"),
-            )
-
-            val annotationLibrary = JpsLibrary(
-                "kotlinc.kotlin-stdlib",
-                JpsLibrary.LibraryType.Repository(
-                    mavenIds.first(),
-                    excludes = listOf(MavenId("org.jetbrains", "annotations")),
-                    remoteRepository = KOTLIN_IDE_DEPS_REPOSITORY
-                ),
-                annotations = listOf(JpsUrl.File(JpsPath.ProjectDir("lib/annotations/kotlin", isCommunity))),
-                classes = mavenIds.map { JpsUrl.Jar(JpsPath.MavenRepository(it)) },
-                sources = mavenIds.map { JpsUrl.Jar(JpsPath.MavenRepository(it, "sources")) }
-            )
-
-            addLibrary(annotationLibrary.convertMavenUrlToCooperativeIfNeeded(kotlincCoordinates.mode, isCommunity))
-        }
     }
 }
 

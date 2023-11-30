@@ -2,7 +2,7 @@
 package org.jetbrains.intellij.build.impl
 
 import com.intellij.platform.diagnostic.telemetry.helpers.useWithScope
-import com.intellij.platform.diagnostic.telemetry.helpers.useWithScope2
+import com.intellij.platform.diagnostic.telemetry.helpers.useWithScopeBlocking
 import com.intellij.util.JavaModuleOptions
 import com.intellij.util.system.OS
 import com.intellij.util.xml.dom.readXmlAsModel
@@ -28,7 +28,7 @@ import kotlin.io.path.copyTo
 import kotlin.time.Duration
 
 internal fun span(spanBuilder: SpanBuilder, task: Runnable) {
-  spanBuilder.useWithScope {
+  spanBuilder.useWithScopeBlocking {
     task.run()
   }
 }
@@ -43,7 +43,7 @@ inline fun CoroutineScope.createSkippableJob(spanBuilder: SpanBuilder,
   }
   else {
     return launch {
-      spanBuilder.useWithScope2 {
+      spanBuilder.useWithScope {
         task()
       }
     }
@@ -60,7 +60,7 @@ fun copyDirWithFileFilter(fromDir: Path, targetDir: Path, fileFilter: Predicate<
 fun zip(context: CompilationContext, targetFile: Path, dir: Path) {
   spanBuilder("pack")
     .setAttribute("targetFile", context.paths.buildOutputDir.relativize(targetFile).toString())
-    .useWithScope {
+    .useWithScopeBlocking {
       org.jetbrains.intellij.build.io.zip(targetFile = targetFile, dirs = mapOf(dir to ""))
     }
 }
@@ -96,7 +96,7 @@ suspend fun runApplicationStarter(context: BuildContext,
   BuildUtils.addVmProperty(jvmArgs, "idea.home.path", context.paths.projectHome.toString())
   BuildUtils.addVmProperty(jvmArgs, "idea.system.path", systemDir.toString())
   BuildUtils.addVmProperty(jvmArgs, "idea.config.path", "$tempDir/config")
-  // reproducible build - avoid touching module outputs, do no write classpath.index
+  // reproducible build - avoid touching module outputs, do not write classpath.index
   BuildUtils.addVmProperty(jvmArgs, "idea.classpath.index.enabled", "false")
   BuildUtils.addVmProperty(jvmArgs, "idea.builtin.server.disabled", "true")
   BuildUtils.addVmProperty(jvmArgs, "java.system.class.loader", "com.intellij.util.lang.PathClassLoader")
@@ -106,6 +106,7 @@ suspend fun runApplicationStarter(context: BuildContext,
   System.getProperty("intellij.build.${arguments.first()}.debug.port")?.let {
     jvmArgs.add("-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=*:$it")
   }
+  //jvmArgs.add("-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=*:5001")
 
   val effectiveIdeClasspath = LinkedHashSet(ideClasspath)
 
@@ -176,7 +177,7 @@ private fun disableCompatibleIgnoredPlugins(context: BuildContext,
  * @return a list of JVM args for opened packages (JBR17+) in a format `--add-opens=PACKAGE=ALL-UNNAMED` for a specified or current OS
  */
 internal fun getCommandLineArgumentsForOpenPackages(context: CompilationContext, target: OsFamily? = null): List<String> {
-  val file = context.paths.communityHomeDir.resolve("plugins/devkit/devkit-core/src/run/OpenedPackages.txt")
+  val file = context.paths.communityHomeDir.resolve("platform/platform-impl/resources/META-INF/OpenedPackages.txt")
   val os = when (target) {
     OsFamily.WINDOWS -> OS.Windows
     OsFamily.MACOS -> OS.macOS

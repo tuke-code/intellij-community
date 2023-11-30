@@ -115,7 +115,7 @@ class UISettings @NonInjectable constructor(private val notRoamableOptions: NotR
     }
 
   var separateMainMenu: Boolean
-    get() = (SystemInfoRt.isWindows || SystemInfoRt.isXWindow) && state.separateMainMenu
+    get() = !SystemInfoRt.isMac && state.separateMainMenu
     set(value) {
       state.separateMainMenu = value
     }
@@ -235,6 +235,12 @@ class UISettings @NonInjectable constructor(private val notRoamableOptions: NotR
 
       val toolbarSettingsState = ToolbarSettings.getInstance().state!!
       toolbarSettingsState.showNewMainToolbar = !value && toolbarSettingsState.showNewMainToolbar
+    }
+
+  var showNewMainToolbar: Boolean
+    get() = state.showNewMainToolbar
+    set(value) {
+      state.showNewMainToolbar = value
     }
 
   var showIconsInMenus: Boolean
@@ -494,6 +500,16 @@ class UISettings @NonInjectable constructor(private val notRoamableOptions: NotR
       state.showBreakpointsOverLineNumbers = value
     }
 
+  var currentIdeScale: Float
+    get() = if (presentationMode) presentationModeIdeScale else ideScale
+    set(scale) {
+      when {
+        scale.percentValue == currentIdeScale.percentValue -> return
+        presentationMode -> presentationModeIdeScale = scale
+        else -> ideScale = scale
+      }
+    }
+
   companion object {
     init {
       if (JBUIScale.SCALE_VERBOSE) {
@@ -574,6 +590,11 @@ class UISettings @NonInjectable constructor(private val notRoamableOptions: NotR
     @JvmStatic
     fun setupFractionalMetrics(g2d: Graphics2D) {
       g2d.setRenderingHint(RenderingHints.KEY_FRACTIONALMETRICS, getPreferredFractionalMetricsValue())
+    }
+
+    @JvmStatic
+    fun setupFractionalMetrics(component: JComponent) {
+      component.putClientProperty(RenderingHints.KEY_FRACTIONALMETRICS, getPreferredFractionalMetricsValue())
     }
 
     /**
@@ -669,7 +690,9 @@ class UISettings @NonInjectable constructor(private val notRoamableOptions: NotR
     // todo remove when all old properties will be converted
     state._incrementModificationCount()
 
-    IconLoader.setFilter(ColorBlindnessSupport.get(state.colorBlindness)?.filter)
+    ColorBlindnessSupport.get(state.colorBlindness)?.filter?.let {
+      IconLoader.setFilter(it)
+    }
 
     // if this is the main UISettings instance (and not on first call to getInstance), push event to bus and to all current components
     if (this === cachedInstance) {
@@ -688,6 +711,10 @@ class UISettings @NonInjectable constructor(private val notRoamableOptions: NotR
 
   override fun getState(): UISettingsState = state
 
+  override fun noStateLoaded() {
+    migrateFontParameters()
+  }
+
   override fun loadState(state: UISettingsState) {
     this.state = state
     updateDeprecatedProperties()
@@ -696,6 +723,7 @@ class UISettings @NonInjectable constructor(private val notRoamableOptions: NotR
     if (migrateOldFontSettings()) {
       notRoamableOptions.fixFontSettings()
     }
+    migrateFontParameters()
 
     // Check tab placement in editor
     val editorTabPlacement = state.editorTabPlacement
@@ -757,6 +785,10 @@ class UISettings @NonInjectable constructor(private val notRoamableOptions: NotR
       migrated = true
     }
     return migrated
+  }
+
+  private fun migrateFontParameters() {
+    notRoamableOptions.migratePresentationModeIdeScale(state.presentationModeFontSize)
   }
 
   //<editor-fold desc="Deprecated stuff.">

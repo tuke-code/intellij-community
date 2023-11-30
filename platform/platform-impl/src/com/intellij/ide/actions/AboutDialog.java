@@ -65,7 +65,7 @@ import static java.util.Objects.requireNonNullElse;
 import static javax.swing.ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER;
 import static javax.swing.ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED;
 
-public class AboutDialog extends DialogWrapper {
+public final class AboutDialog extends DialogWrapper {
   private static final ExtensionPointName<AboutPopupDescriptionProvider> EP_NAME = new ExtensionPointName<>("com.intellij.aboutPopupDescriptionProvider");
 
   /**
@@ -77,7 +77,7 @@ public class AboutDialog extends DialogWrapper {
 
   public AboutDialog(@Nullable Project project) {
     super(project, false);
-    String appName = ApplicationNamesInfo.getInstance().getFullProductName();
+    String appName = getFullNameForAboutDialog();
     setResizable(false);
     setTitle(IdeBundle.message("about.popup.about.app", appName));
 
@@ -101,7 +101,7 @@ public class AboutDialog extends DialogWrapper {
   }
 
   @Override
-  protected @Nullable JComponent createCenterPanel() {
+  protected @NotNull JComponent createCenterPanel() {
     Icon appIcon = AppUIUtil.loadApplicationIcon(ScaleContext.create(), 60);
     Box box = getText();
     JLabel icon = new JLabel(appIcon);
@@ -222,7 +222,7 @@ public class AboutDialog extends DialogWrapper {
     return box;
   }
 
-  public static @NotNull Pair<String, String> getBuildInfo(ApplicationInfoEx appInfo) {
+  public static @NotNull Pair<String, String> getBuildInfo(ApplicationInfo appInfo) {
     String buildInfo = IdeBundle.message("about.box.build.number", appInfo.getBuild().asString());
     String buildInfoNonLocalized = MessageFormat.format("Build #{0}", appInfo.getBuild().asString());
     Date buildDate = appInfo.getBuildDate().getTime();
@@ -305,7 +305,7 @@ public class AboutDialog extends DialogWrapper {
       }
     }
 
-    if (SystemInfo.isXWindow) {
+    if (SystemInfo.isUnix && !SystemInfo.isMac) {
       text.append("Current Desktop: ").append(requireNonNullElse(System.getenv("XDG_CURRENT_DESKTOP"), "Undefined")).append('\n');
     }
 
@@ -377,9 +377,14 @@ public class AboutDialog extends DialogWrapper {
     };
 
     dialog.setTitle(IdeBundle.message("dialog.title.third.party.software",
-                                      ApplicationNamesInfo.getInstance().getFullProductName(),
+                                      getFullNameForAboutDialog(),
                                       ApplicationInfo.getInstance().getFullVersion()));
     dialog.setSize(JBUIScale.scale(750), JBUIScale.scale(650));
     dialog.show();
+  }
+
+  private static @NotNull String getFullNameForAboutDialog() {
+    if (!PlatformUtils.isJetBrainsClient()) return ApplicationNamesInfo.getInstance().getFullProductName();
+    return IdeBundle.message("dialog.message.jetbrains.client.for.ide", ApplicationNamesInfo.getInstance().getFullProductName());
   }
 }

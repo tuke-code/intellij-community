@@ -27,6 +27,8 @@ import com.intellij.psi.impl.file.PsiDirectoryFactory;
 import com.intellij.testFramework.LightVirtualFile;
 import com.intellij.util.ConcurrencyUtil;
 import com.intellij.util.concurrency.annotations.RequiresReadLock;
+import com.intellij.util.concurrency.annotations.RequiresWriteLock;
+import com.intellij.util.containers.CollectionFactory;
 import com.intellij.util.containers.ContainerUtil;
 import com.intellij.util.messages.MessageBusConnection;
 import org.jetbrains.annotations.ApiStatus;
@@ -91,7 +93,7 @@ public final class FileManagerImpl implements FileManager {
   public @NotNull ConcurrentMap<VirtualFile, FileViewProvider> getVFileToViewProviderMap() {
     ConcurrentMap<VirtualFile, FileViewProvider> map = myVFileToViewProviderMap.get();
     if (map == null) {
-      map = ConcurrencyUtil.cacheOrGet(myVFileToViewProviderMap, ContainerUtil.createConcurrentWeakValueMap());
+      map = ConcurrencyUtil.cacheOrGet(myVFileToViewProviderMap, CollectionFactory.createConcurrentWeakValueMap());
     }
     return map;
   }
@@ -151,8 +153,8 @@ public final class FileManagerImpl implements FileManager {
     clearViewProviders();
   }
 
+  @RequiresWriteLock
   private void clearViewProviders() {
-    ApplicationManager.getApplication().assertWriteAccessAllowed();
     DebugUtil.performPsiModification("clearViewProviders", () -> {
       ConcurrentMap<VirtualFile, FileViewProvider> map = myVFileToViewProviderMap.get();
       if (map != null) {
@@ -479,7 +481,7 @@ public final class FileManagerImpl implements FileManager {
   void removeInvalidFilesAndDirs(boolean useFind) {
     removeInvalidDirs();
 
-    // note: important to update directories map first - findFile uses findDirectory!
+    // note: important to update directories the map first - findFile uses findDirectory!
     Map<VirtualFile, FileViewProvider> fileToPsiFileMap = new HashMap<>(getVFileToViewProviderMap());
     Map<VirtualFile, FileViewProvider> originalFileToPsiFileMap = new HashMap<>(getVFileToViewProviderMap());
     if (useFind) {
@@ -647,11 +649,11 @@ public final class FileManagerImpl implements FileManager {
    * Find PsiFile for the supplied VirtualFile similar to {@link #getCachedPsiFile(VirtualFile)},
    * but without any attempts to resurrect the temporary invalidated file (see {@link #shouldResurrect(FileViewProvider, VirtualFile)}) or check its validity.
    * Useful for retrieving the PsiFile in EDT where expensive PSI operations are prohibited.
-   * Do not use, since this is an extremely fragile and low-level API which can return surprising results. Use {@link #getCachedPsiFile(VirtualFile)} instead.
+   * Do not use, since this is an extremely fragile and low-level API that can return surprising results. Use {@link #getCachedPsiFile(VirtualFile)} instead.
    */
   @ApiStatus.Internal
+  @RequiresReadLock
   public PsiFile getFastCachedPsiFile(@NotNull VirtualFile vFile) {
-    ApplicationManager.getApplication().assertReadAccessAllowed();
     if (!vFile.isValid()) {
       throw new InvalidVirtualFileAccessException(vFile);
     }

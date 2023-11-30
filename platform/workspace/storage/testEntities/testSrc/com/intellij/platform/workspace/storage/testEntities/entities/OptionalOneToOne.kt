@@ -1,14 +1,7 @@
 // Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.platform.workspace.storage.testEntities.entities
 
-import com.intellij.platform.workspace.storage.EntitySource
-import com.intellij.platform.workspace.storage.GeneratedCodeApiVersion
-import com.intellij.platform.workspace.storage.MutableEntityStorage
-import com.intellij.platform.workspace.storage.WorkspaceEntity
-import kotlin.jvm.JvmName
-import kotlin.jvm.JvmOverloads
-import kotlin.jvm.JvmStatic
-import com.intellij.platform.workspace.storage.EntityType
+import com.intellij.platform.workspace.storage.*
 import com.intellij.platform.workspace.storage.annotations.Child
 
 interface OptionalOneToOneParentEntity : WorkspaceEntity {
@@ -37,7 +30,7 @@ interface OptionalOneToOneParentEntity : WorkspaceEntity {
 
 //region generated code
 fun MutableEntityStorage.modifyEntity(entity: OptionalOneToOneParentEntity,
-                                      modification: OptionalOneToOneParentEntity.Builder.() -> Unit) = modifyEntity(
+                                      modification: OptionalOneToOneParentEntity.Builder.() -> Unit): OptionalOneToOneParentEntity = modifyEntity(
   OptionalOneToOneParentEntity.Builder::class.java, entity, modification)
 //endregion
 
@@ -70,6 +63,6 @@ interface OptionalOneToOneChildEntity : WorkspaceEntity {
 
 //region generated code
 fun MutableEntityStorage.modifyEntity(entity: OptionalOneToOneChildEntity,
-                                      modification: OptionalOneToOneChildEntity.Builder.() -> Unit) = modifyEntity(
+                                      modification: OptionalOneToOneChildEntity.Builder.() -> Unit): OptionalOneToOneChildEntity = modifyEntity(
   OptionalOneToOneChildEntity.Builder::class.java, entity, modification)
 //endregion

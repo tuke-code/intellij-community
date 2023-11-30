@@ -90,7 +90,7 @@ public final class PsiUtil extends PsiUtilCore {
    * <p>NOTE:</p>
    * If there is no module (IDEA's) dependency from module with {@code place} on a module with {@code member},
    * then reference won't be resolved and this method will return {@code true}.
-   *
+   * <p>
    * Please use {@link #isMemberAccessibleAt(PsiMember, PsiElement)} to catch these cases as well
    */
   public static boolean isAccessible(@NotNull Project project, @NotNull PsiMember member,
@@ -306,6 +306,9 @@ public final class PsiUtil extends PsiUtilCore {
     PsiElement codeBlock = null;
     if (variable instanceof PsiParameter) {
       PsiElement declarationScope = ((PsiParameter)variable).getDeclarationScope();
+      if (variable instanceof PsiPatternVariable) {
+        return declarationScope;
+      }
       if (declarationScope instanceof PsiCatchSection) {
         codeBlock = ((PsiCatchSection)declarationScope).getCatchBlock();
       }
@@ -1033,7 +1036,7 @@ public final class PsiUtil extends PsiUtilCore {
     return false;
   }
 
-  public static final Key<LanguageLevel> FILE_LANGUAGE_LEVEL_KEY = Key.create("FORCE_LANGUAGE_LEVEL");
+  public static final Key<LanguageLevel> FILE_LANGUAGE_LEVEL_KEY = LanguageLevel.FILE_LANGUAGE_LEVEL_KEY;
 
   public static boolean isLanguageLevel5OrHigher(@NotNull PsiElement element) {
     return getLanguageLevel(element).isAtLeast(LanguageLevel.JDK_1_5);
@@ -1100,7 +1103,7 @@ public final class PsiUtil extends PsiUtilCore {
       }
     }
 
-    PsiResolveHelper instance = element.getProject().getService(PsiResolveHelper.class);
+    PsiResolveHelper instance = PsiResolveHelper.getInstance(element.getProject());
     return instance != null ? instance.getEffectiveLanguageLevel(getVirtualFile(file)) : LanguageLevel.HIGHEST;
   }
 
@@ -1447,12 +1450,14 @@ public final class PsiUtil extends PsiUtilCore {
     return variable instanceof PsiLocalVariable || variable instanceof PsiParameter;
   }
 
-  public static boolean isFollowedByImport(PsiElement element) {
-    PsiElement currentElement = element.getNextSibling();
-    while (!(currentElement instanceof PsiImportStatement)) {
-      if (currentElement == null) return false;
-      currentElement = currentElement.getNextSibling();
+  public static boolean isFollowedByImport(@NotNull PsiElement element) {
+    final PsiElement parent = element.getParent();
+    if (parent instanceof PsiImportList) {
+      final PsiImportList importList = (PsiImportList)parent;
+      final PsiImportStatementBase @NotNull [] imports = importList.getAllImportStatements();
+      if (imports.length == 0) return false;
+      return imports[imports.length - 1].getStartOffsetInParent() > element.getStartOffsetInParent();
     }
-    return true;
+    return false;
   }
 }
