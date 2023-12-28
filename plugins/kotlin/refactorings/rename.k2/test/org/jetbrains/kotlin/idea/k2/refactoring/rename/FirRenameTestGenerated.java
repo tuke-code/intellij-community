@@ -43,6 +43,11 @@ public class FirRenameTestGenerated extends AbstractFirRenameTest {
         runTest("../../idea/tests/testData/refactoring/rename/ambiguousReference/ambiguousReference.test");
     }
 
+    @TestMetadata("automaticRenamerEscapedName/automaticRenamerEscapedName.test")
+    public void testAutomaticRenamerEscapedName_AutomaticRenamerEscapedName() throws Exception {
+        runTest("../../idea/tests/testData/refactoring/rename/automaticRenamerEscapedName/automaticRenamerEscapedName.test");
+    }
+
     @TestMetadata("automaticRenamerForJavaClass/javaClass.test")
     public void testAutomaticRenamerForJavaClass_JavaClass() throws Exception {
         runTest("../../idea/tests/testData/refactoring/rename/automaticRenamerForJavaClass/javaClass.test");
@@ -693,6 +698,11 @@ public class FirRenameTestGenerated extends AbstractFirRenameTest {
         runTest("../../idea/tests/testData/refactoring/rename/renameJavaMethodToKtKeyword/renameJavaMethodToKtKeyword.test");
     }
 
+    @TestMetadata("renameJavaMethodWithDelegation/renameJavaMethodWithDelegation.test")
+    public void testRenameJavaMethodWithDelegation_RenameJavaMethodWithDelegation() throws Exception {
+        runTest("../../idea/tests/testData/refactoring/rename/renameJavaMethodWithDelegation/renameJavaMethodWithDelegation.test");
+    }
+
     @TestMetadata("renameJavaMethod/javaBaseMethod.test")
     public void testRenameJavaMethod_JavaBaseMethod() throws Exception {
         runTest("../../idea/tests/testData/refactoring/rename/renameJavaMethod/javaBaseMethod.test");
@@ -746,6 +756,11 @@ public class FirRenameTestGenerated extends AbstractFirRenameTest {
     @TestMetadata("renameJavaSyntheticPropertyByRef1/renameJavaSyntheticPropertyByRef1.test")
     public void testRenameJavaSyntheticPropertyByRef1_RenameJavaSyntheticPropertyByRef1() throws Exception {
         runTest("../../idea/tests/testData/refactoring/rename/renameJavaSyntheticPropertyByRef1/renameJavaSyntheticPropertyByRef1.test");
+    }
+
+    @TestMetadata("renameJavaSyntheticPropertyByRefWithSuperMethod/renameJavaSyntheticPropertyByRefWithSuperMethod.test")
+    public void testRenameJavaSyntheticPropertyByRefWithSuperMethod_RenameJavaSyntheticPropertyByRefWithSuperMethod() throws Exception {
+        runTest("../../idea/tests/testData/refactoring/rename/renameJavaSyntheticPropertyByRefWithSuperMethod/renameJavaSyntheticPropertyByRefWithSuperMethod.test");
     }
 
     @TestMetadata("renameJavaSyntheticPropertyBySetterRef/renameJavaSyntheticPropertyBySetterRef.test")
@@ -913,6 +928,11 @@ public class FirRenameTestGenerated extends AbstractFirRenameTest {
         runTest("../../idea/tests/testData/refactoring/rename/renameKotlinFunWithJvmName/renameKotlinFunWithJvmName.test");
     }
 
+    @TestMetadata("renameKotlinFunctionCallableReference/renameKotlinFunctionCallableReference.test")
+    public void testRenameKotlinFunctionCallableReference_RenameKotlinFunctionCallableReference() throws Exception {
+        runTest("../../idea/tests/testData/refactoring/rename/renameKotlinFunctionCallableReference/renameKotlinFunctionCallableReference.test");
+    }
+
     @TestMetadata("renameKotlinFunctionInEnum/renameKotlinFunctionInEnum.test")
     public void testRenameKotlinFunctionInEnum_RenameKotlinFunctionInEnum() throws Exception {
         runTest("../../idea/tests/testData/refactoring/rename/renameKotlinFunctionInEnum/renameKotlinFunctionInEnum.test");
@@ -941,6 +961,11 @@ public class FirRenameTestGenerated extends AbstractFirRenameTest {
     @TestMetadata("renameKotlinFunctionSameNameAsFilename/renameKotlinFunctionSameNameAsFilename.test")
     public void testRenameKotlinFunctionSameNameAsFilename_RenameKotlinFunctionSameNameAsFilename() throws Exception {
         runTest("../../idea/tests/testData/refactoring/rename/renameKotlinFunctionSameNameAsFilename/renameKotlinFunctionSameNameAsFilename.test");
+    }
+
+    @TestMetadata("renameKotlinFunctionWithJavaBase/renameKotlinFunctionWithJavaBase.test")
+    public void testRenameKotlinFunctionWithJavaBase_RenameKotlinFunctionWithJavaBase() throws Exception {
+        runTest("../../idea/tests/testData/refactoring/rename/renameKotlinFunctionWithJavaBase/renameKotlinFunctionWithJavaBase.test");
     }
 
     @TestMetadata("renameKotlinMethodWithEscapedName/renameKotlinMethodWithEscapedName.test")

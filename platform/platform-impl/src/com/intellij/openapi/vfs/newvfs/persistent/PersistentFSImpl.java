@@ -54,7 +54,10 @@ import it.unimi.dsi.fastutil.ints.IntSet;
 import it.unimi.dsi.fastutil.objects.ReferenceOpenHashSet;
 import org.jetbrains.annotations.*;
 
-import java.io.*;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -70,7 +73,8 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Function;
 
 import static com.intellij.notification.NotificationType.INFORMATION;
-import static com.intellij.util.SystemProperties.*;
+import static com.intellij.util.SystemProperties.getBooleanProperty;
+import static com.intellij.util.SystemProperties.getLongProperty;
 import static java.util.concurrent.TimeUnit.NANOSECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
 
@@ -106,7 +110,7 @@ public final class PersistentFSImpl extends PersistentFS implements Disposable {
 
   public PersistentFSImpl(@NotNull Application app) {
     this.app = app;
-    myVfsData = new VfsData(app);
+    myVfsData = new VfsData(app, this);
     myRoots = SystemInfoRt.isFileSystemCaseSensitive
               ? new ConcurrentHashMap<>(10, 0.4f, JobSchedulerImpl.getCPUCoresCount())
               : ConcurrentCollectionFactory.createConcurrentMap(10, 0.4f, JobSchedulerImpl.getCPUCoresCount(),
@@ -151,7 +155,7 @@ public final class PersistentFSImpl extends PersistentFS implements Disposable {
   @ApiStatus.Internal
   synchronized public void connect() {
     myIdToDirCache.clear();
-    myVfsData = new VfsData(app);
+    myVfsData = new VfsData(app, this);
     LOG.assertTrue(!myConnected.get());// vfsPeer could be !=null after disconnect
     doConnect();
     PersistentFsConnectionListener.EP_NAME.getExtensionList().forEach(PersistentFsConnectionListener::connectionOpen);
@@ -323,7 +327,7 @@ public final class PersistentFSImpl extends PersistentFS implements Disposable {
   }
 
   @ApiStatus.Internal
-  public CharSequence getNameByNameId(int nameId) {
+  public String getNameByNameId(int nameId) {
     return vfsPeer.getNameByNameId(nameId);
   }
 
@@ -487,29 +491,42 @@ public final class PersistentFSImpl extends PersistentFS implements Disposable {
     return vfsPeer.getPersistentModCount();
   }
 
-  // returns `nameId` > 0 if write successful, -1 if not
-  private int writeAttributesToRecord(int id,
-                                      int parentId,
-                                      @NotNull CharSequence name,
-                                      boolean cs,
-                                      @NotNull FileAttributes attributes,
-                                      boolean overwriteMissed) {
-    assert id > 0 : id;
-    assert parentId >= 0 : parentId; // 0 means there's no parent
+  /** @return `nameId` > 0 */
+  private int writeRecordFields(int fileId,
+                                int parentId,
+                                @NotNull CharSequence name,
+                                @NotNull FileAttributes attributes) {
+    assert fileId > 0 : fileId;
+    assert parentId > 0 : parentId; // 0 means it's root => should use .writeRootFields() instead
+    return vfsPeer.updateRecordFields(fileId, parentId, attributes, name.toString(), /* cleanAttributeRef: */ true);
+  }
+
+  /** @return `nameId` > 0 if write was actually done, -1 if write was bypassed */
+  private int writeRootFields(int rootId,
+                              @NotNull String name,
+                              boolean caseSensitive,
+                              @NotNull FileAttributes attributes) {
+    assert rootId > 0 : rootId;
     //RC: why we reject the changes in those 2 cases -- what is special with loaded children or
     //    same-name?
-    //    Maybe: we call it from findRoot() always, even if the root was already existed in
-    //    persistence, but  we don't want to really overwrite root fields every time -- so
-    //    we skip it here by comparing names?
+    //    A guess: we call the method from findRoot() -- always, even if the root already exists in
+    //    persistence -- but we don't want to really overwrite root fields every time -- so we skip
+    //    the write here by comparing names?
     if (!name.isEmpty()) {
-      if (Comparing.equal(name, vfsPeer.getName(id), cs)) return -1; // TODO: Handle root attributes change.
+      if (Comparing.equal(name, vfsPeer.getName(rootId), caseSensitive)) {
+        // TODO RC: what if name doesn't change -- but root _attributes_ do? Handle this case also
+        return -1;
+      }
     }
     else {
-      if (areChildrenLoaded(id)) return -1; // TODO: hack
+      if (areChildrenLoaded(rootId)) {
+        return -1; // TODO: hack
+      }
     }
 
-    return vfsPeer.updateRecordFields(id, parentId, attributes, name.toString(), overwriteMissed);
+    return vfsPeer.updateRecordFields(rootId, FSRecords.NULL_FILE_ID, attributes, name, /* cleanAttributeRef: */ false);
   }
+
 
   @Override
   public @Attributes int getFileAttributes(int id) {
@@ -1638,7 +1655,7 @@ public final class PersistentFSImpl extends PersistentFS implements Disposable {
 
 
     int rootNameId = vfsPeer.getNameId(rootName);
-    boolean mark;
+    boolean markModified;
     VirtualFileSystemEntry newRoot;
     synchronized (myRoots) {
       root = myRoots.get(rootUrl);
@@ -1662,13 +1679,13 @@ public final class PersistentFSImpl extends PersistentFS implements Disposable {
           " path='" + path + "'; fs=" + fs + "; rootUrl='" + rootUrl + "'", e);
       }
       incStructuralModificationCount();
-      mark = writeAttributesToRecord(rootId, FSRecords.NULL_FILE_ID, rootName, fs.isCaseSensitive(), attributes, false) != -1;
+      markModified = writeRootFields(rootId, rootName, fs.isCaseSensitive(), attributes) != -1;
 
       myRoots.put(rootUrl, newRoot);
       myIdToDirCache.cacheDir(newRoot);
     }
 
-    if (!mark && attributes.lastModified != vfsPeer.getTimestamp(rootId)) {
+    if (!markModified && attributes.lastModified != vfsPeer.getTimestamp(rootId)) {
       newRoot.markDirtyRecursively();
     }
 
@@ -1711,17 +1728,23 @@ public final class PersistentFSImpl extends PersistentFS implements Disposable {
    */
   private void cacheMissedRootFromPersistence(int rootId) {
     Ref<String> missedRootUrlRef = new Ref<>();
-    vfsPeer.forEachRoot((rootUrl, rootFileId) -> {
-      if (rootId == rootFileId) {
-        missedRootUrlRef.set(rootUrl);
-      }
-    });
+    try {
+      vfsPeer.treeAccessor().forEachRoot((rootFileId, rootUrlId) -> {
+        if (rootId == rootFileId) {
+          missedRootUrlRef.set(getNameByNameId(rootUrlId));
+        }
+      });
+    }
+    catch (IOException e) {
+      throw vfsPeer.handleError(e);
+    }
 
     if (missedRootUrlRef.isNull()) {
       LOG.warn("Can't find root[#" + rootId + "]");
       return;
     }
-    //for roots 'name' == rootPath:
+    // 'name' == rootPath in case of roots that are not archives
+    // but for archives e.g. jars it will be just name and this method will be unsuccessful (IDEA-341011)
     String rootPath = vfsPeer.getName(rootId);
     ensureRootCached(rootPath, missedRootUrlRef.get());
   }
@@ -1908,7 +1931,7 @@ public final class PersistentFSImpl extends PersistentFS implements Disposable {
             cachedRootsIds.add(cachedRoot.getId());
           }
           IntOpenHashSet rootIds = new IntOpenHashSet();
-          for (final VirtualFile root : PersistentFS.getInstance().getRoots()) {
+          for (VirtualFile root : PersistentFSImpl.this.getRoots()) {
             rootIds.add(((VirtualFileWithId)root).getId());
           }
           int[] nonCachedRoots = rootIds.intStream()
@@ -2121,10 +2144,7 @@ public final class PersistentFSImpl extends PersistentFS implements Disposable {
     FileAttributes attributes = childData.first;
 
     int childId = vfsPeer.createRecord();
-    int nameId = writeAttributesToRecord(childId, parentId, name, parentFile.isCaseSensitive(), attributes, true);
-    if (nameId < 0) {
-      throw new AssertionError("writeAttributesToRecord(" + childId + ", " + parentId + ", '" + name + "',...) returns -1");
-    }
+    int nameId = writeRecordFields(childId, parentId, name, attributes);
 
     if (attributes.isDirectory()) {
       FSRecords.loadDirectoryData(childId, parentFile, name, fs);
@@ -2230,7 +2250,7 @@ public final class PersistentFSImpl extends PersistentFS implements Disposable {
 
   private void executeRename(@NotNull VirtualFile file, @NotNull String newName) {
     int id = getFileId(file);
-    vfsPeer.setName(id, newName, ((VirtualFileSystemEntry)file).getNameId());
+    vfsPeer.setName(id, newName);
     ((VirtualFileSystemEntry)file).setNewName(newName);
   }
 
@@ -2288,6 +2308,8 @@ public final class PersistentFSImpl extends PersistentFS implements Disposable {
                             long newTimestamp) {
     if (reloadContentFromFS) {
       setFlag(file, Flags.MUST_RELOAD_CONTENT, true);
+      //TODO RC: but this flag is immediately reset back to false in .setLength() below -- so reloadContentFromFS
+      //         has no effect at all!
     }
 
     int fileId = getFileId(file);

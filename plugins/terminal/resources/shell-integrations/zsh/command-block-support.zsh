@@ -21,7 +21,7 @@ __jetbrains_intellij_encode() {
 __jetbrains_intellij_encode_large() {
   builtin local value="$1"
   if builtin whence od > /dev/null && builtin whence sed > /dev/null && builtin whence tr > /dev/null; then
-    builtin echo -n "$value" | od -v -A n -t x1 | sed 's/ *//g' | tr -d '\n'
+    builtin printf "%s" "$value" | od -v -A n -t x1 | sed 's/ *//g' | tr -d '\n'
   else
     __jetbrains_intellij_encode "$value"
   fi
@@ -46,9 +46,16 @@ __jetbrains_intellij_get_environment() {
   builtin local builtin_names="$(builtin print -l -- ${(ko)builtins})"
   builtin local function_names="$(builtin print -l -- ${(ko)functions})"
   builtin local command_names="$(builtin print -l -- ${(ko)commands})"
+  builtin local aliases_mapping="$(__jetbrains_intellij_escape_json "$(alias)")"
 
-  builtin local result="{\"envs\": \"$env_vars\", \"keywords\": \"$keyword_names\", \"builtins\": \"$builtin_names\", \"functions\": \"$function_names\", \"commands\": \"$command_names\"}"
+  builtin local result="{\"envs\": \"$env_vars\", \"keywords\": \"$keyword_names\", \"builtins\": \"$builtin_names\", \"functions\": \"$function_names\", \"commands\": \"$command_names\", \"aliases\": \"$aliases_mapping\"}"
   builtin printf '\e]1341;generator_finished;request_id=%s;result=%s\a' "$request_id" "$(__jetbrains_intellij_encode_large "${result}")"
+}
+
+__jetbrains_intellij_escape_json() {
+  sed -e 's/\\/\\\\/g'\
+      -e 's/"/\\"/g'\
+      <<< "$1"
 }
 
 __jetbrains_intellij_zshaddhistory() {

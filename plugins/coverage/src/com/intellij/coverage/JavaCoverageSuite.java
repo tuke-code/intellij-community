@@ -51,11 +51,11 @@ public class JavaCoverageSuite extends BaseCoverageSuite {
                            final CoverageRunner coverageRunner,
                            @NotNull final CoverageEngine coverageEngine,
                            final Project project) {
-    super(name, coverageDataFileProvider, lastCoverageTimeStamp, coverageByTestEnabled,
-          branchCoverage, trackTestFolders,
-          coverageRunner != null ? coverageRunner : CoverageRunner.getInstance(IDEACoverageRunner.class), project);
-
+    super(name, project, coverageRunner, coverageDataFileProvider, lastCoverageTimeStamp);
     myCoverageEngine = coverageEngine;
+    myBranchCoverage = branchCoverage;
+    myTrackTestFolders = trackTestFolders;
+    myCoverageByTestEnabled = coverageByTestEnabled;
     myIncludeFilters = includeFilters;
     myExcludePatterns = excludePatterns;
 
@@ -64,12 +64,25 @@ public class JavaCoverageSuite extends BaseCoverageSuite {
     }
   }
 
+  @Override
+  public final @NotNull CoverageEngine getCoverageEngine() {
+    return myCoverageEngine;
+  }
+
   public final String @NotNull [] getFilteredPackageNames() {
     return getPackageNames(myIncludeFilters);
   }
 
   public final String @NotNull [] getExcludedPackageNames() {
     return getPackageNames(myExcludePatterns);
+  }
+
+  public final String @NotNull [] getFilteredClassNames() {
+    return getClassNames(myIncludeFilters);
+  }
+
+  public final String @NotNull [] getExcludedClassNames() {
+    return getClassNames(myExcludePatterns);
   }
 
   final String @Nullable [] getIncludeFilters() {
@@ -96,95 +109,8 @@ public class JavaCoverageSuite extends BaseCoverageSuite {
     mySkipUnloadedClassesAnalysis = skipUnloadedClassesAnalysis;
   }
 
-  private static String[] getPackageNames(String[] filters) {
-    if (filters == null || filters.length == 0) return ArrayUtilRt.EMPTY_STRING_ARRAY;
-    List<String> result = new ArrayList<>();
-    for (String filter : filters) {
-      if (filter.equals("*")) {
-        result.add(""); //default package
-      }
-      else if (filter.endsWith(".*")) result.add(filter.substring(0, filter.length() - 2));
-    }
-    return ArrayUtilRt.toStringArray(result);
-  }
-
-  public final String @NotNull [] getFilteredClassNames() {
-    return getClassNames(myIncludeFilters);
-  }
-
-  public final String @NotNull [] getExcludedClassNames() {
-    return getClassNames(myExcludePatterns);
-  }
-
-  private static String @NotNull [] getClassNames(final String[] filters) {
-    if (filters == null) return ArrayUtilRt.EMPTY_STRING_ARRAY;
-    List<String> result = new ArrayList<>();
-    for (String filter : filters) {
-      if (!filter.equals("*") && !filter.endsWith(".*")) result.add(filter);
-    }
-    return ArrayUtilRt.toStringArray(result);
-  }
-
-  @Override
-  public final void readExternal(Element element) throws InvalidDataException {
-    super.readExternal(element);
-
-    // filters
-    myIncludeFilters = readFilters(element, FILTER);
-    myExcludePatterns = readFilters(element, EXCLUDED_FILTER);
-
-    if (getRunner() == null) {
-      setRunner(CoverageRunner.getInstance(IDEACoverageRunner.class)); //default
-    }
-  }
-
-  private static String[] readFilters(Element element, final String tagName) {
-    final List<Element> children = element.getChildren(tagName);
-    List<String> filters = new ArrayList<>();
-    for (Element child : children) {
-      filters.add(child.getValue());
-    }
-    return filters.isEmpty() ? null : ArrayUtilRt.toStringArray(filters);
-  }
-
-  @Override
-  public final void writeExternal(final Element element) throws WriteExternalException {
-    super.writeExternal(element);
-    writeFilters(element, myIncludeFilters, FILTER);
-    writeFilters(element, myExcludePatterns, EXCLUDED_FILTER);
-    final CoverageRunner coverageRunner = getRunner();
-    if (coverageRunner != null) {
-      element.setAttribute(COVERAGE_RUNNER, coverageRunner.getId());
-    }
-  }
-
-  private static void writeFilters(Element element, final String[] filters, final String tagName) {
-    if (filters != null) {
-      for (String filter : filters) {
-        final Element filterElement = new Element(tagName);
-        filterElement.setText(filter);
-        element.addContent(filterElement);
-      }
-    }
-  }
-
-  @Override
-  @NotNull
-  public final CoverageEngine getCoverageEngine() {
-    return myCoverageEngine;
-  }
-
   public final boolean isClassFiltered(final String classFQName) {
     return isClassFiltered(classFQName, getFilteredClassNames());
-  }
-
-  public static boolean isClassFiltered(String classFQName, String[] classPatterns) {
-    for (String className : classPatterns) {
-      if (className.equals(classFQName) || classFQName.startsWith(className) && classFQName.charAt(className.length()) == '$') {
-        return true;
-      }
-    }
-    return false;
   }
 
   public final boolean isPackageFiltered(final String packageFQName) {
@@ -232,15 +158,6 @@ public class JavaCoverageSuite extends BaseCoverageSuite {
     });
   }
 
-  private static boolean isSubPackage(String[] filters, String filter) {
-    for (String supPackageFilter : filters) {
-      if (filter.startsWith(supPackageFilter + ".")) {
-        return true;
-      }
-    }
-    return false;
-  }
-
   public final @NotNull List<PsiClass> getCurrentSuiteClasses(final Project project) {
     final List<PsiClass> classes = new ArrayList<>();
     final String[] classNames = getFilteredClassNames();
@@ -251,7 +168,7 @@ public class JavaCoverageSuite extends BaseCoverageSuite {
           GlobalSearchScope searchScope = GlobalSearchScope.allScope(project);
           RunConfigurationBase<?> configuration = getConfiguration();
           if (configuration instanceof ModuleBasedConfiguration) {
-            Module module = ((ModuleBasedConfiguration<?,?>)configuration).getConfigurationModule().getModule();
+            Module module = ((ModuleBasedConfiguration<?, ?>)configuration).getConfigurationModule().getModule();
             if (module != null) {
               searchScope = GlobalSearchScope.moduleRuntimeScope(module, isTrackTestFolders());
             }
@@ -266,5 +183,87 @@ public class JavaCoverageSuite extends BaseCoverageSuite {
     }
 
     return classes;
+  }
+
+  @Override
+  public final void readExternal(Element element) throws InvalidDataException {
+    super.readExternal(element);
+
+    // filters
+    myIncludeFilters = readFilters(element, FILTER);
+    myExcludePatterns = readFilters(element, EXCLUDED_FILTER);
+
+    if (myRunner == null) {
+      myRunner = CoverageRunner.getInstance(IDEACoverageRunner.class); //default
+    }
+  }
+
+  @Override
+  public final void writeExternal(final Element element) throws WriteExternalException {
+    super.writeExternal(element);
+    writeFilters(element, myIncludeFilters, FILTER);
+    writeFilters(element, myExcludePatterns, EXCLUDED_FILTER);
+    final CoverageRunner coverageRunner = getRunner();
+    if (coverageRunner != null) {
+      element.setAttribute(COVERAGE_RUNNER, coverageRunner.getId());
+    }
+  }
+
+  public static boolean isClassFiltered(String classFQName, String[] classPatterns) {
+    for (String className : classPatterns) {
+      if (className.equals(classFQName) || classFQName.startsWith(className) && classFQName.charAt(className.length()) == '$') {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private static boolean isSubPackage(String[] filters, String filter) {
+    for (String supPackageFilter : filters) {
+      if (filter.startsWith(supPackageFilter + ".")) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private static String[] getPackageNames(String[] filters) {
+    if (filters == null || filters.length == 0) return ArrayUtilRt.EMPTY_STRING_ARRAY;
+    List<String> result = new ArrayList<>();
+    for (String filter : filters) {
+      if (filter.equals("*")) {
+        result.add(""); //default package
+      }
+      else if (filter.endsWith(".*")) result.add(filter.substring(0, filter.length() - 2));
+    }
+    return ArrayUtilRt.toStringArray(result);
+  }
+
+  private static String @NotNull [] getClassNames(final String[] filters) {
+    if (filters == null) return ArrayUtilRt.EMPTY_STRING_ARRAY;
+    List<String> result = new ArrayList<>();
+    for (String filter : filters) {
+      if (!filter.equals("*") && !filter.endsWith(".*")) result.add(filter);
+    }
+    return ArrayUtilRt.toStringArray(result);
+  }
+
+  private static String[] readFilters(Element element, final String tagName) {
+    final List<Element> children = element.getChildren(tagName);
+    List<String> filters = new ArrayList<>();
+    for (Element child : children) {
+      filters.add(child.getValue());
+    }
+    return filters.isEmpty() ? null : ArrayUtilRt.toStringArray(filters);
+  }
+
+  private static void writeFilters(Element element, final String[] filters, final String tagName) {
+    if (filters != null) {
+      for (String filter : filters) {
+        final Element filterElement = new Element(tagName);
+        filterElement.setText(filter);
+        element.addContent(filterElement);
+      }
+    }
   }
 }

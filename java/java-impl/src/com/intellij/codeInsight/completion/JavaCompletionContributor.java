@@ -23,11 +23,13 @@ import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.keymap.KeymapUtil;
 import com.intellij.openapi.module.Module;
 import com.intellij.openapi.module.ModuleUtilCore;
+import com.intellij.openapi.options.advanced.AdvancedSettings;
 import com.intellij.openapi.project.DumbAware;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.roots.ModuleRootManager;
 import com.intellij.openapi.util.Condition;
 import com.intellij.openapi.util.NlsContexts;
+import com.intellij.openapi.util.Ref;
 import com.intellij.openapi.util.TextRange;
 import com.intellij.openapi.util.registry.Registry;
 import com.intellij.openapi.util.text.StringUtil;
@@ -75,6 +77,7 @@ import org.jetbrains.annotations.*;
 
 import java.util.*;
 
+import static com.intellij.codeInsight.completion.JavaQualifierAsArgumentContributor.JavaQualifierAsArgumentStaticMembersProcessor;
 import static com.intellij.patterns.PsiJavaPatterns.*;
 import static com.intellij.psi.CommonClassNames.JAVA_LANG_COMPARABLE;
 import static com.intellij.psi.CommonClassNames.JAVA_LANG_OBJECT;
@@ -852,9 +855,40 @@ public final class JavaCompletionContributor extends CompletionContributor imple
 
       ContainerUtil.addIfNotNull(items, ArrayMemberAccess.accessFirstElement(position, element));
     }
+
     if (parameters.getInvocationCount() > 0) {
       items.addAll(getInnerScopeVariables(parameters, position));
     }
+
+    if (ref.getQualifier() instanceof PsiExpression qualifierExpression &&
+        parameters.getInvocationCount() <= 2 &&
+        AdvancedSettings.getBoolean("java.completion.qualifier.as.argument")) {
+      JavaQualifierAsArgumentStaticMembersProcessor processor =
+        new JavaQualifierAsArgumentStaticMembersProcessor(parameters, qualifierExpression);
+
+      items = ContainerUtil.map(items, lookupItem -> {
+        JavaMethodCallElement javaMethodCallElement = lookupItem.as(JavaMethodCallElement.class);
+        if (javaMethodCallElement != null) {
+          PsiMethod psiMethod = javaMethodCallElement.getObject();
+          Ref<LookupElement> staticref = new Ref<>();
+          processor.processStaticMember(staticItem -> staticref.set(staticItem), psiMethod, new HashSet<>());
+          if (!staticref.isNull()) {
+            PrioritizedLookupElement<?> prioritizedLookupElement = lookupItem.as(PrioritizedLookupElement.class);
+            if (prioritizedLookupElement != null) {
+              if (prioritizedLookupElement.getExplicitProximity() != 0) {
+                return PrioritizedLookupElement.withExplicitProximity(staticref.get(), prioritizedLookupElement.getExplicitProximity());
+              }
+              else {
+                return PrioritizedLookupElement.withPriority(staticref.get(), prioritizedLookupElement.getPriority());
+              }
+            }
+            return staticref.get();
+          }
+        }
+        return lookupItem;
+      });
+    }
+
     return items;
   }
 
@@ -1019,7 +1053,7 @@ public final class JavaCompletionContributor extends CompletionContributor imple
       PsiAnnotationMemberValue defaultValue = ((PsiAnnotationMethod)method).getDefaultValue();
       String defText = defaultValue == null ? null : defaultValue.getText();
       if (PsiKeyword.TRUE.equals(defText) || PsiKeyword.FALSE.equals(defText)) {
-        result.addElement(createAnnotationAttributeElement(method, 
+        result.addElement(createAnnotationAttributeElement(method,
                                                            PsiKeyword.TRUE.equals(defText) ? PsiKeyword.FALSE : PsiKeyword.TRUE,
                                                            position));
         result.addElement(PrioritizedLookupElement.withPriority(createAnnotationAttributeElement(method, defText, position)
@@ -1297,7 +1331,7 @@ public final class JavaCompletionContributor extends CompletionContributor imple
 
     if (PsiUtilCore.getElementType(at) == JavaTokenType.LPARENTH &&
         PsiTreeUtil.getParentOfType(ref, PsiExpression.class, PsiClass.class) == null &&
-        PsiTreeUtil.getParentOfType(at, PsiUnnamedClass.class) == null) { // TODO check before it that there is record
+        PsiTreeUtil.getParentOfType(at, PsiImplicitClass.class) == null) { // TODO check before it that there is record
       // looks like a method declaration, e.g. StringBui<caret>methodName() inside a class
       return true;
     }

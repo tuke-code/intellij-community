@@ -5,6 +5,7 @@ import com.intellij.platform.workspace.storage.*
 import com.intellij.platform.workspace.storage.impl.ConnectionId
 import com.intellij.platform.workspace.storage.impl.EntityId
 import com.intellij.platform.workspace.storage.impl.asString
+import org.jetbrains.annotations.ApiStatus
 
 /**
  * Instrumentation level of the storage.
@@ -26,6 +27,14 @@ public interface EntityStorageInstrumentation : EntityStorage {
   public fun getManyChildren(connectionId: ConnectionId, parent: WorkspaceEntity): Sequence<WorkspaceEntity>
 
   public fun getParent(connectionId: ConnectionId, child: WorkspaceEntity): WorkspaceEntity?
+
+  /**
+   * Returns number of entities of the given type in the storage.
+   *
+   * This internal API may be removed in the future, so it should not be used to build any functionality with it.
+   */
+  @ApiStatus.Internal
+  public fun <E : WorkspaceEntity> entityCount(entityClass: Class<E>): Int
 }
 
 @EntityStorageInstrumentationApi
@@ -33,6 +42,46 @@ public interface EntityStorageSnapshotInstrumentation : EntityStorageSnapshot, E
 
 @EntityStorageInstrumentationApi
 public interface MutableEntityStorageInstrumentation : MutableEntityStorage, EntityStorageInstrumentation {
+  /**
+   * Returns a number which is incremented after each change in the storage.
+   *
+   * The number is not precise. A single operation may cause multiple increments.
+   *
+   * This internal API may be removed in the future, so it should not be used to build any functionality with it.
+   */
+  @get:ApiStatus.Internal
+  public val modificationCount: Long
+
+  /**
+   * Returns `true` if this instance contains entities with the same properties as [original] storage it was created from.
+   * The difference from [hasChanges] is that this method will return `true` in cases when an entity was removed, and then a new entity
+   * with the same properties was added.
+   *
+   * This internal API may be removed in the future, so it should not be used to build any functionality with it.
+   */
+  @ApiStatus.Internal
+  public fun hasSameEntities(): Boolean
+
+  /**
+   * Returns `true` if there are changes recorded in this storage after its creation. Note, that this method may return `true` if these
+   * changes actually don't modify the resulting set of entities, you may use [hasSameEntities] to perform more sophisticated check.
+   *
+   * This internal API may be removed in the future, so it should not be used to build any functionality with it.
+   */
+  @ApiStatus.Internal
+  public fun hasChanges(): Boolean
+
+  /**
+   * Return changes in entities recorded in this instance.
+   *
+   * This function isn't supported to be used by client code directly. In order to subscribe to changes in entities inside the IDE process,
+   * use [WorkspaceModelChangeListener][com.intellij.platform.backend.workspace.WorkspaceModelChangeListener].
+   *
+   * To understand how the changes are collected see the KDoc for [com.intellij.platform.backend.workspace.WorkspaceModelChangeListener]
+   */
+  @ApiStatus.Internal
+  public fun collectChanges(): Map<Class<*>, List<EntityChange<*>>>
+
   /**
    * Replaces existing children of a given parent with a new list of children.
    *

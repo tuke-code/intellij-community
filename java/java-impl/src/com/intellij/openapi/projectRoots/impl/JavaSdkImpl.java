@@ -237,7 +237,7 @@ public final class JavaSdkImpl extends JavaSdk {
   public boolean setupSdkPaths(@NotNull Sdk sdk, @NotNull SdkModel sdkModel) {
     setupSdkPaths(sdk);
 
-    if (sdk.getSdkModificator().getRoots(OrderRootType.CLASSES).length == 0) {
+    if (sdk.getRootProvider().getUrls(OrderRootType.CLASSES).length == 0) {
       String title = JavaBundle.message("sdk.cannot.create");
       String message = JavaBundle.message("sdk.java.no.classes", sdk.getHomePath());
       Messages.showMessageDialog(message, title, Messages.getErrorIcon());
@@ -349,6 +349,7 @@ public final class JavaSdkImpl extends JavaSdk {
           modificator.removeRoot(root, annoType);
         }
         modificator.addRoot(root, annoType);
+        ApplicationManager.getApplication().runWriteAction(() -> modificator.commitChanges());
       })
       .submit(AppExecutorUtil.getAppExecutorService())
       .then(file -> file != null);
@@ -458,12 +459,15 @@ public final class JavaSdkImpl extends JavaSdk {
     if (!Files.exists(jdkHomePath)) {
       throw new IllegalArgumentException(jdkHomePath.toAbsolutePath() + " doesn't exist");
     }
-    ProjectJdkImpl jdk = new ProjectJdkImpl(jdkName, this);
+
+    Sdk jdk = ProjectJdkTable.getInstance().createSdk(jdkName, this);
     SdkModificator sdkModificator = jdk.getSdkModificator();
 
     sdkModificator.setHomePath(FileUtil.toSystemIndependentName(home));
     if (JdkVersionDetector.isVersionString(jdkName)) {
       sdkModificator.setVersionString(jdkName);  // must be set after home path, otherwise setting home path clears the version string
+    } else {
+      sdkModificator.setVersionString(this.getVersionString(home));
     }
 
     addClasses(jdkHomePath, sdkModificator, isJre);
@@ -471,8 +475,7 @@ public final class JavaSdkImpl extends JavaSdk {
     addDocs(jdkHomePath, sdkModificator, null);
     attachJdkAnnotations(sdkModificator);
 
-    sdkModificator.commitChanges();
-
+    sdkModificator.applyChangesWithoutWriteAction();
     return jdk;
   }
 

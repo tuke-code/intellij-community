@@ -55,8 +55,9 @@ import org.jetbrains.kotlin.idea.facet.configureFacet
 import org.jetbrains.kotlin.idea.facet.getOrCreateFacet
 import org.jetbrains.kotlin.idea.facet.removeKotlinFacet
 import org.jetbrains.kotlin.idea.formatter.KotlinLanguageCodeStyleSettingsProvider
-import org.jetbrains.kotlin.idea.formatter.KotlinStyleGuideCodeStyle
+import org.jetbrains.kotlin.idea.formatter.KotlinOfficialStyleGuide
 import org.jetbrains.kotlin.idea.inspections.UnusedSymbolInspection
+import org.jetbrains.kotlin.idea.serialization.updateCompilerArguments
 import org.jetbrains.kotlin.idea.test.CompilerTestDirectives.API_VERSION_DIRECTIVE
 import org.jetbrains.kotlin.idea.test.CompilerTestDirectives.COMPILER_ARGUMENTS_DIRECTIVE
 import org.jetbrains.kotlin.idea.test.CompilerTestDirectives.COMPILER_PLUGIN_OPTIONS
@@ -64,7 +65,6 @@ import org.jetbrains.kotlin.idea.test.CompilerTestDirectives.JVM_TARGET_DIRECTIV
 import org.jetbrains.kotlin.idea.test.CompilerTestDirectives.KOTLIN_COMPILER_VERSION_DIRECTIVE
 import org.jetbrains.kotlin.idea.test.CompilerTestDirectives.LANGUAGE_VERSION_DIRECTIVE
 import org.jetbrains.kotlin.idea.test.CompilerTestDirectives.PROJECT_LANGUAGE_VERSION_DIRECTIVE
-import org.jetbrains.kotlin.idea.test.runAll
 import org.jetbrains.kotlin.idea.test.util.slashedPath
 import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.utils.addIfNotNull
@@ -418,9 +418,10 @@ private fun configureCompilerOptions(fileText: String, project: Project, module:
         val facetSettings = KotlinFacet.get(module)!!.configuration.settings
 
         if (jvmTarget != null) {
-            val compilerArguments = facetSettings.compilerArguments
-            require(compilerArguments is K2JVMCompilerArguments) { "Attempt to specify `$JVM_TARGET_DIRECTIVE` for non-JVM test" }
-            compilerArguments.jvmTarget = jvmTarget
+            facetSettings.updateCompilerArguments {
+                require(this is K2JVMCompilerArguments) { "Attempt to specify `$JVM_TARGET_DIRECTIVE` for non-JVM test" }
+                this.jvmTarget = jvmTarget
+            }
         }
 
         if (options != null) {
@@ -469,7 +470,7 @@ fun configureCodeStyleAndRun(
 
 fun enableKotlinOfficialCodeStyle(project: Project) {
     val settings = CodeStyleSettingsManager.getInstance(project).createTemporarySettings()
-    KotlinStyleGuideCodeStyle.apply(settings)
+    KotlinOfficialStyleGuide.apply(settings)
     CodeStyle.setTemporarySettings(project, settings)
 }
 
@@ -508,7 +509,9 @@ private fun rollbackCompilerOptions(project: Project, module: Module, removeFace
     configureLanguageAndApiVersion(project, module, bundledKotlinVersion)
 
     val facetSettings = KotlinFacet.get(module)!!.configuration.settings
-    (facetSettings.compilerArguments as? K2JVMCompilerArguments)?.jvmTarget = JvmTarget.DEFAULT.description
+    facetSettings.updateCompilerArguments {
+        (this as? K2JVMCompilerArguments)?.jvmTarget = JvmTarget.DEFAULT.description
+    }
 
     val compilerSettings = facetSettings.compilerSettings ?: CompilerSettings().also {
         facetSettings.compilerSettings = it
@@ -552,11 +555,12 @@ private fun configureLanguageAndApiVersion(
     WriteAction.run<Throwable> {
         val modelsProvider = ProjectDataManager.getInstance().createModifiableModelsProvider(project)
         val facet = module.getOrCreateFacet(modelsProvider, useProjectSettings = false)
+        val facetSettings = facet.configuration.settings
 
-        val compilerArguments = facet.configuration.settings.compilerArguments
-        if (compilerArguments != null) {
-            compilerArguments.apiVersion = null
+        facetSettings.updateCompilerArguments {
+            this.apiVersion = null
         }
+
         facet.configureFacet(compilerVersion, null, modelsProvider)
         if (apiVersion != null) {
             facet.configuration.settings.apiLevel = LanguageVersion.fromVersionString(apiVersion.versionString)

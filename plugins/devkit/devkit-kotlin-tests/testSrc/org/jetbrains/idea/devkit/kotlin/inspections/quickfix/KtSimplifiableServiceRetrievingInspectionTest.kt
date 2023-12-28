@@ -2,11 +2,9 @@
 package org.jetbrains.idea.devkit.kotlin.inspections.quickfix
 
 import com.intellij.testFramework.TestDataPath
-import org.intellij.lang.annotations.Language
 import org.jetbrains.idea.devkit.DevKitBundle
 import org.jetbrains.idea.devkit.inspections.quickfix.SimplifiableServiceRetrievingInspectionTestBase
 import org.jetbrains.idea.devkit.kotlin.DevkitKtTestsUtil
-import org.jetbrains.kotlin.idea.KotlinFileType
 
 @TestDataPath("\$CONTENT_ROOT/testData/inspections/simplifiableServiceRetrieving")
 internal class KtSimplifiableServiceRetrievingInspectionTest : SimplifiableServiceRetrievingInspectionTestBase() {
@@ -80,32 +78,50 @@ internal class KtSimplifiableServiceRetrievingInspectionTest : SimplifiableServi
     doTestWithServicesKt()
   }
 
+  fun testJvmName() {
+    myFixture.addFileToProject(
+      "JvmPlatformAnnotations.kt",
+      //language=kotlin
+      """
+        package kotlin.jvm
+
+        actual annotation class JvmName(actual val name: String)
+      """
+    )
+    doTest(DevKitBundle.message("inspection.simplifiable.service.retrieving.replace.with", "MyAppService", "getInstance"))
+  }
+
+  fun testReturnExpressionOfNullableMethod() {
+    doTest()
+  }
+
   private fun doTestWithServicesKt() {
-    @Language("kotlin") val servicesKtFileText = """
+    myFixture.configureByText(
+      "services.kt",
+      //language=kotlin
+      """
       @file:Suppress("UnusedReceiverParameter")
-      @file:JvmName("ServicesKt")
 
       package com.intellij.openapi.components
 
       inline fun <reified T : Any> ComponentManager.service(): T {}
       inline fun <reified T : Any> ComponentManager.serviceIfCreated(): T? {}
       inline fun <reified T : Any> ComponentManager.serviceOrNull(): T? {}
-    """
-    myFixture.configureByText(KotlinFileType.INSTANCE, servicesKtFileText)
+    """)
     doTest()
   }
 
   private fun doTestWithServiceKt() {
-    @Language("kotlin") val serviceKtFileText = """
-      @file:JvmName("ServiceKt")
-
+    myFixture.addFileToProject(
+      "service.kt",
+      //language=kotlin
+      """
       package com.intellij.openapi.components
 
       inline fun <reified T : Any> service(): T {}
       inline fun <reified T : Any> serviceIfCreated(): T? {}
       inline fun <reified T : Any> serviceOrNull(): T? {}
-    """
-    myFixture.configureByText(KotlinFileType.INSTANCE, serviceKtFileText)
+    """)
     doTest()
   }
 }

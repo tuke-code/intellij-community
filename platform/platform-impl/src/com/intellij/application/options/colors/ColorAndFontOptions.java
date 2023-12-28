@@ -7,6 +7,8 @@ import com.intellij.application.options.schemes.SchemesModel;
 import com.intellij.codeHighlighting.RainbowHighlighter;
 import com.intellij.execution.impl.ConsoleViewUtil;
 import com.intellij.ide.actions.QuickChangeColorSchemeAction;
+import com.intellij.ide.ui.LafManager;
+import com.intellij.ide.ui.laf.UIThemeLookAndFeelInfoKt;
 import com.intellij.internal.inspector.PropertyBean;
 import com.intellij.internal.inspector.UiInspectorContextProvider;
 import com.intellij.openapi.Disposable;
@@ -193,6 +195,11 @@ public class ColorAndFontOptions extends SearchableConfigurable.Parent.Abstract
       }
     }
     return false;
+  }
+
+  @Override
+  public boolean isDefaultScheme(@NotNull EditorColorsScheme scheme) {
+    return UIThemeLookAndFeelInfoKt.isDefaultForTheme(scheme, LafManager.getInstance().getCurrentUIThemeLookAndFeel());
   }
 
   @Override
@@ -494,13 +501,13 @@ public class ColorAndFontOptions extends SearchableConfigurable.Parent.Abstract
    }
 
   private void initAll() {
+    EditorColorsScheme globalScheme = EditorColorsManager.getInstance().getGlobalScheme();
     mySchemes = new HashMap<>();
     for (EditorColorsScheme allScheme : EditorColorsManager.getInstance().getAllSchemes()) {
       MyColorScheme schemeDelegate = new MyColorScheme(allScheme);
       initScheme(schemeDelegate);
       mySchemes.put(schemeDelegate.getName(), schemeDelegate);
     }
-    EditorColorsScheme globalScheme = EditorColorsManager.getInstance().getGlobalScheme();
     if (EditorColorsManagerImpl.Companion.isTempScheme(globalScheme)) {
       MyColorScheme schemeDelegate = new MyTempColorScheme((AbstractColorsScheme)globalScheme);
       initScheme(schemeDelegate);

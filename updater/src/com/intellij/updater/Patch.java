@@ -3,6 +3,7 @@ package com.intellij.updater;
 
 import java.io.*;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
 import java.time.Instant;
 import java.util.*;
@@ -279,7 +280,7 @@ public class Patch {
         forEach(actionsToApply, UpdaterUI.message("backing.up.files"), ui, action -> action.backup(toDir, _backupDir));
       }
       else {
-        //noinspection SSBasedInspection
+        @SuppressWarnings({"SSBasedInspection", "RedundantSuppression"})
         List<PatchAction> specialActions = actionsToApply.stream().filter(PatchAction::mandatoryBackup).collect(Collectors.toList());
         if (!specialActions.isEmpty()) {
           backupDir = Utils.getTempFile("partial_backup");
@@ -367,12 +368,20 @@ public class Patch {
     return Digester.digestRegularFile(toFile);
   }
 
+  public long digestFile(Path file) throws IOException {
+    return Digester.digest(file);
+  }
+
   public Map<String, Long> digestFiles(File dir, Set<String> ignoredFiles) throws IOException {
+    return digestFiles(dir.toPath(), ignoredFiles);
+  }
+
+  public Map<String, Long> digestFiles(Path dir, Set<String> ignoredFiles) throws IOException {
     Map<String, Long> result = new LinkedHashMap<>();
-    Utils.collectRelativePaths(dir.toPath()).parallelStream().forEachOrdered(path -> {
+    Utils.collectRelativePaths(dir).parallelStream().forEachOrdered(path -> {
       if (!ignoredFiles.contains(path)) {
         try {
-          long hash = digestFile(new File(dir, path));
+          long hash = digestFile(dir.resolve(path));
           synchronized (result) {
             result.put(path, hash);
           }

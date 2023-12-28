@@ -258,19 +258,12 @@ abstract class ProductProperties {
   abstract fun getBaseArtifactName(appInfo: ApplicationInfoProperties, buildNumber: String): String
 
   /**
-   * `<productName>-<releaseVersion>` for release builds, e.g. ideaIC-2023.2
-   * `<productName>-<buildNumber>` for other builds, e.g. ideaIC-232.9999
+   * `<productName>-<buildNumber>` for any (nightly, EAP or release) build, e.g. ideaIC-232.9999
    *
    * See [getBaseArtifactName].
    */
-  open fun getBaseArtifactName(context: BuildContext): String {
-    val buildNumber = if (context.applicationInfo.isRelease) {
-      context.applicationInfo.fullVersion
-    }
-    else {
-      context.buildNumber
-    }
-    return getBaseArtifactName(context.applicationInfo, buildNumber)
+  fun getBaseArtifactName(context: BuildContext): String {
+    return getBaseArtifactName(context.applicationInfo, context.buildNumber)
   }
 
   /**
@@ -394,13 +387,21 @@ abstract class ProductProperties {
    * todo: remove me when platform is ready
    */
   @Deprecated("Do not use it. Needed only for JetBrains Client per-ide customisation + it's temporary")
-  open fun productNameOverride(project: JpsProject): ApplicationNamesInfoOverride? = null
+  open fun applicationInfoOverride(project: JpsProject): ApplicationInfoOverrides? = null
 
   @Deprecated("Do not use it. Needed only for JetBrains Client per-ide customisation + it's temporary")
-  data class ApplicationNamesInfoOverride(
+  data class ApplicationInfoOverrides(
     val fullProductName: String,
     val editionName: String?,
     val motto: String?,
+    val eap: String?,
+    val majorVersion: String?,
+    val minorVersion: String?,
+    val microVersion: String?,
+    val patchVersion: String?,
+    val fullVersionFormat: String?,
+    val versionSuffix: String?,
+    val majorReleaseDate: String?
   )
 
   /**

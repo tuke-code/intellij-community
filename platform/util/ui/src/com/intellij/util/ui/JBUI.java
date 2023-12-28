@@ -461,6 +461,10 @@ public final class JBUI {
         return JBColor.namedColor("Button.disabledBorderColor", JBColor.namedColor("Button.darcula.disabledOutlineColor", Gray.xCF));
       }
 
+      public static @NotNull Dimension minimumSize() {
+        return size("Button.minimumSize", size(72, 24));
+      }
+
       public static final class Split {
         public static final class Default {
           public static final @NotNull Color SEPARATOR_COLOR =
@@ -468,6 +472,12 @@ public final class JBUI {
 
           public static final @NotNull Color ICON_COLOR = JBColor.namedColor("Button.Split.default.iconColor", 0xFFFFFF);
         }
+      }
+    }
+
+    public static final class ComboBox {
+      public static @NotNull Dimension minimumSize() {
+        return size("ComboBox.minimumSize", size(49, 24));
       }
     }
 
@@ -788,6 +798,7 @@ public final class JBUI {
         Color WARNING_BACKGROUND = JBColor.namedColor("Editor.ToolTip.warningBackground", 0xFFF6DE, 0x3D3223);
         Color WARNING_BORDER = JBColor.namedColor("Editor.ToolTip.warningBorder", 0xFED277, 0x5E4D33);
         Color ICON_HOVER_BACKGROUND = JBColor.namedColor("Editor.ToolTip.iconHoverBackground", ActionButton.hoverBorder());
+        Color SELECTION_BACKGROUND = JBColor.namedColor("Editor.ToolTip.selectionBackground", 0xEBECF0, 0x2B2D30);
       }
 
       interface Notification {
@@ -847,6 +858,12 @@ public final class JBUI {
         Color FOREGROUND = JBColor.namedColor("Notification.errorForeground", Notification.FOREGROUND);
         Color BACKGROUND = JBColor.namedColor("Notification.errorBackground", 0xF5E6E7, 0x593D41);
         Color BORDER_COLOR = JBColor.namedColor("Notification.errorBorderColor", 0xE0A8A9, 0x73454B);
+      }
+    }
+
+    public static final class Spinner {
+      public static @NotNull Dimension minimumSize() {
+        return size("Spinner.minimumSize", size(72, 0));
       }
     }
 
@@ -942,6 +959,12 @@ public final class JBUI {
 
       }
 
+    }
+
+    public static final class TextField {
+      public static @NotNull Dimension minimumSize() {
+        return size("TextField.minimumSize", size(49, 24));
+      }
     }
 
     public static final class ToolWindow {
@@ -1242,7 +1265,7 @@ public final class JBUI {
           return insets("MainToolbar.SplitDropdown.leftPartMargin", insets(3, 7));
         }
         @NotNull public static Insets rightPartMargin() {
-          return insets("MainToolbar.SplitDropdown.rightPartMargin", insets(3, 3));
+          return insets("MainToolbar.SplitDropdown.rightPartMargin", JBUI.insets(3));
         }
       }
 

@@ -37,6 +37,10 @@
                     interface="com.intellij.ide.actions.ConfigurablesPatcher"
                     dynamic="true"/>
 
+    <extensionPoint name="logsPreprocessor"
+                    interface="com.intellij.ide.logsUploader.LogProvider"
+                    dynamic="true"/>
+
     <extensionPoint name="fileType"
                     beanClass="com.intellij.openapi.fileTypes.impl.FileTypeBean"
                     dynamic="true">
@@ -422,6 +426,8 @@
 
     <extensionPoint name="obsoleteStorage" beanClass="com.intellij.configurationStore.ObsoleteStorageBean" dynamic="true"/>
 
+    <extensionPoint name="feedbackDescriptionProvider" interface="com.intellij.ide.FeedbackDescriptionProvider"/>
+
     <extensionPoint name="aboutPopupDescriptionProvider" interface="com.intellij.ide.AboutPopupDescriptionProvider" dynamic="true"/>
 
     <extensionPoint name="editorFactoryMouseListener" interface="com.intellij.openapi.editor.event.EditorMouseListener" dynamic="true"/>
@@ -468,8 +474,6 @@
     <extensionPoint name="newProject.onboarding.tips" interface="com.intellij.ide.wizard.NewProjectOnboardingTips" dynamic="true"/>
 
     <extensionPoint name="projectOriginInfoProvider" interface="com.intellij.ide.impl.ProjectOriginInfoProvider" dynamic="true"/>
-    <extensionPoint name="trustedHostsConfigurablePanelProvider" interface="com.intellij.ide.impl.TrustedHostsConfigurablePanelProvider"
-                    dynamic="true"/>
     <extensionPoint name="trustedHostsConfigurableProvider" interface="com.intellij.ide.impl.TrustedHostsConfigurableProvider"
                     dynamic="true"/>
     <extensionPoint name="trustedProjectsLocator" interface="com.intellij.ide.trustedProjects.TrustedProjectsLocator"

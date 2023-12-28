@@ -74,7 +74,7 @@ public abstract class AbstractColorsScheme extends EditorFontCacheImpl implement
   private static final @NonNls String META_INFO_MODIFIED_TIME = "modified";
   private static final @NonNls String META_INFO_IDE = "ide";
   private static final @NonNls String META_INFO_IDE_VERSION = "ideVersion";
-  private static final @NonNls String META_INFO_ORIGINAL = "originalScheme";
+  public static final @NonNls String META_INFO_ORIGINAL = "originalScheme";
   private static final @NonNls String META_INFO_PARTIAL = "partialSave";
   private final ValueElementReader myValueReader = new TextAttributesReader();
   //region Meta info-related fields
@@ -90,7 +90,6 @@ public abstract class AbstractColorsScheme extends EditorFontCacheImpl implement
   // version influences an XML format and triggers migration
   private int version = CURR_VERSION;
   private Color deprecatedBackgroundColor = null;
-
   //endregion
 
   protected AbstractColorsScheme(EditorColorsScheme parentScheme) {
@@ -930,6 +929,10 @@ public abstract class AbstractColorsScheme extends EditorFontCacheImpl implement
   }
 
   public boolean settingsEqual(Object other, @Nullable Predicate<? super ColorKey> colorKeyFilter, boolean ignoreMetaInfo) {
+    return settingsEqual(other, colorKeyFilter, false, true);
+  }
+
+  public boolean settingsEqual(Object other, @Nullable Predicate<? super ColorKey> colorKeyFilter, boolean ignoreMetaInfo, boolean useDefaults) {
     if (!(other instanceof AbstractColorsScheme otherScheme)) {
       return false;
     }
@@ -957,11 +960,11 @@ public abstract class AbstractColorsScheme extends EditorFontCacheImpl implement
 
     return areDelegatingOrEqual(fontPreferences, otherScheme.getFontPreferences()) &&
            areDelegatingOrEqual(consoleFontPreferences, otherScheme.getConsoleFontPreferences()) &&
-           attributesEqual(otherScheme) &&
+           attributesEqual(otherScheme, useDefaults) &&
            colorsEqual(otherScheme, colorKeyFilter);
   }
 
-  protected boolean attributesEqual(AbstractColorsScheme otherScheme) {
+  protected boolean attributesEqual(AbstractColorsScheme otherScheme, boolean useDefaults) {
     return attributesMap.equals(otherScheme.attributesMap);
   }
 

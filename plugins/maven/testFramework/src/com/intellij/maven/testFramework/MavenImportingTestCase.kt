@@ -81,9 +81,9 @@ abstract class MavenImportingTestCase : MavenTestCase() {
     if (settingsFile != null) {
       VfsRootAccess.allowRootAccess(getTestRootDisposable(), settingsFile.absolutePath)
     }
-    myNotificationAware = AutoImportProjectNotificationAware.getInstance(myProject)
-    myProjectTracker = AutoImportProjectTracker.getInstance(myProject)
-    myProject.messageBus.connect(testRootDisposable).subscribe(MavenImportListener.TOPIC, MavenImportLoggingListener())
+    myNotificationAware = AutoImportProjectNotificationAware.getInstance(project)
+    myProjectTracker = AutoImportProjectTracker.getInstance(project)
+    project.messageBus.connect(testRootDisposable).subscribe(MavenImportListener.TOPIC, MavenImportLoggingListener())
   }
 
   @Throws(Exception::class)
@@ -92,7 +92,7 @@ abstract class MavenImportingTestCase : MavenTestCase() {
       ThrowableRunnable<Throwable> { WriteAction.runAndWait<RuntimeException> { JavaAwareProjectJdkTableImpl.removeInternalJdkInTests() } },
       ThrowableRunnable<Throwable> { TestDialogManager.setTestDialog(TestDialog.DEFAULT) },
       ThrowableRunnable<Throwable> { removeFromLocalRepository("test") },
-      ThrowableRunnable<Throwable> { CompilerTestUtil.deleteBuildSystemDirectory(myProject) },
+      ThrowableRunnable<Throwable> { CompilerTestUtil.deleteBuildSystemDirectory(project) },
       ThrowableRunnable<Throwable> { myProjectsManager = null },
       ThrowableRunnable<Throwable> { super.tearDown() },
       ThrowableRunnable<Throwable> {
@@ -108,7 +108,7 @@ abstract class MavenImportingTestCase : MavenTestCase() {
   }
 
   val isWorkspaceImport: Boolean
-    get() = isImportToWorkspaceModelEnabled(myProject)
+    get() = isImportToWorkspaceModelEnabled(project)
 
   fun supportModuleGroups(): Boolean {
     return !isWorkspaceImport
@@ -142,7 +142,7 @@ abstract class MavenImportingTestCase : MavenTestCase() {
   @Throws(Exception::class)
   override fun setUpInWriteAction() {
     super.setUpInWriteAction()
-    myProjectsManager = MavenProjectsManager.getInstance(myProject)
+    myProjectsManager = MavenProjectsManager.getInstance(project)
     removeFromLocalRepository("test")
   }
 
@@ -153,7 +153,7 @@ abstract class MavenImportingTestCase : MavenTestCase() {
   }
 
   protected fun assertModules(vararg expectedNames: String) {
-    val actual = ModuleManager.getInstance(myProject).modules
+    val actual = ModuleManager.getInstance(project).modules
     val actualNames: MutableList<String> = ArrayList()
     for (m in actual) {
       actualNames.add(m.getName())
@@ -286,7 +286,7 @@ abstract class MavenImportingTestCase : MavenTestCase() {
 
   fun assertProjectLibraries(vararg expectedNames: String) {
     val actualNames: MutableList<String> = ArrayList()
-    for (each in LibraryTablesRegistrar.getInstance().getLibraryTable(myProject).getLibraries()) {
+    for (each in LibraryTablesRegistrar.getInstance().getLibraryTable(project).getLibraries()) {
       val name = each.getName()
       actualNames.add(name ?: "<unnamed>")
     }
@@ -306,7 +306,7 @@ abstract class MavenImportingTestCase : MavenTestCase() {
                                       classifier: String?,
                                       packaging: String?,
                                       version: String?) {
-    val lib = LibraryTablesRegistrar.getInstance().getLibraryTable(myProject).getLibraryByName(libraryName)
+    val lib = LibraryTablesRegistrar.getInstance().getLibraryTable(project).getLibraryByName(libraryName)
     assertNotNull("Library [$libraryName] not found", lib)
     val libraryProperties = (lib as LibraryEx?)!!.getProperties()
     assertInstanceOf(libraryProperties, LibraryWithMavenCoordinatesProperties::class.java)
@@ -325,7 +325,7 @@ abstract class MavenImportingTestCase : MavenTestCase() {
 
   protected fun assertModuleGroupPath(moduleName: String, groupWasManuallyAdded: Boolean, vararg expected: String) {
     val moduleGroupsSupported = supportModuleGroups() || groupWasManuallyAdded && supportsKeepingManualChanges()
-    val path = ModuleManager.getInstance(myProject).getModuleGroupPath(getModule(moduleName)!!)
+    val path = ModuleManager.getInstance(project).getModuleGroupPath(getModule(moduleName)!!)
     if (!moduleGroupsSupported || expected.size == 0) {
       assertNull(path)
     }
@@ -336,17 +336,17 @@ abstract class MavenImportingTestCase : MavenTestCase() {
   }
 
   protected fun getModule(name: String): Module {
-    val m = ReadAction.compute<Module?, RuntimeException> { ModuleManager.getInstance(myProject).findModuleByName(name) }
+    val m = ReadAction.compute<Module?, RuntimeException> { ModuleManager.getInstance(project).findModuleByName(name) }
     assertNotNull("Module $name not found", m)
     return m
   }
 
   protected fun assertMavenizedModule(name: String) {
-    assertTrue(MavenProjectsManager.getInstance(myProject).isMavenizedModule(getModule(name)))
+    assertTrue(MavenProjectsManager.getInstance(project).isMavenizedModule(getModule(name)))
   }
 
   protected fun assertNotMavenizedModule(name: String) {
-    assertFalse(MavenProjectsManager.getInstance(myProject).isMavenizedModule(getModule(name)))
+    assertFalse(MavenProjectsManager.getInstance(project).isMavenizedModule(getModule(name)))
   }
 
   fun getContentRoots(moduleName: String): Array<ContentEntry> {
@@ -376,7 +376,7 @@ abstract class MavenImportingTestCase : MavenTestCase() {
   }
 
   protected suspend fun importProjectAsync() {
-    importProjectsAsync(listOf(myProjectPom))
+    importProjectsAsync(listOf(projectPom))
   }
 
   protected suspend fun importProjectAsync(file: VirtualFile) {
@@ -387,12 +387,12 @@ abstract class MavenImportingTestCase : MavenTestCase() {
     importProjectsAsync(listOf(*files))
   }
 
-  protected suspend fun importProjectsAsync(files: List<VirtualFile>) {
+  protected open suspend fun importProjectsAsync(files: List<VirtualFile>) {
     if (preimportTestMode) {
-      val activity = ProjectImportCollector.IMPORT_ACTIVITY.started(myProject)
+      val activity = ProjectImportCollector.IMPORT_ACTIVITY.started(project)
       try {
-        MavenProjectPreImporter.getInstance(myProject)
-          .preimport(files, null, mavenImporterSettings, mavenGeneralSettings, activity)
+        MavenProjectPreImporter.getInstance(project)
+          .preimport(files, null, mavenImporterSettings, mavenGeneralSettings, true,  activity)
       }
       finally {
         activity.finished()
@@ -408,13 +408,8 @@ abstract class MavenImportingTestCase : MavenTestCase() {
 
   }
 
-  protected fun importProjectWithErrors() {
-    val files = listOf(myProjectPom)
-    doImportProjects(files, false)
-  }
-
   protected fun importProjectWithProfiles(vararg profiles: String) {
-    doImportProjects(listOf(myProjectPom), true, *profiles)
+    doImportProjects(listOf(projectPom), true, *profiles)
   }
 
   @Obsolete
@@ -458,11 +453,7 @@ abstract class MavenImportingTestCase : MavenTestCase() {
     }
   }
 
-  protected fun readProjects(files: List<VirtualFile>, vararg profiles: String) {
-    readProjects(files, emptyList<String>(), *profiles)
-  }
-
-  protected fun readProjects(files: List<VirtualFile>, disabledProfiles: List<String>, vararg profiles: String) {
+  private fun readProjects(files: List<VirtualFile>, disabledProfiles: List<String>, vararg profiles: String) {
     projectsManager.resetManagedFilesAndProfilesInTests(files, MavenExplicitProfiles(listOf(*profiles), disabledProfiles))
   }
 
@@ -508,7 +499,7 @@ abstract class MavenImportingTestCase : MavenTestCase() {
         }
       }
     }
-    MavenUtil.invokeAndWait(myProject) {}
+    MavenUtil.invokeAndWait(project) {}
 
     // otherwise project settings was modified while importing
     assertNoPendingProjectForReload()
@@ -533,11 +524,6 @@ abstract class MavenImportingTestCase : MavenTestCase() {
     projectsManager.updateAllMavenProjects(MavenImportSpec.EXPLICIT_IMPORT)
   }
 
-  @Throws(Exception::class)
-  protected open fun readProjects() {
-    readProjects(projectsManager.getProjectsFiles())
-  }
-
   protected suspend fun downloadArtifacts() {
     projectsManager.downloadArtifacts(projectsManager.getProjects(), null, true, true)
   }
@@ -546,12 +532,12 @@ abstract class MavenImportingTestCase : MavenTestCase() {
 
   @Throws(Exception::class)
   protected fun executeGoal(relativePath: String?, goal: String) {
-    val dir = myProjectRoot.findFileByRelativePath(relativePath!!)
+    val dir = projectRoot.findFileByRelativePath(relativePath!!)
     val rp = MavenRunnerParameters(true, dir!!.getPath(), null as String?, listOf(goal), emptyList())
     val rs = MavenRunnerSettings()
     val wait = Semaphore(1)
     wait.acquire()
-    MavenRunner.getInstance(myProject).run(rp, rs) { wait.release() }
+    MavenRunner.getInstance(project).run(rp, rs) { wait.release() }
     val tryAcquire = wait.tryAcquire(10, TimeUnit.SECONDS)
     assertTrue("Maven execution failed", tryAcquire)
   }
@@ -578,16 +564,16 @@ abstract class MavenImportingTestCase : MavenTestCase() {
 
   private val currentCodeStyleSettings: CodeStyleSettings
     get() = if (CodeStyleSchemes.getInstance().getCurrentScheme() == null) CodeStyle.createTestSettings()
-    else CodeStyle.getSettings(myProject)
+    else CodeStyle.getSettings(project)
 
   protected fun waitForSmartMode() {
     val promise = AsyncPromise<Void>()
-    DumbService.getInstance(myProject).smartInvokeLater { promise.setResult(null) }
+    DumbService.getInstance(project).smartInvokeLater { promise.setResult(null) }
     edt<RuntimeException> { PlatformTestUtil.waitForPromise(promise, 60_000) }
   }
 
   protected suspend fun renameModule(oldName: String, newName: String) {
-    val moduleManager = ModuleManager.getInstance(myProject)
+    val moduleManager = ModuleManager.getInstance(project)
     val module = moduleManager.findModuleByName(oldName)!!
     val modifiableModel = moduleManager.getModifiableModel()
     try {
@@ -598,17 +584,17 @@ abstract class MavenImportingTestCase : MavenTestCase() {
     }
     writeAction {
       modifiableModel.commit()
-      myProject.getMessageBus().syncPublisher(ModuleListener.TOPIC).modulesRenamed(myProject, listOf(module)) { oldName }
+      project.getMessageBus().syncPublisher(ModuleListener.TOPIC).modulesRenamed(project, listOf(module)) { oldName }
     }
   }
 
   @RequiresBackgroundThread
-  protected suspend fun waitForImportWithinTimeout(action: suspend () -> Any?) {
-    waitForImportWithinTimeout(myProject, action)
+  protected suspend fun waitForImportWithinTimeout(action: suspend () -> Unit) {
+    waitForImportWithinTimeout(project, action)
   }
 
   @RequiresBackgroundThread
-  protected suspend fun waitForImportWithinTimeout(project: Project, action: suspend () -> Any?) {
+  protected suspend fun waitForImportWithinTimeout(project: Project, action: suspend () -> Unit) {
     MavenLog.LOG.warn("waitForImportWithinTimeout started")
     val importStarted = AtomicBoolean(false)
     val importFinished = AtomicBoolean(false)

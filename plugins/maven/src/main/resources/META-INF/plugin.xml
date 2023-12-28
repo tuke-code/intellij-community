@@ -376,6 +376,9 @@
     <registryKey key="maven.server.generate.sources.for.aggregator.projects" defaultValue="true"
                  description="Generate sources for aggregator projects (instead of all projects) for better performance"/>
 
+    <registryKey key="maven.max.parallel.tasks" defaultValue="-1"
+                 description="Maximal parallel tasks to read and resolve. If equal or less than zero, no limitations applied"/>
+
     <intentionAction>
       <language>XML</language>
       <className>org.jetbrains.idea.maven.dom.converters.MavenArtifactCoordinatesConverter$MyUpdateIndicesIntention</className>
@@ -561,6 +564,8 @@
     <importer implementation="org.jetbrains.idea.maven.importing.MavenWslTargetConfigurator"/>
     <importing.workspaceConfigurator implementation="org.jetbrains.idea.maven.importing.MavenWslTargetConfigurator"/>
 
+    <importing.workspaceConfigurator implementation="org.jetbrains.idea.maven.importing.MavenShadePluginConfigurator"/>
+
     <compiler implementation="org.jetbrains.idea.maven.importing.MavenCompilerJavacExtension"/>
     <compiler implementation="org.jetbrains.idea.maven.importing.MavenCompilerEclipseExtension"/>
     <executionEnvironmentProvider
@@ -729,6 +734,7 @@
       <action id="Maven.ResetReadStatistic" class="org.jetbrains.idea.maven.internal.MavenResetStatisticsAction"/>
       <action id="Maven.Killall" class="org.jetbrains.idea.maven.internal.MavenKillallConnectors"/>
       <action id="Maven.ShowConnectors" class="org.jetbrains.idea.maven.server.ui.ShowMavenConnectorsAction"/>
+      <action id="Maven.ReReadAll" class="org.jetbrains.idea.maven.internal.MavenReadExistingTreeAction"/>
       <add-to-group group-id="Internal" anchor="last"/>
     </group>
 
@@ -872,4 +878,9 @@
   <projectListeners>
     <listener class="org.jetbrains.idea.maven.project.MavenDependencyUpdater" topic="org.jetbrains.idea.maven.project.MavenImportListener"/>
   </projectListeners>
+  <applicationListeners>
+    <listener class="org.jetbrains.idea.maven.project.MavenImportListenerBridge"
+              topic="org.jetbrains.idea.maven.project.MavenSyncListener"
+              activeInTestMode="true" activeInHeadlessMode="true"/>
+  </applicationListeners>
 </idea-plugin>

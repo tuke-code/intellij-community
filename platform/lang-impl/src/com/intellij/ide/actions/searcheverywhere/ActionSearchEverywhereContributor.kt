@@ -15,10 +15,11 @@ import com.intellij.ide.util.gotoByName.ActionAsyncProvider
 import com.intellij.ide.util.gotoByName.GotoActionModel
 import com.intellij.ide.util.gotoByName.GotoActionModel.GotoActionListCellRenderer
 import com.intellij.ide.util.gotoByName.GotoActionModel.MatchedValue
-import com.intellij.ide.util.gotoByName.SearchFinishedException
 import com.intellij.openapi.actionSystem.*
 import com.intellij.openapi.actionSystem.impl.Utils.runUpdateSessionForActionSearch
 import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.components.serviceAsync
+import com.intellij.openapi.diagnostic.debug
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.keymap.KeymapManager
@@ -84,7 +85,7 @@ open class ActionSearchEverywhereContributor : WeightedSearchEverywhereContribut
   override fun createExtendedInfo(): @Nls ExtendedInfo? = createActionExtendedInfo(myProject)
 
 
-  fun includeNonProjectItemsText(): @NlsContexts.Checkbox String? = IdeBundle.message("checkbox.disabled.included")
+  fun includeNonProjectItemsText(): @NlsContexts.Checkbox String = IdeBundle.message("checkbox.disabled.included")
 
   override fun getSortWeight(): Int = 400
 
@@ -94,22 +95,17 @@ open class ActionSearchEverywhereContributor : WeightedSearchEverywhereContribut
                                      progressIndicator: ProgressIndicator,
                                      consumer: Processor<in FoundItemDescriptor<MatchedValue>>) {
     ProgressManager.getInstance().runProcess({
-      try {
-        runBlockingCancellable {
-          model.buildGroupMappings()
-          runUpdateSessionForActionSearch(model.getUpdateSession()) { presentationProvider ->
-            doFetchItems(this, presentationProvider, pattern) { consumer.process(it) }
-          }
+      runBlockingCancellable {
+        model.buildGroupMappings()
+        runUpdateSessionForActionSearch(model.getUpdateSession()) { presentationProvider ->
+          doFetchItems(this, presentationProvider, pattern) { consumer.process(it) }
         }
-      }
-      catch (e: SearchFinishedException) {
-        LOG.debug("Search finished with reason:", e)
       }
     }, progressIndicator)
   }
 
   override fun getActions(onChanged: Runnable): List<AnAction> {
-    return listOf<AnAction>(object : CheckBoxSearchEverywhereToggleAction(includeNonProjectItemsText()!!) {
+    return listOf<AnAction>(object : CheckBoxSearchEverywhereToggleAction(includeNonProjectItemsText()) {
       override fun isEverywhere(): Boolean {
         return myDisabledActions
       }
@@ -145,7 +141,7 @@ open class ActionSearchEverywhereContributor : WeightedSearchEverywhereContribut
     val description = action.templatePresentation.description
     if (UISettings.getInstance().showInplaceCommentsInternal) {
       val presentableId = StringUtil.notNullize(ActionManager.getInstance().getId(action), "class: " + action.javaClass.name)
-      return String.format("[%s] %s", presentableId, StringUtil.notNullize(description))
+      return "[$presentableId] ${description ?: ""}"
     }
     return description
   }
@@ -172,8 +168,7 @@ open class ActionSearchEverywhereContributor : WeightedSearchEverywhereContribut
     }
 
     GotoActionAction.openOptionOrPerformAction(selected, text, myProject, myContextComponent.get(), modifiers)
-    val inplaceChange = (selected is GotoActionModel.ActionWrapper
-                         && selected.action is ToggleAction)
+    val inplaceChange = (selected is GotoActionModel.ActionWrapper && selected.action is ToggleAction)
     return !inplaceChange
   }
 
@@ -230,8 +225,8 @@ open class ActionSearchEverywhereContributor : WeightedSearchEverywhereContribut
       val action = getAction(element)
       if (action == null) return@processActions true
 
-      val id = ActionManager.getInstance().getId(action)
-      val degree = actionIDs.stream().toList().indexOf(id)
+      val id = serviceAsync<ActionManager>().getId(action)
+      val degree = actionIDs.indexOf(id)
       consumer(FoundItemDescriptor(element, degree))
     }
   }

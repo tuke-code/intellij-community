@@ -3,6 +3,7 @@ package com.intellij;
 
 import com.intellij.idea.ExcludeFromTestDiscovery;
 import com.intellij.idea.HardwareAgentRequired;
+import com.intellij.idea.IJIgnore;
 import com.intellij.idea.IgnoreJUnit3;
 import com.intellij.nastradamus.NastradamusClient;
 import com.intellij.openapi.util.text.StringUtil;
@@ -15,6 +16,7 @@ import com.intellij.util.containers.MultiMap;
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
+import kotlin.text.StringsKt;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -91,6 +93,8 @@ public class TestCaseLoader {
   private static final boolean REVERSE_ORDER = SystemProperties.getBooleanProperty("intellij.build.test.reverse.order", false);
 
   private static final String PLATFORM_LITE_FIXTURE_NAME = "com.intellij.testFramework.PlatformLiteFixture";
+
+  public static final String COMMON_TEST_GROUPS_RESOURCE_NAME = "tests/testGroups.properties";
 
   private final HashSet<Class<?>> myClassSet = new HashSet<>();
   private final List<Throwable> myClassLoadingErrors = new ArrayList<>();
@@ -226,6 +230,15 @@ public class TestCaseLoader {
     return StringUtil.split(System.getProperty("intellij.build.test.groups", System.getProperty("idea.test.group", "")).trim(), ";");
   }
 
+  private boolean isPotentiallyTestCase(String className, String moduleName) {
+    String classNameWithoutPackage = StringsKt.substringAfterLast(className, '.', className);
+    if (!myForceLoadPerformanceTests && !shouldIncludePerformanceTestCase(classNameWithoutPackage)) return false;
+    if (!myTestClassesFilter.matches(className, moduleName)) return false;
+    if (myFirstTestClass != null && className.equals(myFirstTestClass.getName())) return false;
+    if (myLastTestClass != null && className.equals(myLastTestClass.getName())) return false;
+    return true;
+  }
+
   private boolean isClassTestCase(Class<?> testCaseClass, String moduleName) {
     if (shouldAddTestCase(testCaseClass, moduleName, true) &&
         testCaseClass != myFirstTestClass &&
@@ -289,7 +302,7 @@ public class TestCaseLoader {
   }
 
   private static List<Class<?>> loadClassesForWarmup() {
-    var groupsTestCaseLoader = new TestCaseLoader("tests/testGroups.properties");
+    var groupsTestCaseLoader = new TestCaseLoader(COMMON_TEST_GROUPS_RESOURCE_NAME);
 
     for (Path classesRoot : TestAll.getClassRoots()) {
       ClassFinder classFinder = new ClassFinder(classesRoot, "", INCLUDE_UNCONVENTIONALLY_NAMED_TESTS);
@@ -298,7 +311,7 @@ public class TestCaseLoader {
       groupsTestCaseLoader.loadTestCases(classesRoot.getFileName().toString(), foundTestClasses);
     }
 
-    var testCaseClasses = groupsTestCaseLoader.getClasses();
+    var testCaseClasses = groupsTestCaseLoader.getClasses(false);
 
     System.out.printf("Finishing warmup initialization. Found %s classes%n", testCaseClasses.size());
 
@@ -417,7 +430,7 @@ public class TestCaseLoader {
   }
 
   private boolean shouldAddTestCase(Class<?> testCaseClass, String moduleName, boolean checkForExclusion) {
-    if ((testCaseClass.getModifiers() & Modifier.ABSTRACT) != 0) return false;
+    if (Modifier.isAbstract(testCaseClass.getModifiers())) return false;
 
     if (checkForExclusion) {
       if (shouldExcludeTestClass(moduleName, testCaseClass)) return false;
@@ -432,7 +445,7 @@ public class TestCaseLoader {
 
     try {
       final Method suiteMethod = testCaseClass.getMethod("suite");
-      if (Test.class.isAssignableFrom(suiteMethod.getReturnType()) && (suiteMethod.getModifiers() & Modifier.STATIC) != 0) {
+      if (Test.class.isAssignableFrom(suiteMethod.getReturnType()) && Modifier.isStatic(suiteMethod.getModifiers())) {
         return true;
       }
     }
@@ -448,6 +461,7 @@ public class TestCaseLoader {
     String className = testCaseClass.getName();
 
     return !myTestClassesFilter.matches(className, moduleName) ||
+           testCaseClass.isAnnotationPresent(IJIgnore.class) ||
            testCaseClass.isAnnotationPresent(IgnoreJUnit3.class) ||
            isExcludeFromTestDiscovery(testCaseClass);
   }
@@ -458,6 +472,9 @@ public class TestCaseLoader {
 
   public void loadTestCases(final String moduleName, final Collection<String> classNamesIterator) {
     for (String className : classNamesIterator) {
+      if (!isPotentiallyTestCase(className, moduleName)) {
+        continue;
+      }
       try {
         Class<?> candidateClass = Class.forName(className, false, getClassLoader());
         if (isClassTestCase(candidateClass, moduleName)) {
@@ -521,15 +538,19 @@ public class TestCaseLoader {
    * @return Sorted list of loaded classes
    */
   public List<Class<?>> getClasses() {
-    List<Class<?>> result = new ArrayList<>(myClassSet.size() + 2);
+    return getClasses(true);
+  }
 
-    if (myFirstTestClass != null) {
+  List<Class<?>> getClasses(boolean includeFirstAndLast) {
+    List<Class<?>> result = new ArrayList<>(myClassSet.size() + (includeFirstAndLast ? 2 : 0));
+
+    if (includeFirstAndLast && myFirstTestClass != null) {
       result.add(myFirstTestClass);
     }
 
     result.addAll(loadTestSorter().sorted(myClassSet.stream().toList(), TestCaseLoader::getRank));
 
-    if (myLastTestClass != null) {
+    if (includeFirstAndLast && myLastTestClass != null) {
       result.add(myLastTestClass);
     }
 
@@ -600,9 +621,9 @@ public class TestCaseLoader {
 
   // called reflectively from `JUnit5TeamCityRunnerForTestsOnClasspath#createClassNameFilter`
   @SuppressWarnings("unused")
-  public static boolean isClassIncluded(String className) {
-    if (!INCLUDE_UNCONVENTIONALLY_NAMED_TESTS &&
-        !className.endsWith("Test")) {
+  public static boolean isClassNameIncluded(String className) {
+    String classNameWithoutPackage = StringsKt.substringAfterLast(className, '.', className);
+    if (!ClassFinder.isSuitableTestClassName(classNameWithoutPackage, INCLUDE_UNCONVENTIONALLY_NAMED_TESTS)) {
       return false;
     }
     if ("_FirstInSuiteTest".equals(className) || "_LastInSuiteTest".equals(className)) {
@@ -610,7 +631,7 @@ public class TestCaseLoader {
     }
 
     if (ourFilter == null) {
-      ourFilter = calcTestClassFilter("tests/testGroups.properties");
+      ourFilter = calcTestClassFilter(COMMON_TEST_GROUPS_RESOURCE_NAME);
       TestClassesFilter affectedTestsFilter = affectedTestsFilter();
       if (affectedTestsFilter != null) {
         ourFilter = new TestClassesFilter.And(ourFilter, affectedTestsFilter);
@@ -622,9 +643,16 @@ public class TestCaseLoader {
       System.out.println("Initialized tests filter: " + ourFilter);
     }
     return (isIncludingPerformanceTestsRun() || isPerformanceTestsRun() == isPerformanceTest(null, className)) &&
-           // no need to calculate bucket matching (especially that may break fair bucketing), if the test does not match the filter
-           ourFilter.matches(className) &&
-           matchesCurrentBucket(className);
+           ourFilter.matches(className);
+  }
+
+  // called reflectively from `JUnit5TeamCityRunnerForTestsOnClasspath#createPostDiscoveryFilter`
+  @SuppressWarnings("unused")
+  public static boolean isClassIncluded(String className) {
+    // JUnit 5 might rediscover `@Nested` tests if they were previously filtered out by `isClassNameIncluded`,
+    // but their host class was not filtered out. Let's not remove them again based on `ourFilter.matches(className)`,
+    // so not checking for `isClassNameIncluded` here.
+    return matchesCurrentBucket(className);
   }
 
   public void fillTestCases(String rootPackage, List<? extends Path> classesRoots) {

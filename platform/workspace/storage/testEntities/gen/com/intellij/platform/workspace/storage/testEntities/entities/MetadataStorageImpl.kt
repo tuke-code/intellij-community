@@ -11,13 +11,12 @@ import com.intellij.platform.workspace.storage.metadata.model.StorageTypeMetadat
 import com.intellij.platform.workspace.storage.metadata.model.ValueTypeMetadata
 
 object MetadataStorageImpl: MetadataStorageBase() {
-    init {
-
+    override fun initializeMetadata() {
         val primitiveTypeStringNotNullable = ValueTypeMetadata.SimpleType.PrimitiveType(isNullable = false, type = "String")
+        val primitiveTypeListNotNullable = ValueTypeMetadata.SimpleType.PrimitiveType(isNullable = false, type = "List")
         val primitiveTypeBooleanNotNullable = ValueTypeMetadata.SimpleType.PrimitiveType(isNullable = false, type = "Boolean")
         val primitiveTypeIntNotNullable = ValueTypeMetadata.SimpleType.PrimitiveType(isNullable = false, type = "Int")
         val primitiveTypeSetNotNullable = ValueTypeMetadata.SimpleType.PrimitiveType(isNullable = false, type = "Set")
-        val primitiveTypeListNotNullable = ValueTypeMetadata.SimpleType.PrimitiveType(isNullable = false, type = "List")
         val primitiveTypeStringNullable = ValueTypeMetadata.SimpleType.PrimitiveType(isNullable = true, type = "String")
         val primitiveTypeIntNullable = ValueTypeMetadata.SimpleType.PrimitiveType(isNullable = true, type = "Int")
         val primitiveTypeMapNotNullable = ValueTypeMetadata.SimpleType.PrimitiveType(isNullable = false, type = "Map")
@@ -108,6 +107,26 @@ OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = 
 
         typeMetadata = FinalClassMetadata.ClassMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.FacetTestEntitySymbolicId", properties = listOf(OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "presentableName", valueType = primitiveTypeStringNotNullable, withDefault = false),
 OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "name", valueType = primitiveTypeStringNotNullable, withDefault = false)), supertypes = listOf("com.intellij.platform.workspace.storage.SymbolicEntityId"))
+
+        addMetadata(typeMetadata)
+
+        typeMetadata = FinalClassMetadata.ClassMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.ChangedComputablePropEntityId", properties = listOf(OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "presentableName", valueType = primitiveTypeStringNotNullable, withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "text", valueType = primitiveTypeStringNotNullable, withDefault = false)), supertypes = listOf("com.intellij.platform.workspace.storage.SymbolicEntityId"))
+
+        addMetadata(typeMetadata)
+
+        typeMetadata = FinalClassMetadata.ClassMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.ChangedComputablePropsOrderEntityId", properties = listOf(OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "presentableName", valueType = primitiveTypeStringNotNullable, withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "names", valueType = ValueTypeMetadata.ParameterizedType(generics = listOf(primitiveTypeStringNotNullable), primitive = primitiveTypeListNotNullable), withDefault = false)), supertypes = listOf("com.intellij.platform.workspace.storage.SymbolicEntityId"))
+
+        addMetadata(typeMetadata)
+
+        typeMetadata = FinalClassMetadata.ClassMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.ChangedComputablePropEntityId", properties = listOf(OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "presentableName", valueType = primitiveTypeStringNotNullable, withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "texts", valueType = ValueTypeMetadata.ParameterizedType(generics = listOf(primitiveTypeStringNotNullable), primitive = primitiveTypeListNotNullable), withDefault = false)), supertypes = listOf("com.intellij.platform.workspace.storage.SymbolicEntityId"))
+
+        addMetadata(typeMetadata)
+
+        typeMetadata = FinalClassMetadata.ClassMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.ChangedComputablePropsOrderEntityId", properties = listOf(OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "presentableName", valueType = primitiveTypeStringNotNullable, withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "names", valueType = ValueTypeMetadata.ParameterizedType(generics = listOf(primitiveTypeStringNotNullable), primitive = primitiveTypeListNotNullable), withDefault = false)), supertypes = listOf("com.intellij.platform.workspace.storage.SymbolicEntityId"))
 
         addMetadata(typeMetadata)
 
@@ -375,20 +394,16 @@ OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = 
 OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "name", valueType = primitiveTypeStringNotNullable, withDefault = false)), supertypes = listOf("com.intellij.platform.workspace.storage.SymbolicEntityId"))), withDefault = false),
 OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "justData", valueType = primitiveTypeStringNotNullable, withDefault = false)), supertypes = listOf()))), primitive = primitiveTypeListNotNullable), withDefault = false),
 OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "optionalId", valueType = ValueTypeMetadata.SimpleType.CustomType(isNullable = true, typeMetadata = FinalClassMetadata.KnownClass(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.OneSymbolicId")), withDefault = false)), supertypes = listOf()))), primitive = primitiveTypeListNotNullable), withDefault = false)), supertypes = listOf()))), primitive = primitiveTypeListNotNullable), withDefault = false),
-OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "sealedContainer", valueType = ValueTypeMetadata.SimpleType.CustomType(isNullable = false, typeMetadata = ExtendableClassMetadata.AbstractClassMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.SealedContainer", subclasses = listOf(FinalClassMetadata.ClassMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.SealedContainer\$ContainerContainer", properties = listOf(OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "container", valueType = ValueTypeMetadata.ParameterizedType(generics = listOf(ValueTypeMetadata.SimpleType.CustomType(isNullable = false, typeMetadata = FinalClassMetadata.ClassMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.Container", properties = listOf(OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "id", valueType = ValueTypeMetadata.SimpleType.CustomType(isNullable = false, typeMetadata = FinalClassMetadata.ClassMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.OneSymbolicId", properties = listOf(OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "presentableName", valueType = primitiveTypeStringNotNullable, withDefault = false),
-OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "name", valueType = primitiveTypeStringNotNullable, withDefault = false)), supertypes = listOf("com.intellij.platform.workspace.storage.SymbolicEntityId"))), withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "sealedContainer", valueType = ValueTypeMetadata.SimpleType.CustomType(isNullable = false, typeMetadata = ExtendableClassMetadata.AbstractClassMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.SealedContainer", subclasses = listOf(FinalClassMetadata.ClassMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.SealedContainer\$ContainerContainer", properties = listOf(OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "container", valueType = ValueTypeMetadata.ParameterizedType(generics = listOf(ValueTypeMetadata.SimpleType.CustomType(isNullable = false, typeMetadata = FinalClassMetadata.ClassMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.Container", properties = listOf(OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "id", valueType = ValueTypeMetadata.SimpleType.CustomType(isNullable = false, typeMetadata = FinalClassMetadata.KnownClass(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.OneSymbolicId")), withDefault = false),
 OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "justData", valueType = primitiveTypeStringNotNullable, withDefault = false)), supertypes = listOf()))), primitive = primitiveTypeListNotNullable), withDefault = false)), supertypes = listOf("com.intellij.platform.workspace.storage.testEntities.entities.SealedContainer")),
 FinalClassMetadata.ClassMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.SealedContainer\$EmptyContainer", properties = listOf(OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "data", valueType = primitiveTypeStringNotNullable, withDefault = false)), supertypes = listOf("com.intellij.platform.workspace.storage.testEntities.entities.SealedContainer")),
-FinalClassMetadata.ClassMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.SealedContainer\$SmallContainer", properties = listOf(OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "notId", valueType = ValueTypeMetadata.SimpleType.CustomType(isNullable = false, typeMetadata = FinalClassMetadata.ClassMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.OneSymbolicId", properties = listOf(OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "presentableName", valueType = primitiveTypeStringNotNullable, withDefault = false),
-OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "name", valueType = primitiveTypeStringNotNullable, withDefault = false)), supertypes = listOf("com.intellij.platform.workspace.storage.SymbolicEntityId"))), withDefault = false)), supertypes = listOf("com.intellij.platform.workspace.storage.testEntities.entities.SealedContainer")),
+FinalClassMetadata.ClassMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.SealedContainer\$SmallContainer", properties = listOf(OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "notId", valueType = ValueTypeMetadata.SimpleType.CustomType(isNullable = false, typeMetadata = FinalClassMetadata.KnownClass(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.OneSymbolicId")), withDefault = false)), supertypes = listOf("com.intellij.platform.workspace.storage.testEntities.entities.SealedContainer")),
 FinalClassMetadata.ClassMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.SealedContainer\$BigContainer", properties = listOf(OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "id", valueType = ValueTypeMetadata.SimpleType.CustomType(isNullable = false, typeMetadata = FinalClassMetadata.ClassMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.OneSymbolicId", properties = listOf(OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "presentableName", valueType = primitiveTypeStringNotNullable, withDefault = false),
 OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "name", valueType = primitiveTypeStringNotNullable, withDefault = false)), supertypes = listOf("com.intellij.platform.workspace.storage.SymbolicEntityId"))), withDefault = false)), supertypes = listOf("com.intellij.platform.workspace.storage.testEntities.entities.SealedContainer"))), supertypes = listOf())), withDefault = false),
-OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "listSealedContainer", valueType = ValueTypeMetadata.ParameterizedType(generics = listOf(ValueTypeMetadata.SimpleType.CustomType(isNullable = false, typeMetadata = ExtendableClassMetadata.AbstractClassMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.SealedContainer", subclasses = listOf(FinalClassMetadata.ClassMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.SealedContainer\$ContainerContainer", properties = listOf(OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "container", valueType = ValueTypeMetadata.ParameterizedType(generics = listOf(ValueTypeMetadata.SimpleType.CustomType(isNullable = false, typeMetadata = FinalClassMetadata.ClassMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.Container", properties = listOf(OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "id", valueType = ValueTypeMetadata.SimpleType.CustomType(isNullable = false, typeMetadata = FinalClassMetadata.ClassMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.OneSymbolicId", properties = listOf(OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "presentableName", valueType = primitiveTypeStringNotNullable, withDefault = false),
-OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "name", valueType = primitiveTypeStringNotNullable, withDefault = false)), supertypes = listOf("com.intellij.platform.workspace.storage.SymbolicEntityId"))), withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "listSealedContainer", valueType = ValueTypeMetadata.ParameterizedType(generics = listOf(ValueTypeMetadata.SimpleType.CustomType(isNullable = false, typeMetadata = ExtendableClassMetadata.AbstractClassMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.SealedContainer", subclasses = listOf(FinalClassMetadata.ClassMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.SealedContainer\$ContainerContainer", properties = listOf(OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "container", valueType = ValueTypeMetadata.ParameterizedType(generics = listOf(ValueTypeMetadata.SimpleType.CustomType(isNullable = false, typeMetadata = FinalClassMetadata.ClassMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.Container", properties = listOf(OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "id", valueType = ValueTypeMetadata.SimpleType.CustomType(isNullable = false, typeMetadata = FinalClassMetadata.KnownClass(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.OneSymbolicId")), withDefault = false),
 OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "justData", valueType = primitiveTypeStringNotNullable, withDefault = false)), supertypes = listOf()))), primitive = primitiveTypeListNotNullable), withDefault = false)), supertypes = listOf("com.intellij.platform.workspace.storage.testEntities.entities.SealedContainer")),
 FinalClassMetadata.ClassMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.SealedContainer\$EmptyContainer", properties = listOf(OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "data", valueType = primitiveTypeStringNotNullable, withDefault = false)), supertypes = listOf("com.intellij.platform.workspace.storage.testEntities.entities.SealedContainer")),
-FinalClassMetadata.ClassMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.SealedContainer\$SmallContainer", properties = listOf(OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "notId", valueType = ValueTypeMetadata.SimpleType.CustomType(isNullable = false, typeMetadata = FinalClassMetadata.ClassMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.OneSymbolicId", properties = listOf(OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "presentableName", valueType = primitiveTypeStringNotNullable, withDefault = false),
-OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "name", valueType = primitiveTypeStringNotNullable, withDefault = false)), supertypes = listOf("com.intellij.platform.workspace.storage.SymbolicEntityId"))), withDefault = false)), supertypes = listOf("com.intellij.platform.workspace.storage.testEntities.entities.SealedContainer")),
+FinalClassMetadata.ClassMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.SealedContainer\$SmallContainer", properties = listOf(OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "notId", valueType = ValueTypeMetadata.SimpleType.CustomType(isNullable = false, typeMetadata = FinalClassMetadata.KnownClass(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.OneSymbolicId")), withDefault = false)), supertypes = listOf("com.intellij.platform.workspace.storage.testEntities.entities.SealedContainer")),
 FinalClassMetadata.ClassMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.SealedContainer\$BigContainer", properties = listOf(OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "id", valueType = ValueTypeMetadata.SimpleType.CustomType(isNullable = false, typeMetadata = FinalClassMetadata.ClassMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.OneSymbolicId", properties = listOf(OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "presentableName", valueType = primitiveTypeStringNotNullable, withDefault = false),
 OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "name", valueType = primitiveTypeStringNotNullable, withDefault = false)), supertypes = listOf("com.intellij.platform.workspace.storage.SymbolicEntityId"))), withDefault = false)), supertypes = listOf("com.intellij.platform.workspace.storage.testEntities.entities.SealedContainer"))), supertypes = listOf()))), primitive = primitiveTypeListNotNullable), withDefault = false),
 OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "justProperty", valueType = primitiveTypeStringNotNullable, withDefault = false),
@@ -419,12 +434,7 @@ OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = 
 OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "url", valueType = primitiveTypeStringNullable, withDefault = false),
 OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "revision", valueType = primitiveTypeStringNullable, withDefault = false)), supertypes = listOf())), withDefault = false),
 OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "description", valueType = primitiveTypeStringNotNullable, withDefault = true),
-OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "anotherVersion", valueType = primitiveTypeIntNotNullable, withDefault = true),
-OwnPropertyMetadata(isComputable = true, isKey = false, isOpen = false, name = "version", valueType = primitiveTypeIntNotNullable, withDefault = false),
-OwnPropertyMetadata(isComputable = true, isKey = false, isOpen = false, name = "source", valueType = primitiveTypeBooleanNotNullable, withDefault = false),
-OwnPropertyMetadata(isComputable = true, isKey = false, isOpen = false, name = "displayName", valueType = primitiveTypeStringNullable, withDefault = false),
-OwnPropertyMetadata(isComputable = true, isKey = false, isOpen = false, name = "gitUrl", valueType = primitiveTypeStringNullable, withDefault = false),
-OwnPropertyMetadata(isComputable = true, isKey = false, isOpen = false, name = "gitRevision", valueType = primitiveTypeStringNullable, withDefault = false)), extProperties = listOf(), isAbstract = false)
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "anotherVersion", valueType = primitiveTypeIntNotNullable, withDefault = true)), extProperties = listOf(), isAbstract = false)
 
         addMetadata(typeMetadata)
 
@@ -937,5 +947,568 @@ OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = 
 OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "childChild", valueType = ValueTypeMetadata.EntityReference(connectionType = ConnectionId.ConnectionType.ONE_TO_MANY, entityFqName = "com.intellij.platform.workspace.storage.testEntities.entities.XChildChildEntity", isChild = true, isNullable = false), withDefault = false)), extProperties = listOf(), isAbstract = false)
 
         addMetadata(typeMetadata)
+
+        typeMetadata = EntityMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.AnotherOneToManyRefEntity", entityDataFqName = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.AnotherOneToManyRefEntityData", supertypes = listOf("com.intellij.platform.workspace.storage.WorkspaceEntity"), properties = listOf(OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "entitySource", valueType = ValueTypeMetadata.SimpleType.CustomType(isNullable = false, typeMetadata = FinalClassMetadata.KnownClass(fqName = "com.intellij.platform.workspace.storage.EntitySource")), withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "parentEntity", valueType = ValueTypeMetadata.EntityReference(connectionType = ConnectionId.ConnectionType.ONE_TO_MANY, entityFqName = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.OneToManyRefEntity", isChild = false, isNullable = false), withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "version", valueType = primitiveTypeIntNotNullable, withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "someData", valueType = ValueTypeMetadata.SimpleType.CustomType(isNullable = false, typeMetadata = FinalClassMetadata.ClassMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.OneToManyRefDataClass", properties = listOf(OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "list", valueType = ValueTypeMetadata.ParameterizedType(generics = listOf(ValueTypeMetadata.ParameterizedType(generics = listOf(primitiveTypeStringNotNullable), primitive = primitiveTypeSetNotNullable)), primitive = primitiveTypeListNotNullable), withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "value", valueType = primitiveTypeIntNotNullable, withDefault = false)), supertypes = listOf())), withDefault = false)), extProperties = listOf(), isAbstract = false)
+
+        addMetadata(typeMetadata)
+
+        typeMetadata = EntityMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.AnotherOneToOneRefEntity", entityDataFqName = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.AnotherOneToOneRefEntityData", supertypes = listOf("com.intellij.platform.workspace.storage.WorkspaceEntity"), properties = listOf(OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "entitySource", valueType = ValueTypeMetadata.SimpleType.CustomType(isNullable = false, typeMetadata = FinalClassMetadata.KnownClass(fqName = "com.intellij.platform.workspace.storage.EntitySource")), withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "someString", valueType = primitiveTypeStringNotNullable, withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "boolean", valueType = primitiveTypeBooleanNotNullable, withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "parentEntity", valueType = ValueTypeMetadata.EntityReference(connectionType = ConnectionId.ConnectionType.ONE_TO_ONE, entityFqName = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.OneToOneRefEntity", isChild = false, isNullable = false), withDefault = false)), extProperties = listOf(), isAbstract = false)
+
+        addMetadata(typeMetadata)
+
+        typeMetadata = EntityMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.ChangedComputablePropEntity", entityDataFqName = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.ChangedComputablePropEntityData", supertypes = listOf("com.intellij.platform.workspace.storage.WorkspaceEntity",
+"com.intellij.platform.workspace.storage.WorkspaceEntityWithSymbolicId"), properties = listOf(OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "entitySource", valueType = ValueTypeMetadata.SimpleType.CustomType(isNullable = false, typeMetadata = FinalClassMetadata.KnownClass(fqName = "com.intellij.platform.workspace.storage.EntitySource")), withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "text", valueType = primitiveTypeStringNotNullable, withDefault = false),
+OwnPropertyMetadata(isComputable = true, isKey = false, isOpen = false, name = "symbolicId", valueType = ValueTypeMetadata.SimpleType.CustomType(isNullable = false, typeMetadata = FinalClassMetadata.ClassMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.ChangedComputablePropEntityId", properties = listOf(OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "presentableName", valueType = primitiveTypeStringNotNullable, withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "text", valueType = primitiveTypeStringNotNullable, withDefault = false)), supertypes = listOf("com.intellij.platform.workspace.storage.SymbolicEntityId"))), withDefault = false)), extProperties = listOf(), isAbstract = false)
+
+        addMetadata(typeMetadata)
+
+        typeMetadata = EntityMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.ChangedComputablePropsOrderEntity", entityDataFqName = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.ChangedComputablePropsOrderEntityData", supertypes = listOf("com.intellij.platform.workspace.storage.WorkspaceEntity",
+"com.intellij.platform.workspace.storage.WorkspaceEntityWithSymbolicId"), properties = listOf(OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "entitySource", valueType = ValueTypeMetadata.SimpleType.CustomType(isNullable = false, typeMetadata = FinalClassMetadata.KnownClass(fqName = "com.intellij.platform.workspace.storage.EntitySource")), withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "someKey", valueType = primitiveTypeIntNotNullable, withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "names", valueType = ValueTypeMetadata.ParameterizedType(generics = listOf(primitiveTypeStringNotNullable), primitive = primitiveTypeListNotNullable), withDefault = false),
+OwnPropertyMetadata(isComputable = true, isKey = false, isOpen = false, name = "symbolicId", valueType = ValueTypeMetadata.SimpleType.CustomType(isNullable = false, typeMetadata = FinalClassMetadata.ClassMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.ChangedComputablePropsOrderEntityId", properties = listOf(OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "presentableName", valueType = primitiveTypeStringNotNullable, withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "names", valueType = ValueTypeMetadata.ParameterizedType(generics = listOf(primitiveTypeStringNotNullable), primitive = primitiveTypeListNotNullable), withDefault = false)), supertypes = listOf("com.intellij.platform.workspace.storage.SymbolicEntityId"))), withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "value", valueType = primitiveTypeIntNotNullable, withDefault = false)), extProperties = listOf(), isAbstract = false)
+
+        addMetadata(typeMetadata)
+
+        typeMetadata = EntityMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.ChangedEnumNameEntity", entityDataFqName = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.ChangedEnumNameEntityData", supertypes = listOf("com.intellij.platform.workspace.storage.WorkspaceEntity"), properties = listOf(OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "entitySource", valueType = ValueTypeMetadata.SimpleType.CustomType(isNullable = false, typeMetadata = FinalClassMetadata.KnownClass(fqName = "com.intellij.platform.workspace.storage.EntitySource")), withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "someEnum", valueType = ValueTypeMetadata.SimpleType.CustomType(isNullable = false, typeMetadata = FinalClassMetadata.EnumClassMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.ChangedEnumNameEnum", properties = listOf(), supertypes = listOf("kotlin.Enum",
+"kotlin.Comparable",
+"java.io.Serializable"), values = listOf("FIRST",
+"SECOND",
+"THIRD"))), withDefault = false)), extProperties = listOf(), isAbstract = false)
+
+        addMetadata(typeMetadata)
+
+        typeMetadata = EntityMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.ChangedPropsOrderEntity", entityDataFqName = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.ChangedPropsOrderEntityData", supertypes = listOf("com.intellij.platform.workspace.storage.WorkspaceEntity"), properties = listOf(OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "entitySource", valueType = ValueTypeMetadata.SimpleType.CustomType(isNullable = false, typeMetadata = FinalClassMetadata.KnownClass(fqName = "com.intellij.platform.workspace.storage.EntitySource")), withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "version", valueType = primitiveTypeIntNotNullable, withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "string", valueType = primitiveTypeStringNotNullable, withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "list", valueType = ValueTypeMetadata.ParameterizedType(generics = listOf(ValueTypeMetadata.ParameterizedType(generics = listOf(primitiveTypeIntNotNullable), primitive = primitiveTypeSetNotNullable)), primitive = primitiveTypeListNotNullable), withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "data", valueType = ValueTypeMetadata.SimpleType.CustomType(isNullable = false, typeMetadata = FinalClassMetadata.ClassMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.ChangedPropsOrderDataClass", properties = listOf(OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "value", valueType = primitiveTypeIntNotNullable, withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "text", valueType = primitiveTypeStringNotNullable, withDefault = false)), supertypes = listOf())), withDefault = false)), extProperties = listOf(), isAbstract = false)
+
+        addMetadata(typeMetadata)
+
+        typeMetadata = EntityMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.ChangedValueTypeEntity", entityDataFqName = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.ChangedValueTypeEntityData", supertypes = listOf("com.intellij.platform.workspace.storage.WorkspaceEntity"), properties = listOf(OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "entitySource", valueType = ValueTypeMetadata.SimpleType.CustomType(isNullable = false, typeMetadata = FinalClassMetadata.KnownClass(fqName = "com.intellij.platform.workspace.storage.EntitySource")), withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "type", valueType = primitiveTypeStringNotNullable, withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "someKey", valueType = primitiveTypeIntNotNullable, withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "text", valueType = ValueTypeMetadata.ParameterizedType(generics = listOf(primitiveTypeStringNotNullable), primitive = primitiveTypeListNotNullable), withDefault = false)), extProperties = listOf(), isAbstract = false)
+
+        addMetadata(typeMetadata)
+
+        typeMetadata = EntityMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.ComputablePropEntity", entityDataFqName = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.ComputablePropEntityData", supertypes = listOf("com.intellij.platform.workspace.storage.WorkspaceEntity"), properties = listOf(OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "entitySource", valueType = ValueTypeMetadata.SimpleType.CustomType(isNullable = false, typeMetadata = FinalClassMetadata.KnownClass(fqName = "com.intellij.platform.workspace.storage.EntitySource")), withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "list", valueType = ValueTypeMetadata.ParameterizedType(generics = listOf(ValueTypeMetadata.ParameterizedType(generics = listOf(ValueTypeMetadata.ParameterizedType(generics = listOf(primitiveTypeIntNullable), primitive = primitiveTypeListNotNullable),
+primitiveTypeStringNotNullable), primitive = primitiveTypeMapNotNullable)), primitive = primitiveTypeListNotNullable), withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "value", valueType = primitiveTypeIntNotNullable, withDefault = false)), extProperties = listOf(), isAbstract = false)
+
+        addMetadata(typeMetadata)
+
+        typeMetadata = EntityMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.DefaultPropEntity", entityDataFqName = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.DefaultPropEntityData", supertypes = listOf("com.intellij.platform.workspace.storage.WorkspaceEntity"), properties = listOf(OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "entitySource", valueType = ValueTypeMetadata.SimpleType.CustomType(isNullable = false, typeMetadata = FinalClassMetadata.KnownClass(fqName = "com.intellij.platform.workspace.storage.EntitySource")), withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "someString", valueType = primitiveTypeStringNotNullable, withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "someList", valueType = ValueTypeMetadata.ParameterizedType(generics = listOf(primitiveTypeIntNotNullable), primitive = primitiveTypeListNotNullable), withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "constInt", valueType = primitiveTypeIntNotNullable, withDefault = true)), extProperties = listOf(), isAbstract = false)
+
+        addMetadata(typeMetadata)
+
+        typeMetadata = EntityMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.EnumPropsEntity", entityDataFqName = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.EnumPropsEntityData", supertypes = listOf("com.intellij.platform.workspace.storage.WorkspaceEntity"), properties = listOf(OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "entitySource", valueType = ValueTypeMetadata.SimpleType.CustomType(isNullable = false, typeMetadata = FinalClassMetadata.KnownClass(fqName = "com.intellij.platform.workspace.storage.EntitySource")), withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "someEnum", valueType = ValueTypeMetadata.SimpleType.CustomType(isNullable = false, typeMetadata = FinalClassMetadata.EnumClassMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.EnumPropsEnum", properties = listOf(OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "value", valueType = primitiveTypeIntNotNullable, withDefault = false)), supertypes = listOf("kotlin.Enum",
+"kotlin.Comparable",
+"java.io.Serializable"), values = listOf("FIRST",
+"SECOND",
+"THIRD"))), withDefault = false)), extProperties = listOf(), isAbstract = false)
+
+        addMetadata(typeMetadata)
+
+        typeMetadata = EntityMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.KeyPropEntity", entityDataFqName = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.KeyPropEntityData", supertypes = listOf("com.intellij.platform.workspace.storage.WorkspaceEntity"), properties = listOf(OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "entitySource", valueType = ValueTypeMetadata.SimpleType.CustomType(isNullable = false, typeMetadata = FinalClassMetadata.KnownClass(fqName = "com.intellij.platform.workspace.storage.EntitySource")), withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "someInt", valueType = primitiveTypeIntNotNullable, withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "text", valueType = primitiveTypeStringNotNullable, withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = true, isOpen = false, name = "url", valueType = ValueTypeMetadata.SimpleType.CustomType(isNullable = false, typeMetadata = FinalClassMetadata.KnownClass(fqName = "com.intellij.platform.workspace.storage.url.VirtualFileUrl")), withDefault = false)), extProperties = listOf(), isAbstract = false)
+
+        addMetadata(typeMetadata)
+
+        typeMetadata = EntityMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.NotNullToNullEntity", entityDataFqName = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.NotNullToNullEntityData", supertypes = listOf("com.intellij.platform.workspace.storage.WorkspaceEntity"), properties = listOf(OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "entitySource", valueType = ValueTypeMetadata.SimpleType.CustomType(isNullable = false, typeMetadata = FinalClassMetadata.KnownClass(fqName = "com.intellij.platform.workspace.storage.EntitySource")), withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "nullInt", valueType = primitiveTypeIntNullable, withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "notNullString", valueType = primitiveTypeStringNotNullable, withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "notNullList", valueType = ValueTypeMetadata.ParameterizedType(generics = listOf(primitiveTypeIntNotNullable), primitive = primitiveTypeListNotNullable), withDefault = false)), extProperties = listOf(), isAbstract = false)
+
+        addMetadata(typeMetadata)
+
+        typeMetadata = EntityMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.NullToNotNullEntity", entityDataFqName = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.NullToNotNullEntityData", supertypes = listOf("com.intellij.platform.workspace.storage.WorkspaceEntity"), properties = listOf(OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "entitySource", valueType = ValueTypeMetadata.SimpleType.CustomType(isNullable = false, typeMetadata = FinalClassMetadata.KnownClass(fqName = "com.intellij.platform.workspace.storage.EntitySource")), withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "nullString", valueType = primitiveTypeStringNullable, withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "notNullBoolean", valueType = primitiveTypeBooleanNotNullable, withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "notNullInt", valueType = primitiveTypeIntNotNullable, withDefault = false)), extProperties = listOf(), isAbstract = false)
+
+        addMetadata(typeMetadata)
+
+        typeMetadata = EntityMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.OneToManyRefEntity", entityDataFqName = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.OneToManyRefEntityData", supertypes = listOf("com.intellij.platform.workspace.storage.WorkspaceEntity"), properties = listOf(OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "entitySource", valueType = ValueTypeMetadata.SimpleType.CustomType(isNullable = false, typeMetadata = FinalClassMetadata.KnownClass(fqName = "com.intellij.platform.workspace.storage.EntitySource")), withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "someData", valueType = ValueTypeMetadata.SimpleType.CustomType(isNullable = false, typeMetadata = FinalClassMetadata.ClassMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.OneToManyRefDataClass", properties = listOf(OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "list", valueType = ValueTypeMetadata.ParameterizedType(generics = listOf(ValueTypeMetadata.ParameterizedType(generics = listOf(primitiveTypeStringNotNullable), primitive = primitiveTypeSetNotNullable)), primitive = primitiveTypeListNotNullable), withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "value", valueType = primitiveTypeIntNotNullable, withDefault = false)), supertypes = listOf())), withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "anotherEntity", valueType = ValueTypeMetadata.EntityReference(connectionType = ConnectionId.ConnectionType.ONE_TO_MANY, entityFqName = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.AnotherOneToManyRefEntity", isChild = true, isNullable = false), withDefault = false)), extProperties = listOf(), isAbstract = false)
+
+        addMetadata(typeMetadata)
+
+        typeMetadata = EntityMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.OneToOneRefEntity", entityDataFqName = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.OneToOneRefEntityData", supertypes = listOf("com.intellij.platform.workspace.storage.WorkspaceEntity"), properties = listOf(OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "entitySource", valueType = ValueTypeMetadata.SimpleType.CustomType(isNullable = false, typeMetadata = FinalClassMetadata.KnownClass(fqName = "com.intellij.platform.workspace.storage.EntitySource")), withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "version", valueType = primitiveTypeIntNotNullable, withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "text", valueType = primitiveTypeStringNotNullable, withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "anotherEntity", valueType = ValueTypeMetadata.EntityReference(connectionType = ConnectionId.ConnectionType.ONE_TO_ONE, entityFqName = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.AnotherOneToOneRefEntity", isChild = true, isNullable = true), withDefault = false)), extProperties = listOf(), isAbstract = false)
+
+        addMetadata(typeMetadata)
+
+        typeMetadata = EntityMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.SimpleObjectsEntity", entityDataFqName = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.SimpleObjectsEntityData", supertypes = listOf("com.intellij.platform.workspace.storage.WorkspaceEntity"), properties = listOf(OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "entitySource", valueType = ValueTypeMetadata.SimpleType.CustomType(isNullable = false, typeMetadata = FinalClassMetadata.KnownClass(fqName = "com.intellij.platform.workspace.storage.EntitySource")), withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "someData", valueType = ValueTypeMetadata.SimpleType.CustomType(isNullable = false, typeMetadata = ExtendableClassMetadata.AbstractClassMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.SimpleObjectsSealedClass", subclasses = listOf(FinalClassMetadata.ObjectMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.SimpleObjectsSealedClass\$SecondSimpleObjectsSealedClassObject", properties = listOf(OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "list", valueType = ValueTypeMetadata.ParameterizedType(generics = listOf(primitiveTypeStringNotNullable), primitive = primitiveTypeListNotNullable), withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "id", valueType = primitiveTypeIntNotNullable, withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "data", valueType = primitiveTypeStringNotNullable, withDefault = false)), supertypes = listOf("com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.SimpleObjectsSealedClass")),
+FinalClassMetadata.ObjectMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.SimpleObjectsSealedClass\$FirstSimpleObjectsSealedClassObject", properties = listOf(OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "value", valueType = primitiveTypeIntNotNullable, withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "id", valueType = primitiveTypeIntNotNullable, withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "data", valueType = primitiveTypeStringNotNullable, withDefault = false)), supertypes = listOf("com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.SimpleObjectsSealedClass"))), supertypes = listOf())), withDefault = false)), extProperties = listOf(), isAbstract = false)
+
+        addMetadata(typeMetadata)
+
+        typeMetadata = EntityMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.SimplePropsEntity", entityDataFqName = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.SimplePropsEntityData", supertypes = listOf("com.intellij.platform.workspace.storage.WorkspaceEntity"), properties = listOf(OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "entitySource", valueType = ValueTypeMetadata.SimpleType.CustomType(isNullable = false, typeMetadata = FinalClassMetadata.KnownClass(fqName = "com.intellij.platform.workspace.storage.EntitySource")), withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "text", valueType = primitiveTypeStringNotNullable, withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "list", valueType = ValueTypeMetadata.ParameterizedType(generics = listOf(primitiveTypeIntNotNullable), primitive = primitiveTypeListNotNullable), withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "set", valueType = ValueTypeMetadata.ParameterizedType(generics = listOf(ValueTypeMetadata.ParameterizedType(generics = listOf(primitiveTypeStringNotNullable), primitive = primitiveTypeListNotNullable)), primitive = primitiveTypeSetNotNullable), withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "map", valueType = ValueTypeMetadata.ParameterizedType(generics = listOf(ValueTypeMetadata.ParameterizedType(generics = listOf(primitiveTypeIntNotNullable), primitive = primitiveTypeSetNotNullable),
+ValueTypeMetadata.ParameterizedType(generics = listOf(primitiveTypeStringNotNullable), primitive = primitiveTypeListNotNullable)), primitive = primitiveTypeMapNotNullable), withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "bool", valueType = primitiveTypeBooleanNotNullable, withDefault = false)), extProperties = listOf(), isAbstract = false)
+
+        addMetadata(typeMetadata)
+
+        typeMetadata = EntityMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.SimpleSealedClassEntity", entityDataFqName = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.SimpleSealedClassEntityData", supertypes = listOf("com.intellij.platform.workspace.storage.WorkspaceEntity"), properties = listOf(OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "entitySource", valueType = ValueTypeMetadata.SimpleType.CustomType(isNullable = false, typeMetadata = FinalClassMetadata.KnownClass(fqName = "com.intellij.platform.workspace.storage.EntitySource")), withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "text", valueType = primitiveTypeStringNotNullable, withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "someData", valueType = ValueTypeMetadata.SimpleType.CustomType(isNullable = false, typeMetadata = ExtendableClassMetadata.AbstractClassMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.SimpleSealedClass", subclasses = listOf(FinalClassMetadata.ClassMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.SimpleSealedClass\$SecondKeyPropDataClass", properties = listOf(OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "type", valueType = primitiveTypeStringNotNullable, withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "value", valueType = primitiveTypeIntNotNullable, withDefault = false)), supertypes = listOf("com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.SimpleSealedClass")),
+FinalClassMetadata.ClassMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.SimpleSealedClass\$FirstKeyPropDataClass", properties = listOf(OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "type", valueType = primitiveTypeStringNotNullable, withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "text", valueType = primitiveTypeStringNotNullable, withDefault = false)), supertypes = listOf("com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.SimpleSealedClass"))), supertypes = listOf())), withDefault = false)), extProperties = listOf(), isAbstract = false)
+
+        addMetadata(typeMetadata)
+
+        typeMetadata = EntityMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.SubsetEnumEntity", entityDataFqName = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.SubsetEnumEntityData", supertypes = listOf("com.intellij.platform.workspace.storage.WorkspaceEntity"), properties = listOf(OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "entitySource", valueType = ValueTypeMetadata.SimpleType.CustomType(isNullable = false, typeMetadata = FinalClassMetadata.KnownClass(fqName = "com.intellij.platform.workspace.storage.EntitySource")), withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "someEnum", valueType = ValueTypeMetadata.SimpleType.CustomType(isNullable = false, typeMetadata = FinalClassMetadata.EnumClassMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.SubsetEnumEnum", properties = listOf(OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "type", valueType = primitiveTypeStringNotNullable, withDefault = false)), supertypes = listOf("kotlin.Enum",
+"kotlin.Comparable",
+"java.io.Serializable"), values = listOf("FIRST",
+"FIFTH",
+"THIRD"))), withDefault = false)), extProperties = listOf(), isAbstract = false)
+
+        addMetadata(typeMetadata)
+
+        typeMetadata = EntityMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.SubsetSealedClassEntity", entityDataFqName = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.SubsetSealedClassEntityData", supertypes = listOf("com.intellij.platform.workspace.storage.WorkspaceEntity"), properties = listOf(OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "entitySource", valueType = ValueTypeMetadata.SimpleType.CustomType(isNullable = false, typeMetadata = FinalClassMetadata.KnownClass(fqName = "com.intellij.platform.workspace.storage.EntitySource")), withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "someData", valueType = ValueTypeMetadata.SimpleType.CustomType(isNullable = false, typeMetadata = ExtendableClassMetadata.AbstractClassMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.SubsetSealedClass", subclasses = listOf(FinalClassMetadata.ClassMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.SubsetSealedClass\$SecondSubsetSealedClassDataClass", properties = listOf(OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "name", valueType = primitiveTypeStringNotNullable, withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "list", valueType = ValueTypeMetadata.ParameterizedType(generics = listOf(primitiveTypeIntNotNullable), primitive = primitiveTypeListNotNullable), withDefault = false)), supertypes = listOf("com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.SubsetSealedClass")),
+FinalClassMetadata.ClassMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.SubsetSealedClass\$FirstSubsetSealedClassDataClass", properties = listOf(OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "name", valueType = primitiveTypeStringNotNullable, withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "string", valueType = primitiveTypeStringNotNullable, withDefault = false)), supertypes = listOf("com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.SubsetSealedClass")),
+FinalClassMetadata.ObjectMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.SubsetSealedClass\$FirstSubsetSealedClassObject", properties = listOf(OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "name", valueType = primitiveTypeStringNotNullable, withDefault = false)), supertypes = listOf("com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.SubsetSealedClass"))), supertypes = listOf())), withDefault = false)), extProperties = listOf(), isAbstract = false)
+
+        addMetadata(typeMetadata)
+
+        typeMetadata = EntityMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.AnotherOneToManyRefEntity", entityDataFqName = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.AnotherOneToManyRefEntityData", supertypes = listOf("com.intellij.platform.workspace.storage.WorkspaceEntity"), properties = listOf(OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "entitySource", valueType = ValueTypeMetadata.SimpleType.CustomType(isNullable = false, typeMetadata = FinalClassMetadata.KnownClass(fqName = "com.intellij.platform.workspace.storage.EntitySource")), withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "parentEntity", valueType = ValueTypeMetadata.EntityReference(connectionType = ConnectionId.ConnectionType.ONE_TO_ONE, entityFqName = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.OneToManyRefEntity", isChild = false, isNullable = false), withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "version", valueType = primitiveTypeIntNotNullable, withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "someData", valueType = ValueTypeMetadata.SimpleType.CustomType(isNullable = false, typeMetadata = FinalClassMetadata.ClassMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.OneToManyRefDataClass", properties = listOf(OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "list", valueType = ValueTypeMetadata.ParameterizedType(generics = listOf(ValueTypeMetadata.ParameterizedType(generics = listOf(primitiveTypeStringNotNullable), primitive = primitiveTypeSetNotNullable)), primitive = primitiveTypeListNotNullable), withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "value", valueType = primitiveTypeIntNotNullable, withDefault = false)), supertypes = listOf())), withDefault = false)), extProperties = listOf(), isAbstract = false)
+
+        addMetadata(typeMetadata)
+
+        typeMetadata = EntityMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.AnotherOneToOneRefEntity", entityDataFqName = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.AnotherOneToOneRefEntityData", supertypes = listOf("com.intellij.platform.workspace.storage.WorkspaceEntity"), properties = listOf(OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "entitySource", valueType = ValueTypeMetadata.SimpleType.CustomType(isNullable = false, typeMetadata = FinalClassMetadata.KnownClass(fqName = "com.intellij.platform.workspace.storage.EntitySource")), withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "someString", valueType = primitiveTypeStringNotNullable, withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "boolean", valueType = primitiveTypeBooleanNotNullable, withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "parentEntity", valueType = ValueTypeMetadata.EntityReference(connectionType = ConnectionId.ConnectionType.ONE_TO_MANY, entityFqName = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.OneToOneRefEntity", isChild = false, isNullable = false), withDefault = false)), extProperties = listOf(), isAbstract = false)
+
+        addMetadata(typeMetadata)
+
+        typeMetadata = EntityMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.ChangedComputablePropEntity", entityDataFqName = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.ChangedComputablePropEntityData", supertypes = listOf("com.intellij.platform.workspace.storage.WorkspaceEntity",
+"com.intellij.platform.workspace.storage.WorkspaceEntityWithSymbolicId"), properties = listOf(OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "entitySource", valueType = ValueTypeMetadata.SimpleType.CustomType(isNullable = false, typeMetadata = FinalClassMetadata.KnownClass(fqName = "com.intellij.platform.workspace.storage.EntitySource")), withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "text", valueType = primitiveTypeStringNotNullable, withDefault = false),
+OwnPropertyMetadata(isComputable = true, isKey = false, isOpen = false, name = "symbolicId", valueType = ValueTypeMetadata.SimpleType.CustomType(isNullable = false, typeMetadata = FinalClassMetadata.ClassMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.ChangedComputablePropEntityId", properties = listOf(OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "presentableName", valueType = primitiveTypeStringNotNullable, withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "texts", valueType = ValueTypeMetadata.ParameterizedType(generics = listOf(primitiveTypeStringNotNullable), primitive = primitiveTypeListNotNullable), withDefault = false)), supertypes = listOf("com.intellij.platform.workspace.storage.SymbolicEntityId"))), withDefault = false)), extProperties = listOf(), isAbstract = false)
+
+        addMetadata(typeMetadata)
+
+        typeMetadata = EntityMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.ChangedComputablePropsOrderEntity", entityDataFqName = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.ChangedComputablePropsOrderEntityData", supertypes = listOf("com.intellij.platform.workspace.storage.WorkspaceEntity",
+"com.intellij.platform.workspace.storage.WorkspaceEntityWithSymbolicId"), properties = listOf(OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "entitySource", valueType = ValueTypeMetadata.SimpleType.CustomType(isNullable = false, typeMetadata = FinalClassMetadata.KnownClass(fqName = "com.intellij.platform.workspace.storage.EntitySource")), withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "someKey", valueType = primitiveTypeIntNotNullable, withDefault = false),
+OwnPropertyMetadata(isComputable = true, isKey = false, isOpen = false, name = "symbolicId", valueType = ValueTypeMetadata.SimpleType.CustomType(isNullable = false, typeMetadata = FinalClassMetadata.ClassMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.ChangedComputablePropsOrderEntityId", properties = listOf(OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "presentableName", valueType = primitiveTypeStringNotNullable, withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "names", valueType = ValueTypeMetadata.ParameterizedType(generics = listOf(primitiveTypeStringNotNullable), primitive = primitiveTypeListNotNullable), withDefault = false)), supertypes = listOf("com.intellij.platform.workspace.storage.SymbolicEntityId"))), withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "names", valueType = ValueTypeMetadata.ParameterizedType(generics = listOf(primitiveTypeStringNotNullable), primitive = primitiveTypeListNotNullable), withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "value", valueType = primitiveTypeIntNotNullable, withDefault = false)), extProperties = listOf(), isAbstract = false)
+
+        addMetadata(typeMetadata)
+
+        typeMetadata = EntityMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.ChangedEnumNameEntity", entityDataFqName = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.ChangedEnumNameEntityData", supertypes = listOf("com.intellij.platform.workspace.storage.WorkspaceEntity"), properties = listOf(OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "entitySource", valueType = ValueTypeMetadata.SimpleType.CustomType(isNullable = false, typeMetadata = FinalClassMetadata.KnownClass(fqName = "com.intellij.platform.workspace.storage.EntitySource")), withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "someEnum", valueType = ValueTypeMetadata.SimpleType.CustomType(isNullable = false, typeMetadata = FinalClassMetadata.EnumClassMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.ChangedEnumNameEnum", properties = listOf(), supertypes = listOf("kotlin.Enum",
+"kotlin.Comparable",
+"java.io.Serializable"), values = listOf("FIRST",
+"SECOND",
+"NOT_THIRD"))), withDefault = false)), extProperties = listOf(), isAbstract = false)
+
+        addMetadata(typeMetadata)
+
+        typeMetadata = EntityMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.ChangedPropsOrderEntity", entityDataFqName = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.ChangedPropsOrderEntityData", supertypes = listOf("com.intellij.platform.workspace.storage.WorkspaceEntity"), properties = listOf(OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "entitySource", valueType = ValueTypeMetadata.SimpleType.CustomType(isNullable = false, typeMetadata = FinalClassMetadata.KnownClass(fqName = "com.intellij.platform.workspace.storage.EntitySource")), withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "version", valueType = primitiveTypeIntNotNullable, withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "string", valueType = primitiveTypeStringNotNullable, withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "data", valueType = ValueTypeMetadata.SimpleType.CustomType(isNullable = false, typeMetadata = FinalClassMetadata.ClassMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.ChangedPropsOrderDataClass", properties = listOf(OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "value", valueType = primitiveTypeIntNotNullable, withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "text", valueType = primitiveTypeStringNotNullable, withDefault = false)), supertypes = listOf())), withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "list", valueType = ValueTypeMetadata.ParameterizedType(generics = listOf(ValueTypeMetadata.ParameterizedType(generics = listOf(primitiveTypeIntNotNullable), primitive = primitiveTypeSetNotNullable)), primitive = primitiveTypeListNotNullable), withDefault = false)), extProperties = listOf(), isAbstract = false)
+
+        addMetadata(typeMetadata)
+
+        typeMetadata = EntityMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.ChangedValueTypeEntity", entityDataFqName = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.ChangedValueTypeEntityData", supertypes = listOf("com.intellij.platform.workspace.storage.WorkspaceEntity"), properties = listOf(OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "entitySource", valueType = ValueTypeMetadata.SimpleType.CustomType(isNullable = false, typeMetadata = FinalClassMetadata.KnownClass(fqName = "com.intellij.platform.workspace.storage.EntitySource")), withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "type", valueType = primitiveTypeStringNotNullable, withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "someKey", valueType = primitiveTypeStringNotNullable, withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "text", valueType = ValueTypeMetadata.ParameterizedType(generics = listOf(primitiveTypeStringNotNullable), primitive = primitiveTypeListNotNullable), withDefault = false)), extProperties = listOf(), isAbstract = false)
+
+        addMetadata(typeMetadata)
+
+        typeMetadata = EntityMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.ComputablePropEntity", entityDataFqName = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.ComputablePropEntityData", supertypes = listOf("com.intellij.platform.workspace.storage.WorkspaceEntity"), properties = listOf(OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "entitySource", valueType = ValueTypeMetadata.SimpleType.CustomType(isNullable = false, typeMetadata = FinalClassMetadata.KnownClass(fqName = "com.intellij.platform.workspace.storage.EntitySource")), withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "list", valueType = ValueTypeMetadata.ParameterizedType(generics = listOf(ValueTypeMetadata.ParameterizedType(generics = listOf(ValueTypeMetadata.ParameterizedType(generics = listOf(primitiveTypeIntNullable), primitive = primitiveTypeListNotNullable),
+primitiveTypeStringNotNullable), primitive = primitiveTypeMapNotNullable)), primitive = primitiveTypeListNotNullable), withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "value", valueType = primitiveTypeIntNotNullable, withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "computableText", valueType = primitiveTypeStringNotNullable, withDefault = false)), extProperties = listOf(), isAbstract = false)
+
+        addMetadata(typeMetadata)
+
+        typeMetadata = EntityMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.DefaultPropEntity", entityDataFqName = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.DefaultPropEntityData", supertypes = listOf("com.intellij.platform.workspace.storage.WorkspaceEntity"), properties = listOf(OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "entitySource", valueType = ValueTypeMetadata.SimpleType.CustomType(isNullable = false, typeMetadata = FinalClassMetadata.KnownClass(fqName = "com.intellij.platform.workspace.storage.EntitySource")), withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "someString", valueType = primitiveTypeStringNotNullable, withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "someList", valueType = ValueTypeMetadata.ParameterizedType(generics = listOf(primitiveTypeIntNotNullable), primitive = primitiveTypeListNotNullable), withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "constInt", valueType = primitiveTypeIntNotNullable, withDefault = false)), extProperties = listOf(), isAbstract = false)
+
+        addMetadata(typeMetadata)
+
+        typeMetadata = EntityMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.EnumPropsEntity", entityDataFqName = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.EnumPropsEntityData", supertypes = listOf("com.intellij.platform.workspace.storage.WorkspaceEntity"), properties = listOf(OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "entitySource", valueType = ValueTypeMetadata.SimpleType.CustomType(isNullable = false, typeMetadata = FinalClassMetadata.KnownClass(fqName = "com.intellij.platform.workspace.storage.EntitySource")), withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "someEnum", valueType = ValueTypeMetadata.SimpleType.CustomType(isNullable = false, typeMetadata = FinalClassMetadata.EnumClassMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.EnumPropsEnum", properties = listOf(OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "value", valueType = primitiveTypeIntNotNullable, withDefault = false)), supertypes = listOf("kotlin.Enum",
+"kotlin.Comparable",
+"java.io.Serializable"), values = listOf("FIRST",
+"SECOND",
+"THIRD"))), withDefault = false)), extProperties = listOf(), isAbstract = false)
+
+        addMetadata(typeMetadata)
+
+        typeMetadata = EntityMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.KeyPropEntity", entityDataFqName = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.KeyPropEntityData", supertypes = listOf("com.intellij.platform.workspace.storage.WorkspaceEntity"), properties = listOf(OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "entitySource", valueType = ValueTypeMetadata.SimpleType.CustomType(isNullable = false, typeMetadata = FinalClassMetadata.KnownClass(fqName = "com.intellij.platform.workspace.storage.EntitySource")), withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "someInt", valueType = primitiveTypeIntNotNullable, withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "text", valueType = primitiveTypeStringNotNullable, withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "url", valueType = ValueTypeMetadata.SimpleType.CustomType(isNullable = false, typeMetadata = FinalClassMetadata.KnownClass(fqName = "com.intellij.platform.workspace.storage.url.VirtualFileUrl")), withDefault = false)), extProperties = listOf(), isAbstract = false)
+
+        addMetadata(typeMetadata)
+
+        typeMetadata = EntityMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.NotNullToNullEntity", entityDataFqName = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.NotNullToNullEntityData", supertypes = listOf("com.intellij.platform.workspace.storage.WorkspaceEntity"), properties = listOf(OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "entitySource", valueType = ValueTypeMetadata.SimpleType.CustomType(isNullable = false, typeMetadata = FinalClassMetadata.KnownClass(fqName = "com.intellij.platform.workspace.storage.EntitySource")), withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "nullInt", valueType = primitiveTypeIntNullable, withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "notNullString", valueType = primitiveTypeStringNullable, withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "notNullList", valueType = ValueTypeMetadata.ParameterizedType(generics = listOf(primitiveTypeIntNotNullable), primitive = primitiveTypeListNotNullable), withDefault = false)), extProperties = listOf(), isAbstract = false)
+
+        addMetadata(typeMetadata)
+
+        typeMetadata = EntityMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.NullToNotNullEntity", entityDataFqName = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.NullToNotNullEntityData", supertypes = listOf("com.intellij.platform.workspace.storage.WorkspaceEntity"), properties = listOf(OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "entitySource", valueType = ValueTypeMetadata.SimpleType.CustomType(isNullable = false, typeMetadata = FinalClassMetadata.KnownClass(fqName = "com.intellij.platform.workspace.storage.EntitySource")), withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "nullString", valueType = primitiveTypeStringNotNullable, withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "notNullBoolean", valueType = primitiveTypeBooleanNotNullable, withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "notNullInt", valueType = primitiveTypeIntNotNullable, withDefault = false)), extProperties = listOf(), isAbstract = false)
+
+        addMetadata(typeMetadata)
+
+        typeMetadata = EntityMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.OneToManyRefEntity", entityDataFqName = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.OneToManyRefEntityData", supertypes = listOf("com.intellij.platform.workspace.storage.WorkspaceEntity"), properties = listOf(OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "entitySource", valueType = ValueTypeMetadata.SimpleType.CustomType(isNullable = false, typeMetadata = FinalClassMetadata.KnownClass(fqName = "com.intellij.platform.workspace.storage.EntitySource")), withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "someData", valueType = ValueTypeMetadata.SimpleType.CustomType(isNullable = false, typeMetadata = FinalClassMetadata.ClassMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.OneToManyRefDataClass", properties = listOf(OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "list", valueType = ValueTypeMetadata.ParameterizedType(generics = listOf(ValueTypeMetadata.ParameterizedType(generics = listOf(primitiveTypeStringNotNullable), primitive = primitiveTypeSetNotNullable)), primitive = primitiveTypeListNotNullable), withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "value", valueType = primitiveTypeIntNotNullable, withDefault = false)), supertypes = listOf())), withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "anotherEntity", valueType = ValueTypeMetadata.EntityReference(connectionType = ConnectionId.ConnectionType.ONE_TO_ONE, entityFqName = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.AnotherOneToManyRefEntity", isChild = true, isNullable = true), withDefault = false)), extProperties = listOf(), isAbstract = false)
+
+        addMetadata(typeMetadata)
+
+        typeMetadata = EntityMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.OneToOneRefEntity", entityDataFqName = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.OneToOneRefEntityData", supertypes = listOf("com.intellij.platform.workspace.storage.WorkspaceEntity"), properties = listOf(OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "entitySource", valueType = ValueTypeMetadata.SimpleType.CustomType(isNullable = false, typeMetadata = FinalClassMetadata.KnownClass(fqName = "com.intellij.platform.workspace.storage.EntitySource")), withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "version", valueType = primitiveTypeIntNotNullable, withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "text", valueType = primitiveTypeStringNotNullable, withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "anotherEntity", valueType = ValueTypeMetadata.EntityReference(connectionType = ConnectionId.ConnectionType.ONE_TO_MANY, entityFqName = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.AnotherOneToOneRefEntity", isChild = true, isNullable = false), withDefault = false)), extProperties = listOf(), isAbstract = false)
+
+        addMetadata(typeMetadata)
+
+        typeMetadata = EntityMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.SimpleObjectsEntity", entityDataFqName = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.SimpleObjectsEntityData", supertypes = listOf("com.intellij.platform.workspace.storage.WorkspaceEntity"), properties = listOf(OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "entitySource", valueType = ValueTypeMetadata.SimpleType.CustomType(isNullable = false, typeMetadata = FinalClassMetadata.KnownClass(fqName = "com.intellij.platform.workspace.storage.EntitySource")), withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "someData", valueType = ValueTypeMetadata.SimpleType.CustomType(isNullable = false, typeMetadata = ExtendableClassMetadata.AbstractClassMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.SimpleObjectsSealedClass", subclasses = listOf(FinalClassMetadata.ObjectMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.SimpleObjectsSealedClass\$SecondSimpleObjectsSealedClassObject", properties = listOf(OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "list", valueType = ValueTypeMetadata.ParameterizedType(generics = listOf(primitiveTypeStringNotNullable), primitive = primitiveTypeListNotNullable), withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "listSize", valueType = primitiveTypeIntNotNullable, withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "id", valueType = primitiveTypeIntNotNullable, withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "data", valueType = primitiveTypeStringNotNullable, withDefault = false)), supertypes = listOf("com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.SimpleObjectsSealedClass")),
+FinalClassMetadata.ObjectMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.SimpleObjectsSealedClass\$FirstSimpleObjectsSealedClassObject", properties = listOf(OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "value", valueType = primitiveTypeIntNotNullable, withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "id", valueType = primitiveTypeIntNotNullable, withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "data", valueType = primitiveTypeStringNotNullable, withDefault = false)), supertypes = listOf("com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.SimpleObjectsSealedClass"))), supertypes = listOf())), withDefault = false)), extProperties = listOf(), isAbstract = false)
+
+        addMetadata(typeMetadata)
+
+        typeMetadata = EntityMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.SimplePropsEntity", entityDataFqName = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.SimplePropsEntityData", supertypes = listOf("com.intellij.platform.workspace.storage.WorkspaceEntity"), properties = listOf(OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "entitySource", valueType = ValueTypeMetadata.SimpleType.CustomType(isNullable = false, typeMetadata = FinalClassMetadata.KnownClass(fqName = "com.intellij.platform.workspace.storage.EntitySource")), withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "text", valueType = primitiveTypeStringNotNullable, withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "list", valueType = ValueTypeMetadata.ParameterizedType(generics = listOf(primitiveTypeIntNotNullable), primitive = primitiveTypeListNotNullable), withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "set", valueType = ValueTypeMetadata.ParameterizedType(generics = listOf(ValueTypeMetadata.ParameterizedType(generics = listOf(primitiveTypeStringNotNullable), primitive = primitiveTypeListNotNullable)), primitive = primitiveTypeSetNotNullable), withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "map", valueType = ValueTypeMetadata.ParameterizedType(generics = listOf(ValueTypeMetadata.ParameterizedType(generics = listOf(primitiveTypeStringNotNullable), primitive = primitiveTypeSetNotNullable),
+ValueTypeMetadata.ParameterizedType(generics = listOf(primitiveTypeStringNotNullable), primitive = primitiveTypeListNotNullable)), primitive = primitiveTypeMapNotNullable), withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "bool", valueType = primitiveTypeBooleanNotNullable, withDefault = false)), extProperties = listOf(), isAbstract = false)
+
+        addMetadata(typeMetadata)
+
+        typeMetadata = EntityMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.SimpleSealedClassEntity", entityDataFqName = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.SimpleSealedClassEntityData", supertypes = listOf("com.intellij.platform.workspace.storage.WorkspaceEntity"), properties = listOf(OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "entitySource", valueType = ValueTypeMetadata.SimpleType.CustomType(isNullable = false, typeMetadata = FinalClassMetadata.KnownClass(fqName = "com.intellij.platform.workspace.storage.EntitySource")), withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "text", valueType = primitiveTypeStringNotNullable, withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "someData", valueType = ValueTypeMetadata.SimpleType.CustomType(isNullable = false, typeMetadata = ExtendableClassMetadata.AbstractClassMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.SimpleSealedClass", subclasses = listOf(FinalClassMetadata.ClassMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.SimpleSealedClass\$SecondKeyPropDataClass", properties = listOf(OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "type", valueType = primitiveTypeStringNotNullable, withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "value", valueType = primitiveTypeIntNotNullable, withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "list", valueType = ValueTypeMetadata.ParameterizedType(generics = listOf(primitiveTypeStringNotNullable), primitive = primitiveTypeListNotNullable), withDefault = false)), supertypes = listOf("com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.SimpleSealedClass")),
+FinalClassMetadata.ClassMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.SimpleSealedClass\$FirstKeyPropDataClass", properties = listOf(OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "type", valueType = primitiveTypeStringNotNullable, withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "text", valueType = primitiveTypeStringNotNullable, withDefault = false)), supertypes = listOf("com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.SimpleSealedClass"))), supertypes = listOf())), withDefault = false)), extProperties = listOf(), isAbstract = false)
+
+        addMetadata(typeMetadata)
+
+        typeMetadata = EntityMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.SubsetEnumEntity", entityDataFqName = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.SubsetEnumEntityData", supertypes = listOf("com.intellij.platform.workspace.storage.WorkspaceEntity"), properties = listOf(OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "entitySource", valueType = ValueTypeMetadata.SimpleType.CustomType(isNullable = false, typeMetadata = FinalClassMetadata.KnownClass(fqName = "com.intellij.platform.workspace.storage.EntitySource")), withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "someEnum", valueType = ValueTypeMetadata.SimpleType.CustomType(isNullable = false, typeMetadata = FinalClassMetadata.EnumClassMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.SubsetEnumEnum", properties = listOf(OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "type", valueType = primitiveTypeStringNotNullable, withDefault = false)), supertypes = listOf("kotlin.Enum",
+"kotlin.Comparable",
+"java.io.Serializable"), values = listOf("FIRST",
+"SECOND",
+"THIRD",
+"FOURTH",
+"FIFTH"))), withDefault = false)), extProperties = listOf(), isAbstract = false)
+
+        addMetadata(typeMetadata)
+
+        typeMetadata = EntityMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.SubsetSealedClassEntity", entityDataFqName = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.SubsetSealedClassEntityData", supertypes = listOf("com.intellij.platform.workspace.storage.WorkspaceEntity"), properties = listOf(OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "entitySource", valueType = ValueTypeMetadata.SimpleType.CustomType(isNullable = false, typeMetadata = FinalClassMetadata.KnownClass(fqName = "com.intellij.platform.workspace.storage.EntitySource")), withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "someData", valueType = ValueTypeMetadata.SimpleType.CustomType(isNullable = false, typeMetadata = ExtendableClassMetadata.AbstractClassMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.SubsetSealedClass", subclasses = listOf(FinalClassMetadata.ClassMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.SubsetSealedClass\$FirstSubsetSealedClassDataClass", properties = listOf(OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "name", valueType = primitiveTypeStringNotNullable, withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "string", valueType = primitiveTypeStringNotNullable, withDefault = false)), supertypes = listOf("com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.SubsetSealedClass")),
+FinalClassMetadata.ClassMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.SubsetSealedClass\$SecondSubsetSealedClassDataClass", properties = listOf(OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "name", valueType = primitiveTypeStringNotNullable, withDefault = false),
+OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "list", valueType = ValueTypeMetadata.ParameterizedType(generics = listOf(primitiveTypeIntNotNullable), primitive = primitiveTypeListNotNullable), withDefault = false)), supertypes = listOf("com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.SubsetSealedClass")),
+FinalClassMetadata.ObjectMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.SubsetSealedClass\$FirstSubsetSealedClassObject", properties = listOf(OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "name", valueType = primitiveTypeStringNotNullable, withDefault = false)), supertypes = listOf("com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.SubsetSealedClass")),
+FinalClassMetadata.ObjectMetadata(fqName = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.SubsetSealedClass\$SecondSubsetSealedClassObject", properties = listOf(OwnPropertyMetadata(isComputable = false, isKey = false, isOpen = false, name = "name", valueType = primitiveTypeStringNotNullable, withDefault = false)), supertypes = listOf("com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.SubsetSealedClass"))), supertypes = listOf())), withDefault = false)), extProperties = listOf(), isAbstract = false)
+
+        addMetadata(typeMetadata)
     }
+
+    override fun initializeMetadataHash() {
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.AbstractChildEntity", metadataHash = 1263851929)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.AbstractChildWithLinkToParentEntity", metadataHash = -477335471)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.AbstractParentEntity", metadataHash = -2104699688)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.AssertConsistencyEntity", metadataHash = -608064634)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.AttachedEntity", metadataHash = -1938345421)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.AttachedEntityList", metadataHash = 425941323)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.AttachedEntityParentList", metadataHash = -1530462790)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.AttachedEntityToNullableParent", metadataHash = 778966778)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.AttachedEntityToParent", metadataHash = -1798717542)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.BaseEntity", metadataHash = -1981396793)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.BooleanEntity", metadataHash = -1740332513)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.ChainedEntity", metadataHash = 1612527368)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.ChainedParentEntity", metadataHash = 403401788)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.ChildAbstractBaseEntity", metadataHash = 134283391)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.ChildEntity", metadataHash = -47236628)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.ChildFirstEntity", metadataHash = -320079560)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.ChildMultipleEntity", metadataHash = 663933117)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.ChildSampleEntity", metadataHash = -1401797076)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.ChildSecondEntity", metadataHash = -1134084038)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.ChildSingleAbstractBaseEntity", metadataHash = 1521557064)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.ChildSingleFirstEntity", metadataHash = -51546939)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.ChildSingleSecondEntity", metadataHash = 1899880397)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.ChildSourceEntity", metadataHash = -1451039884)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.ChildSubEntity", metadataHash = 2009123950)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.ChildSubSubEntity", metadataHash = 1538241234)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.ChildWithExtensionParent", metadataHash = 2119200954)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.ChildWithNulls", metadataHash = -221611992)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.ChildWithNullsMultiple", metadataHash = 1983296296)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.ChildWithNullsOppositeMultiple", metadataHash = 1320941676)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.ChildWpidSampleEntity", metadataHash = 80701255)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.CollectionFieldEntity", metadataHash = -1884361194)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.ComposedIdSoftRefEntity", metadataHash = -2110645111)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.ComposedLinkEntity", metadataHash = -852533916)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.CompositeAbstractEntity", metadataHash = 1278507972)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.CompositeBaseEntity", metadataHash = -790725087)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.CompositeChildAbstractEntity", metadataHash = 1571034826)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.ContentRootTestEntity", metadataHash = -1425558132)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.DefaultValueEntity", metadataHash = -776988771)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.EntityWithSoftLinks", metadataHash = -1867001719)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.FacetTestEntity", metadataHash = -1834454456)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.FinalFieldsEntity", metadataHash = 1914905624)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.FirstEntityWithPId", metadataHash = 1362098184)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.HeadAbstractionEntity", metadataHash = 1865273204)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.IntEntity", metadataHash = 1897205162)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.KeyChild", metadataHash = 2110698573)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.KeyParent", metadataHash = 1903357141)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.LeftEntity", metadataHash = -1296156928)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.LinkedListEntity", metadataHash = -810387134)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.ListEntity", metadataHash = -1431929916)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.ListVFUEntity", metadataHash = 1691895434)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.MainEntity", metadataHash = 946576918)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.MainEntityList", metadataHash = 2129302614)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.MainEntityParentList", metadataHash = 1942831723)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.MainEntityToParent", metadataHash = 1318247573)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.MiddleEntity", metadataHash = -1737940993)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.ModuleTestEntity", metadataHash = 1922446021)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.NamedChildEntity", metadataHash = 1782040957)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.NamedEntity", metadataHash = -1252280207)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.NullableVFUEntity", metadataHash = -897072017)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.OneEntityWithSymbolicId", metadataHash = 798609093)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.OoChildAlsoWithPidEntity", metadataHash = 505714811)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.OoChildEntity", metadataHash = -2143646751)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.OoChildForParentWithPidEntity", metadataHash = 540763430)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.OoChildWithNullableParentEntity", metadataHash = -1217176414)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.OoChildWithPidEntity", metadataHash = -289367873)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.OoParentEntity", metadataHash = 558150305)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.OoParentWithPidEntity", metadataHash = -2089918014)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.OoParentWithoutPidEntity", metadataHash = -1799861643)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.OptionalIntEntity", metadataHash = -293892995)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.OptionalOneToOneChildEntity", metadataHash = 1189276839)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.OptionalOneToOneParentEntity", metadataHash = 1574478813)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.OptionalStringEntity", metadataHash = -4433203)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.ParentAbEntity", metadataHash = -424957563)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.ParentChainEntity", metadataHash = -1499364934)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.ParentEntity", metadataHash = 157816377)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.ParentMultipleEntity", metadataHash = -2114422010)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.ParentSingleAbEntity", metadataHash = -1350293822)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.ParentSubEntity", metadataHash = -1411861305)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.ParentWithExtensionEntity", metadataHash = 296603792)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.ParentWithLinkToAbstractChild", metadataHash = 1802161331)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.ParentWithNulls", metadataHash = 721712501)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.ParentWithNullsMultiple", metadataHash = -78488320)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.ParentWithNullsOppositeMultiple", metadataHash = 2051547912)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.ProjectModelTestEntity", metadataHash = 890217422)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.RightEntity", metadataHash = 1959027600)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.SampleEntity", metadataHash = 1766431783)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.SampleEntity2", metadataHash = 1090671350)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.SampleWithSymbolicIdEntity", metadataHash = 700962564)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.SecondEntityWithPId", metadataHash = 418302128)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.SecondSampleEntity", metadataHash = 1163752112)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.SelfLinkedEntity", metadataHash = -2021495852)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.SetVFUEntity", metadataHash = 355732300)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.SimpleAbstractEntity", metadataHash = 1087702198)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.SimpleChildAbstractEntity", metadataHash = 1523292579)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.SoftLinkReferencedChild", metadataHash = 650496053)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.SourceEntity", metadataHash = 1981706215)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.SourceRootTestEntity", metadataHash = -1195505388)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.SourceRootTestOrderEntity", metadataHash = 725933387)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.SpecificChildEntity", metadataHash = -632341313)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.SpecificChildWithLinkToParentEntity", metadataHash = 522779067)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.SpecificParent", metadataHash = 1622278625)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.StringEntity", metadataHash = -743912870)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.SymbolicIdEntity", metadataHash = -850438988)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.TreeEntity", metadataHash = 1447684722)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.TreeMultiparentLeafEntity", metadataHash = -302173474)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.TreeMultiparentRootEntity", metadataHash = 582143651)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.UnknownFieldEntity", metadataHash = 1133954668)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.VFUEntity", metadataHash = -1039222678)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.VFUEntity2", metadataHash = 772299328)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.VFUWithTwoPropertiesEntity", metadataHash = 1348885034)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.WithListSoftLinksEntity", metadataHash = -574979739)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.WithSoftLinkEntity", metadataHash = 700923686)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.XChildChildEntity", metadataHash = 1440578746)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.XChildEntity", metadataHash = 1263509146)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.XChildWithOptionalParentEntity", metadataHash = -834345822)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.XParentEntity", metadataHash = -1295072648)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.AnotherOneToManyRefEntity", metadataHash = -1274719715)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.AnotherOneToOneRefEntity", metadataHash = -957226626)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.ChangedComputablePropEntity", metadataHash = 67773678)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.ChangedComputablePropsOrderEntity", metadataHash = 99581827)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.ChangedEnumNameEntity", metadataHash = 372017626)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.ChangedPropsOrderEntity", metadataHash = -1009419561)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.ChangedValueTypeEntity", metadataHash = -1180438384)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.ComputablePropEntity", metadataHash = 2072899247)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.DefaultPropEntity", metadataHash = -434438296)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.EnumPropsEntity", metadataHash = 1445430285)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.KeyPropEntity", metadataHash = 460747374)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.NotNullToNullEntity", metadataHash = 1930499616)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.NullToNotNullEntity", metadataHash = 140828339)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.OneToManyRefEntity", metadataHash = 1642608471)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.OneToOneRefEntity", metadataHash = -1100351421)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.SimpleObjectsEntity", metadataHash = -1076425879)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.SimplePropsEntity", metadataHash = 1530776632)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.SimpleSealedClassEntity", metadataHash = -1325637674)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.SubsetEnumEntity", metadataHash = -1403319619)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.SubsetSealedClassEntity", metadataHash = -617222995)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.AnotherOneToManyRefEntity", metadataHash = -1073508598)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.AnotherOneToOneRefEntity", metadataHash = 768463409)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.ChangedComputablePropEntity", metadataHash = 1498959757)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.ChangedComputablePropsOrderEntity", metadataHash = 1288567279)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.ChangedEnumNameEntity", metadataHash = 1982856910)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.ChangedPropsOrderEntity", metadataHash = -873139493)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.ChangedValueTypeEntity", metadataHash = 976859610)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.ComputablePropEntity", metadataHash = -160169425)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.DefaultPropEntity", metadataHash = 113329447)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.EnumPropsEntity", metadataHash = 1445430285)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.KeyPropEntity", metadataHash = 127047553)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.NotNullToNullEntity", metadataHash = 974521945)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.NullToNotNullEntity", metadataHash = -906528540)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.OneToManyRefEntity", metadataHash = -614618817)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.OneToOneRefEntity", metadataHash = 572068427)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.SimpleObjectsEntity", metadataHash = 1097431183)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.SimplePropsEntity", metadataHash = 525404090)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.SimpleSealedClassEntity", metadataHash = -993905491)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.SubsetEnumEntity", metadataHash = 1471742839)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.SubsetSealedClassEntity", metadataHash = 677642599)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.NameId", metadataHash = 142541689)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.ComposedId", metadataHash = -1739701125)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.OneSymbolicId", metadataHash = 117875402)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.Container", metadataHash = 444247947)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.TooDeepContainer", metadataHash = -1562879722)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.DeepContainer", metadataHash = -1466481139)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.SealedContainer", metadataHash = 1560412723)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.SealedContainer\$BigContainer", metadataHash = -1778806158)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.SealedContainer\$ContainerContainer", metadataHash = 2107169060)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.SealedContainer\$EmptyContainer", metadataHash = -445307259)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.SealedContainer\$SmallContainer", metadataHash = -1319910747)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.DeepSealedOne", metadataHash = 889890835)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.DeepSealedOne\$DeepSealedTwo", metadataHash = 795258468)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.DeepSealedOne\$DeepSealedTwo\$DeepSealedThree", metadataHash = 1875447747)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.DeepSealedOne\$DeepSealedTwo\$DeepSealedThree\$DeepSealedFour", metadataHash = 1513726279)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.AnotherDataClass", metadataHash = 114662133)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.FirstPId", metadataHash = -103607010)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.LinkedListEntityId", metadataHash = 119501706)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.OoChildEntityId", metadataHash = -600631485)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.OoParentEntityId", metadataHash = -972628649)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.Descriptor", metadataHash = -356784219)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.DescriptorInstance", metadataHash = -716106614)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.SecondPId", metadataHash = -440847684)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.TreeMultiparentSymbolicId", metadataHash = 720087818)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.AnotherNameId", metadataHash = -248851180)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.DataClassX", metadataHash = -1621919930)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.OneToManyRefDataClass", metadataHash = 1171276804)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.ChangedComputablePropEntityId", metadataHash = 1507277203)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.ChangedComputablePropsOrderEntityId", metadataHash = 755949879)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.ChangedEnumNameEnum", metadataHash = 97042208)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.ChangedPropsOrderDataClass", metadataHash = -17695294)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.EnumPropsEnum", metadataHash = -689765859)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.SimpleObjectsSealedClass", metadataHash = 1509422458)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.SimpleObjectsSealedClass\$FirstSimpleObjectsSealedClassObject", metadataHash = -773934119)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.SimpleObjectsSealedClass\$SecondSimpleObjectsSealedClassObject", metadataHash = -1953330770)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.SimpleSealedClass", metadataHash = 389791893)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.SimpleSealedClass\$FirstKeyPropDataClass", metadataHash = -875015981)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.SimpleSealedClass\$SecondKeyPropDataClass", metadataHash = 196078261)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.SubsetEnumEnum", metadataHash = 2117280713)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.SubsetSealedClass", metadataHash = 854116724)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.SubsetSealedClass\$FirstSubsetSealedClassDataClass", metadataHash = -1185936690)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.SubsetSealedClass\$FirstSubsetSealedClassObject", metadataHash = 1315739634)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.SubsetSealedClass\$SecondSubsetSealedClassDataClass", metadataHash = -1154137807)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.OneToManyRefDataClass", metadataHash = 1171276804)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.ChangedComputablePropEntityId", metadataHash = 1551757908)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.ChangedComputablePropsOrderEntityId", metadataHash = 755949879)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.ChangedEnumNameEnum", metadataHash = -485977940)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.ChangedPropsOrderDataClass", metadataHash = -17695294)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.EnumPropsEnum", metadataHash = -689765859)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.SimpleObjectsSealedClass", metadataHash = -47298220)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.SimpleObjectsSealedClass\$FirstSimpleObjectsSealedClassObject", metadataHash = -773934119)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.SimpleObjectsSealedClass\$SecondSimpleObjectsSealedClassObject", metadataHash = 231924872)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.SimpleSealedClass", metadataHash = 2054591390)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.SimpleSealedClass\$FirstKeyPropDataClass", metadataHash = -875015981)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.SimpleSealedClass\$SecondKeyPropDataClass", metadataHash = -1074636788)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.SubsetEnumEnum", metadataHash = 967538255)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.SubsetSealedClass", metadataHash = 922382586)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.SubsetSealedClass\$FirstSubsetSealedClassDataClass", metadataHash = -1185936690)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.SubsetSealedClass\$FirstSubsetSealedClassObject", metadataHash = 1315739634)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.SubsetSealedClass\$SecondSubsetSealedClassDataClass", metadataHash = -1154137807)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.currentVersion.SubsetSealedClass\$SecondSubsetSealedClassObject", metadataHash = 2030799620)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.EntitySource", metadataHash = -207660048)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.AnotherSource", metadataHash = 1783283309)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.MyDummyParentSource", metadataHash = -1458866609)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.MySource", metadataHash = -866848740)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.SampleEntitySource", metadataHash = 494124466)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.SymbolicEntityId", metadataHash = 2091941909)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.FacetTestEntitySymbolicId", metadataHash = -675724348)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.HeadAbstractionSymbolicId", metadataHash = 2069054680)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.ModuleTestEntitySymbolicId", metadataHash = 1373690897)
+        addMetadataHash(typeFqn = "com.intellij.platform.workspace.storage.testEntities.entities.SampleSymbolicId", metadataHash = 880343843)
+    }
+
 }

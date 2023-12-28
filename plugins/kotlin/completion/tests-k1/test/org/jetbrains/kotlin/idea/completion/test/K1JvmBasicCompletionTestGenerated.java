@@ -485,9 +485,19 @@ public abstract class K1JvmBasicCompletionTestGenerated extends AbstractK1JvmBas
                 runTest("../testData/basic/common/callableReference/EmptyQualifier.kt");
             }
 
+            @TestMetadata("EmptyQualifierExtensionFun.kt")
+            public void testEmptyQualifierExtensionFun() throws Exception {
+                runTest("../testData/basic/common/callableReference/EmptyQualifierExtensionFun.kt");
+            }
+
             @TestMetadata("EmptyQualifierInExtensionFun.kt")
             public void testEmptyQualifierInExtensionFun() throws Exception {
                 runTest("../testData/basic/common/callableReference/EmptyQualifierInExtensionFun.kt");
+            }
+
+            @TestMetadata("EnumStaticMembers.kt")
+            public void testEnumStaticMembers() throws Exception {
+                runTest("../testData/basic/common/callableReference/EnumStaticMembers.kt");
             }
 
             @TestMetadata("ExpressionQualifier.kt")
@@ -538,6 +548,21 @@ public abstract class K1JvmBasicCompletionTestGenerated extends AbstractK1JvmBas
             @TestMetadata("NonEmptyQualifier.kt")
             public void testNonEmptyQualifier() throws Exception {
                 runTest("../testData/basic/common/callableReference/NonEmptyQualifier.kt");
+            }
+
+            @TestMetadata("NonEmptyQualifierWithTypeArguments.kt")
+            public void testNonEmptyQualifierWithTypeArguments() throws Exception {
+                runTest("../testData/basic/common/callableReference/NonEmptyQualifierWithTypeArguments.kt");
+            }
+
+            @TestMetadata("NonEmptyQualifierWithTypeArguments2.kt")
+            public void testNonEmptyQualifierWithTypeArguments2() throws Exception {
+                runTest("../testData/basic/common/callableReference/NonEmptyQualifierWithTypeArguments2.kt");
+            }
+
+            @TestMetadata("Unsupported.kt")
+            public void testUnsupported() throws Exception {
+                runTest("../testData/basic/common/callableReference/Unsupported.kt");
             }
         }
 
@@ -2576,6 +2601,11 @@ public abstract class K1JvmBasicCompletionTestGenerated extends AbstractK1JvmBas
             @TestMetadata("ambiguousSuperMethodHigherUp.kt")
             public void testAmbiguousSuperMethodHigherUp() throws Exception {
                 runTest("../testData/basic/common/ambiguousSuperMethodHigherUp.kt");
+            }
+
+            @TestMetadata("ambiguousSuperMethodLambdaArgument.kt")
+            public void testAmbiguousSuperMethodLambdaArgument() throws Exception {
+                runTest("../testData/basic/common/ambiguousSuperMethodLambdaArgument.kt");
             }
 
             @TestMetadata("ambiguousSuperMethodSingleImpl.kt")

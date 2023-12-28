@@ -21,6 +21,7 @@ import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.*;
 import com.intellij.psi.impl.source.tree.LeafElement;
+import com.intellij.psi.util.PsiTreeUtil;
 import com.intellij.util.DocumentUtil;
 import com.intellij.util.Processor;
 import com.intellij.util.SlowOperations;
@@ -30,9 +31,9 @@ import com.intellij.xdebugger.XDebuggerUtil;
 import com.intellij.xdebugger.XSourcePosition;
 import com.intellij.xdebugger.breakpoints.XBreakpoint;
 import com.intellij.xdebugger.breakpoints.XLineBreakpoint;
+import com.intellij.xdebugger.breakpoints.XLineBreakpointType;
 import com.intellij.xdebugger.breakpoints.ui.XBreakpointCustomPropertiesPanel;
 import com.intellij.xdebugger.breakpoints.ui.XBreakpointGroupingRule;
-import com.intellij.xdebugger.impl.XDebuggerUtilImpl;
 import com.intellij.xdebugger.impl.XSourcePositionImpl;
 import com.intellij.xdebugger.impl.breakpoints.XLineBreakpointImpl;
 import com.sun.jdi.Location;
@@ -50,6 +51,7 @@ import org.jetbrains.org.objectweb.asm.Opcodes;
 import javax.swing.*;
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Stream;
 
 /**
@@ -141,7 +143,7 @@ public class JavaLineBreakpointType extends JavaLineBreakpointTypeBase<JavaLineB
     boolean mainMethodAdded = false;
     int lambdaCount = 0;
     if (!(startMethod instanceof PsiLambdaExpression)) {
-      res.add(new LineJavaBreakpointVariant(position, startMethod, -1));
+      res.add(new LineJavaBreakpointVariant(position, startMethod, JavaLineBreakpointProperties.NO_LAMBDA));
       mainMethodAdded = true;
     }
 
@@ -264,9 +266,10 @@ public class JavaLineBreakpointType extends JavaLineBreakpointTypeBase<JavaLineB
     if (position == null) return null;
 
     JavaBreakpointProperties properties = breakpoint.getProperties();
-    if (properties instanceof JavaLineBreakpointProperties && !(breakpoint instanceof RunToCursorBreakpoint)) {
-      Integer ordinal = ((JavaLineBreakpointProperties)properties).getLambdaOrdinal();
-      if (ordinal != null && ordinal != -1) {
+    if (properties instanceof JavaLineBreakpointProperties javaProperties && !(breakpoint instanceof RunToCursorBreakpoint)) {
+      if (javaProperties.isInLambda()) {
+        Integer ordinal = javaProperties.getLambdaOrdinal();
+        assert ordinal != null;
         List<PsiLambdaExpression> lambdas = DebuggerUtilsEx.collectLambdas(position, true);
         if (ordinal < lambdas.size()) {
           return lambdas.get(ordinal);
@@ -318,6 +321,19 @@ public class JavaLineBreakpointType extends JavaLineBreakpointTypeBase<JavaLineB
     return visitor.returnOffsets.stream().map(offs -> method.locationOfCodeIndex(offs));
   }
 
+  @Override
+  public boolean variantAndBreakpointMatch(@NotNull XLineBreakpoint<JavaLineBreakpointProperties> breakpoint,
+                                           @NotNull XLineBreakpointType<JavaLineBreakpointProperties>.XLineBreakpointVariant variant) {
+    var props = breakpoint.getProperties();
+    if (variant instanceof ExactJavaBreakpointVariant exactJavaVariant) {
+      return Objects.equals(props.getEncodedInlinePosition(), exactJavaVariant.myEncodedInlinePosition);
+
+    } else {
+      // variant is a default line breakpoint variant or explicit "all" variant
+      return props.isLinePosition();
+    }
+  }
+
   public class JavaBreakpointVariant extends XLineBreakpointAllVariant {
     private final int lambdaCount;
 
@@ -363,10 +379,16 @@ public class JavaLineBreakpointType extends JavaLineBreakpointTypeBase<JavaLineB
 
     @Override
     public TextRange getHighlightRange() {
-      if (myElement != null) {
-        return DebuggerUtilsEx.getHighlightingRangeInsideLine(myElement.getTextRange(), myElement.getContainingFile(), mySourcePosition.getLine());
+      if (myElement == null || JavaLineBreakpointProperties.isLinePosition(myEncodedInlinePosition)) {
+        return null;
       }
-      return null;
+      TextRange textRange = getTextRangeWithoutTrailingComments(myElement);
+      return DebuggerUtilsEx.getHighlightingRangeInsideLine(textRange, myElement.getContainingFile(), mySourcePosition.getLine());
+    }
+
+    @Override
+    public boolean isMultiVariant() {
+      return false;
     }
 
     @NotNull
@@ -449,8 +471,7 @@ public class JavaLineBreakpointType extends JavaLineBreakpointTypeBase<JavaLineB
     if (properties == null) return null;
 
     boolean condRet = properties.isConditionalReturn();
-    Integer lambdaOrdinal = properties.getLambdaOrdinal();
-    boolean isLambda = lambdaOrdinal != null && lambdaOrdinal != -1;
+    boolean isLambda = properties.isInLambda();
     if (!condRet && !isLambda) return null;
 
     return ReadAction.compute(() -> {
@@ -461,6 +482,8 @@ public class JavaLineBreakpointType extends JavaLineBreakpointTypeBase<JavaLineB
           return XSourcePositionImpl.createByElement(theReturn);
         }
         else if (isLambda) {
+          Integer lambdaOrdinal = properties.getLambdaOrdinal();
+          assert lambdaOrdinal != null;
           return DebuggerUtilsEx.toXSourcePosition(new PositionManagerImpl.JavaSourcePosition(linePosition, lambdaOrdinal));
         }
       }
@@ -527,5 +550,20 @@ public class JavaLineBreakpointType extends JavaLineBreakpointTypeBase<JavaLineB
       return new CallTracingPropertiesPanel(project);
     }
     return null;
+  }
+
+  private static boolean isWhiteSpaceOrComment(@NotNull PsiElement psiElement) {
+    return psiElement instanceof PsiWhiteSpace || PsiTreeUtil.getParentOfType(psiElement, PsiComment.class, false) != null;
+  }
+
+  public static TextRange getTextRangeWithoutTrailingComments(@NotNull PsiElement psiElement) {
+    PsiElement lastChild = psiElement.getLastChild();
+    if (lastChild == null || !isWhiteSpaceOrComment(lastChild)) {
+      return psiElement.getTextRange();
+    }
+    while (isWhiteSpaceOrComment(lastChild)) {
+      lastChild = lastChild.getPrevSibling();
+    }
+    return new TextRange(psiElement.getTextRange().getStartOffset(), lastChild.getTextRange().getEndOffset());
   }
 }

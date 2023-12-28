@@ -18,6 +18,18 @@ fun <T : CommandChain> T.waitForSmartMode(): T = apply {
   addCommand("${CMD_PREFIX}waitForSmart")
 }
 
+fun <T : CommandChain> T.replaceBrowser(): T = apply {
+  addCommand("${CMD_PREFIX}replaceBrowser")
+}
+
+fun <T : CommandChain> T.logout(): T = apply {
+  addCommand("${CMD_PREFIX}logout")
+}
+
+fun <T : CommandChain> T.action(id: String): T = apply {
+  addCommand("${CMD_PREFIX}action $id")
+}
+
 @Suppress("unused")
 fun <T : CommandChain> T.waitForDumbMode(maxWaitingTimeInSec: Int): T = apply {
   addCommand("${CMD_PREFIX}waitForDumb ${maxWaitingTimeInSec}")
@@ -225,12 +237,12 @@ fun <T : CommandChain> T.startProfile(args: String): T = apply {
   addCommand("${CMD_PREFIX}startProfile $args")
 }
 
-fun <T : CommandChain> T.startProfile(args: String, profilerParams: String): T = apply {
-  addCommand("${CMD_PREFIX}startProfile $args $profilerParams")
+fun <T : CommandChain> T.startProfile(profileFileName: String, profilerParams: String): T = apply {
+  addCommand("${CMD_PREFIX}startProfile $profileFileName $profilerParams")
 }
 
-fun <T : CommandChain> T.stopProfile(args: String = "jfr"): T = apply {
-  addCommand("${CMD_PREFIX}stopProfile $args")
+fun <T : CommandChain> T.stopProfile(profilerParams: String = "jfr"): T = apply {
+  addCommand("${CMD_PREFIX}stopProfile $profilerParams")
 }
 
 fun <T : CommandChain> T.memoryDump(): T = apply {
@@ -372,8 +384,20 @@ fun <T : CommandChain> T.createAllServicesAndExtensions(): T = apply {
   addCommand("${CMD_PREFIX}CreateAllServicesAndExtensions")
 }
 
-fun <T : CommandChain> T.runConfiguration(command: String): T = apply {
-  addCommand("${CMD_PREFIX}runConfiguration", command)
+fun <T : CommandChain> T.runConfiguration(configurationName: String,
+                                          mode: String = "TILL_TERMINATED",
+                                          failureExpected: Boolean = false,
+                                          debug: Boolean = false): T = apply {
+  val command = mutableListOf("${CMD_PREFIX}runConfiguration")
+  command.add("-configurationName=$configurationName")
+  command.add("-mode=$mode")
+  if (failureExpected) {
+    command.add("-failureExpected")
+  }
+  if (debug) {
+    command.add("-debug")
+  }
+  addCommandWithSeparator("|", *command.toTypedArray())
 }
 
 fun <T : CommandChain> T.openFileWithTerminate(relativePath: String, terminateIdeInSeconds: Long): T = apply {
@@ -489,6 +513,16 @@ fun <T : CommandChain> T.importMavenProject(): T = apply {
   addCommand("${CMD_PREFIX}importMavenProject")
 }
 
+fun <T : CommandChain> T.setModuleJdk(moduleName: String, jdk: SdkObject): T {
+  val command = mutableListOf("${CMD_PREFIX}setModuleJdk")
+  command.add("-moduleName=$moduleName")
+  command.add("-jdkName=${jdk.sdkName}")
+  command.add("-jdkType=${jdk.sdkType}")
+  command.add("-jdkPath=${jdk.sdkPath}")
+  addCommandWithSeparator("|", *command.toTypedArray())
+  return this
+}
+
 fun <T : CommandChain> T.toggleMavenProfiles(profileIds: Set<String>, enable: Boolean = true): T = apply {
   addCommand("${CMD_PREFIX}toggleMavenProfiles ${profileIds.joinToString(",")} $enable")
 }
@@ -542,6 +576,10 @@ fun <T : CommandChain> T.assertOpenedFileInRoot(path: String): T = apply {
 
 fun <T : CommandChain> T.importGradleProject(): T = apply {
   addCommand("${CMD_PREFIX}importGradleProject")
+}
+
+fun <T : CommandChain> T.setGradleJdk(jdk: SdkObject): T = apply {
+  addCommand("${CMD_PREFIX}setGradleJdk ${jdk.sdkName}|${jdk.sdkType}|${jdk.sdkPath}")
 }
 
 fun <T : CommandChain> T.showEvaluateExpression(expression: String = "",
@@ -701,6 +739,14 @@ fun <T : CommandChain> T.authenticateInGrazie(token: String): T = apply {
   addCommand("${CMD_PREFIX}authenticateInGrazie ${token}")
 }
 
+fun <T : CommandChain> T.waitFullLineModelLoaded(language: String): T = apply {
+  addCommand("${CMD_PREFIX}waitFullLineModelLoaded ${language}")
+}
+
+fun <T : CommandChain> T.waitKotlinFullLineModelLoaded(): T = apply {
+  waitFullLineModelLoaded("kotlin")
+}
+
 fun <T : CommandChain> T.createJavaFile(fileName: String, filePath: String, fileType: String): T = apply {
   addCommand("${CMD_PREFIX}createJavaFile $fileName,$filePath,$fileType")
 }
@@ -821,4 +867,11 @@ fun <T : CommandChain> T.captureMemoryMetrics(suffix: String): T = apply {
 
 fun <T : CommandChain> T.sleep(timeOut: Long, unit: TimeUnit = TimeUnit.MILLISECONDS): T = apply {
   addCommand("${CMD_PREFIX}sleep ${unit.toMillis(timeOut)}")
+}
+
+
+fun <T : CommandChain> T.repeatCommand(times: Int, commandChain: (CommandChain) -> Unit): T = apply {
+  repeat(times) {
+    commandChain.invoke(this)
+  }
 }

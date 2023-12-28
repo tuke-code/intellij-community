@@ -5,7 +5,9 @@ import com.intellij.ide.plugins.IdeaPluginDescriptor
 import com.intellij.ide.plugins.PluginNode
 import com.intellij.openapi.application.PluginMigrationOptions
 import com.intellij.openapi.extensions.PluginId
+import org.jetbrains.annotations.ApiStatus.Internal
 
+@Internal
 abstract class PluginMigration {
   open fun migratePlugins(options: PluginMigrationOptions) {
     migratePlugins(PluginMigrationDescriptor(options))
@@ -28,6 +30,10 @@ abstract class PluginMigration {
 
     fun removePlugin(pluginIdString: String) {
       options.pluginsToMigrate.removeIf { it.pluginId.idString == pluginIdString }
+    }
+
+    fun removePluginToDownload(pluginIdString: String) {
+      options.pluginsToDownload.removeIf { it.pluginId.idString == pluginIdString }
     }
   }
 }

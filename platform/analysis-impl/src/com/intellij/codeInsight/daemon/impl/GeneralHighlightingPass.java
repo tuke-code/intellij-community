@@ -303,11 +303,14 @@ public class GeneralHighlightingPass extends ProgressableTextEditorHighlightingP
                   nestedRange, nestedInfos);
     });
     // there can be extra highlights generated in PostHighlightVisitor
-    List<HighlightInfo> postInfos = new ArrayList<>(holder.size());
-    for (int j = 0; j < holder.size(); j++) {
-      HighlightInfo info = holder.get(j);
-      postInfos.add(info);
-      insideResult.add(info);
+    List<HighlightInfo> postInfos;
+    synchronized (holder) {
+      postInfos = new ArrayList<>(holder.size());
+      for (int j = 0; j < holder.size(); j++) {
+        HighlightInfo info = holder.get(j);
+        postInfos.add(info);
+        insideResult.add(info);
+      }
     }
     myHighlightInfoProcessor.highlightsInsideVisiblePartAreProduced(myHighlightingSession, getEditor(),
                                                                     postInfos, getFile().getTextRange(), getFile().getTextRange(), POST_UPDATE_ALL);
@@ -396,7 +399,7 @@ public class GeneralHighlightingPass extends ProgressableTextEditorHighlightingP
         // if this highlight info range is contained inside the current element range we are visiting
         // that means we can clear this highlight as soon as visitors won't produce any highlights during visiting the same range next time.
         // We also know that we can remove a syntax error element.
-        info.setVisitingTextRange(elementRange);
+        info.setVisitingTextRange(myFile, myDocument, elementRange);
         infosForThisRange.add(info);
       }
       holder.clear();
@@ -470,7 +473,7 @@ public class GeneralHighlightingPass extends ProgressableTextEditorHighlightingP
 
 
   protected @NotNull HighlightInfoHolder createInfoHolder(@NotNull PsiFile file) {
-    List<HighlightInfoFilter> filters = HighlightInfoFilter.EXTENSION_POINT_NAME.getExtensionList();
+    HighlightInfoFilter[] filters = HighlightInfoFilter.EXTENSION_POINT_NAME.getExtensionList().toArray(HighlightInfoFilter.EMPTY_ARRAY);
     EditorColorsScheme actualScheme = getColorsScheme() == null ? EditorColorsManager.getInstance().getGlobalScheme() : getColorsScheme();
     HighlightInfoHolder infoHolder = new HighlightInfoHolder(file, filters) {
       @Override
@@ -480,7 +483,10 @@ public class GeneralHighlightingPass extends ProgressableTextEditorHighlightingP
 
       @Override
       public boolean add(@Nullable HighlightInfo info) {
-        boolean added = super.add(info);
+        boolean added;
+        synchronized (this) {
+          added = super.add(info);
+        }
         if (info != null && added) {
           queueInfoToUpdateIncrementally(info, info.getGroup() == 0 ? Pass.UPDATE_ALL : info.getGroup());
         }

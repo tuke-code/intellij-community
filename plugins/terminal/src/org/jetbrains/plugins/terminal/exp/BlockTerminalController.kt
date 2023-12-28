@@ -18,7 +18,7 @@ import java.util.concurrent.CopyOnWriteArrayList
 
 class BlockTerminalController(
   private val project: Project,
-  private val session: TerminalSession,
+  private val session: BlockTerminalSession,
   private val outputController: TerminalOutputController,
   private val promptController: TerminalPromptController,
   private val selectionController: TerminalSelectionController,
@@ -60,7 +60,7 @@ class BlockTerminalController(
     promptVisibilityAlarm.addRequest(Runnable {
       promptController.promptIsVisible = false
     }, 50)
-    session.sendCommandToExecute(command)
+    session.commandManager.sendCommandToExecute(command)
     session.model.isCommandRunning = true
   }
 

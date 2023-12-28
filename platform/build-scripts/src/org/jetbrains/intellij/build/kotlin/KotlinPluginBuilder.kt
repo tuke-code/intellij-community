@@ -22,7 +22,7 @@ object KotlinPluginBuilder {
    */
   const val MAIN_KOTLIN_PLUGIN_MODULE: String = "kotlin.plugin"
 
-  @SuppressWarnings("SpellCheckingInspection")
+  @Suppress("SpellCheckingInspection")
   val MODULES: List<String> = persistentListOf(
     "kotlin.plugin.common",
     "kotlin.plugin.k1",
@@ -41,6 +41,7 @@ object KotlinPluginBuilder {
     "kotlin.base.analysis-api-providers",
     "kotlin.base.analysis",
     "kotlin.base.code-insight",
+    "kotlin.base.code-insight.minimal",
     "kotlin.base.jps",
     "kotlin.base.analysis-api.utils",
     "kotlin.base.compiler-configuration-ui",
@@ -57,14 +58,13 @@ object KotlinPluginBuilder {
     "kotlin.core",
     "kotlin.idea",
     "kotlin.fir.frontend-independent",
-    "kotlin.line-indent-provider",
     "kotlin.jvm",
     "kotlin.compiler-reference-index",
     "kotlin.compiler-plugins.parcelize.common",
     "kotlin.compiler-plugins.parcelize.k1",
     "kotlin.compiler-plugins.parcelize.k2",
     "kotlin.compiler-plugins.parcelize.gradle",
-    "kotlin.compiler-plugins.allopen.common",
+    "kotlin.compiler-plugins.allopen.common-k1",
     "kotlin.compiler-plugins.allopen.gradle",
     "kotlin.compiler-plugins.allopen.maven",
     "kotlin.compiler-plugins.compiler-plugin-support.common",
@@ -105,6 +105,7 @@ object KotlinPluginBuilder {
     "kotlin.run-configurations.junit-fe10",
     "kotlin.run-configurations.testng",
     "kotlin.formatter",
+    "kotlin.formatter.minimal",
     "kotlin.repl",
     "kotlin.git",
     "kotlin.base.injection",
@@ -182,6 +183,7 @@ object KotlinPluginBuilder {
     "kotlin.highlighting.shared",
     "kotlin.highlighting.k1",
     "kotlin.highlighting.k2",
+    "kotlin.highlighting.minimal",
     "kotlin.uast.uast-kotlin-fir",
     "kotlin.uast.uast-kotlin-idea-fir",
     "kotlin.fir.fir-low-level-api-ide-impl",
@@ -195,7 +197,7 @@ object KotlinPluginBuilder {
     "kotlin.bundled-compiler-plugins-support",
   )
 
-  @SuppressWarnings("SpellCheckingInspection")
+  @Suppress("SpellCheckingInspection")
   private val LIBRARIES = persistentListOf(
     "kotlinc.analysis-api-providers",
     "kotlinc.analysis-project-structure",
@@ -237,15 +239,16 @@ object KotlinPluginBuilder {
   )
 
   @JvmStatic
-  fun kotlinPlugin(ultimateSources: KotlinUltimateSources): PluginLayout {
+  fun kotlinPlugin(ultimateSources: KotlinUltimateSources, addition: ((PluginLayout.PluginLayoutSpec) -> Unit)? = null): PluginLayout {
     return kotlinPlugin(
       kind = KotlinPluginKind.valueOf(System.getProperty("kotlin.plugin.kind", "IJ")),
       ultimateSources = ultimateSources,
+      addition = addition,
     )
   }
 
   @JvmStatic
-  fun kotlinPlugin(kind: KotlinPluginKind, ultimateSources: KotlinUltimateSources): PluginLayout {
+  fun kotlinPlugin(kind: KotlinPluginKind, ultimateSources: KotlinUltimateSources, addition: ((PluginLayout.PluginLayoutSpec) -> Unit)? = null): PluginLayout {
     return PluginLayout.plugin(MAIN_KOTLIN_PLUGIN_MODULE) { spec ->
       spec.directoryName = "Kotlin"
       spec.mainJarName = "kotlin-plugin.jar"
@@ -398,6 +401,8 @@ object KotlinPluginBuilder {
           else -> {}
         }
       }
+
+      addition?.invoke(spec)
     }
   }
 

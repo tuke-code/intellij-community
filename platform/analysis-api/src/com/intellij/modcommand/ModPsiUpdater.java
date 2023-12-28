@@ -15,6 +15,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
+import java.util.Map;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
@@ -103,6 +104,7 @@ public interface ModPsiUpdater extends ModPsiNavigator {
    * 
    * @param declaration declaration to track
    */
+  @ApiStatus.Experimental
   void trackDeclaration(@NotNull PsiElement declaration);
 
   /**
@@ -117,6 +119,22 @@ public interface ModPsiUpdater extends ModPsiNavigator {
    * @param errorMessage the error message to display
    */
   void cancel(@NotNull @NlsContexts.Tooltip String errorMessage);
+
+  /**
+   * Records conflicts. All the recorded conflicts will be shown before any other modifications.
+   * If user cancels the conflict view, then no actual modification will be done.
+   * <p>
+   *   Subsequent calls of this method add new conflicts instead of replacing the old ones.
+   * </p>
+   * <p>
+   *   The PSI elements in the map must be physical elements or their writable copies obtained by
+   *   previous {@link #getWritable(PsiElement)} call. No actual PSI modifications should be done prior to
+   *   this call.
+   * </p>
+   *
+   * @param conflicts conflicts to show.
+   */
+  void showConflicts(@NotNull Map<@NotNull PsiElement, ModShowConflicts.@NotNull Conflict> conflicts);
 
   /**
    * Display message
@@ -148,7 +166,7 @@ public interface ModPsiUpdater extends ModPsiNavigator {
    * @param offset offset to move to
    */
   @Override
-  void moveTo(int offset);
+  void moveCaretTo(int offset);
 
   /**
    * Navigates to a given element. Does nothing when executed non-interactively.
@@ -157,19 +175,10 @@ public interface ModPsiUpdater extends ModPsiNavigator {
    * @param element element to navigate to
    */
   @Override
-  void moveTo(@NotNull PsiElement element);
+  void moveCaretTo(@NotNull PsiElement element);
 
   /**
-   * Moves caret to a previous occurrence of character ch in the current file. Do nothing if no such occurrence is found,
-   * or when executed non-interactively.
-   *
-   * @param ch character to find
-   */
-  @Override
-  void moveToPrevious(char ch);
-
-  /**
-   * @return current caret offset inside the current file. It may be based on the previous result of {@link #moveTo(int)} 
+   * @return current caret offset inside the current file. It may be based on the previous result of {@link #moveCaretTo(int)} 
    * or similar methods. The initial caret offset is taken from {@link ActionContext} 
    * if {@link ModCommand#psiUpdate(ActionContext, Consumer)} was used. Otherwise, it's zero. 
    */

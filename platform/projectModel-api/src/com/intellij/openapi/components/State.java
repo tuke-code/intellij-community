@@ -1,10 +1,7 @@
 // Copyright 2000-2021 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
 package com.intellij.openapi.components;
 
-import org.jetbrains.annotations.ApiStatus;
-import org.jetbrains.annotations.Nls;
-import org.jetbrains.annotations.NonNls;
-import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.*;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -89,4 +86,9 @@ public @interface State {
   }
 
   SettingsCategory category() default SettingsCategory.OTHER;
+
+  /**
+   * Is exportable (Export Settings dialog, migrate settings) regardless of roaming type.
+   */
+  boolean exportable() default false;
 }

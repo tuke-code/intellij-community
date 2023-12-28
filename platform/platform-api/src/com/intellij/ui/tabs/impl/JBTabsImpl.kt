@@ -34,6 +34,8 @@ import com.intellij.ui.*
 import com.intellij.ui.awt.RelativePoint
 import com.intellij.ui.components.JBScrollBar
 import com.intellij.ui.components.JBScrollPane
+import com.intellij.ui.components.TabMacScrollBarUI
+import com.intellij.ui.components.TabScrollBarUI
 import com.intellij.ui.components.panels.NonOpaquePanel
 import com.intellij.ui.hover.HoverListener
 import com.intellij.ui.popup.list.GroupedItemsListRenderer
@@ -73,13 +75,14 @@ import javax.swing.event.ChangeListener
 import javax.swing.event.PopupMenuEvent
 import javax.swing.event.PopupMenuListener
 import javax.swing.plaf.ComponentUI
+import javax.swing.plaf.ScrollBarUI
 import kotlin.Pair
 import kotlin.math.max
 import kotlin.math.min
 
 private val ABC_COMPARATOR: Comparator<TabInfo> = Comparator { o1, o2 -> NaturalComparator.INSTANCE.compare(o1.text, o2.text) }
 private val LOG = logger<JBTabsImpl>()
-private const val SCROLL_BAR_THICKNESS = 3
+private const val SCROLL_BAR_THICKNESS = 5
 private const val ADJUST_BORDERS = true
 private const val LAYOUT_DONE: @NonNls String = "Layout.done"
 
@@ -268,7 +271,7 @@ open class JBTabsImpl(private var project: Project?,
   protected open fun createTabPainterAdapter(): TabPainterAdapter = DefaultTabPainterAdapter(DEFAULT)
 
   private var tabLabelAtMouse: TabLabel? = null
-  private val scrollBar: JBScrollBar
+  protected val scrollBar: JBScrollBar
   private val scrollBarChangeListener: ChangeListener
   private var scrollBarOn = false
 
@@ -317,13 +320,16 @@ open class JBTabsImpl(private var project: Project?,
     val fakeScrollPane = JBScrollPane(ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS, ScrollPaneConstants.HORIZONTAL_SCROLLBAR_ALWAYS)
     scrollBar = object : JBScrollBar(if (isHorizontalTabs) Adjustable.HORIZONTAL else Adjustable.VERTICAL) {
       override fun updateUI() {
-        super.updateUI()
+        setUI(createUI())
         val fontSize = JBFont.labelFontSize()
         setUnitIncrement(fontSize)
         setBlockIncrement(fontSize * 10)
       }
 
-      override fun isThin(): Boolean = true
+      private fun createUI(): ScrollBarUI {
+        return if (SystemInfo.isMac) TabMacScrollBarUI(SCROLL_BAR_THICKNESS, SCROLL_BAR_THICKNESS, SCROLL_BAR_THICKNESS)
+        else TabScrollBarUI(SCROLL_BAR_THICKNESS, SCROLL_BAR_THICKNESS, SCROLL_BAR_THICKNESS)
+      }
     }
     fakeScrollPane.verticalScrollBar = scrollBar
     fakeScrollPane.horizontalScrollBar = scrollBar
@@ -3047,7 +3053,9 @@ open class JBTabsImpl(private var project: Project?,
       accessibleComponent
       addListener(object : TabsListener {
         override fun selectionChanged(oldSelection: TabInfo?, newSelection: TabInfo?) {
-          firePropertyChange(ACCESSIBLE_SELECTION_PROPERTY, null, null)
+          if (!SystemInfo.isMac) {
+            firePropertyChange(ACCESSIBLE_SELECTION_PROPERTY, null, null)
+          }
         }
       })
     }

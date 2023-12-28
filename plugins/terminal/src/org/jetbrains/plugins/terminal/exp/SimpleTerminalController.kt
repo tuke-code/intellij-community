@@ -20,7 +20,7 @@ import org.jetbrains.plugins.terminal.exp.TerminalUiUtils.toTextAttributes
 
 class SimpleTerminalController(
   settings: JBTerminalSystemSettingsProviderBase,
-  private val session: TerminalSession,
+  private val session: BlockTerminalSession,
   private val editor: EditorEx
 ) : Disposable {
   val document: Document
@@ -138,9 +138,7 @@ class SimpleTerminalController(
 
   private fun TextStyle.toTextAttributes(): TextAttributes = this.toTextAttributes(session.colorPalette)
 
-  override fun dispose() {
-    Disposer.dispose(caretModel)
-  }
+  override fun dispose() {}
 
   private data class TerminalContent(val text: String, val highlightings: List<HighlightingInfo>)
 

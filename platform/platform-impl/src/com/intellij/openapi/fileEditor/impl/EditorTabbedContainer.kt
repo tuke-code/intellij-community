@@ -57,10 +57,7 @@ import com.intellij.ui.tabs.impl.multiRow.WrapMultiRowLayout
 import com.intellij.ui.tabs.impl.singleRow.ScrollableSingleRowLayout
 import com.intellij.ui.tabs.impl.singleRow.SingleRowLayout
 import com.intellij.util.concurrency.EdtScheduledExecutorService
-import com.intellij.util.ui.JBInsets
-import com.intellij.util.ui.JBUI
-import com.intellij.util.ui.TimedDeadzone
-import com.intellij.util.ui.UIUtil
+import com.intellij.util.ui.*
 import kotlinx.coroutines.*
 import org.jetbrains.annotations.NonNls
 import java.awt.*
@@ -252,6 +249,11 @@ class EditorTabbedContainer internal constructor(private val window: EditorWindo
    */
   fun getSelectedComponent(ignorePopup: Boolean): Any? {
     return (if (ignorePopup) editorTabs.selectedInfo else editorTabs.targetInfo)?.component
+  }
+
+  fun getSelectedComposite(): EditorComposite? {
+    val selectedInfo = editorTabs.selectedInfo
+    return selectedInfo?.component?.let { (it as EditorWindowTopComponent).composite }
   }
 
   fun insertTab(file: VirtualFile,
@@ -624,6 +626,16 @@ private class EditorTabs(
   private inner class EditorTabLabel(info: TabInfo) : SingleHeightLabel(this, info) {
     init {
       updateFont()
+    }
+
+    override fun processMouseEvent(e: MouseEvent) {
+      MouseEventAdapter.redispatch(e, scrollBar)
+      super.processMouseEvent(e)
+    }
+
+    override fun processMouseMotionEvent(e: MouseEvent) {
+      MouseEventAdapter.redispatch(e, scrollBar)
+      super.processMouseMotionEvent(e)
     }
 
     override fun updateUI() {

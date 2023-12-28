@@ -48,7 +48,7 @@ import static com.intellij.codeInspection.options.OptPane.checkbox;
 import static com.intellij.codeInspection.options.OptPane.pane;
 import static com.intellij.psi.CommonClassNames.JAVA_UTIL_FUNCTION_SUPPLIER;
 
-public class IgnoreResultOfCallInspection extends BaseInspection {
+public final class IgnoreResultOfCallInspection extends BaseInspection {
   private static final CallMatcher STREAM_COLLECT =
     CallMatcher.instanceCall(CommonClassNames.JAVA_UTIL_STREAM_STREAM, "collect").parameterCount(1);
   private static final CallMatcher COLLECTOR_TO_COLLECTION =
@@ -60,17 +60,31 @@ public class IgnoreResultOfCallInspection extends BaseInspection {
   private static final CallMapper<String> KNOWN_EXCEPTIONAL_SIDE_EFFECTS = new CallMapper<String>()
     .register(CallMatcher.staticCall("java.util.regex.Pattern", "compile"), "java.util.regex.PatternSyntaxException")
     .register(CallMatcher.anyOf(
-      CallMatcher.staticCall(CommonClassNames.JAVA_LANG_SHORT, "parseShort", "valueOf"),
-      CallMatcher.staticCall(CommonClassNames.JAVA_LANG_BYTE, "parseByte", "valueOf"),
-      CallMatcher.staticCall(CommonClassNames.JAVA_LANG_INTEGER, "parseInt", "valueOf"),
-      CallMatcher.staticCall(CommonClassNames.JAVA_LANG_LONG, "parseLong", "valueOf"),
+      CallMatcher.staticCall(CommonClassNames.JAVA_LANG_SHORT, "parseShort", "valueOf", "decode"),
+      CallMatcher.staticCall(CommonClassNames.JAVA_LANG_BYTE, "parseByte", "valueOf", "decode"),
+      CallMatcher.staticCall(CommonClassNames.JAVA_LANG_INTEGER, "parseInt", "valueOf", "decode"),
+      CallMatcher.staticCall(CommonClassNames.JAVA_LANG_LONG, "parseLong", "valueOf", "decode"),
       CallMatcher.staticCall(CommonClassNames.JAVA_LANG_DOUBLE, "parseDouble", "valueOf"),
       CallMatcher.staticCall(CommonClassNames.JAVA_LANG_FLOAT, "parseFloat", "valueOf")), "java.lang.NumberFormatException")
     .register(CallMatcher.instanceCall(CommonClassNames.JAVA_LANG_CLASS,
                                        "getMethod", "getDeclaredMethod", "getConstructor", "getDeclaredConstructor"),
               "java.lang.NoSuchMethodException")
     .register(CallMatcher.instanceCall(CommonClassNames.JAVA_LANG_CLASS,
-                                       "getField", "getDeclaredField"), "java.lang.NoSuchFieldException");
+                                       "getField", "getDeclaredField"), "java.lang.NoSuchFieldException")
+    .register(CallMatcher.anyOf(
+      CallMatcher.instanceCall("java.time.format.DateTimeFormatter", "parse", "parseBest"),
+      CallMatcher.staticCall("java.time.Duration", "parse"),
+      CallMatcher.staticCall("java.time.Instant", "parse"),
+      CallMatcher.staticCall("java.time.MonthDay", "parse"),
+      CallMatcher.staticCall("java.time.Period", "parse"),
+      CallMatcher.staticCall("java.time.Year", "parse"),
+      CallMatcher.staticCall("java.time.YearMonth", "parse"),
+      CallMatcher.staticCall(CommonClassNames.JAVA_TIME_OFFSET_TIME, "parse"),
+      CallMatcher.staticCall(CommonClassNames.JAVA_TIME_OFFSET_DATE_TIME, "parse"),
+      CallMatcher.staticCall(CommonClassNames.JAVA_TIME_ZONED_DATE_TIME, "parse"),
+      CallMatcher.staticCall(CommonClassNames.JAVA_TIME_LOCAL_DATE, "parse"),
+      CallMatcher.staticCall(CommonClassNames.JAVA_TIME_LOCAL_DATE_TIME, "parse"),
+      CallMatcher.staticCall(CommonClassNames.JAVA_TIME_LOCAL_TIME, "parse")), "java.time.format.DateTimeParseException");
   private static final CallMatcher MOCK_LIBS_EXCLUDED_QUALIFIER_CALLS =
     CallMatcher.anyOf(
       CallMatcher.instanceCall("org.mockito.stubbing.Stubber", "when"),

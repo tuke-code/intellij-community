@@ -13,6 +13,7 @@ import com.intellij.platform.workspace.storage.impl.indices.MultimapStorageIndex
 import com.intellij.platform.workspace.storage.impl.indices.SymbolicIdInternalIndex
 import com.intellij.platform.workspace.storage.impl.indices.VirtualFileIndex
 import com.intellij.platform.workspace.storage.impl.indices.VirtualFileIndex.MutableVirtualFileIndex.Companion.VIRTUAL_FILE_INDEX_ENTITY_SOURCE_PROPERTY
+import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentationApi
 
 internal open class StorageIndexes(
   // List of IDs of entities that use this particular persistent id
@@ -56,7 +57,7 @@ internal open class StorageIndexes(
 
     // Assert external mappings
     for ((_, mappings) in externalMappings) {
-      for ((id, _) in mappings.index) {
+      mappings.index.forEach { id, _ ->
         assert(storage.entityDataById(id) != null) { "Missing entity by id: $id" }
       }
     }
@@ -148,6 +149,7 @@ internal open class StorageIndexes(
   }
 }
 
+@OptIn(EntityStorageInstrumentationApi::class)
 internal class MutableStorageIndexes(
   override val softLinks: MultimapStorageIndex.MutableMultimapStorageIndex,
   override val virtualFileIndex: VirtualFileIndex.MutableVirtualFileIndex,
@@ -275,10 +277,6 @@ internal class MutableStorageIndexes(
       // TODO :: Avoid updating of all soft links for the dependent entity
       builder.indexes.updateSymbolicIdIndexes(builder, entity.createEntity(builder), editingBeforeSymbolicId, entity)
     }
-  }
-
-  fun removeExternalMapping(identifier: String) {
-    externalMappings[identifier]?.clearMapping()
   }
 
   fun toImmutable(): StorageIndexes {

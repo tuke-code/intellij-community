@@ -11,6 +11,7 @@ import org.jetbrains.jps.builders.BuildTargetType;
 import org.jetbrains.jps.builders.impl.BuildTargetChunk;
 import org.jetbrains.jps.builders.impl.storage.BuildTargetStorages;
 import org.jetbrains.jps.builders.java.JavaBuilderUtil;
+import org.jetbrains.jps.builders.java.dependencyView.DumbMappings;
 import org.jetbrains.jps.builders.java.dependencyView.Mappings;
 import org.jetbrains.jps.builders.storage.BuildDataCorruptedException;
 import org.jetbrains.jps.builders.storage.BuildDataPaths;
@@ -21,6 +22,7 @@ import org.jetbrains.jps.dependency.*;
 import org.jetbrains.jps.dependency.impl.Containers;
 import org.jetbrains.jps.dependency.impl.DependencyGraphImpl;
 import org.jetbrains.jps.dependency.impl.LoggingDependencyGraph;
+import org.jetbrains.jps.dependency.impl.PathSourceMapper;
 import org.jetbrains.jps.incremental.IncProjectBuilder;
 import org.jetbrains.jps.incremental.relativizer.PathRelativizerService;
 
@@ -52,6 +54,7 @@ public final class BuildDataManager {
   private final Mappings myMappings;
   private final Object myGraphManagementLock = new Object();
   private DependencyGraph myDepGraph;
+  private final NodeSourcePathMapper myDepGraphPathMapper;
   private final BuildDataPaths myDataPaths;
   private final BuildTargetsState myTargetsState;
   private final OutputToTargetRegistry myOutputToTargetRegistry;
@@ -74,19 +77,35 @@ public final class BuildDataManager {
   public BuildDataManager(BuildDataPaths dataPaths, BuildTargetsState targetsState, PathRelativizerService relativizer) throws IOException {
     myDataPaths = dataPaths;
     myTargetsState = targetsState;
-    mySrcToFormMap = new OneToManyPathsMapping(new File(getSourceToFormsRoot(), "data"), relativizer);
-    myOutputToTargetRegistry = new OutputToTargetRegistry(new File(getOutputToSourceRegistryRoot(), "data"), relativizer);
-    File mappingsRoot = getMappingsRoot(myDataPaths.getDataStorageRoot());
-    if (JavaBuilderUtil.isDepGraphEnabled()) {
-      myMappings = null;
-      createDependencyGraph(mappingsRoot, false);
-      LOG.info("Using DependencyGraph-based build incremental analysis");
+    try {
+      mySrcToFormMap = new OneToManyPathsMapping(new File(getSourceToFormsRoot(), "data"), relativizer);
+      myOutputToTargetRegistry = new OutputToTargetRegistry(new File(getOutputToSourceRegistryRoot(), "data"), relativizer);
+      File mappingsRoot = getMappingsRoot(myDataPaths.getDataStorageRoot());
+      if (JavaBuilderUtil.isDepGraphEnabled()) {
+        if(Boolean.parseBoolean(System.getProperty("kotlin.jps.workaround.tests", "false"))) {
+          myMappings = new DumbMappings();
+        }
+        else {
+          myMappings = null;
+        }
+        createDependencyGraph(mappingsRoot, false);
+        LOG.info("Using DependencyGraph-based build incremental analysis");
+      }
+      else {
+        myMappings = new Mappings(mappingsRoot, relativizer);
+        myMappings.setProcessConstantsIncrementally(isProcessConstantsIncrementally());
+      }
     }
-    else {
-      myMappings = new Mappings(mappingsRoot, relativizer);
-      myMappings.setProcessConstantsIncrementally(isProcessConstantsIncrementally());
+    catch (IOException e) {
+      try {
+        close();
+      }
+      catch (Throwable ignored) {
+      }
+      throw e;
     }
     myVersionFile = new File(myDataPaths.getDataStorageRoot(), "version.dat");
+    myDepGraphPathMapper = relativizer != null? new PathSourceMapper(relativizer::toFull, relativizer::toRelative) : new PathSourceMapper();
     myRelativizer = relativizer;
   }
 
@@ -132,9 +151,21 @@ public final class BuildDataManager {
     return myMappings;
   }
 
-  public DependencyGraph getDependencyGraph() {
+  @Nullable
+  public GraphConfiguration getDependencyGraph() {
     synchronized (myGraphManagementLock) {
-      return myDepGraph;
+      DependencyGraph depGraph = myDepGraph;
+      return depGraph == null? null : new GraphConfiguration() {
+        @Override
+        public @NotNull NodeSourcePathMapper getPathMapper() {
+          return myDepGraphPathMapper;
+        }
+
+        @Override
+        public @NotNull DependencyGraph getGraph() {
+          return depGraph;
+        }
+      };
     }
   }
 
@@ -195,25 +226,34 @@ public final class BuildDataManager {
   }
 
   public void createDependencyGraph(File mappingsRoot, boolean deleteExisting) throws IOException {
-    synchronized (myGraphManagementLock) {
-      DependencyGraph depGraph = myDepGraph;
-      if (depGraph == null) {
-        if (deleteExisting) {
-          FileUtil.delete(mappingsRoot);
-        }
-        myDepGraph = asSynchronizableGraph(new DependencyGraphImpl(Containers.createPersistentContainerFactory(mappingsRoot.getAbsolutePath())));
-      }
-      else {
-        try {
-          depGraph.close();
-        }
-        finally {
+    try {
+      synchronized (myGraphManagementLock) {
+        DependencyGraph depGraph = myDepGraph;
+        if (depGraph == null) {
           if (deleteExisting) {
             FileUtil.delete(mappingsRoot);
           }
-          myDepGraph = asSynchronizableGraph(new DependencyGraphImpl(Containers.createPersistentContainerFactory(mappingsRoot.getAbsolutePath())));
+          myDepGraph = asSynchronizedGraph(new DependencyGraphImpl(Containers.createPersistentContainerFactory(mappingsRoot.getAbsolutePath())));
+        }
+        else {
+          try {
+            depGraph.close();
+          }
+          finally {
+            if (deleteExisting) {
+              FileUtil.delete(mappingsRoot);
+            }
+            myDepGraph = asSynchronizedGraph(new DependencyGraphImpl(Containers.createPersistentContainerFactory(mappingsRoot.getAbsolutePath())));
+          }
         }
       }
+    }
+    catch (RuntimeException e) {
+      Throwable cause = e.getCause();
+      if (cause instanceof IOException) {
+        throw (IOException)cause;
+      }
+      throw e;
     }
   }
 
@@ -480,7 +520,7 @@ public final class BuildDataManager {
     };
   }
 
-  private static DependencyGraph asSynchronizableGraph(DependencyGraph graph) {
+  private static DependencyGraph asSynchronizedGraph(DependencyGraph graph) {
     //noinspection IOResourceOpenedButNotSafelyClosed
     DependencyGraph delegate = new LoggingDependencyGraph(graph, msg -> LOG.info(msg));
     return new DependencyGraph() {

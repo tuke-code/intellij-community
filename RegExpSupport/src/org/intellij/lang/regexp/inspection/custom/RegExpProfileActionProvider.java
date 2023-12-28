@@ -10,7 +10,6 @@ import com.intellij.openapi.actionSystem.DefaultActionGroup;
 import com.intellij.openapi.project.DumbAwareAction;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.NlsActions;
-import com.intellij.openapi.util.Pair;
 import com.intellij.profile.codeInspection.ui.InspectionMetaDataDialog;
 import com.intellij.profile.codeInspection.ui.InspectionProfileActionProvider;
 import com.intellij.profile.codeInspection.ui.SingleInspectionProfilePanel;
@@ -18,14 +17,25 @@ import org.intellij.lang.regexp.RegExpBundle;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.List;
+
 public class RegExpProfileActionProvider extends InspectionProfileActionProvider {
   @Override
-  public @Nullable Pair<@NotNull ActionGroup, @NotNull String> getAddActions(@NotNull SingleInspectionProfilePanel panel) {
-    final var group = new DefaultActionGroup(
+  public @Nullable ActionGroup getAddActions(@NotNull SingleInspectionProfilePanel panel) {
+    return getActionGroup(panel);
+  }
+
+  @Override
+  public List<ActionToRegister> getActionsToRegister(SingleInspectionProfilePanel panel) {
+    return List.of(new ActionToRegister(getActionGroup(panel), "regexp.profile.action.provider.add.group"));
+  }
+
+  @NotNull
+  private static DefaultActionGroup getActionGroup(@NotNull SingleInspectionProfilePanel panel) {
+    return new DefaultActionGroup(
       new AddCustomRegExpInspectionAction(panel, RegExpBundle.message("action.add.regexp.search.inspection.text"), false),
       new AddCustomRegExpInspectionAction(panel, RegExpBundle.message("action.add.regexp.replace.inspection.text"), true)
     );
-    return Pair.create(group, "regexp.profile.action.provider.add.group");
   }
 
   static final class AddCustomRegExpInspectionAction extends DumbAwareAction {

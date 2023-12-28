@@ -39,8 +39,18 @@ class CompilationCacheUploadConfiguration(
   val checkFiles: Boolean = true,
   val uploadOnly: Boolean = false,
   branch: String? = null,
+  uploadPredix: String? = null,
 ) {
   val serverUrl: String by lazy { serverUrl ?: normalizeServerUrl() }
+
+  val uploadPrefix: String by lazy {
+    uploadPredix ?: System.getProperty(UPLOAD_PREFIX, "intellij-compile/v2").also {
+      check(!it.isNullOrBlank()) {
+        "$UPLOAD_PREFIX system property should not be blank."
+      }
+    }
+  }
+
   val branch: String by lazy {
     branch ?: System.getProperty(BRANCH_PROPERTY_NAME).also {
       check(!it.isNullOrBlank()) {
@@ -51,9 +61,11 @@ class CompilationCacheUploadConfiguration(
 
   companion object {
     private const val BRANCH_PROPERTY_NAME = "intellij.build.compiled.classes.branch"
+    private const val SERVER_URL = "intellij.build.compiled.classes.server.url"
+    private const val UPLOAD_PREFIX = "intellij.build.compiled.classes.upload.prefix"
 
     private fun normalizeServerUrl(): String {
-      val serverUrlPropertyName = "intellij.build.compiled.classes.server.url"
+      val serverUrlPropertyName = SERVER_URL
       var result = System.getProperty(serverUrlPropertyName)?.trimEnd('/')
       check(!result.isNullOrBlank()) {
         "Compilation cache archive server url is not defined. Please set $serverUrlPropertyName system property."
@@ -180,9 +192,6 @@ private fun isModuleOutputDirEmpty(moduleOutDir: Path): Boolean {
   return true
 }
 
-// TODO: Remove hardcoded constant
-internal const val UPLOAD_PREFIX = "intellij-compile/v2"
-
 private fun upload(config: CompilationCacheUploadConfiguration,
                    zipDir: Path,
                    messages: BuildMessages,
@@ -192,7 +201,7 @@ private fun upload(config: CompilationCacheUploadConfiguration,
   val metadataJson = Json.encodeToString(CompilationPartsMetadata(
     serverUrl = config.serverUrl,
     branch = config.branch,
-    prefix = UPLOAD_PREFIX,
+    prefix = config.uploadPrefix,
     files = items.associateTo(TreeMap()) { item ->
       item.name to item.hash!!
     },
@@ -345,10 +354,12 @@ fun fetchAndUnpackCompiledClasses(reportStatisticValue: (key: String, value: Str
 
       reportStatisticValue("compile-parts:download:time", TimeUnit.NANOSECONDS.toMillis((System.nanoTime() - start)).toString())
 
-      val downloadedBytes = toDownload.sumOf { Files.size(it.file) }
+      val downloadedSuccessfully = toDownload - failed.toSet()
+      val downloadedSuccessfullyBytes = downloadedSuccessfully.sumOf { Files.size(it.file) }
 
-      reportStatisticValue("compile-parts:downloaded:bytes", downloadedBytes.toString())
-      reportStatisticValue("compile-parts:downloaded:count", toDownload.size.toString())
+      reportStatisticValue("compile-parts:downloaded:bytes", downloadedSuccessfullyBytes.toString())
+      reportStatisticValue("compile-parts:downloaded:count", downloadedSuccessfully.size.toString())
+      reportStatisticValue("compile-parts:failed:count", failed.size.toString())
 
       if (!failed.isEmpty()) {
         error("Failed to fetch ${failed.size} file${if (failed.size > 1) "s" else ""}, see details above or in a trace file")

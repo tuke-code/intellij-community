@@ -2,7 +2,6 @@
 package com.intellij.openapi.wm.impl;
 
 import com.intellij.openapi.diagnostic.Logger;
-import com.intellij.openapi.util.SystemInfo;
 import com.intellij.openapi.util.SystemInfoRt;
 import com.intellij.openapi.wm.ex.WindowManagerEx;
 import com.intellij.util.ArrayUtil;
@@ -41,22 +40,31 @@ public final class X11UiUtil {
   private static final long NET_WM_STATE_TOGGLE = 2;
 
   /**
-   * List of all known tile WM, can be updated later
+   * List of all known tile WM in lower case, can be updated later
    */
-  private static final Set<String> TILE_WM = Set.of(
+  public static final Set<String> TILE_WM = Set.of(
     "awesome",
     "bspwm",
+    "cagebreak",
+    "compiz",
+    "dwl",
     "dwm",
     "frankenwm",
     "herbstluftwm",
+    "hyprland",
     "i3",
+    "ion",
+    "larswm",
     "leftwm",
     "notion",
     "qtile",
     "ratpoison",
+    "river",
     "snapwm",
     "spectrwm",
     "stumpwm",
+    "sway",
+    "wmii",
     "xmonad"
   );
 
@@ -302,6 +310,11 @@ public final class X11UiUtil {
   public static boolean isTileWM() {
     String desktop = System.getenv("XDG_CURRENT_DESKTOP");
     return SystemInfoRt.isUnix && !SystemInfoRt.isMac && desktop != null && TILE_WM.contains(desktop.toLowerCase(Locale.ENGLISH));
+  }
+
+  public static boolean isUndefinedDesktop() {
+    String desktop = System.getenv("XDG_CURRENT_DESKTOP");
+    return SystemInfoRt.isUnix && !SystemInfoRt.isMac && desktop == null;
   }
 
   private static boolean hasWindowProperty(JFrame frame, long name, long expected) {

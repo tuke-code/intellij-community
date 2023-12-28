@@ -19,7 +19,7 @@ import com.intellij.refactoring.changeSignature.ChangeSignatureProcessor
 import com.intellij.refactoring.changeSignature.ParameterInfoImpl
 import com.intellij.refactoring.util.CanonicalTypes
 import com.intellij.refactoring.util.CommonRefactoringUtil
-import com.intellij.rt.execution.junit.FileComparisonFailure
+import com.intellij.rt.execution.junit.FileComparisonData
 import com.intellij.testFramework.LightProjectDescriptor
 import com.intellij.util.VisibilityUtil
 import org.jetbrains.kotlin.asJava.getRepresentativeLightMethod
@@ -231,7 +231,8 @@ abstract class BaseKotlinChangeSignatureTest<C: KotlinModifiableChangeInfo<P>, P
             val afterFilePath: String = getAfterFilePath(file)
             try {
                 myFixture.checkResultByFile(file, afterFilePath, true)
-            } catch (e: FileComparisonFailure) {
+            } catch (e: AssertionError) {
+                if (e !is FileComparisonData) throw e
                 KotlinTestUtils.assertEqualsToFile(File(testDataDirectory, afterFilePath), psiFile.text)
             }
 
@@ -404,6 +405,18 @@ abstract class BaseKotlinChangeSignatureTest<C: KotlinModifiableChangeInfo<P>, P
 
     fun testBadSelection() {
         myFixture.configureByFile(getTestName(false) + "Before.kt")
+        assertNull(findTargetElement())
+    }
+
+    fun testDeconstructionEntry() {
+        myFixture.configureByText("dummy.kt", """
+            fun main(args: Array<String>) {
+
+    val result = mapOf<String, Int>("A" to 1, "B" to 2, "C" to 3)
+
+    result.forEach { (k<caret>ey, value) ->
+    }
+}""")
         assertNull(findTargetElement())
     }
 
@@ -730,6 +743,14 @@ abstract class BaseKotlinChangeSignatureTest<C: KotlinModifiableChangeInfo<P>, P
         clearParameters()
     }
 
+    fun testParameterConflictAlreadyExists() = doTestConflict {
+        removeParameter(0)
+    }
+
+    fun testParameterConflictAlreadyExistsInSuper() = doTestConflict {
+        removeParameter(0)
+    }
+
     fun testRemoveParameterBeforeLambda() = doTest { removeParameter(1) }
 
     fun testRemoveParameterKeepFormat1() = doTest { removeParameter(0) }
@@ -900,6 +921,20 @@ abstract class BaseKotlinChangeSignatureTest<C: KotlinModifiableChangeInfo<P>, P
         receiverParameterInfo = null
     }
 
+
+    //-----  conflicts with parents ------------------------
+    fun testAddReceiverConflict() = doTestConflict {
+        receiverParameterInfo = createKotlinParameter("receiver", "String", currentType = "kotlin.String")
+    }
+
+    fun testRemoveParameterInContainingClassConflict() = doTestConflict {
+        removeParameter(0)
+    }
+
+    fun testRemoveReceiverInContainingClassConflict() = doTestConflict {
+        removeParameter(0)
+    }
+
     // ----  renames ----------------------------------
 
 
@@ -985,6 +1020,9 @@ abstract class BaseKotlinChangeSignatureTest<C: KotlinModifiableChangeInfo<P>, P
         newParameters[0].setType("Int")
     }
 
+    fun testParameterInConstructorConflictAlreadyExists() = doTestConflict {
+        newParameters[0].setType("Int")
+    }
 
     fun testMakePrimaryConstructorPrivateNoParams() = doTest { setNewVisibility(Private) }
 

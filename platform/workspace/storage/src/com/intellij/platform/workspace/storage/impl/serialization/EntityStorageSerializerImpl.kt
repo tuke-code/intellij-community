@@ -11,7 +11,7 @@ import com.esotericsoftware.kryo.kryo5.objenesis.strategy.StdInstantiatorStrateg
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.platform.diagnostic.telemetry.JPS
 import com.intellij.platform.diagnostic.telemetry.TelemetryManager
-import com.intellij.platform.diagnostic.telemetry.helpers.addElapsedTimeMs
+import com.intellij.platform.diagnostic.telemetry.helpers.addElapsedTimeMillis
 import com.intellij.platform.workspace.storage.*
 import com.intellij.platform.workspace.storage.impl.*
 import com.intellij.platform.workspace.storage.impl.containers.BidirectionalLongMultiMap
@@ -22,9 +22,6 @@ import com.intellij.platform.workspace.storage.impl.serialization.registration.S
 import com.intellij.platform.workspace.storage.impl.serialization.registration.StorageRegistrar
 import com.intellij.platform.workspace.storage.impl.serialization.registration.registerEntitiesClasses
 import com.intellij.platform.workspace.storage.impl.serialization.serializer.StorageSerializerUtil
-import com.intellij.platform.workspace.storage.metadata.diff.CacheMetadataComparator
-import com.intellij.platform.workspace.storage.metadata.diff.ComparisonResult
-import com.intellij.platform.workspace.storage.metadata.model.StorageTypeMetadata
 import com.intellij.platform.workspace.storage.url.UrlRelativizer
 import com.intellij.platform.workspace.storage.url.VirtualFileUrl
 import com.intellij.platform.workspace.storage.url.VirtualFileUrlManager
@@ -44,18 +41,16 @@ public class EntityStorageSerializerImpl(
   private val urlRelativizer: UrlRelativizer? = null
 ) : EntityStorageSerializer {
   public companion object {
-    public const val STORAGE_SERIALIZATION_VERSION: String = "version3"
+    public const val STORAGE_SERIALIZATION_VERSION: String = "version5"
 
     private val loadCacheMetadataFromFileTimeMs: AtomicLong = AtomicLong()
 
     private fun setupOpenTelemetryReporting(meter: Meter) {
-      val loadCacheMetadataFromFileTimeGauge = meter.gaugeBuilder("workspaceModel.load.cache.metadata.from.file.ms")
-        .ofLongs().setDescription("Total time spent on metadata deserialization").buildObserver()
+      val loadCacheMetadataFromFileTimeCounter = meter.counterBuilder("workspaceModel.load.cache.metadata.from.file.ms").buildObserver()
 
-      meter.batchCallback({
-          loadCacheMetadataFromFileTimeGauge.record(loadCacheMetadataFromFileTimeMs.get())
-        },
-        loadCacheMetadataFromFileTimeGauge
+      meter.batchCallback(
+        { loadCacheMetadataFromFileTimeCounter.record(loadCacheMetadataFromFileTimeMs.get()) },
+        loadCacheMetadataFromFileTimeCounter
       )
     }
 
@@ -104,10 +99,11 @@ public class EntityStorageSerializerImpl(
       // Save version
       output.writeString(serializerDataFormatVersion)
 
-      val entitiesMetadata = getCacheMetadata(storage, typesResolver)
-      kryo.writeObject(output, entitiesMetadata)// Serialize all Entities, Entity Source and Symbolic id metadata from the storage
+      val cacheMetadata = getCacheMetadata(storage, typesResolver)
 
-      writeAndRegisterClasses(kryo, output, storage, entitiesMetadata, classCache) // Register entities classes
+      kryo.writeObject(output, cacheMetadata)// Serialize all Entities, Entity Source and Symbolic id metadata from the storage
+
+      writeAndRegisterClasses(kryo, output, storage, cacheMetadata, classCache) // Register entities classes
 
       // Write entity data and references
       kryo.writeClassAndObject(output, storage.entitiesByType)
@@ -151,14 +147,13 @@ public class EntityStorageSerializerImpl(
         val metadataDeserializationStartTimeMs = System.currentTimeMillis()
 
         val cacheMetadata = kryo.readObject(input, CacheMetadata::class.java)
-        val currentMetadata = loadCurrentEntitiesMetadata(cacheMetadata, typesResolver)
-        val comparisonResult = compareMetadata(cacheMetadata, currentMetadata)
+        val comparisonResult = compareWithCurrentEntitiesMetadata(cacheMetadata, typesResolver)
         if (!comparisonResult.areEquals) {
           LOG.info("Cache isn't loaded. Reason:\n${comparisonResult.info}")
           return Result.failure(UnsupportedEntitiesVersionException())
         }
 
-        loadCacheMetadataFromFileTimeMs.addElapsedTimeMs(metadataDeserializationStartTimeMs)
+        loadCacheMetadataFromFileTimeMs.addElapsedTimeMillis(metadataDeserializationStartTimeMs)
 
         time = logAndResetTime(time) { measuredTime -> "Read cache metadata and compare it with the existing metadata: $measuredTime ns" }
 
@@ -218,17 +213,6 @@ public class EntityStorageSerializerImpl(
       }
     }
     return Result.success(deserializedCache)
-  }
-
-
-  private fun compareMetadata(cacheMetadata: CacheMetadata, currentMetadata: List<StorageTypeMetadata>?): ComparisonResult {
-    if (currentMetadata == null) {
-      return object : ComparisonResult {
-        override val areEquals: Boolean = false
-        override val info: String = "Failed to load existing metadata"
-      }
-    }
-    return CacheMetadataComparator().areEquals(cacheMetadata.toList(), currentMetadata)
   }
 
 

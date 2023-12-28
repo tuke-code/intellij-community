@@ -33,12 +33,16 @@
                     dynamic="true"/>
     <extensionPoint qualifiedName="org.jetbrains.plugins.gradle.importCustomizer" interface="org.jetbrains.plugins.gradle.service.project.GradleImportCustomizer"
                     dynamic="true"/>
+    <extensionPoint qualifiedName="org.jetbrains.plugins.gradle.previewCustomizer" interface="org.jetbrains.plugins.gradle.service.project.GradlePreviewCustomizer"
+                    dynamic="true"/>
     <extensionPoint qualifiedName="org.jetbrains.plugins.gradle.executionEnvironmentProvider" interface="org.jetbrains.plugins.gradle.execution.build.GradleExecutionEnvironmentProvider"
                     dynamic="true"/>
     <extensionPoint qualifiedName="org.jetbrains.plugins.gradle.orderEnumerationHandlerFactory"
                     interface="org.jetbrains.plugins.gradle.execution.GradleOrderEnumeratorHandler$FactoryImpl"
                     dynamic="true"/>
     <extensionPoint qualifiedName="org.jetbrains.plugins.gradle.issueChecker" interface="org.jetbrains.plugins.gradle.issue.GradleIssueChecker"
+                    dynamic="true"/>
+    <extensionPoint qualifiedName="org.jetbrains.plugins.gradle.gradleJvmResolver" interface="org.jetbrains.plugins.gradle.resolvers.GradleJvmResolver"
                     dynamic="true"/>
     <extensionPoint qualifiedName="org.jetbrains.plugins.gradle.targetEnvironmentAware" interface="org.jetbrains.plugins.gradle.execution.target.GradleTargetEnvironmentAware"
                     dynamic="true"/>
@@ -70,6 +74,8 @@
       implementation="org.jetbrains.plugins.gradle.service.project.GradleAutoImportAware$WrapperConfigCollector"/>
     <autoReloadSettingsCollector
       implementation="org.jetbrains.plugins.gradle.service.project.GradleAutoImportAware$GradleScriptCollector"/>
+    <gradleJvmResolver implementation="org.jetbrains.plugins.gradle.resolvers.GradleJvmGradlePropertiesResolver"/>
+    <gradleJvmResolver implementation="org.jetbrains.plugins.gradle.resolvers.GradleJvmGradleLocalJavaHomeResolver"/>
   </extensions>
 
   <extensions defaultExtensionNs="com.intellij">

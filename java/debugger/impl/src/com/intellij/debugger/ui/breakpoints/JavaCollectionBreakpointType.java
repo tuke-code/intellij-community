@@ -27,7 +27,7 @@ import org.jetbrains.java.debugger.breakpoints.properties.JavaFieldBreakpointPro
 import javax.swing.*;
 
 @ApiStatus.Experimental
-public class JavaCollectionBreakpointType extends JavaLineBreakpointTypeBase<JavaCollectionBreakpointProperties> {
+public final class JavaCollectionBreakpointType extends JavaLineBreakpointTypeBase<JavaCollectionBreakpointProperties> {
 
   public JavaCollectionBreakpointType() {
     super("java-collection", JavaDebuggerBundle.message("collection.watchpoints.tab.title"));
@@ -80,7 +80,7 @@ public class JavaCollectionBreakpointType extends JavaLineBreakpointTypeBase<Jav
   }
 
   //@Override
-  protected String getHelpID() {
+  private static String getHelpID() {
     return HelpID.COLLECTION_WATCHPOINTS;
   }
 

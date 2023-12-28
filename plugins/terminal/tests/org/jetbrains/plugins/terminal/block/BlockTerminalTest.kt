@@ -11,6 +11,7 @@ import com.intellij.testFramework.ProjectRule
 import com.intellij.testFramework.RuleChain
 import com.jediterm.core.util.TermSize
 import kotlinx.coroutines.*
+import org.jetbrains.plugins.terminal.block.testApps.MoveCursorToLineEndAndPrint
 import org.jetbrains.plugins.terminal.block.testApps.SimpleTextRepeater
 import org.jetbrains.plugins.terminal.exp.*
 import org.jetbrains.plugins.terminal.exp.completion.IJShellRuntimeDataProvider
@@ -64,16 +65,16 @@ class BlockTerminalTest(private val shellPath: String) {
     val termSize = TermSize(20, 10)
     val session = startBlockTerminalSession(termSize)
     val outputFuture: CompletableFuture<CommandResult> = getCommandResultFuture(session)
-    val items = listOf(SimpleTextRepeater.Item("Hello, World", termSize.rows * 3),
-                       SimpleTextRepeater.Item("Done", 1))
+    val items = listOf(SimpleTextRepeater.Item("Hello, World", false, true, termSize.rows * 3),
+                       SimpleTextRepeater.Item("Done", false, true, 1))
     session.sendCommandToExecuteWithoutAddingToHistory(SimpleTextRepeater.Helper.generateCommandLine(items))
     assertCommandResult(0, SimpleTextRepeater.Helper.getExpectedOutput(items), outputFuture)
   }
 
   @Test
   fun `test large output`() {
-    val items = listOf(SimpleTextRepeater.Item(UUID.randomUUID().toString(), 10_000),
-                       SimpleTextRepeater.Item("Done", 1))
+    val items = listOf(SimpleTextRepeater.Item(UUID.randomUUID().toString(), false, true, 10_000),
+                       SimpleTextRepeater.Item("Done", false, true, 1))
     setTerminalBufferMaxLines(items.sumOf { it.count })
     val session = startBlockTerminalSession(TermSize(200, 100))
     PlatformTestUtil.startPerformanceTest("large output is read", 30000) {
@@ -87,7 +88,7 @@ class BlockTerminalTest(private val shellPath: String) {
   fun `concurrent command and generator execution`() {
     val session = startBlockTerminalSession()
     // ShellType.FISH doesn't support generators yet
-    Assume.assumeTrue(setOf(ShellType.ZSH, ShellType.BASH).contains(session.shellIntegration?.shellType))
+    Assume.assumeTrue(setOf(ShellType.ZSH, ShellType.BASH).contains(session.shellIntegration.shellType))
     runBlocking {
       for (stepId in 1..100) {
         val startTime = TimeSource.Monotonic.markNow()
@@ -98,7 +99,7 @@ class BlockTerminalTest(private val shellPath: String) {
         }
         withTimeout(20.seconds) { generatorCommandSent.await() }
         delay((1..50).random().milliseconds) // wait a little to start generator
-        session.sendCommandToExecute("echo foo")
+        session.sendCommandToExecuteWithoutAddingToHistory("echo foo")
         val env: ShellEnvironment? = withTimeout(20.seconds) { envListDeferred.await() }
         Assert.assertTrue(env != null && env.envs.isNotEmpty())
         assertCommandResult(0, "foo\n", outputFuture)
@@ -107,7 +108,51 @@ class BlockTerminalTest(private val shellPath: String) {
     }
   }
 
-  private fun createCommandSentDeferred(session: TerminalSession): CompletableDeferred<Unit> {
+  @Test
+  fun `long output lines without line breaks`() {
+    val termSize = TermSize(20, 10)
+    val session = startBlockTerminalSession(termSize)
+    val outputFuture: CompletableFuture<CommandResult> = getCommandResultFuture(session)
+    val items = listOf(SimpleTextRepeater.Item("_", true, false, termSize.columns),
+                       SimpleTextRepeater.Item.NEW_LINE /* finish with a new line to get rid of trailing '%' in zsh */)
+    session.sendCommandToExecuteWithoutAddingToHistory(SimpleTextRepeater.Helper.generateCommandLine(items))
+    assertCommandResult(0, SimpleTextRepeater.Helper.getExpectedOutput(items), outputFuture)
+  }
+
+  @Test
+  fun `mix of empty area and text #1`() {
+    val termSize = TermSize(10, 10)
+    val session = startBlockTerminalSession(termSize)
+    val outputFuture: CompletableFuture<CommandResult> = getCommandResultFuture(session)
+    val textsToPrint = listOf("foo")
+    session.sendCommandToExecuteWithoutAddingToHistory(MoveCursorToLineEndAndPrint.Helper.generateCommandLine(textsToPrint))
+    assertCommandResult(0, MoveCursorToLineEndAndPrint.Helper.getExpectedOutput(termSize, textsToPrint), outputFuture)
+  }
+
+  @Test
+  fun `mix of empty area and text #2`() {
+    val termSize = TermSize(10, 10)
+    val session = startBlockTerminalSession(termSize)
+    val outputFuture: CompletableFuture<CommandResult> = getCommandResultFuture(session)
+    val textsToPrint = listOf("foo", "a".repeat(termSize.columns  + 1), "b")
+    session.sendCommandToExecuteWithoutAddingToHistory(MoveCursorToLineEndAndPrint.Helper.generateCommandLine(textsToPrint))
+    assertCommandResult(0, MoveCursorToLineEndAndPrint.Helper.getExpectedOutput(termSize, textsToPrint), outputFuture)
+  }
+
+  @Test
+  fun `mix of empty area and text #3`() {
+    val termSize = TermSize(15, 15)
+    val session = startBlockTerminalSession(termSize)
+    val outputFuture: CompletableFuture<CommandResult> = getCommandResultFuture(session)
+    val textsToPrint = ('a'..'z').map {
+      val cnt = it - 'a'
+      it.toString().repeat(cnt) + cnt.toString()
+    }
+    session.sendCommandToExecuteWithoutAddingToHistory(MoveCursorToLineEndAndPrint.Helper.generateCommandLine(textsToPrint))
+    assertCommandResult(0, MoveCursorToLineEndAndPrint.Helper.getExpectedOutput(termSize, textsToPrint), outputFuture)
+  }
+
+  private fun createCommandSentDeferred(session: BlockTerminalSession): CompletableDeferred<Unit> {
     val generatorCommandSent = CompletableDeferred<Unit>()
     val generatorCommandSentDisposable = Disposer.newDisposable().also { disposable ->
       generatorCommandSent.invokeOnCompletion { Disposer.dispose(disposable) }
@@ -130,8 +175,8 @@ class BlockTerminalTest(private val shellPath: String) {
   private fun startBlockTerminalSession(termSize: TermSize = TermSize(80, 24)) =
     TerminalSessionTestUtil.startBlockTerminalSession(projectRule.project, shellPath, disposableRule.disposable, termSize)
 
-  private fun TerminalSession.sendCommandToExecuteWithoutAddingToHistory(shellCommand: String) {
-    this.sendCommandToExecute(" $shellCommand")
+  private fun BlockTerminalSession.sendCommandToExecuteWithoutAddingToHistory(shellCommand: String) {
+    this.commandManager.sendCommandToExecute(" $shellCommand")
   }
 
   @Suppress("SameParameterValue")
@@ -149,7 +194,7 @@ class BlockTerminalTest(private val shellPath: String) {
   }
 }
 
-fun getCommandResultFuture(session: TerminalSession): CompletableFuture<CommandResult> {
+fun getCommandResultFuture(session: BlockTerminalSession): CompletableFuture<CommandResult> {
   val disposable = Disposer.newDisposable(session)
   val scraper = ShellCommandOutputScraper(session)
   val lastOutput: AtomicReference<StyledCommandOutput> = AtomicReference()

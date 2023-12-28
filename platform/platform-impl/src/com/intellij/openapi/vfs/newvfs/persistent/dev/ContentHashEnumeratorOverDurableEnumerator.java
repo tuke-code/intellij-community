@@ -8,7 +8,7 @@ import com.intellij.openapi.vfs.newvfs.persistent.dev.enumerator.DurableEnumerat
 import com.intellij.util.hash.ContentHashEnumerator;
 import com.intellij.util.io.CleanableStorage;
 import com.intellij.util.io.ScannableDataEnumeratorEx;
-import com.intellij.util.io.dev.appendonlylog.AppendOnlyLog;
+import com.intellij.util.io.dev.enumerator.DataExternalizerEx;
 import com.intellij.util.io.dev.enumerator.KeyDescriptorEx;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -184,7 +184,7 @@ public class ContentHashEnumeratorOverDurableEnumerator implements ContentHashEn
     }
 
     @Override
-    public int hashCodeOf(byte[] contentHash) {
+    public int getHashCode(byte[] contentHash) {
       int hashCode = 0; // take first 4 bytes, this should be good enough hash given we reference git revisions with 7-8 hex digits
       for (int i = 0; i < 4; i++) {
         hashCode = (hashCode << 8) + (contentHash[i] & 0xFF);
@@ -193,15 +193,14 @@ public class ContentHashEnumeratorOverDurableEnumerator implements ContentHashEn
     }
 
     @Override
-    public boolean areEqual(byte[] hash1,
-                            byte[] hash2) {
+    public boolean isEqual(byte[] hash1,
+                           byte[] hash2) {
       return Arrays.equals(hash1, hash2);
     }
 
     @Override
-    public long saveToLog(byte @NotNull [] hash,
-                          @NotNull AppendOnlyLog log) throws IOException {
-      return log.append(hash);
+    public KnownSizeRecordWriter writerFor(byte @NotNull [] hash) throws IOException {
+      return DataExternalizerEx.fromBytes(hash);
     }
 
     @Override

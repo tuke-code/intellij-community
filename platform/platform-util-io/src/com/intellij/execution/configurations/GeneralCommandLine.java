@@ -21,6 +21,7 @@ import com.intellij.util.io.IdeUtilIoBundle;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenCustomHashMap;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.TestOnly;
 
 import java.io.File;
 import java.io.IOException;
@@ -64,7 +65,7 @@ import java.util.function.Function;
  */
 public class GeneralCommandLine implements UserDataHolder {
   private static final Logger LOG = Logger.getInstance(GeneralCommandLine.class);
-  private Function<ProcessBuilder, Process> myProcessCreator;
+  private @Nullable Function<ProcessBuilder, Process> myProcessCreator;
 
   /**
    * Determines the scope of a parent environment passed to a child process.
@@ -87,7 +88,6 @@ public class GeneralCommandLine implements UserDataHolder {
   private boolean myRedirectErrorStream;
   private File myInputFile;
   private Map<Object, Object> myUserData;
-  private boolean myIsEscapingForLocalRun = true;
 
   public GeneralCommandLine() {
     this(Collections.emptyList());
@@ -279,35 +279,6 @@ public class GeneralCommandLine implements UserDataHolder {
   }
 
   /**
-   * See {@link #withEscapingForLocalRun(boolean)}.
-   * <p>
-   * The default is {@code true}.
-   *
-   * @return {@code true if arguments and environment variables will be checked and <b>altered</b> before starting the process,
-   * {@code false} otherwise.
-   */
-  public boolean isEscapingForLocalRun() {
-    return myIsEscapingForLocalRun;
-  }
-
-  /**
-   * Allows to enable or disable the validation and escaping for local run.
-   * <p>
-   * Historically, {@link GeneralCommandLine} was supposed to prepare processes locally. Later, it turned out that
-   * {@link GeneralCommandLine#createProcess()}} is also used sometimes for running commands on other machines with different operating
-   * systems.
-   * <p>
-   * Quoting, which is required for running processes locally, may be harmful for remote operating systems. F.i., arguments with spaces
-   * must be quoted before passing them into {@code CreateProcess} on Windows, and must not be quoted for {@code exec} on a Unix-like OS.
-   * <p>
-   * See also {@link #setProcessCreator}.
-   */
-  public GeneralCommandLine withEscapingForLocalRun(boolean isEscapingForLocalRun) {
-    myIsEscapingForLocalRun = isEscapingForLocalRun;
-    return this;
-  }
-
-  /**
    * Returns string representation of this command line.<br/>
    * Warning: resulting string is not OS-dependent - <b>do not</b> use it for executing this command line.
    *
@@ -374,7 +345,7 @@ public class GeneralCommandLine implements UserDataHolder {
     }
 
     List<String> commands;
-    if (myIsEscapingForLocalRun) {
+    if (myProcessCreator == null) {
       commands = validateAndPrepareCommandLineForLocalRun();
     }
     else {
@@ -396,12 +367,24 @@ public class GeneralCommandLine implements UserDataHolder {
     }
   }
 
-  protected final Function<ProcessBuilder, Process> getProcessCreator() {
+  protected final @Nullable Function<ProcessBuilder, Process> getProcessCreator() {
     return myProcessCreator;
   }
 
-  public final void setProcessCreator(Function<ProcessBuilder, Process> processCreator) {
+  /**
+   * Allows to specify a handler for creating processes different from {@link ProcessBuilder#start()}.
+   * <p>
+   * Quoting, which is required for running processes locally, may be harmful for remote operating systems. F.i., arguments with spaces
+   * must be quoted before passing them into {@code CreateProcess} on Windows, and must not be quoted for {@code exec} on a Unix-like OS.
+   * Therefore, when the process creator is not null, various validations and mangling of arguments and environment variables are disabled.
+   */
+  public final void setProcessCreator(@Nullable Function<ProcessBuilder, Process> processCreator) {
     myProcessCreator = processCreator;
+  }
+
+  @TestOnly
+  public final boolean isProcessCreatorSet() {
+    return myProcessCreator != null;
   }
 
   public @NotNull ProcessBuilder toProcessBuilder() throws ExecutionException {
@@ -503,18 +486,18 @@ public class GeneralCommandLine implements UserDataHolder {
     return builder;
   }
 
-  protected Process createProcess(ProcessBuilder processBuilder) throws IOException {
+  protected @NotNull Process createProcess(ProcessBuilder processBuilder) throws IOException {
     return myProcessCreator != null ? myProcessCreator.apply(processBuilder) : processBuilder.start();
   }
 
   protected void setupEnvironment(@NotNull Map<String, String> environment) {
     environment.clear();
 
-    if (myParentEnvironmentType != ParentEnvironmentType.NONE) {
+    if (myParentEnvironmentType != ParentEnvironmentType.NONE && myProcessCreator == null) {
       environment.putAll(getParentEnvironment());
     }
 
-    if (SystemInfo.isUnix) {
+    if (SystemInfo.isUnix && myProcessCreator == null) {
       File workDirectory = getWorkDirectory();
       if (workDirectory != null) {
         environment.put("PWD", FileUtil.toSystemDependentName(workDirectory.getAbsolutePath()));
@@ -522,7 +505,7 @@ public class GeneralCommandLine implements UserDataHolder {
     }
 
     if (!myEnvParams.isEmpty()) {
-      if (SystemInfo.isWindows) {
+      if (SystemInfo.isWindows && myProcessCreator == null) {
         Map<String, String> envVars = CollectionFactory.createCaseInsensitiveStringMap();
         envVars.putAll(environment);
         envVars.putAll(myEnvParams);

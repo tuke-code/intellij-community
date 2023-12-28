@@ -757,7 +757,7 @@
       <add-to-group group-id="RunContextPopupGroup" anchor="after" relative-to-action="OpenInRightSplit"/>
     </reference>
 
-    <group id="RevealGroup" popup="true">
+    <group id="RevealGroup" popup="true" class="com.intellij.ide.actions.RevealGroup">
       <action id="RevealIn" class="com.intellij.ide.actions.RevealFileAction"/>
       <reference ref="ShowFilePath"/>
 
@@ -1702,7 +1702,7 @@
     <group id="RunToolbarMainActionGroup">
       <action class="com.intellij.execution.ui.RedesignedRunConfigurationSelector" id="RedesignedRunConfigurationSelector"/>
       <group id="compositeResumeGroup" searchable="false" popup="false"/>
-      <group id="RunToolbarTopLevelExecutorActionGroup" class="com.intellij.execution.ui.RunToolbarTopLevelExecutorActionGroup" />
+      <group id="RunToolbarTopLevelExecutorActionGroup" class="com.intellij.execution.ui.RunToolbarTopLevelExecutorActionGroup" popup="false"/>
       <reference ref="Stop"/>
       <action id="MoreRunToolbarActions" class="com.intellij.execution.ui.MoreRunToolbarActions" />
       <action id="InactiveStopActionPlaceholder" class="com.intellij.execution.ui.InactiveStopActionPlaceholder" />
@@ -1745,12 +1745,12 @@
       <action id="DumpExtensions" internal="true" class="com.intellij.internal.DumpExtensionsAction"/>
       <action id="DumpInspectionDescriptions" internal="true" class="com.intellij.internal.DumpInspectionDescriptionsAction"/>
       <action id="DumpIntentionsDescriptions" internal="true" class="com.intellij.internal.DumpIntentionsAction"/>
-      <action id="DumpConfigurationTypes" internal="true" class="com.intellij.internal.DumpConfigurationTypesAction"/>
       <action id="ScanSourceCommentsAction" internal="true" class="com.intellij.tools.ScanSourceCommentsAction"/>
       <action id="DumpScreenConfiguration" class="com.intellij.internal.DumpScreenConfigurationAction"/>
       <action id="DumpIElementTypesAction" internal="true" class="com.intellij.internal.DumpIElementTypesAction"/>
       <action id="DumpLoadedInspectionsAction" internal="true" class="com.intellij.internal.DumpLoadedInspectionsAction"/>
       <action id="DumpPluginDescriptorsAction" internal="true" class="com.intellij.internal.DumpPluginDescriptorsAction"/>
+      <action id="DumpRunConfigurationTypesAction" internal="true" class="com.intellij.internal.DumpRunConfigurationTypesAction"/>
       <add-to-group group-id="Internal" anchor="last"/>
     </group>
     <group id="Internal.VFS" popup="true" internal="true">

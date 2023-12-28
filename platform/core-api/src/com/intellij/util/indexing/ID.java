@@ -5,7 +5,7 @@ import com.intellij.ide.plugins.PluginUtil;
 import com.intellij.openapi.application.PathManager;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.extensions.PluginId;
-import com.intellij.util.containers.UnmodifiableHashMap;
+import com.intellij.util.Java11Shim;
 import com.intellij.util.io.SimpleStringPersistentEnumerator;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NonNls;
@@ -19,19 +19,23 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 
+import static com.intellij.util.containers.UtilKt.with;
+import static com.intellij.util.containers.UtilKt.without;
+
 /**
  * @author Eugene Zhuravlev
  */
 public class ID<K, V> extends IndexId<K,V> {
   private static final Logger LOG = Logger.getInstance(ID.class);
+  private static final PluginId CORE_PLUGIN_ID = PluginId.getId("com.intellij");
 
   private static volatile SimpleStringPersistentEnumerator nameToIdRegistry = new SimpleStringPersistentEnumerator(getEnumFile());
 
   private static final Map<String, ID<?, ?>> idObjects = new ConcurrentHashMap<>();
 
   private static final Object lock = new Object();
-  private static volatile UnmodifiableHashMap<ID<?, ?>, PluginId> idToPluginId = UnmodifiableHashMap.empty();
-  private static volatile UnmodifiableHashMap<ID<?, ?>, Throwable> idToRegistrationStackTrace = UnmodifiableHashMap.empty();
+  private static volatile Map<@NotNull ID<?, ?>, @NotNull PluginId> idToPluginId = Java11Shim.INSTANCE.mapOf();
+  private static volatile Map<@NotNull ID<?, ?>, @NotNull Throwable> idToRegistrationStackTrace = Java11Shim.INSTANCE.mapOf();
   static final int MAX_NUMBER_OF_INDICES = Short.MAX_VALUE;
 
   private volatile int uniqueId;
@@ -93,17 +97,14 @@ public class ID<K, V> extends IndexId<K,V> {
 
     synchronized (lock) {
       PluginId oldPluginId = idToPluginId.get(this);
-      assert oldPluginId == null : "ID with name '" +
-                                   name +
-                                   "' is already registered in " +
-                                   oldPluginId +
-                                   " but current caller is " +
-                                   pluginId;
+      assert oldPluginId == null : "ID with name '" + name +
+                                   "' is already registered in " + oldPluginId +
+                                   " but current caller is " + pluginId;
 
       //noinspection AssignmentToStaticFieldFromInstanceMethod
-      idToPluginId = idToPluginId.with(this, pluginId);
+      idToPluginId = with(idToPluginId, this, pluginId == null ? CORE_PLUGIN_ID : pluginId);
       //noinspection AssignmentToStaticFieldFromInstanceMethod
-      idToRegistrationStackTrace = idToRegistrationStackTrace.with(this, new Throwable());
+      idToRegistrationStackTrace = with(idToRegistrationStackTrace, this, new Throwable());
     }
   }
 
@@ -120,7 +121,7 @@ public class ID<K, V> extends IndexId<K,V> {
   }
 
   public static @NotNull <K, V> ID<K, V> create(@NonNls @NotNull String name) {
-    PluginId pluginId = getCallerPluginId();
+    PluginId pluginId = PluginUtil.getInstance().getCallerPlugin(3);
     synchronized (lock) {
       ID<K, V> found = findByName(name, true, pluginId);
       return found == null ? new ID<>(name, pluginId) : found;
@@ -140,17 +141,17 @@ public class ID<K, V> extends IndexId<K,V> {
     if (checkCallerPlugin && id != null) {
       PluginId actualPluginId = idToPluginId.get(id);
 
-      String actualPluginIdStr = actualPluginId == null ? "IJ Core" : actualPluginId.getIdString();
-      String requiredPluginIdStr = requiredPluginId == null ? "IJ Core" : requiredPluginId.getIdString();
+      String actualPluginIdStr = actualPluginId == null ? "" : actualPluginId.getIdString();
+      String requiredPluginIdStr = requiredPluginId == null ? "" : requiredPluginId.getIdString();
 
       if (!Objects.equals(actualPluginIdStr, requiredPluginIdStr)) {
         Throwable registrationStackTrace = idToRegistrationStackTrace.get(id);
         String message = getInvalidIdAccessMessage(name, actualPluginIdStr, requiredPluginIdStr, registrationStackTrace);
-        if (registrationStackTrace != null) {
-          throw new AssertionError(message, registrationStackTrace);
+        if (registrationStackTrace == null) {
+          throw new AssertionError(message);
         }
         else {
-          throw new AssertionError(message);
+          throw new AssertionError(message, registrationStackTrace);
         }
       }
     }
@@ -195,18 +196,13 @@ public class ID<K, V> extends IndexId<K,V> {
   }
 
   @ApiStatus.Internal
-  protected static @Nullable PluginId getCallerPluginId() {
-    return PluginUtil.getInstance().getCallerPlugin(4);
-  }
-
-  @ApiStatus.Internal
   public static void unloadId(@NotNull ID<?, ?> id) {
     String name = id.getName();
     synchronized (lock) {
       ID<?, ?> oldID = idObjects.remove(name);
       LOG.assertTrue(id.equals(oldID), "Failed to unload: " + name);
-      idToPluginId = idToPluginId.without(id);
-      idToRegistrationStackTrace = idToRegistrationStackTrace.without(id);
+      idToPluginId = without(idToPluginId, id);
+      idToRegistrationStackTrace = without(idToRegistrationStackTrace, id);
     }
   }
 }

@@ -11,16 +11,18 @@ import com.intellij.platform.ide.progress.runWithModalProgressBlocking
 import com.intellij.util.application
 import org.intellij.plugins.markdown.MarkdownBundle
 import org.jdom.Element
+import org.jetbrains.annotations.ApiStatus
 
 private const val FIRST_EDITOR = "first_editor"
 private const val SECOND_EDITOR = "second_editor"
 private const val SPLIT_LAYOUT = "split_layout"
 
+@ApiStatus.Internal
 abstract class SplitTextEditorProvider(
   private val firstProvider: FileEditorProvider,
   private val secondProvider: FileEditorProvider
 ): AsyncFileEditorProvider, DumbAware {
-  private val editorTypeId = "split-provider[${firstProvider.getEditorTypeId()};${secondProvider.getEditorTypeId()}]"
+  private val editorTypeId = createSplitEditorProviderTypeId(firstProvider.editorTypeId, secondProvider.editorTypeId)
 
   override fun accept(project: Project, file: VirtualFile): Boolean {
     return firstProvider.accept(project, file) && secondProvider.accept(project, file)
@@ -72,13 +74,6 @@ abstract class SplitTextEditorProvider(
     return sourceElement.getAttribute(SPLIT_LAYOUT)?.value
   }
 
-  override fun readState(sourceElement: Element, project: Project, file: VirtualFile): FileEditorState {
-    val firstState = readFirstProviderState(sourceElement, project, file)
-    val secondState = readSecondProviderState(sourceElement, project, file)
-    val layoutName = readSplitLayoutState(sourceElement, project, file)
-    return SplitFileEditor.MyFileEditorState(/* splitLayout = */ layoutName, /* firstState = */ firstState, /* secondState = */ secondState)
-  }
-
   protected fun writeFirstProviderState(state: FileEditorState?, project: Project, targetElement: Element) {
     val child = Element(FIRST_EDITOR)
     if (state != null) {
@@ -99,15 +94,6 @@ abstract class SplitTextEditorProvider(
     if (splitLayout != null) {
       targetElement.setAttribute(SPLIT_LAYOUT, splitLayout)
     }
-  }
-
-  override fun writeState(state: FileEditorState, project: Project, targetElement: Element) {
-    if (state !is SplitFileEditor.MyFileEditorState) {
-      return
-    }
-    writeFirstProviderState(state = state.firstState, project = project, targetElement = targetElement)
-    writeSecondProviderState(state = state.secondState, project = project, targetElement = targetElement)
-    writeSplitLayoutState(splitLayout = state.splitLayout, targetElement = targetElement)
   }
 
   protected abstract fun createSplitEditor(firstEditor: FileEditor, secondEditor: FileEditor): FileEditor
@@ -154,4 +140,9 @@ private suspend fun createEditorBuilderAsync(
       return provider.createEditor(project, file)
     }
   }
+}
+
+@ApiStatus.Internal
+fun createSplitEditorProviderTypeId(first: String, second: String): String {
+  return "split-provider[$first;$second]"
 }

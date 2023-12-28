@@ -27,7 +27,7 @@ import javax.swing.*;
 /**
  * @author Eugene Zhuravlev
  */
-public class JavaFieldBreakpointType extends JavaLineBreakpointTypeBase<JavaFieldBreakpointProperties> {
+public final class JavaFieldBreakpointType extends JavaLineBreakpointTypeBase<JavaFieldBreakpointProperties> {
   public JavaFieldBreakpointType() {
     super("java-field", JavaDebuggerBundle.message("field.watchpoints.tab.title"));
   }
@@ -74,7 +74,7 @@ public class JavaFieldBreakpointType extends JavaLineBreakpointTypeBase<JavaFiel
   }
 
   //@Override
-  protected String getHelpID() {
+  private static String getHelpID() {
     return HelpID.FIELD_WATCHPOINTS;
   }
 

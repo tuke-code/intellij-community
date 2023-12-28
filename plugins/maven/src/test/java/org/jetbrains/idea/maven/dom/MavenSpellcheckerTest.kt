@@ -21,11 +21,9 @@ import kotlinx.coroutines.runBlocking
 import org.junit.Test
 
 class MavenSpellcheckerTest : MavenDomTestCase() {
-  override fun runInDispatchThread() = true
-
   @Test
   fun testSpell() = runBlocking {
-    myFixture.enableInspections(SpellCheckingInspection::class.java)
+    fixture.enableInspections(SpellCheckingInspection::class.java)
 
     createProjectPom("""
                        <groupId>test</groupId>

@@ -76,11 +76,14 @@
     <colorSettingsPage implementation="de.plushnikov.intellij.plugin.language.LombokConfigColorSettingsPage"/>
     <completion.contributor language="Lombok.Config"
                             implementationClass="de.plushnikov.intellij.plugin.language.LombokConfigCompletionContributor"/>
+
+    <completion.contributor language="JAVA" implementationClass="de.plushnikov.intellij.plugin.completion.LombokOnXCompletionContributorFilter" order="first"/>
     <lang.commenter language="Lombok.Config"
                     implementationClass="de.plushnikov.intellij.plugin.language.LombokConfigCommentor"/>
     <fileBasedIndex implementation="de.plushnikov.intellij.plugin.lombokconfig.LombokConfigIndex"/>
 
     <custom.exception.handler implementation="de.plushnikov.intellij.plugin.handler.SneakyThrowsExceptionHandler"/>
+    <java.error.fix errorCode="unhandled.exceptions" implementationClass="de.plushnikov.intellij.plugin.handler.AddSneakyThrowsAnnotationCommandAction"/>
 
     <implicit.resource.closer
       implementation="de.plushnikov.intellij.plugin.extension.LombokCleanUpImplicitResourceCloser"/>

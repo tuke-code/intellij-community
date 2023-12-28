@@ -20,13 +20,7 @@ import org.jetbrains.kotlin.idea.fir.completion.test.handlers.AbstractK2Completi
 import org.jetbrains.kotlin.idea.fir.completion.wheigher.AbstractHighLevelWeigherTest
 import org.jetbrains.kotlin.idea.fir.documentation.AbstractFirQuickDocTest
 import org.jetbrains.kotlin.idea.fir.externalAnnotations.AbstractK2ExternalAnnotationTest
-import org.jetbrains.kotlin.idea.fir.findUsages.AbstractFindUsagesFirTest
-import org.jetbrains.kotlin.idea.fir.findUsages.AbstractFindUsagesWithDisableComponentSearchFirTest
-import org.jetbrains.kotlin.idea.fir.findUsages.AbstractKotlinFindUsagesWithLibraryFirTest
-import org.jetbrains.kotlin.idea.fir.findUsages.AbstractKotlinFindUsagesWithStdlibFirTest
-import org.jetbrains.kotlin.idea.fir.findUsages.AbstractKotlinGroupUsagesBySimilarityFeaturesFirTest
-import org.jetbrains.kotlin.idea.fir.findUsages.AbstractKotlinGroupUsagesBySimilarityFirTest
-import org.jetbrains.kotlin.idea.fir.findUsages.AbstractKotlinScriptFindUsagesFirTest
+import org.jetbrains.kotlin.idea.fir.findUsages.*
 import org.jetbrains.kotlin.idea.fir.imports.AbstractFirJvmOptimizeImportsTest
 import org.jetbrains.kotlin.idea.fir.low.level.api.AbstractFirLibraryModuleDeclarationResolveTest
 import org.jetbrains.kotlin.idea.fir.navigation.AbstractFirGotoDeclarationTest
@@ -38,12 +32,12 @@ import org.jetbrains.kotlin.idea.fir.quickfix.AbstractHighLevelQuickFixTest
 import org.jetbrains.kotlin.idea.fir.resolve.*
 import org.jetbrains.kotlin.idea.fir.search.AbstractHLImplementationSearcherTest
 import org.jetbrains.kotlin.idea.fir.shortenRefs.AbstractFirShortenRefsTest
-import org.jetbrains.kotlin.idea.imports.AbstractK2AutoImportTest
-import org.jetbrains.kotlin.idea.imports.AbstractK2FilteringAutoImportTest
+import org.jetbrains.kotlin.idea.fir.imports.AbstractK2AutoImportTest
+import org.jetbrains.kotlin.idea.fir.imports.AbstractK2FilteringAutoImportTest
 import org.jetbrains.kotlin.idea.k2.copyright.AbstractFirUpdateKotlinCopyrightTest
 import org.jetbrains.kotlin.idea.k2.refactoring.rename.AbstractFirRenameTest
 import org.jetbrains.kotlin.idea.k2.refactoring.rename.AbstractK2InplaceRenameTest
-import org.jetbrains.kotlin.idea.projectView.AbstractK2ProjectViewTest
+import org.jetbrains.kotlin.idea.fir.projectView.AbstractK2ProjectViewTest
 import org.jetbrains.kotlin.parcelize.ide.test.AbstractParcelizeK2QuickFixTest
 import org.jetbrains.kotlin.testGenerator.generator.TestGenerator
 import org.jetbrains.kotlin.testGenerator.model.*
@@ -113,7 +107,7 @@ private fun assembleWorkspace(): TWorkspace = workspace {
         }
     }
 
-    testGroup("fir", testDataPath = "../idea/tests/testData") {
+    testGroup("fir/tests", testDataPath = "../../idea/tests/testData") {
         testClass<AbstractK2AddImportActionTest> {
             model("idea/actions/kotlinAddImportAction", pattern = KT_WITHOUT_DOTS)
         }
@@ -397,7 +391,7 @@ private fun assembleWorkspace(): TWorkspace = workspace {
         }
 
         testClass<AbstractK2BytecodeToolWindowTest> {
-            model("internal/toolWindow", isRecursive = false, pattern = DIRECTORY, testMethodName = "doTestWithIr")
+            model("internal/toolWindow", isRecursive = false, pattern = DIRECTORY)
         }
 
         testClass<AbstractK2ExternalAnnotationTest> {
@@ -405,7 +399,7 @@ private fun assembleWorkspace(): TWorkspace = workspace {
         }
     }
 
-    testGroup("fir", testDataPath = "../completion/testData") {
+    testGroup("fir/tests", testDataPath = "../../completion/testData") {
         testClass<AbstractK2JvmBasicCompletionTest> {
             model("basic/common", pattern = KT_WITHOUT_FIR_PREFIX)
             model("basic/java", pattern = KT_WITHOUT_FIR_PREFIX)
@@ -463,13 +457,13 @@ private fun assembleWorkspace(): TWorkspace = workspace {
         }
     }
 
-    testGroup("fir", testDataPath = "../code-insight/testData") {
+    testGroup("fir/tests", testDataPath = "../../code-insight/testData") {
         testClass<AbstractK2MultiModuleLineMarkerTest> {
             model("linemarkers", isRecursive = false, pattern = DIRECTORY)
         }
     }
 
-    testGroup("fir", testDataPath = "../idea/tests/testData") {
+    testGroup("fir/tests", testDataPath = "../../idea/tests/testData") {
         testClass<AbstractK2ProjectViewTest> {
             model("projectView", pattern = TEST)
         }
@@ -484,7 +478,7 @@ private fun assembleWorkspace(): TWorkspace = workspace {
         }
     }
 
-    testGroup("fir", testDataPath = "../idea/tests/testData/findUsages") {
+    testGroup("fir/tests", testDataPath = "../../idea/tests/testData/findUsages") {
         testClass<AbstractFindUsagesFirTest> {
             model("kotlin", pattern = Patterns.forRegex("""^(.+)\.0\.(kt|kts)$"""))
             model("java", pattern = Patterns.forRegex("""^(.+)\.0\.java$"""))
@@ -516,7 +510,7 @@ private fun assembleWorkspace(): TWorkspace = workspace {
         }
     }
 
-    testGroup("fir") {
+    testGroup("fir/tests") {
         testClass<AbstractHLImplementationSearcherTest> {
             model("search/implementations", pattern = KT_WITHOUT_DOTS)
         }

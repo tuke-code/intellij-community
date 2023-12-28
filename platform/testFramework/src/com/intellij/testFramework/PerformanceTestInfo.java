@@ -24,11 +24,13 @@ import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.lang.annotation.Annotation;
+import java.io.IOException;
 import java.lang.reflect.Method;
+import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Locale;
+import java.util.ServiceLoader;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
@@ -303,14 +305,19 @@ public class PerformanceTestInfo {
             PlatformTestUtil.waitForAllBackgroundActivityToCalmDown();
             actualInputSize = new AtomicInteger(expectedInputSize);
 
+            int iterationNumber = attempt;
             Supplier<IterationStatus> operation = () -> {
               CpuUsageData currentData;
               try {
+                Profiler.startProfiling(iterationType.name() + iterationNumber);
                 currentData = CpuUsageData.measureCpuUsage(() -> actualInputSize.set(test.compute()));
               }
               catch (Throwable e) {
                 ExceptionUtil.rethrowUnchecked(e);
                 throw new RuntimeException(e);
+              }
+              finally {
+                Profiler.stopProfiling();
               }
               int actualUsedCpuCores = usedReferenceCpuCores < 8
                                        ? Math.min(JobSchedulerImpl.getJobPoolParallelism(), usedReferenceCpuCores)
@@ -432,6 +439,44 @@ public class PerformanceTestInfo {
     BORDERLINE, // test barely managed to complete within the specified range
     SLOW,       // test was too slow
     DISTRACTED  // CPU was occupied by irrelevant computations for too long (e.g., JIT or GC)
+  }
+
+  private static final class Profiler {
+    private static final ProfilerForTests profiler = getProfilerInstance();
+
+    private static ProfilerForTests getProfilerInstance() {
+      ServiceLoader<ProfilerForTests> loader = ServiceLoader.load(ProfilerForTests.class);
+      for (ProfilerForTests service : loader) {
+        if (service != null) {
+          return service;
+        }
+      }
+      System.out.println("No service com.intellij.testFramework.Profiler is found in class path");
+      return null;
+    }
+
+    public static void stopProfiling() {
+      if (profiler != null) {
+        try {
+          profiler.stopProfiling();
+        }
+        catch (IOException e) {
+          System.out.println("Can't stop profiling");
+        }
+      }
+    }
+
+    public static void startProfiling(String fileName) {
+      Path logDir = PathManager.getLogDir();
+      if (profiler != null) {
+        try {
+          profiler.startProfiling(logDir, fileName);
+        }
+        catch (IOException e) {
+          System.out.println("Can't start profiling");
+        }
+      }
+    }
   }
 
   private int getExpectedTimeOnThisMachine(int actualInputSize, int actualUsedCpuCores) {

@@ -6,10 +6,8 @@ import org.jetbrains.idea.maven.indices.MavenIndicesTestFixture
 import org.junit.Test
 
 class MavenSurefirePluginTest : MavenDomWithIndicesTestCase() {
-  override fun runInDispatchThread() = true
-
   override fun createIndicesFixture(): MavenIndicesTestFixture {
-    return MavenIndicesTestFixture(myDir.toPath(), myProject, "plugins", "local1")
+    return MavenIndicesTestFixture(dir.toPath(), project, "plugins", "local1")
   }
 
   @Test
@@ -40,7 +38,7 @@ class MavenSurefirePluginTest : MavenDomWithIndicesTestCase() {
     createProjectSubFile("src/test/A.txt", "")
     createProjectSubFile("src/A.txt", "")
 
-    assertCompletionVariants(myProjectPom, "main", "test")
+    assertCompletionVariants(projectPom, "main", "test")
   }
 
   @Test
@@ -67,7 +65,7 @@ class MavenSurefirePluginTest : MavenDomWithIndicesTestCase() {
         """.trimIndent())
     importProjectAsync()
 
-    assertCompletionVariants(myProjectPom, "surefire.forkNumber", "surefire.threadNumber")
+    assertCompletionVariants(projectPom, "surefire.forkNumber", "surefire.threadNumber")
   }
 
   @Test
@@ -95,7 +93,7 @@ class MavenSurefirePluginTest : MavenDomWithIndicesTestCase() {
         """.trimIndent())
     importProjectAsync()
 
-    assertCompletionVariants(myProjectPom)
+    assertCompletionVariants(projectPom)
   }
 
   @Test

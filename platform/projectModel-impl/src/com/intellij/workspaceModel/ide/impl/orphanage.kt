@@ -11,6 +11,8 @@ import com.intellij.platform.workspace.jps.OrphanageWorkerEntitySource
 import com.intellij.platform.workspace.jps.entities.*
 import com.intellij.platform.workspace.storage.*
 import com.intellij.platform.workspace.storage.impl.VersionedEntityStorageImpl
+import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentationApi
+import com.intellij.platform.workspace.storage.instrumentation.MutableEntityStorageInstrumentation
 import com.intellij.platform.workspace.storage.url.VirtualFileUrl
 import com.intellij.util.concurrency.annotations.RequiresWriteLock
 import com.intellij.workspaceModel.ide.EntitiesOrphanage
@@ -23,6 +25,7 @@ class EntitiesOrphanageImpl(private val project: Project) : EntitiesOrphanage {
   override val currentSnapshot: EntityStorageSnapshot
     get() = entityStorage.current
 
+  @OptIn(EntityStorageInstrumentationApi::class)
   @RequiresWriteLock
   override fun update(updater: (MutableEntityStorage) -> Unit) {
     ApplicationManager.getApplication().assertWriteAccessAllowed()
@@ -32,7 +35,7 @@ class EntitiesOrphanageImpl(private val project: Project) : EntitiesOrphanage {
 
     updater(builder)
 
-    val changes = builder.collectChanges()
+    val changes = (builder as MutableEntityStorageInstrumentation).collectChanges()
 
     checkIfParentsAlreadyExist(changes, builder)
 
@@ -113,10 +116,9 @@ class OrphanListener(private val project: Project) : WorkspaceModelChangeListene
     private val updateOrphanTimeMs: AtomicLong = AtomicLong()
 
     private fun setupOpenTelemetryReporting(meter: Meter) {
-      val updateOrphanTimeGauge = meter.gaugeBuilder("workspaceModel.orphan.listener.update.ms")
-        .ofLongs().buildObserver()
+      val updateOrphanTimeCounter = meter.counterBuilder("workspaceModel.orphan.listener.update.ms").buildObserver()
 
-      meter.batchCallback({ updateOrphanTimeGauge.record(updateOrphanTimeMs.get()) }, updateOrphanTimeGauge)
+      meter.batchCallback({ updateOrphanTimeCounter.record(updateOrphanTimeMs.get()) }, updateOrphanTimeCounter)
     }
 
     init {

@@ -24,12 +24,13 @@ import org.jetbrains.kotlin.analysis.api.symbols.KtClassLikeSymbol
 import org.jetbrains.kotlin.analysis.api.symbols.KtConstructorSymbol
 import org.jetbrains.kotlin.analysis.api.symbols.KtDeclarationSymbol
 import org.jetbrains.kotlin.asJava.toLightElements
-import org.jetbrains.kotlin.idea.base.analysis.api.utils.invokeShortening
+import org.jetbrains.kotlin.idea.base.analysis.api.utils.shortenReferences
 import org.jetbrains.kotlin.idea.base.psi.imports.addImport
 import org.jetbrains.kotlin.idea.base.utils.fqname.isImported
 import org.jetbrains.kotlin.idea.references.KtReference
 import org.jetbrains.kotlin.idea.references.KtSimpleNameReference
 import org.jetbrains.kotlin.idea.references.mainReference
+import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.psi.psiUtil.collectDescendantsOfType
 import org.jetbrains.kotlin.psi.psiUtil.forEachDescendantOfType
@@ -199,7 +200,9 @@ sealed class K2MoveRenameUsageInfo(
                     val ref = refExpr.mainReference
                     val declSymbol = ref.resolveToSymbol() as? KtDeclarationSymbol? ?: return@forEachDescendantOfType
                     val declPsi = declSymbol.psi as? KtNamedDeclaration ?: return@forEachDescendantOfType
-                    if (!declSymbol.isImported(refExpr.containingKtFile) && refExpr.isImportable() && declPsi.needsReferenceUpdate) {
+                    if (!declSymbol.isImported(refExpr.containingKtFile)
+                        && (refExpr.isUnqualifiable() || refExpr.isFirstInQualifiedChain())
+                        && declPsi.needsReferenceUpdate) {
                         val usageInfo = ref.createKotlinUsageInfo(declPsi, isInternal = true)
                         usages.add(usageInfo)
                         refExpr.internalUsageInfo = usageInfo
@@ -249,17 +252,12 @@ sealed class K2MoveRenameUsageInfo(
             return isExtensionReference() || isCallableReferenceExpressionWithoutQualifier()
         }
 
-        /**
-         * For example:
-         * * `Foo.bar().fooBar` it will return true for `Foo` but false for `bar` and `fooBar`
-         * * `x.bar()` it will return `bar` in case `bar` is an extension function
-         */
-        private fun KtSimpleNameExpression.isImportable(): Boolean {
-            if (isUnqualifiable()) return true
+        private fun KtSimpleNameExpression.isFirstInQualifiedChain(): Boolean {
             val baseExpression = (parent as? KtCallExpression) ?: this
             val parent = baseExpression.parent
             if (parent !is KtDotQualifiedExpression) return true
-            return parent.selectorExpression != baseExpression // check if this expression is first in qualified chain
+            val receiver = parent.receiverExpression
+            return this == receiver // if current ref is first in qualified chain the ref can be imported
         }
 
         private fun KtSimpleNameReference.createKotlinUsageInfo(declaration: KtNamedDeclaration, isInternal: Boolean): K2MoveRenameUsageInfo {
@@ -334,20 +332,40 @@ sealed class K2MoveRenameUsageInfo(
         ) = allowAnalysisFromWriteAction {
             allowAnalysisOnEdt {
                 usageInfosByFile.forEach { (file, usageInfos) ->
+                    // TODO instead of manually handling of qualifiable/non-qualifiable references we should invoke `bindToElement` in bulk
                     val qualifiedElements = usageInfos.mapNotNull { usageInfo ->
-                        val newElement = oldToNewMap[usageInfo.referencedElement] as? KtNamedDeclaration ?: usageInfo.referencedElement
-                        val result = usageInfo.retarget(newElement)
-                        if (usageInfo is Qualifiable && result != null) result else null
+                        val newDeclaration = oldToNewMap[usageInfo.referencedElement] as? KtNamedDeclaration ?: usageInfo.referencedElement
+                        val qualifiedReference = usageInfo.retarget(newDeclaration)
+                        if (usageInfo is Qualifiable && qualifiedReference != null) {
+                            qualifiedReference to newDeclaration
+                        } else null
+                    }.filter { it.first.isValid }.toMap()  // imports can become invalid because they are removed when binding element
+                    if (file is KtFile) {
+                        shortenReferences(file, qualifiedElements)
                     }
-                    if (file !is KtFile) return@forEach
 
-                    // TODO handle bulk usage shortening in a better way, there should be API for this
-                    qualifiedElements.forEach { qualifiedElem ->
-                        analyze(file) {
-                            collectPossibleReferenceShortenings(file, qualifiedElem.textRange).invokeShortening()
-                        }
-                    }
                 }
+            }
+        }
+
+        /**
+         * Ad-hoc implementation of bulk shortening that should be replaced by some better API in the future.
+         */
+        private fun shortenReferences(file: KtFile, qualifiedElements: Map<PsiElement, KtNamedDeclaration>) {
+            fun FqName.proximityTo(other: FqName): Int {
+                return pathSegments().zip(other.pathSegments()).takeWhile { (left, right) -> left == right }.size
+            }
+
+            val nonNestedElems = qualifiedElements.filter { (elem, _) ->
+                qualifiedElements.keys.none { otherElem -> elem != otherElem && otherElem.isAncestor(elem) }
+            }
+            val fileFqn = file.packageFqName
+            val sortedElements = nonNestedElems.keys.sortedByDescending { ref ->
+                val newDecl = nonNestedElems[ref]
+                newDecl?.fqName?.proximityTo(fileFqn)
+            }
+            sortedElements.forEach { qualifiedElem ->
+                shortenReferences(qualifiedElem as KtElement)
             }
         }
     }

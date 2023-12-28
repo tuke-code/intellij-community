@@ -426,9 +426,24 @@
     <codeInsight.createFieldFromUsageHelper language="Groovy"
                                             implementationClass="org.jetbrains.plugins.groovy.annotator.intentions.GroovyCreateFieldFromUsageHelper"/>
     <codeInsight.typeInfo language="Groovy" implementationClass="org.jetbrains.plugins.groovy.codeInsight.hint.GroovyExpressionTypeProvider"/>
-    <codeInsight.inlayProvider language="Groovy" implementationClass="org.jetbrains.plugins.groovy.codeInsight.hint.types.GroovyParameterTypeHintsInlayProvider"/>
-    <codeInsight.inlayProvider language="Groovy" implementationClass="org.jetbrains.plugins.groovy.codeInsight.hint.types.GroovyLocalVariableTypeHintsInlayProvider"/>
-    <codeInsight.inlayProvider language="Groovy" implementationClass="org.jetbrains.plugins.groovy.codeInsight.hint.GroovyImplicitNullArgumentHintProvider"/>
+    <codeInsight.declarativeInlayProvider
+      language="Groovy"
+      implementationClass="org.jetbrains.plugins.groovy.codeInsight.hint.types.GroovyLocalVariableTypeHintsInlayProvider"
+      isEnabledByDefault="true"
+      group="TYPES_GROUP"
+      providerId="groovy.local.variable.implicit.types"
+      bundle="messages.GroovyBundle"
+      nameKey="settings.inlay.groovy.local.variable.implicit.types.name"
+      descriptionKey="settings.inlay.groovy.local.variable.implicit.types.description"/>
+    <codeInsight.declarativeInlayProvider
+      language="Groovy"
+      implementationClass="org.jetbrains.plugins.groovy.codeInsight.hint.GroovyImplicitNullArgumentHintProvider"
+      isEnabledByDefault="true"
+      group="VALUES_GROUP"
+      providerId="groovy.implicit.null.argument"
+      bundle="messages.GroovyBundle"
+      nameKey="settings.inlay.groovy.implicit.null.argument.provider.name"
+      descriptionKey="settings.inlay.groovy.implicit.null.argument.provider.description"/>
     <codeInsight.parameterNameHints
         language="Groovy" implementationClass="org.jetbrains.plugins.groovy.codeInsight.hint.GroovyInlayParameterHintsProvider"
     />

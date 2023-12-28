@@ -12,20 +12,23 @@ import com.intellij.openapi.util.UserDataHolder
 import com.intellij.openapi.util.UserDataHolderBase
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.platform.util.coroutines.flow.mapStateIn
 import com.intellij.util.concurrency.annotations.RequiresEdt
-import com.intellij.util.flow.mapStateIn
 import com.intellij.util.text.nullize
 import com.jetbrains.python.psi.LanguageLevel
 import com.jetbrains.python.run.PythonInterpreterTargetEnvironmentFactory
-import com.jetbrains.python.sdk.*
+import com.jetbrains.python.sdk.PyDetectedSdk
+import com.jetbrains.python.sdk.PySdkUtil
 import com.jetbrains.python.sdk.add.LocalContext
 import com.jetbrains.python.sdk.add.ProjectLocationContext
 import com.jetbrains.python.sdk.add.ProjectLocationContexts
 import com.jetbrains.python.sdk.add.target.conda.suggestCondaPath
 import com.jetbrains.python.sdk.add.target.createDetectedSdk
 import com.jetbrains.python.sdk.configuration.createVirtualEnvSynchronously
+import com.jetbrains.python.sdk.detectSystemWideSdksSuspended
 import com.jetbrains.python.sdk.flavors.conda.PyCondaEnv
 import com.jetbrains.python.sdk.flavors.conda.PyCondaEnvIdentity
+import com.jetbrains.python.sdk.prepareSdkList
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import java.nio.file.InvalidPathException
@@ -43,9 +46,9 @@ internal fun PythonAddInterpreterPresenter.getPathOnTarget(path: Path): @NlsSafe
   path.convertToPathOnTarget(targetEnvironmentConfiguration)
 
 
-internal fun PythonAddInterpreterPresenter.setupVirtualenv(venvPath: Path, projectPath: String, baseSdk: Sdk): Sdk {
+internal fun PythonAddInterpreterPresenter.setupVirtualenv(venvPath: Path, projectPath: String, baseSdk: Sdk): Sdk? {
   val venvPathOnTarget = getPathOnTarget(venvPath)
-  val savedSdk = setupBaseSdk(baseSdk, state.allSdks.get())
+  val savedSdk = setupBaseSdk(baseSdk, state.allSdks.get()) ?: return null
   val sdk = createVirtualEnvSynchronously(savedSdk, state.allSdks.get(), venvPathOnTarget,
                                           projectPath, null, null) ?: error("Failed to create SDK")
   SdkConfigurationUtil.addSdk(sdk)

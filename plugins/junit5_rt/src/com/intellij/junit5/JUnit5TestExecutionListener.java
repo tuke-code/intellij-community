@@ -29,6 +29,7 @@ import java.util.*;
 
 import static com.intellij.rt.execution.TestListenerProtocol.CLASS_CONFIGURATION;
 import static com.intellij.rt.execution.junit.ComparisonFailureData.OPENTEST4J_FILE_CONTENT_CHARSET;
+import static com.intellij.rt.execution.junit.ComparisonFailureData.OPENTEST4J_FILE_INFO;
 
 @SuppressWarnings("UseOfSystemOutOrSystemErr")
 public class JUnit5TestExecutionListener implements TestExecutionListener {
@@ -351,7 +352,11 @@ public class JUnit5TestExecutionListener implements TestExecutionListener {
         if (testSource instanceof ClassSource) {
           //noinspection SpellCheckingInspection
           return ((ClassSource)testSource).getPosition()
-            .map(position -> " metainfo='" + position.getLine() + ":" + position.getColumn() + "'")
+            .map(position ->
+                   " metainfo='"
+                   // Convert JUnit's 1-based values to 0-based
+                   + (position.getLine() - 1) + ":"
+                   + (position.getColumn().orElse(1) - 1) + "'")
             .orElse(NO_LOCATION_HINT);
         }
         return NO_LOCATION_HINT;
@@ -450,7 +455,7 @@ public class JUnit5TestExecutionListener implements TestExecutionListener {
 
   private static AssertionValue getOpentest4jAssertionValue(ValueWrapper valueWrapper) {
     Object value = valueWrapper.getValue();
-    if (value instanceof FileInfo) {
+    if (value != null && OPENTEST4J_FILE_INFO.equals(value.getClass().getName())) {
       String valueString = ((FileInfo)value).getContentsAsString(OPENTEST4J_FILE_CONTENT_CHARSET);
       String valuePath = ((FileInfo)value).getPath();
       return new AssertionValue(valueString, valuePath);

@@ -37,7 +37,7 @@ import org.jetbrains.kotlin.idea.codeInsight.inspections.shared.idea.kdoc.Abstra
 import org.jetbrains.kotlin.idea.codeInsight.intentions.shared.AbstractSharedK1IntentionTest
 import org.jetbrains.kotlin.idea.codeInsight.moveUpDown.AbstractMoveLeftRightTest
 import org.jetbrains.kotlin.idea.codeInsight.moveUpDown.AbstractMoveStatementTest
-import org.jetbrains.kotlin.idea.codeInsight.postfix.AbstractPostfixTemplateProviderTest
+import org.jetbrains.kotlin.idea.codeInsight.postfix.AbstractK1PostfixTemplateTest
 import org.jetbrains.kotlin.idea.codeInsight.surroundWith.AbstractSurroundWithTest
 import org.jetbrains.kotlin.idea.codeInsight.unwrap.AbstractUnwrapRemoveTest
 import org.jetbrains.kotlin.idea.compilerPlugin.kotlinxSerialization.AbstractSerializationPluginIdeDiagnosticTest
@@ -916,7 +916,7 @@ private fun assembleWorkspace(): TWorkspace = workspace {
         }
 
         testClass<AbstractExtractionTest> {
-            model("refactoring/introduceVariable", pattern = KT_OR_KTS, testMethodName = "doIntroduceVariableTest")
+            model("refactoring/introduceVariable", pattern = KT_OR_KTS_WITHOUT_DOTS, testMethodName = "doIntroduceVariableTest")
             model("refactoring/extractFunction", pattern = KT_OR_KTS, testMethodName = "doExtractFunctionTest", excludedDirectories = listOf("inplace"))
             model("refactoring/introduceProperty", pattern = KT_OR_KTS, testMethodName = "doIntroducePropertyTest")
             model("refactoring/introduceParameter", pattern = KT_OR_KTS, testMethodName = "doIntroduceSimpleParameterTest")
@@ -942,15 +942,12 @@ private fun assembleWorkspace(): TWorkspace = workspace {
         }
 
         testClass<AbstractBytecodeToolWindowTest> {
-            model("internal/toolWindow", isRecursive = false, pattern = DIRECTORY, testMethodName = "doTestWithIr", testClassName = "WithIR")
-            model("internal/toolWindow", isRecursive = false, pattern = DIRECTORY, testMethodName = "doTestWithoutIr", testClassName = "WithoutIR")
+            model("internal/toolWindow", isRecursive = false, pattern = DIRECTORY)
         }
 
         testClass<AbstractBytecodeToolWindowMultiplatformTest> {
-            model("internal/toolWindowMultiplatform", isRecursive = false, pattern = DIRECTORY, testMethodName = "doTestWithIrCommon", testClassName = "WithIRCommon")
-            model("internal/toolWindowMultiplatform", isRecursive = false, pattern = DIRECTORY, testMethodName = "doTestWithoutIrCommon", testClassName = "WithoutIRCommon")
-            model("internal/toolWindowMultiplatform", isRecursive = false, pattern = DIRECTORY, testMethodName = "doTestWithIrJvm", testClassName = "WithIRJvm")
-            model("internal/toolWindowMultiplatform", isRecursive = false, pattern = DIRECTORY, testMethodName = "doTestWithoutIrJvm", testClassName = "WithoutIRJvm")
+            model("internal/toolWindowMultiplatform", isRecursive = false, pattern = DIRECTORY, testMethodName = "doTestCommon", testClassName = "Common")
+            model("internal/toolWindowMultiplatform", isRecursive = false, pattern = DIRECTORY, testMethodName = "doTestJvm", testClassName = "Jvm")
         }
 
         testClass<AbstractReferenceResolveTest>("org.jetbrains.kotlin.idea.kdoc.KdocResolveTestGenerated") {
@@ -983,10 +980,6 @@ private fun assembleWorkspace(): TWorkspace = workspace {
 
         testClass<AbstractIdeReplCompletionTest> {
             model("repl/completion")
-        }
-
-        testClass<AbstractPostfixTemplateProviderTest> {
-            model("codeInsight/postfix")
         }
 
         testClass<AbstractKotlinArgumentsHintsProviderTest> {
@@ -1418,6 +1411,12 @@ private fun assembleWorkspace(): TWorkspace = workspace {
 
         testClass<AbstractPerformanceCompletionCharFilterTest>(commonSuite = false) {
             model("handlers/charFilter", testMethodName = "doPerfTest", pattern = KT_WITHOUT_DOTS)
+        }
+    }
+
+    testGroup("idea/tests",  testDataPath = "../../code-insight/postfix-templates/testData") {
+        testClass<AbstractK1PostfixTemplateTest> {
+            model("expansion/oldTestData", pattern = KT_WITHOUT_DOTS, passTestDataPath = false)
         }
     }
 

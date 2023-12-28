@@ -139,7 +139,7 @@ class MarketplaceRequests(private val coroutineScope: CoroutineScope) : PluginIn
     @JvmStatic
     @JvmOverloads
     @Throws(IOException::class)
-    internal fun loadPluginDescriptor(
+    fun loadPluginDescriptor(
       xmlId: String,
       ideCompatibleUpdate: IdeCompatibleUpdate,
       indicator: ProgressIndicator? = null,
@@ -577,7 +577,7 @@ class MarketplaceRequests(private val coroutineScope: CoroutineScope) : PluginIn
   }
 
   fun loadCachedJBPlugins(): Set<PluginId>? {
-    val pluginXmlIdsFile = Paths.get(PathManager.getPluginTempPath(), MarketplaceUrls.JB_PLUGINS_XML_IDS_FILENAME)
+    val pluginXmlIdsFile = Path.of(PathManager.getPluginTempPath(), MarketplaceUrls.JB_PLUGINS_XML_IDS_FILENAME)
     try {
       if (Files.size(pluginXmlIdsFile) > 0) {
         return Files.newInputStream(pluginXmlIdsFile).use(::parseXmlIds)

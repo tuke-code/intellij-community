@@ -68,7 +68,12 @@ class KotlinMavenImporterEx : KotlinMavenImporter(), MavenWorkspaceFacetConfigur
             emptyList(),
             KotlinModuleKind.DEFAULT,
             "",
-            CompilerSettingsData("", "", "", true, "lib"), "", module.entitySource
+            CompilerSettingsData("", "", "", true, "lib", true),
+            "",
+            emptyList(),
+            KotlinFacetSettings.CURRENT_VERSION,
+            false,
+            module.entitySource
         ) {
             this.module = module
         }
@@ -245,16 +250,17 @@ class KotlinMavenImporterEx : KotlinMavenImporter(), MavenWorkspaceFacetConfigur
             this.isHmppEnabled = kotlinFacetSettings.isHmppEnabled
             this.pureKotlinSourceFolders = kotlinFacetSettings.pureKotlinSourceFolders.toMutableList()
             this.kind = kotlinFacetSettings.kind
-            this.compilerArguments = KotlinModuleSettingsSerializer.serializeToString(kotlinFacetSettings.compilerArguments)
+            this.compilerArguments = CompilerArgumentsSerializer.serializeToString(kotlinFacetSettings.compilerArguments)
             val compilerSettings = kotlinFacetSettings.compilerSettings
             this.compilerSettings =
-                if (compilerSettings == null) CompilerSettingsData("", "", "", true, "lib")
+                if (compilerSettings == null) CompilerSettingsData("", "", "", true, "lib", false)
                 else CompilerSettingsData(
                     compilerSettings.additionalArguments,
                     compilerSettings.scriptTemplates,
                     compilerSettings.scriptTemplatesClasspath,
                     compilerSettings.copyJsLibraryFiles,
-                    compilerSettings.outputDirectoryForJsLibraryFiles
+                    compilerSettings.outputDirectoryForJsLibraryFiles,
+                    true
                 )
             this.targetPlatform = kotlinFacetSettings.targetPlatform?.serializeComponentPlatforms() ?: ""
         }

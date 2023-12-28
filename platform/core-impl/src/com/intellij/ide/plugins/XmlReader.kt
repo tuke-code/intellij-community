@@ -12,7 +12,6 @@ import com.intellij.openapi.extensions.ExtensionDescriptor
 import com.intellij.openapi.extensions.ExtensionPointDescriptor
 import com.intellij.openapi.extensions.LoadingOrder
 import com.intellij.openapi.extensions.PluginId
-import com.intellij.util.Java11Shim
 import com.intellij.util.lang.ZipFilePool
 import com.intellij.util.messages.ListenerDescriptor
 import com.intellij.util.xml.dom.NoOpXmlInterner
@@ -218,7 +217,10 @@ private fun readRootElementChild(reader: XMLStreamReader2,
     "product-descriptor" -> readProduct(reader, descriptor)
     "module" -> {
       findAttributeValue(reader, "value")?.let { moduleName ->
-        descriptor.modules = descriptor.modules.add(PluginId.getId(moduleName))
+        if (descriptor.modules == null) {
+          descriptor.modules = ArrayList()
+        }
+        descriptor.modules!!.add(PluginId.getId(moduleName))
       }
       reader.skipElement()
     }
@@ -242,7 +244,10 @@ private fun readRootElementChild(reader: XMLStreamReader2,
     }
     "incompatible-with" -> {
       getNullifiedContent(reader)?.let {
-        descriptor.incompatibilities = descriptor.incompatibilities.add(PluginId.getId(it))
+        if (descriptor.incompatibilities == null) {
+          descriptor.incompatibilities = ArrayList()
+        }
+        descriptor.incompatibilities!!.add(PluginId.getId(it))
       }
     }
 
@@ -261,9 +266,7 @@ private fun readRootElementChild(reader: XMLStreamReader2,
                                              dataLoader = dataLoader,
                                              includeBase = includeBase)
 
-    "content" -> readContent(reader = reader,
-                             descriptor = descriptor,
-                             readContext = readContext)
+    "content" -> readContent(reader = reader, descriptor = descriptor, readContext = readContext)
     "dependencies" -> readDependencies(reader = reader, descriptor = descriptor, readContext = readContext)
 
     "depends" -> readOldDepends(reader, descriptor)
@@ -301,10 +304,8 @@ private fun readRootElementChild(reader: XMLStreamReader2,
 }
 
 private val actionNameToEnum = run {
-  HashMap<String, ActionDescriptorName>().let { map ->
-    ActionDescriptorName.entries.associateByTo(map, ActionDescriptorName::name)
-    Java11Shim.INSTANCE.copyOf(map)
-  }
+  val entries = ActionDescriptorName.entries
+  entries.associateByTo(HashMap<String, ActionDescriptorName>(entries.size), ActionDescriptorName::name)
 }
 
 private fun readActions(descriptor: RawPluginDescriptor, reader: XMLStreamReader2, readContext: ReadModuleContext) {
@@ -329,9 +330,10 @@ private fun readActions(descriptor: RawPluginDescriptor, reader: XMLStreamReader
 
     val element = readXmlAsModel(reader = reader, rootName = elementName, interner = readContext.interner)
 
+    val attributes = element.attributes
     when (name) {
       ActionDescriptorName.action -> {
-        val className = element.attributes.get("class")
+        val className = attributes.get("class")
         if (className.isNullOrEmpty()) {
           LOG.error("action element should have specified \"class\" attribute at ${reader.location}")
           reader.skipElement()
@@ -340,14 +342,15 @@ private fun readActions(descriptor: RawPluginDescriptor, reader: XMLStreamReader
 
         actionElements.add(ActionDescriptorAction(
           className = className,
+          isInternal = attributes.get("internal").toBoolean(),
           element = element,
           resourceBundle = resourceBundle,
         ))
       }
       ActionDescriptorName.group -> {
-        var className = element.attributes.get("class")
+        var className = attributes.get("class")
         if (className.isNullOrEmpty()) {
-          className = if (element.attributes.get("compact") == "true") {
+          className = if (attributes.get("compact") == "true") {
             "com.intellij.openapi.actionSystem.DefaultCompactActionGroup"
           }
           else {
@@ -355,7 +358,7 @@ private fun readActions(descriptor: RawPluginDescriptor, reader: XMLStreamReader
           }
         }
 
-        val id = element.attributes.get("id")
+        val id = attributes.get("id")
         if (id != null && id.isEmpty()) {
           LOG.error("ID of the group cannot be an empty string at ${reader.location}")
           reader.skipElement()
@@ -463,9 +466,7 @@ private fun readExtensions(reader: XMLStreamReader2, descriptor: RawPluginDescri
           descriptor.epNameToExtensions = epNameToExtensions
         }
 
-        val list = epNameToExtensions.get(qualifiedExtensionPointName)
-        @Suppress("IfThenToElvis")
-        epNameToExtensions.put(qualifiedExtensionPointName, if (list == null) persistentListOf(extensionDescriptor) else list.add(extensionDescriptor))
+        epNameToExtensions.computeIfAbsent(qualifiedExtensionPointName) { ArrayList() }.add(extensionDescriptor)
 
         assert(reader.isEndElement)
         return@consumeChildElements
@@ -566,7 +567,10 @@ private fun readExtensionPoints(reader: XMLStreamReader2,
       }
     }
 
-    containerDescriptor.extensionPoints = containerDescriptor.extensionPoints.add(ExtensionPointDescriptor(
+    if (containerDescriptor.extensionPoints == null) {
+      containerDescriptor.extensionPoints = ArrayList()
+    }
+    containerDescriptor.extensionPoints!!.add(ExtensionPointDescriptor(
       name = qualifiedName ?: name ?: throw RuntimeException("`name` attribute not specified for extension point at ${reader.location}"),
       isNameQualified = qualifiedName != null,
       className = `interface` ?: beanClass!!,
@@ -580,9 +584,14 @@ private fun readExtensionPoints(reader: XMLStreamReader2,
 private inline fun applyPartialContainer(from: RawPluginDescriptor,
                                          to: RawPluginDescriptor,
                                          crossinline extractor: (RawPluginDescriptor) -> ContainerDescriptor) {
-  extractor(from).extensionPoints.takeIf { it.isNotEmpty() }?.let {
+  extractor(from).extensionPoints.takeIf { !it.isNullOrEmpty() }?.let {
     val toContainer = extractor(to)
-    toContainer.extensionPoints = toContainer.extensionPoints.addAll(it)
+    if (toContainer.extensionPoints == null) {
+      toContainer.extensionPoints = it
+    }
+    else {
+      toContainer.extensionPoints!!.addAll(it)
+    }
   }
 }
 
@@ -712,19 +721,20 @@ private fun readComponents(reader: XMLStreamReader2, containerDescriptor: Contai
     }
     assert(reader.isEndElement)
 
-    containerDescriptor.components = containerDescriptor.components.add(ComponentConfig(interfaceClass,
-                                                                                        implementationClass,
-                                                                                        headlessImplementationClass,
-                                                                                        isApplicableForDefaultProject,
-                                                                                        os,
-                                                                                        overrides,
-                                                                                        options))
+    if (containerDescriptor.components == null) {
+      containerDescriptor.components = ArrayList()
+    }
+    containerDescriptor.components!!.add(ComponentConfig(interfaceClass,
+                                                         implementationClass,
+                                                         headlessImplementationClass,
+                                                         isApplicableForDefaultProject,
+                                                         os,
+                                                         overrides,
+                                                         options))
   }
 }
 
-private fun readContent(reader: XMLStreamReader2,
-                        descriptor: RawPluginDescriptor,
-                        readContext: ReadModuleContext) {
+private fun readContent(reader: XMLStreamReader2, descriptor: RawPluginDescriptor, readContext: ReadModuleContext) {
   reader.consumeChildElements { elementName ->
     when (elementName) {
       "module" -> {
@@ -745,7 +755,10 @@ private fun readContent(reader: XMLStreamReader2,
           configFile = "${name.substring(0, index)}.${name.substring(index + 1)}.xml"
         }
 
-        descriptor.contentModules = descriptor.contentModules.add(PluginContentDescriptor.ModuleItem(name = name, configFile = configFile))
+        if (descriptor.contentModules == null) {
+          descriptor.contentModules = ArrayList()
+        }
+        descriptor.contentModules!!.add(PluginContentDescriptor.ModuleItem(name = name, configFile = configFile))
       }
       else -> throw RuntimeException("Unknown content item type: $elementName")
     }

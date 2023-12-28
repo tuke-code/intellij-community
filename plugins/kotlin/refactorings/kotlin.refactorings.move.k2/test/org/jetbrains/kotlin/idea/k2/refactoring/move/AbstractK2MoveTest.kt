@@ -6,6 +6,7 @@ import com.intellij.openapi.application.runWriteAction
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VfsUtil
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.openapi.vfs.isFile
 import com.intellij.psi.*
 import com.intellij.refactoring.PackageWrapper
 import com.intellij.refactoring.move.MoveHandler
@@ -14,8 +15,6 @@ import com.intellij.refactoring.move.moveClassesOrPackages.MultipleRootsMoveDest
 import com.intellij.refactoring.move.moveInner.MoveInnerProcessor
 import com.intellij.refactoring.move.moveMembers.MockMoveMembersOptions
 import com.intellij.refactoring.move.moveMembers.MoveMembersProcessor
-import org.jetbrains.kotlin.idea.KotlinFileType
-import org.jetbrains.kotlin.idea.base.psi.kotlinFqName
 import org.jetbrains.kotlin.idea.core.util.toPsiDirectory
 import org.jetbrains.kotlin.idea.core.util.toPsiFile
 import org.jetbrains.kotlin.idea.jsonUtils.getNullableString
@@ -23,7 +22,6 @@ import org.jetbrains.kotlin.idea.jsonUtils.getString
 import org.jetbrains.kotlin.idea.k2.refactoring.move.descriptor.K2MoveDescriptor
 import org.jetbrains.kotlin.idea.k2.refactoring.move.descriptor.K2MoveSourceDescriptor
 import org.jetbrains.kotlin.idea.k2.refactoring.move.descriptor.K2MoveTargetDescriptor
-import org.jetbrains.kotlin.idea.k2.refactoring.move.processor.K2MoveFilesOrDirectoriesRefactoringProcessor
 import org.jetbrains.kotlin.idea.k2.refactoring.move.processor.K2MoveMembersRefactoringProcessor
 import org.jetbrains.kotlin.idea.refactoring.AbstractMultifileRefactoringTest
 import org.jetbrains.kotlin.idea.refactoring.runRefactoringTest
@@ -50,6 +48,18 @@ abstract class AbstractK2MoveTest : AbstractMultifileRefactoringTest() {
         if (config.get("enabledInK2")?.asBoolean == true && onlyPassingDisabledTests) fail()
         runMoveRefactoring(path, config, rootDir, project)
     }
+
+    override fun fileFilter(file: VirtualFile): Boolean {
+        if (file.isFile && file.extension == "kt") {
+            if (file.name.endsWith(".k2.kt")) return true
+            val k2CounterPart = file.parent.findChild("${file.nameWithoutExtension}.k2.kt")
+            if (k2CounterPart?.isFile == true) return false
+        }
+        return super.fileFilter(file)
+    }
+
+    override fun fileNameMapper(file: VirtualFile): String =
+        file.name.replace(".k2.kt", ".kt")
 }
 
 fun runMoveRefactoring(path: String, config: JsonObject, rootDir: VirtualFile, project: Project) {
@@ -138,7 +148,7 @@ object K2MoveAction : AbstractMultifileRefactoringTest.RefactoringAction {
 
         fun buildTarget(project: Project, rootDir: VirtualFile, config: JsonObject): Any {
             val targetPackage = config.getNullableString("targetPackage")
-            val targetDir = config.getNullableString("targetDirectory") ?: targetPackage?.replace('.', '/')
+            val targetDir = config.getNullableString("targetDirectory")
             val targetFile = config.getNullableString("targetFile")
             return when {
                 targetFile != null && targetDir != null -> error("Target can't both be file and directory")
@@ -147,15 +157,16 @@ object K2MoveAction : AbstractMultifileRefactoringTest.RefactoringAction {
                     if (file is KtFile) K2MoveTargetDescriptor.File(file) else targetFile
                 }
                 targetDir != null -> {
-                    runWriteAction { VfsUtil.createDirectoryIfMissing(rootDir, targetDir) }
+                    val directory =  runWriteAction { VfsUtil.createDirectoryIfMissing(rootDir, targetDir) }.toPsiDirectory(project)!!
                     if (targetPackage != null) {
-                        val directory = JavaPsiFacade.getInstance(project).findPackage(targetPackage)!!.directories.first()
                         K2MoveTargetDescriptor.SourceDirectory(FqName(targetPackage), directory)
                     } else {
-                        val directory = rootDir.findFileByRelativePath(targetDir)!!.toPsiDirectory(project)!!
                         val pkg = JavaDirectoryService.getInstance().getPackage(directory) ?: error("No package was found")
                         K2MoveTargetDescriptor.SourceDirectory(FqName(pkg.qualifiedName), directory)
                     }
+                }
+                targetPackage != null -> {
+                    K2MoveTargetDescriptor.SourceDirectory(FqName(targetPackage), rootDir.toPsiDirectory(project)!!)
                 }
                 else -> error("No target specified")
             }
@@ -170,19 +181,16 @@ object K2MoveAction : AbstractMultifileRefactoringTest.RefactoringAction {
         val specifiedTarget = buildTarget(project, rootDir, config)
         if (source is K2MoveSourceDescriptor.FileSource && specifiedTarget is K2MoveTargetDescriptor.SourceDirectory) {
             val descriptor = K2MoveDescriptor.Files(project, source, specifiedTarget, true, true, true)
-            K2MoveFilesOrDirectoriesRefactoringProcessor(descriptor).run()
+            descriptor.refactoringProcessor().run()
         } else if (source is K2MoveSourceDescriptor.ElementSource) {
             val actualTarget = when (specifiedTarget) {
                 is K2MoveTargetDescriptor.File -> specifiedTarget
                 is K2MoveTargetDescriptor.SourceDirectory -> {
-                    val file = runWriteAction {
-                        createKotlinFile(
-                            source.elements.first().name?.capitalizeAsciiOnly() + ".kt",
-                            specifiedTarget.directory,
-                            specifiedTarget.pkgName.asString()
-                        )
-                    }
-                    K2MoveTargetDescriptor.File(file)
+                    K2MoveTargetDescriptor.File(
+                        source.elements.first().name?.capitalizeAsciiOnly() + ".kt",
+                        specifiedTarget.pkgName,
+                        specifiedTarget.baseDirectory
+                    )
                 }
                 else -> throw IllegalStateException("Invalid specified target")
             }
@@ -197,18 +205,5 @@ object K2MoveAction : AbstractMultifileRefactoringTest.RefactoringAction {
                 /* callback = */ null
             )
         }
-    }
-
-    private fun createKotlinFile(
-        fileName: String,
-        targetDir: PsiDirectory,
-        packageName: String? = targetDir.kotlinFqName?.asString()
-    ): KtFile {
-        targetDir.checkCreateFile(fileName)
-        val packageFqName = packageName?.let(::FqName) ?: FqName.ROOT
-        val file = PsiFileFactory.getInstance(targetDir.project).createFileFromText(
-            fileName, KotlinFileType.INSTANCE, if (!packageFqName.isRoot) "package ${packageFqName} \n\n" else ""
-        )
-        return targetDir.add(file) as KtFile
     }
 }

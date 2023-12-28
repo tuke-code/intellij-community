@@ -2,7 +2,7 @@
 package com.intellij.platform.workspace.storage.tests.metadata
 
 import com.intellij.platform.workspace.storage.impl.ConnectionId.ConnectionType
-import com.intellij.platform.workspace.storage.metadata.diff.CacheMetadataComparator
+import com.intellij.platform.workspace.storage.metadata.diff.TypesMetadataComparator
 import com.intellij.platform.workspace.storage.metadata.model.*
 import com.intellij.platform.workspace.storage.metadata.model.ExtendableClassMetadata.AbstractClassMetadata
 import com.intellij.platform.workspace.storage.metadata.model.FinalClassMetadata.ClassMetadata
@@ -93,7 +93,7 @@ class MetadataDiffTest {
       createOwnProperty("someType", createPrimitiveType("Int", false))
     )
 
-    assertTrue(twoEntitiesDiff(current, cache))
+    assertFalse(twoEntitiesDiff(current, cache))
   }
 
 
@@ -208,7 +208,7 @@ class MetadataDiffTest {
       )
     )
 
-    assertTrue(twoEntitiesDiff(current, cache))
+    assertFalse(twoEntitiesDiff(current, cache))
   }
 
   @Test
@@ -394,7 +394,7 @@ class MetadataDiffTest {
 
 
   private fun twoEntitiesDiff(current: EntityMetadata, cache: EntityMetadata): Boolean {
-    val comparisonResult = CacheMetadataComparator().areEquals(listOf(cache), listOf(current))
+    val comparisonResult = TypesMetadataComparator(cache, current).areEquals(cache, current)
     return comparisonResult.areEquals
   }
 

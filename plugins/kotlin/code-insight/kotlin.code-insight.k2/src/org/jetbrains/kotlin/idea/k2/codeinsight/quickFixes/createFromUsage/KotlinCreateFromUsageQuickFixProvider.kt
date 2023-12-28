@@ -4,16 +4,14 @@ package org.jetbrains.kotlin.idea.k2.codeinsight.quickFixes.createFromUsage
 import com.intellij.codeInsight.daemon.QuickFixActionRegistrar
 import com.intellij.codeInsight.quickfix.UnresolvedReferenceQuickFixProvider
 import com.intellij.psi.PsiReference
-import org.jetbrains.kotlin.psi.KtCallExpression
 import org.jetbrains.kotlin.psi.KtElement
 
 class KotlinCreateFromUsageQuickFixProvider: UnresolvedReferenceQuickFixProvider<PsiReference>() {
     override fun registerFixes(ref: PsiReference, registrar: QuickFixActionRegistrar) {
-        val ktElement = ref.element as? KtElement ?: return
-        val parent = ktElement.parent
-        if (parent is KtCallExpression) {
-            //todo create dedicated fix if all accessible targets are kotlin kotlin KTIJ-27789
-            generateCreateMethodActions(parent).forEach(registrar::register)
+        when (val element = ref.element) {
+            // Currently, we only support creating Kotlin functions from usage in Kotlin. We can add more cases here like
+            // creating Kotlin functions from usage in Java, creating Kotlin classes, and so on.
+            is KtElement -> generateCreateMethodActions(element).forEach(registrar::register)
         }
     }
 

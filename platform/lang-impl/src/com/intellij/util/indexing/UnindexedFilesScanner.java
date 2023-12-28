@@ -10,6 +10,7 @@ import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.progress.Task;
+import com.intellij.openapi.progress.impl.CoreProgressManager;
 import com.intellij.openapi.progress.util.ProgressIndicatorUtils;
 import com.intellij.openapi.project.*;
 import com.intellij.openapi.roots.ContentIterator;
@@ -127,7 +128,10 @@ public class UnindexedFilesScanner extends FilesScanningTaskBase {
     myProvidedStatusMark = predefinedIndexableFilesIterators == null ? null : mark;
     myPredefinedIndexableFilesIterators = predefinedIndexableFilesIterators;
     LOG.assertTrue(myPredefinedIndexableFilesIterators == null || !myPredefinedIndexableFilesIterators.isEmpty());
-    LOG.assertTrue(!myOnProjectOpen || myPredefinedIndexableFilesIterators == null, "Should request full scanning on project open");
+    LOG.assertTrue(!myOnProjectOpen ||
+                   myPredefinedIndexableFilesIterators == null ||
+                   TestModeFlags.get(INDEX_PROJECT_WITH_MANY_UPDATERS_TEST_KEY) == Boolean.TRUE,
+                   "Should request full scanning on project open");
     myFutureScanningRequestToken = project.getService(ProjectIndexingDependenciesService.class).newFutureScanningToken();
 
     if (isFullIndexUpdate()) {
@@ -310,7 +314,13 @@ public class UnindexedFilesScanner extends FilesScanningTaskBase {
 
     if (isFullIndexUpdate()) {
       // the full VFS refresh makes sense only after it's loaded, i.e., after scanning files to index is finished
-      myProject.getService(InitialVfsRefreshService.class).scheduleInitialVfsRefresh();
+      var service = myProject.getService(InitialVfsRefreshService.class);
+      if (ApplicationManager.getApplication().isCommandLine() && !CoreProgressManager.shouldKeepTasksAsynchronousInHeadlessMode()) {
+        service.runInitialVfsRefresh();
+      }
+      else {
+        service.scheduleInitialVfsRefresh();
+      }
     }
   }
 
@@ -512,7 +522,7 @@ public class UnindexedFilesScanner extends FilesScanningTaskBase {
     finally {
       synchronized (allTasksFinished) {
         allTasksFinished.set(true);
-        projectIndexingDependenciesService.completeToken(scanningRequest);
+        projectIndexingDependenciesService.completeToken(scanningRequest, isFullIndexUpdate());
       }
     }
   }

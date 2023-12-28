@@ -4,6 +4,7 @@
 package com.intellij.openapi.actionSystem.impl
 
 import com.intellij.CommonBundle
+import com.intellij.codeWithMe.ClientId
 import com.intellij.concurrency.ContextAwareRunnable
 import com.intellij.concurrency.resetThreadContext
 import com.intellij.diagnostic.PluginException
@@ -250,8 +251,8 @@ object Utils {
                              place: String,
                              isToolbarAction: Boolean,
                              fastTrack: Boolean): CancellablePromise<List<AnAction>> {
-    return service<CoreUiCoroutineScopeHolder>().coroutineScope.async(Dispatchers.EDT + ModalityState.any().asContextElement(),
-                                                                      CoroutineStart.UNDISPATCHED) {
+    return service<CoreUiCoroutineScopeHolder>().coroutineScope.async(Dispatchers.EDT + ModalityState.any().asContextElement() +
+                                                                      ClientId.coroutineContext(), CoroutineStart.UNDISPATCHED) {
       expandActionGroupSuspend(group, presentationFactory, context, place, isToolbarAction, fastTrack)
     }.asCompletableFuture().asCancellablePromise()
   }
@@ -366,6 +367,36 @@ object Utils {
     finally {
       progressJob?.cancel()
       loopJob?.cancel()
+    }
+  }
+
+  fun <T> computeWithProgressIcon(dataContext: DataContext,
+                                  place: String,
+                                  task: suspend () -> T): T {
+    val component = PlatformCoreDataKeys.CONTEXT_COMPONENT.getData(dataContext)
+    val loadingIconPoint = if (component == null) null
+    else JBPopupFactory.getInstance().guessBestPopupLocation(dataContext)
+    return computeWithProgressIcon(loadingIconPoint, component, place, task)
+  }
+
+  fun <T> computeWithProgressIcon(loadingIconPoint: RelativePoint?,
+                                  component: Component?,
+                                  place: String,
+                                  task: suspend () -> T): T = runBlockingForActionExpand(CoroutineName("computeWithProgressIcon")) {
+    val mainJob = coroutineContext.job
+    val loopJob = launch {
+      runEdtLoop(mainJob, null, component, null)
+    }
+    val progressJob = if (loadingIconPoint == null) null
+    else launch {
+      addLoadingIcon(loadingIconPoint, place)
+    }
+    try {
+      task()
+    }
+    finally {
+      progressJob?.cancel()
+      loopJob.cancel()
     }
   }
 
@@ -1171,4 +1202,5 @@ interface SuspendingUpdateSession: UpdateSession {
   suspend fun <T : Any?> sharedDataSuspend(key: Key<T>, supplier: suspend () -> T): T
 
   fun visitCaches(visitor: (AnAction, String, Any) -> Unit)
+  fun dropCaches(predicate: (AnAction) -> Boolean)
 }

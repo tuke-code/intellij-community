@@ -2,9 +2,7 @@
 package com.intellij.history.integration.ui.views;
 
 import com.intellij.CommonBundle;
-import com.intellij.diff.contents.DiffContent;
 import com.intellij.diff.requests.ContentDiffRequest;
-import com.intellij.diff.requests.SimpleDiffRequest;
 import com.intellij.diff.util.DiffUtil;
 import com.intellij.history.core.LocalHistoryFacade;
 import com.intellij.history.integration.IdeaGateway;
@@ -21,9 +19,11 @@ import com.intellij.ide.actions.RevealFileAction;
 import com.intellij.ide.ui.SplitterProportionsDataImpl;
 import com.intellij.openapi.actionSystem.*;
 import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.diff.impl.patch.FilePatch;
 import com.intellij.openapi.diff.impl.patch.IdeaTextPatchBuilder;
 import com.intellij.openapi.progress.ProgressIndicator;
+import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.progress.Task;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.*;
@@ -297,27 +297,15 @@ public abstract class HistoryDialog<T extends HistoryDialogModel> extends FrameW
 
   protected abstract Runnable doUpdateDiffs(T model);
 
-  protected ContentDiffRequest createDifference(final FileDifferenceModel m) {
-    final Ref<ContentDiffRequest> requestRef = new Ref<>();
-
-    new Task.Modal(myProject, message("message.processing.revisions"), false) {
+  protected ContentDiffRequest createDifference(FileDifferenceModel m) {
+    return ProgressManager.getInstance().run(new Task.WithResult<>(myProject, message("message.processing.revisions"), false) {
       @Override
-      public void run(final @NotNull ProgressIndicator i) {
-        i.setIndeterminate(false);
-        ApplicationManager.getApplication().runReadAction(() -> {
-          RevisionProcessingProgressAdapter p = new RevisionProcessingProgressAdapter(i);
-          p.processingLeftRevision();
-          DiffContent left = m.getLeftDiffContent(p);
-
-          p.processingRightRevision();
-          DiffContent right = m.getRightDiffContent(p);
-
-          requestRef.set(new SimpleDiffRequest(m.getTitle(), left, right, m.getLeftTitle(p), m.getRightTitle(p)));
-        });
+      protected ContentDiffRequest compute(@NotNull ProgressIndicator indicator) {
+        indicator.setIndeterminate(false);
+        RevisionProcessingProgressAdapter p = new RevisionProcessingProgressAdapter(indicator);
+        return FileDifferenceModel.createRequest(m, p);
       }
-    }.queue();
-
-    return requestRef.get();
+    });
   }
 
   private void saveSplitterProportion() {
@@ -418,7 +406,8 @@ public abstract class HistoryDialog<T extends HistoryDialogModel> extends FrameW
   }
 
   private @NotNull Path getDefaultPatchFile() {
-    return FileUtil.findSequentNonexistentFile(ProjectKt.getStateStore(myProject).getProjectBasePath().toFile(), "local_history", "patch").toPath();
+    return FileUtil.findSequentNonexistentFile(ProjectKt.getStateStore(myProject).getProjectBasePath().toFile(), "local_history", "patch")
+      .toPath();
   }
 
   private boolean showAsDialog(CreatePatchConfigurationPanel p) {
@@ -497,29 +486,6 @@ public abstract class HistoryDialog<T extends HistoryDialogModel> extends FrameW
     @Override
     protected boolean isEnabled(T model) {
       return isCreatePatchEnabled();
-    }
-  }
-
-  private static final class RevisionProcessingProgressAdapter implements RevisionProcessingProgress {
-    private final ProgressIndicator myIndicator;
-
-    RevisionProcessingProgressAdapter(ProgressIndicator i) {
-      myIndicator = i;
-    }
-
-    @Override
-    public void processingLeftRevision() {
-      myIndicator.setText(message("message.processing.left.revision"));
-    }
-
-    @Override
-    public void processingRightRevision() {
-      myIndicator.setText(message("message.processing.right.revision"));
-    }
-
-    @Override
-    public void processed(int percentage) {
-      myIndicator.setFraction(percentage / 100.0);
     }
   }
 

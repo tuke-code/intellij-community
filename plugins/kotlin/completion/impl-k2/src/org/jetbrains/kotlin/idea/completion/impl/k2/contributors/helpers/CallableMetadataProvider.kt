@@ -11,7 +11,9 @@ import org.jetbrains.kotlin.analysis.api.signatures.KtCallableSignature
 import org.jetbrains.kotlin.analysis.api.symbols.*
 import org.jetbrains.kotlin.analysis.api.types.*
 import org.jetbrains.kotlin.analysis.api.types.KtIntersectionType
+import org.jetbrains.kotlin.idea.base.analysis.api.utils.resolveToExpandedSymbol
 import org.jetbrains.kotlin.idea.completion.lookups.isExtensionCall
+import org.jetbrains.kotlin.idea.completion.reference
 import org.jetbrains.kotlin.idea.completion.weighers.WeighingContext
 import org.jetbrains.kotlin.idea.references.mainReference
 import org.jetbrains.kotlin.kdoc.psi.impl.KDocName
@@ -107,7 +109,7 @@ internal object CallableMetadataProvider {
     ): CallableMetadata? {
         val symbol = signature.symbol
 
-        val expectedReceiver = signature.symbol.originalContainingClassForOverride ?: return null
+        val expectedReceiver = getExpectedNonExtensionReceiver(signature.symbol) ?: return null
         val expectedReceiverType = buildClassType(expectedReceiver)
         val flattenedActualReceiverTypes = getFlattenedActualReceiverTypes(context)
 
@@ -159,6 +161,16 @@ internal object CallableMetadataProvider {
     }
 
     context(KtAnalysisSession)
+    private fun getExpectedNonExtensionReceiver(symbol: KtCallableSymbol): KtClassOrObjectSymbol? {
+        val containingClass = symbol.originalContainingClassForOverride
+        return if (symbol is KtConstructorSymbol && (containingClass as? KtNamedClassOrObjectSymbol)?.isInner == true) {
+            containingClass.getContainingSymbol() as? KtClassOrObjectSymbol
+        } else {
+            containingClass
+        }
+    }
+
+    context(KtAnalysisSession)
     private fun getFlattenedActualReceiverTypes(context: WeighingContext): List<List<KtType>> {
         val actualExplicitReceiverTypes = context.explicitReceiver?.let { receiver ->
             val referencedClass = getReferencedClassInCallableReferenceExpression(receiver) ?: getQualifierClassInKDocName(receiver)
@@ -207,12 +219,7 @@ internal object CallableMetadataProvider {
     private fun getReferencedClassInCallableReferenceExpression(explicitReceiver: KtElement): KtClassLikeSymbol? {
         val callableReferenceExpression = explicitReceiver.getParentOfType<KtCallableReferenceExpression>(strict = true) ?: return null
         if (callableReferenceExpression.lhs != explicitReceiver) return null
-        val symbol = when (explicitReceiver) {
-            is KtDotQualifiedExpression -> explicitReceiver.selectorExpression?.mainReference?.resolveToExpandedSymbol()
-            is KtNameReferenceExpression -> explicitReceiver.mainReference.resolveToExpandedSymbol()
-            else -> return null
-        }
-        return symbol as? KtClassLikeSymbol
+        return explicitReceiver.reference()?.resolveToExpandedSymbol() as? KtClassLikeSymbol
     }
 
     context(KtAnalysisSession)

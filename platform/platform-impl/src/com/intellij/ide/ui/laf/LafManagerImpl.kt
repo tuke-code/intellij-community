@@ -10,6 +10,7 @@ import com.intellij.icons.AllIcons
 import com.intellij.ide.HelpTooltip
 import com.intellij.ide.IdeBundle
 import com.intellij.ide.actions.QuickChangeLookAndFeel
+import com.intellij.ide.plugins.PluginManager
 import com.intellij.ide.ui.*
 import com.intellij.ide.ui.laf.SystemDarkThemeDetector.Companion.createDetector
 import com.intellij.ide.ui.laf.darcula.DarculaLaf
@@ -27,7 +28,7 @@ import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.editor.colors.EditorColorsManager
 import com.intellij.openapi.editor.colors.EditorColorsScheme
 import com.intellij.openapi.editor.colors.impl.EditorColorsManagerImpl
-import com.intellij.openapi.options.Scheme
+import com.intellij.openapi.extensions.PluginId
 import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.ui.DialogWrapper
 import com.intellij.openapi.ui.Messages
@@ -241,10 +242,9 @@ class LafManagerImpl(private val coroutineScope: CoroutineScope) : LafManager(),
   }
 
   override fun loadState(element: Element) {
-    replaceIntellijLightThemeIfSelected(element)
     autodetect = element.getAttributeBooleanValue(ATTRIBUTE_AUTODETECT)
-    preferredLightThemeId = element.getChild(ELEMENT_PREFERRED_LIGHT_LAF)?.getAttributeValue(ATTRIBUTE_THEME_NAME)
-    preferredDarkThemeId = element.getChild(ELEMENT_PREFERRED_DARK_LAF)?.getAttributeValue(ATTRIBUTE_THEME_NAME)
+    preferredLightThemeId = element.getChild(ELEMENT_PREFERRED_LIGHT_LAF)?.getThemeNameWithReplacingDeprecated()
+    preferredDarkThemeId = element.getChild(ELEMENT_PREFERRED_DARK_LAF)?.getThemeNameWithReplacingDeprecated()
 
     val lafToPreviousScheme = HashMap<String, String>()
     val child = element.getChild(ELEMENT_LAFS_TO_PREVIOUS_SCHEMES)
@@ -266,22 +266,36 @@ class LafManagerImpl(private val coroutineScope: CoroutineScope) : LafManager(),
       getGetOrCreateLafDetector()
     }
 
-    val oldTheme = currentTheme
-
-    val newThemeSupplier = loadThemeState(element)
-    val newTheme = newThemeSupplier.get()!!
-    if (isFirstSetup || newThemeSupplier == oldTheme) {
-      currentTheme = newTheme
+    if (isFirstSetup) {
+      currentTheme = try {
+        loadThemeState(element).get()
+      }
+      catch (e: Throwable) {
+        LOG.error(e)
+        null
+      } ?: loadDefaultTheme().get()
     }
     else {
-      QuickChangeLookAndFeel.switchLafAndUpdateUI(this, newTheme, true, true, true)
+      val oldTheme = currentTheme
+      val newThemeSupplier = loadThemeState(element)
+      val newTheme = newThemeSupplier.get()!!
+      if (newThemeSupplier == oldTheme) {
+        currentTheme = newTheme
+      }
+      else {
+        QuickChangeLookAndFeel.switchLafAndUpdateUI(/* lafManager = */ this,
+                                                    /* lf = */ newTheme,
+                                                    /* async = */ true,
+                                                    /* force = */ true,
+                                                    /* lockEditorScheme = */ true)
+      }
     }
   }
 
   private fun loadThemeState(element: Element): Supplier<out UIThemeLookAndFeelInfo?> {
     val themeProviderManager = UiThemeProviderListManager.getInstance()
 
-    element.getChild(ELEMENT_LAF)?.getAttributeValue(ATTRIBUTE_THEME_NAME)?.let {
+    element.getChild(ELEMENT_LAF)?.getThemeNameWithReplacingDeprecated()?.let {
       themeProviderManager.findThemeSupplierById(it)
     }?.let {
       return it
@@ -345,21 +359,14 @@ class LafManagerImpl(private val coroutineScope: CoroutineScope) : LafManager(),
     return element
   }
 
-  //IDEA-331405 Hide IntelliJ Light from new UI
-  private fun replaceIntellijLightThemeIfSelected(element: Element) {
-    if (!ExperimentalUI.isNewUI()) return
-    val replacementThemeId = "JetBrainsLightTheme"
-    val newThemeId = "ExperimentalLightWithLightHeader"
-    val prefLightThemeElement = element.getChild(ELEMENT_PREFERRED_LIGHT_LAF)
-    val preferredLightTheme = prefLightThemeElement?.getAttributeValue(ATTRIBUTE_THEME_NAME)
-    if (preferredLightTheme == replacementThemeId) {
-      prefLightThemeElement.setAttribute(ATTRIBUTE_THEME_NAME, newThemeId)
+  private fun Element.getThemeNameWithReplacingDeprecated(): String? {
+    val currentTheme = this.getAttributeValue(ATTRIBUTE_THEME_NAME)
+    if (ExperimentalUI.isNewUI() && currentTheme == "JetBrainsLightTheme") {
+      val newThemeId = "ExperimentalLightWithLightHeader"
+      this.setAttribute(ATTRIBUTE_THEME_NAME, newThemeId)
+      return newThemeId
     }
-    val currentThemeElement = element.getChild(ELEMENT_LAF)
-    val currentTheme = currentThemeElement?.getAttributeValue(ATTRIBUTE_THEME_NAME)
-    if (currentTheme == replacementThemeId) {
-      currentThemeElement.setAttribute(ATTRIBUTE_THEME_NAME, newThemeId)
-    }
+    return currentTheme
   }
 
   override fun getInstalledLookAndFeels(): Array<UIManager.LookAndFeelInfo> {
@@ -624,8 +631,15 @@ class LafManagerImpl(private val coroutineScope: CoroutineScope) : LafManager(),
   private val defaultInterFont: FontUIResource
     get() {
       val userScaleFactor = defaultUserScaleFactor
-      return getFontWithFallback(INTER_NAME, Font.PLAIN, scaleFontSize(INTER_SIZE.toFloat(), userScaleFactor).toFloat())
+      val fontName = if (SystemInfo.isWindows && isSimplifiedChinese) "Microsoft YaHei UI" else INTER_NAME
+
+      return getFontWithFallback(fontName, Font.PLAIN, scaleFontSize(INTER_SIZE.toFloat(), userScaleFactor).toFloat())
     }
+
+  private val isSimplifiedChinese: Boolean get() =
+    PluginId.findId("com.intellij.zh")?.let {
+      PluginManager.getInstance().findEnabledPlugin(it)
+    } != null
 
   private val storedLafFont: Font?
     get() = storedDefaults.get(currentTheme?.id)?.get("Label.font") as Font?
@@ -719,7 +733,7 @@ class LafManagerImpl(private val coroutineScope: CoroutineScope) : LafManager(),
     // Remove the mapping previously imported from 2023.2.
     lafToPreviousScheme.remove(theme.name)
     // Classic Light color scheme has id `EditorColorsScheme.DEFAULT_SCHEME_NAME` - save it as is
-    if (Scheme.getBaseName(scheme.name) == theme.editorSchemeId) {
+    if (scheme.isDefaultForTheme(theme)) {
       lafToPreviousScheme.remove(theme.id)
     }
     else {

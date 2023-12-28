@@ -17,18 +17,27 @@ package org.jetbrains.idea.maven.dom
 
 import com.intellij.maven.testFramework.MavenDomTestCase
 import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.application.EDT
+import com.intellij.openapi.application.readAction
+import com.intellij.openapi.editor.Document
+import com.intellij.openapi.fileEditor.FileDocumentManager
+import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.VirtualFileManager
 import com.intellij.openapi.vfs.newvfs.BulkFileListener
 import com.intellij.openapi.vfs.newvfs.events.VFileEvent
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import org.jetbrains.idea.maven.utils.MavenLog
 import org.junit.Test
 
 class MavenDomSoftReferencesInParentTest : MavenDomTestCase() {
-  override fun runInDispatchThread() = true
-  override fun setUp() {
+  override fun setUp() = runBlocking {
     super.setUp()
-    VirtualFileManager.getInstance().syncRefresh()
+    withContext(Dispatchers.EDT) {
+      VirtualFileManager.getInstance().syncRefresh()
+    }
+    Unit
   }
 
   @Test
@@ -73,7 +82,7 @@ class MavenDomSoftReferencesInParentTest : MavenDomTestCase() {
                     </build>
                     """.trimIndent())
 
-    setFileContent(myProjectPom, createPomXml("""
+    setFileContent(projectPom, createPomXml("""
                        <groupId>test</groupId>
                        <artifactId>project</artifactId>
                        <version>1</version>
@@ -86,5 +95,12 @@ class MavenDomSoftReferencesInParentTest : MavenDomTestCase() {
                        """.trimIndent()), false)
 
     checkHighlighting()
+
+    val documentSaved = !FileDocumentManager.getInstance().isDocumentUnsaved(getDocument(projectPom))
+    assertTrue(documentSaved)
+  }
+
+  private suspend fun getDocument(f: VirtualFile): Document {
+    return readAction { fixture.getDocument(findPsiFile(f)) }
   }
 }

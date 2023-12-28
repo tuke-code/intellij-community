@@ -8,6 +8,7 @@ import com.intellij.ide.startup.importSettings.chooser.ui.ImportSettingsControll
 import com.intellij.ide.startup.importSettings.chooser.ui.ImportSettingsPage
 import com.intellij.ide.startup.importSettings.data.DialogImportData
 import com.intellij.ide.startup.importSettings.data.ImportFromProduct
+import com.intellij.openapi.rd.createLifetime
 import com.intellij.openapi.ui.MessageDialogBuilder
 import com.intellij.openapi.util.NlsContexts
 import com.intellij.platform.ide.bootstrap.StartupWizardStage
@@ -18,20 +19,23 @@ import com.intellij.ui.util.preferredWidth
 import com.intellij.util.ui.JBDimension
 import com.intellij.util.ui.JBFont
 import com.intellij.util.ui.JBUI
-import java.awt.Dimension
-import java.awt.Font
-import java.awt.GridBagConstraints
-import java.awt.GridBagLayout
+import com.jetbrains.rd.util.lifetime.intersect
+import java.awt.*
 import javax.swing.*
 
 class ImportProgressPage(importFromProduct: DialogImportData, controller: ImportSettingsController) : ImportSettingsPage {
 
   override val stage = StartupWizardStage.ImportProgressPage
 
-  override fun showExit(): MessageDialogBuilder.YesNo = MessageDialogBuilder.yesNo(ImportSettingsBundle.message("exit.confirm.title"),
-                                                                                   ImportSettingsBundle.message("exit.confirm.prompt"))
-    .yesText(ImportSettingsBundle.message("stop.import"))
-    .noText(CommonBundle.getCancelButtonText())
+  private val lifetime = controller.lifetime.createNested().intersect(this.createLifetime())
+
+  override fun confirmExit(parentComponent: Component?): Boolean {
+    return MessageDialogBuilder.yesNo(ImportSettingsBundle.message("exit.confirm.title"),
+                                      ImportSettingsBundle.message("exit.confirm.prompt"))
+      .yesText(ImportSettingsBundle.message("stop.import"))
+      .noText(CommonBundle.getCancelButtonText())
+      .ask(parentComponent)
+  }
 
 
   private val panel = JPanel(VerticalLayout(JBUI.scale(8))).apply {
@@ -53,7 +57,7 @@ class ImportProgressPage(importFromProduct: DialogImportData, controller: Import
     })
 
 
-    if(importFromProduct is ImportFromProduct) {
+    if (importFromProduct is ImportFromProduct) {
       val from = importFromProduct.from
       val to = importFromProduct.to
 
@@ -90,17 +94,19 @@ class ImportProgressPage(importFromProduct: DialogImportData, controller: Import
     }
 
     add(JPanel(VerticalLayout(JBUI.scale(8)).apply {
+      val hLabel = CommentLabel("")
+
       add(JProgressBar(0, 99).apply {
-        importFromProduct.progress.progress.advise(controller.lifetime) {
+        importFromProduct.progress.progress.advise(lifetime) {
           this.value = it
         }
+        importFromProduct.progress.progressMessage.advise(lifetime) {
+          hLabel.text = if (it != null) "<center>$it</center>" else "&nbsp"
+        }
+
         preferredWidth = JBUI.scale(280)
       })
 
-      val hLabel = CommentLabel("")
-      importFromProduct.progress.progressMessage.advise(controller.lifetime) {
-        hLabel.text = if (it != null) "<center>$it</center>" else "&nbsp"
-      }
 
       add(hLabel.label.apply {
         font = JBFont.medium()

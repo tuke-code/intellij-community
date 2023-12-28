@@ -13,6 +13,7 @@ import io.opentelemetry.api.common.Attributes
 import io.opentelemetry.api.trace.Span
 import kotlinx.coroutines.*
 import org.jetbrains.annotations.ApiStatus.Internal
+import org.jetbrains.annotations.ApiStatus.Obsolete
 import org.jetbrains.intellij.build.*
 import org.jetbrains.intellij.build.TraceManager.spanBuilder
 import org.jetbrains.intellij.build.dependencies.BuildDependenciesCommunityRoot
@@ -41,7 +42,7 @@ import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.io.path.name
 
-@JvmOverloads
+@Obsolete
 fun createCompilationContextBlocking(communityHome: BuildDependenciesCommunityRoot,
                                      projectHome: Path,
                                      defaultOutputRoot: Path,
@@ -148,11 +149,11 @@ class CompilationContextImpl private constructor(
 
       val messages = BuildMessagesImpl.create()
       if (options.printEnvironmentInfo) {
-        messages.block("Environment info") {
-          messages.info("Community home: ${communityHome.communityRoot}")
-          messages.info("Project home: $projectHome")
-          printEnvironmentDebugInfo()
-        }
+        Span.current().addEvent("environment info", Attributes.of(
+          AttributeKey.stringKey("community home"), communityHome.communityRoot.toString(),
+          AttributeKey.stringKey("project home"), projectHome.toString(),
+        ))
+        printEnvironmentDebugInfo()
       }
 
       if (options.printFreeSpace) {
@@ -194,7 +195,6 @@ class CompilationContextImpl private constructor(
       }
 
       messages.setDebugLogPath(context.paths.logDir.resolve("debug.log"))
-
       // this is not a proper place to initialize logging, but this is the only place called in most build scripts
       BuildMessagesHandler.initLogging(messages)
       return context

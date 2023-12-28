@@ -279,6 +279,16 @@ public abstract class K2BindToElementTestGenerated extends AbstractK2BindToEleme
             runTest("../../idea/tests/testData/refactoring/bindToElement/propertyTypeReference/FullyQualified.kt");
         }
 
+        @TestMetadata("FullyQualifiedWithLongerFqn.kt")
+        public void testFullyQualifiedWithLongerFqn() throws Exception {
+            runTest("../../idea/tests/testData/refactoring/bindToElement/propertyTypeReference/FullyQualifiedWithLongerFqn.kt");
+        }
+
+        @TestMetadata("FullyQualifiedWithShorterFqn.kt")
+        public void testFullyQualifiedWithShorterFqn() throws Exception {
+            runTest("../../idea/tests/testData/refactoring/bindToElement/propertyTypeReference/FullyQualifiedWithShorterFqn.kt");
+        }
+
         @TestMetadata("RootPkg.kt")
         public void testRootPkg() throws Exception {
             runTest("../../idea/tests/testData/refactoring/bindToElement/propertyTypeReference/RootPkg.kt");
@@ -364,6 +374,11 @@ public abstract class K2BindToElementTestGenerated extends AbstractK2BindToEleme
     public static class TopLevelFunctionCall extends AbstractK2BindToElementTest {
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+        }
+
+        @TestMetadata("ExtensionOverload.kt")
+        public void testExtensionOverload() throws Exception {
+            runTest("../../idea/tests/testData/refactoring/bindToElement/topLevelFunctionCall/ExtensionOverload.kt");
         }
 
         @TestMetadata("Qualified.kt")

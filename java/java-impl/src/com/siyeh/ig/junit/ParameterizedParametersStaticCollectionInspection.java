@@ -24,9 +24,9 @@ import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
 
-public class ParameterizedParametersStaticCollectionInspection extends BaseInspection {
+public final class ParameterizedParametersStaticCollectionInspection extends BaseInspection {
 
-  protected static final String PARAMETERS_FQN = "org.junit.runners.Parameterized.Parameters";
+  private static final String PARAMETERS_FQN = "org.junit.runners.Parameterized.Parameters";
 
   @Override
   protected LocalQuickFix buildFix(final Object... infos) {

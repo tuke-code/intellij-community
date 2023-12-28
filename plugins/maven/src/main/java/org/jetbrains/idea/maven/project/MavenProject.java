@@ -106,10 +106,10 @@ public class MavenProject {
   @NotNull
   @ApiStatus.Internal
   public MavenProjectChanges set(@NotNull MavenProjectReaderResult readerResult,
-                          @NotNull MavenGeneralSettings settings,
-                          boolean updateLastReadStamp,
-                          boolean resetArtifacts,
-                          boolean resetProfiles) {
+                                 @NotNull MavenGeneralSettings settings,
+                                 boolean updateLastReadStamp,
+                                 boolean resetArtifacts,
+                                 boolean resetProfiles) {
     State newState = myState.clone();
 
     if (updateLastReadStamp) newState.myLastReadStamp = myState.myLastReadStamp + 1;
@@ -1270,9 +1270,10 @@ public class MavenProject {
       return this;
     }
 
-    public void setPlugins(@NotNull List<MavenPlugin> plugins) {
+    public Updater setPlugins(@NotNull List<MavenPlugin> plugins) {
       myState.myPlugins.clear();
       myState.myPlugins.addAll(plugins);
+      return this;
     }
   }
 

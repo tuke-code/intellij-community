@@ -9,6 +9,7 @@ import org.jetbrains.kotlin.descriptors.ClassKind
 import org.jetbrains.kotlin.idea.base.resources.KotlinBundle
 import org.jetbrains.kotlin.idea.caches.resolve.analyze
 import org.jetbrains.kotlin.idea.refactoring.introduce.IntroduceRefactoringException
+import org.jetbrains.kotlin.idea.refactoring.introduce.KotlinIntroduceVariableHelper
 import org.jetbrains.kotlin.idea.refactoring.introduce.KotlinIntroduceVariableService
 import org.jetbrains.kotlin.idea.refactoring.introduce.findExpressionOrStringFragment
 import org.jetbrains.kotlin.idea.util.ElementKind
@@ -52,14 +53,13 @@ internal class KotlinIntroduceVariableServiceK1Impl(private val project: Project
         return element
     }
 
-    override fun getContainersForExpression(expression: KtExpression): List<Pair<KtElement, KtElement>> {
-        return KotlinIntroduceVariableHandler.getContainersForExpression(expression)
-    }
+    override fun getContainersForExpression(expression: KtExpression): List<KotlinIntroduceVariableHelper.Containers> =
+        with(K1IntroduceVariableHandler) { expression.getCandidateContainers() }
 
     override fun findOccurrences(
         expression: KtExpression,
         occurrenceContainer: PsiElement
-    ): List<KtExpression> = with(KotlinIntroduceVariableHandler) {
+    ): List<KtExpression> = with(K1IntroduceVariableHandler) {
         expression.findOccurrences(occurrenceContainer)
     }
 
@@ -69,14 +69,14 @@ internal class KotlinIntroduceVariableServiceK1Impl(private val project: Project
         container: KtElement,
         occurrencesToReplace: List<KtExpression>?
     ) {
-        KotlinIntroduceVariableHandler.doRefactoringWithContainer(
+        K1IntroduceVariableHandler.collectCandidateTargetContainersAndDoRefactoring(
             project = project,
             editor = editor,
             expressionToExtract = expressionToExtract,
-            container = container,
             isVar = false,
             occurrencesToReplace = occurrencesToReplace,
-            onNonInteractiveFinish = null
+            onNonInteractiveFinish = null,
+            targetContainer = container,
         )
     }
 

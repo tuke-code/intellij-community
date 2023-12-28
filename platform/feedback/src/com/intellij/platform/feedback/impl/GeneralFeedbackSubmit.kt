@@ -4,6 +4,7 @@ package com.intellij.platform.feedback.impl
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.ApplicationNamesInfo
 import com.intellij.openapi.diagnostic.Logger
+import com.intellij.platform.feedback.impl.statistics.FeedbackSendActionCountCollector
 import com.intellij.util.PlatformUtils
 import com.intellij.util.io.HttpRequests
 import com.intellij.util.io.HttpRequests.JSON_CONTENT_TYPE
@@ -31,6 +32,7 @@ private const val FEEDBACK_COLLECTED_DATA_KEY = "collected_data"
 private const val FEEDBACK_EMAIL_KEY = "email"
 private const val FEEDBACK_SUBJECT_KEY = "subject"
 private const val FEEDBACK_COMMENT_KEY = "comment"
+private const val FEEDBACK_TAGS_KEY = "tags"
 
 const val DEFAULT_FEEDBACK_CONSENT_ID = "rsch.statistics.feedback.common"
 
@@ -38,6 +40,7 @@ private const val REQUEST_ID_KEY = "Request-Id"
 
 private const val EMAIL_PLACEHOLDER = "<EMAIL>"
 internal val EMAIL_REGEX = Regex("\\S+@\\S+\\.\\S+")
+internal val SPACE_SYMBOL_REGEX = Regex("\\s")
 
 private val LOG = Logger.getInstance(FeedbackRequestDataHolder::class.java)
 
@@ -78,6 +81,7 @@ data class FeedbackRequestDataWithDetailedAnswer(val email: String,
                                                  val description: String,
                                                  val privacyConsentType: String,
                                                  val autoSolveTicket: Boolean,
+                                                 val ticketTags: List<String>,
                                                  override val feedbackType: String,
                                                  override val collectedData: JsonObject) : FeedbackRequestDataHolder {
   override fun toJsonObject(): JsonObject {
@@ -91,6 +95,7 @@ data class FeedbackRequestDataWithDetailedAnswer(val email: String,
       put(FEEDBACK_TYPE_KEY, feedbackType)
       put(FEEDBACK_PRIVACY_CONSENT_KEY, true)
       put(FEEDBACK_PRIVACY_CONSENT_TYPE_KEY, privacyConsentType)
+      put(FEEDBACK_TAGS_KEY, buildJsonArray { ticketTags.forEach { add(it.replace(SPACE_SYMBOL_REGEX, "_")) } })
       put(FEEDBACK_COLLECTED_DATA_KEY, cleanFeedbackFromEmails(collectedData))
     }
   }
@@ -114,6 +119,7 @@ private fun sendFeedback(feedbackUrl: String,
                          feedbackData: FeedbackRequestDataHolder,
                          onDone: () -> Unit,
                          onError: () -> Unit) {
+  FeedbackSendActionCountCollector.logFeedbackSendSuccess()
   val requestData = feedbackData.toJsonObject().toString()
 
   try {
@@ -132,6 +138,7 @@ private fun sendFeedback(feedbackUrl: String,
             LOG.info("Failed to submit feedback. Feedback data:\n$requestData\nStatus code:${connection.responseCode}\n" +
                      "Server response:${errorResponse}\nRequest ID:${requestId}")
             onError()
+            FeedbackSendActionCountCollector.logFeedbackSendFail()
             return@connect
           }
 
@@ -146,6 +153,7 @@ private fun sendFeedback(feedbackUrl: String,
                    "Server response:\n$errorResponse\n" +
                    "Exception: ${e.stackTraceToString()}")
           onError()
+          FeedbackSendActionCountCollector.logFeedbackSendFail()
           return@connect
         }
         onDone()
@@ -154,6 +162,7 @@ private fun sendFeedback(feedbackUrl: String,
   catch (e: IOException) {
     LOG.info("Failed to submit feedback. Feedback data:\n$requestData\nError message:\n${e.message}")
     onError()
+    FeedbackSendActionCountCollector.logFeedbackSendFail()
     return
   }
 }

@@ -4,6 +4,7 @@ package org.jetbrains.plugins.gitlab.mergerequest.ui.create.model
 import com.intellij.collaboration.api.HttpStatusErrorException
 import com.intellij.collaboration.async.launchNow
 import com.intellij.collaboration.async.modelFlow
+import com.intellij.collaboration.async.withInitial
 import com.intellij.collaboration.ui.ListenableProgressIndicator
 import com.intellij.collaboration.ui.icon.IconsProvider
 import com.intellij.collaboration.util.ResultUtil.runCatchingUser
@@ -13,6 +14,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
 import com.intellij.platform.util.coroutines.childScope
 import com.intellij.ui.awt.RelativePoint
+import com.intellij.vcs.log.Hash
 import com.intellij.vcs.log.VcsCommitMetadata
 import git4idea.GitBranch
 import git4idea.GitLocalBranch
@@ -20,12 +22,13 @@ import git4idea.GitPushUtil
 import git4idea.GitRemoteBranch
 import git4idea.config.GitSharedSettings
 import git4idea.history.GitLogUtil
+import git4idea.remote.hosting.changesSignalFlow
+import git4idea.repo.GitRepository
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.future.await
 import org.jetbrains.plugins.gitlab.GitLabProjectsManager
-import org.jetbrains.plugins.gitlab.api.data.GitLabPlan
 import org.jetbrains.plugins.gitlab.api.dto.GitLabUserDTO
 import org.jetbrains.plugins.gitlab.mergerequest.data.GitLabProject
 import org.jetbrains.plugins.gitlab.mergerequest.util.GitLabMergeRequestReviewersUtil
@@ -40,7 +43,7 @@ internal interface GitLabMergeRequestCreateViewModel {
 
   val isBusy: Flow<Boolean>
 
-  val plan: Deferred<GitLabPlan>
+  val allowsMultipleReviewers: Flow<Boolean>
   val branchState: Flow<BranchState?>
 
   val existingMergeRequest: Flow<String?>
@@ -78,7 +81,7 @@ internal class GitLabMergeRequestCreateViewModelImpl(
 
   override val isBusy: Flow<Boolean> = taskLauncher.busy
 
-  override val plan: Deferred<GitLabPlan> = projectData.plan
+  override val allowsMultipleReviewers: Flow<Boolean> = projectData.allowsMultipleReviewers
 
   private val listenableProgressIndicator = ListenableProgressIndicator()
   override val creatingProgressText: Flow<String?> = callbackFlow {
@@ -107,8 +110,17 @@ internal class GitLabMergeRequestCreateViewModelImpl(
     }?.iid
   }
 
-  override val commits: SharedFlow<Result<List<VcsCommitMetadata>>?> = branchState.transformLatest { model ->
-    if (model == null) {
+  private val gitRepository: GitRepository = projectData.projectMapping.gitRepository
+  private val commitRevisionComparisonFlow: Flow<CommitRevisionComparison?> =
+    combine(gitRepository.changesSignalFlow().withInitial(Unit), branchState) { _, state -> state }
+      .map { state ->
+        state ?: return@map null
+        CommitRevisionComparison.create(gitRepository, state.headBranch, state.baseBranch)
+      }
+      .distinctUntilChangedBy { it }
+
+  override val commits: SharedFlow<Result<List<VcsCommitMetadata>>?> = commitRevisionComparisonFlow.transformLatest { revisionComparison ->
+    if (revisionComparison == null || revisionComparison.baseRevision == null || revisionComparison.headRevision == null) {
       emit(Result.success(emptyList()))
       return@transformLatest
     }
@@ -116,11 +128,9 @@ internal class GitLabMergeRequestCreateViewModelImpl(
     emit(null)
     val result = withContext(Dispatchers.IO) {
       runCatchingUser {
-        GitLogUtil.collectMetadata(
-          project,
-          model.headRepo.gitRepository.root,
-          "${model.baseBranch.name}..${model.headBranch.name}"
-        ).commits
+        val revisionRange = "${revisionComparison.baseRevision}..${revisionComparison.headRevision}"
+        val metadata = GitLogUtil.collectMetadata(project, gitRepository.root, revisionRange)
+        metadata.commits
       }
     }
     emit(result)
@@ -168,11 +178,12 @@ internal class GitLabMergeRequestCreateViewModelImpl(
 
   override fun adjustReviewer(point: RelativePoint) {
     cs.launchNow(Dispatchers.Main) {
+      val allowsMultipleReviewers = allowsMultipleReviewers.first()
       val originalReviewersIds = adjustedReviewers.value.mapTo(mutableSetOf<String>(), GitLabUserDTO::id)
-      val updatedReviewers = if (plan.await() == GitLabPlan.FREE)
-        GitLabMergeRequestReviewersUtil.selectReviewer(point, originalReviewersIds, potentialReviewers, avatarIconProvider)
-      else
+      val updatedReviewers = if (allowsMultipleReviewers == true)
         GitLabMergeRequestReviewersUtil.selectReviewers(point, originalReviewersIds, potentialReviewers, avatarIconProvider)
+      else
+        GitLabMergeRequestReviewersUtil.selectReviewer(point, originalReviewersIds, potentialReviewers, avatarIconProvider)
 
       updatedReviewers ?: return@launchNow
       _adjustedReviewers.value = updatedReviewers
@@ -285,4 +296,15 @@ private fun checkProtectedBranch(branchState: BranchState, project: Project): Me
   if (!settings.isBranchProtected(localBranchName)) return null
 
   return MergeRequestRequirementsErrorType.PROTECTED_BRANCH
+}
+
+private data class CommitRevisionComparison(val headRevision: Hash?, val baseRevision: Hash?) {
+  companion object {
+    fun create(repository: GitRepository, headBranch: GitBranch, baseBranch: GitRemoteBranch): CommitRevisionComparison {
+      val info = repository.info
+      val headRevision = info.localBranchesWithHashes[headBranch]
+      val baseRevision = info.remoteBranchesWithHashes[baseBranch]
+      return CommitRevisionComparison(headRevision, baseRevision)
+    }
+  }
 }

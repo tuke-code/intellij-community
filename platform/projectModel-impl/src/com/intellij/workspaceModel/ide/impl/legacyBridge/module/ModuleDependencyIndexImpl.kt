@@ -5,12 +5,16 @@ import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.debug
 import com.intellij.openapi.diagnostic.logger
+import com.intellij.openapi.extensions.ExtensionPointListener
+import com.intellij.openapi.extensions.ExtensionPointPriorityListener
+import com.intellij.openapi.extensions.PluginDescriptor
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.projectRoots.ProjectJdkTable
 import com.intellij.openapi.projectRoots.Sdk
 import com.intellij.openapi.roots.ProjectRootManager
 import com.intellij.openapi.roots.RootProvider
 import com.intellij.openapi.roots.ex.ProjectRootManagerEx
+import com.intellij.openapi.roots.libraries.CustomLibraryTableDescription
 import com.intellij.openapi.roots.libraries.Library
 import com.intellij.openapi.roots.libraries.LibraryTable
 import com.intellij.openapi.roots.libraries.LibraryTablesRegistrar
@@ -46,6 +50,17 @@ class ModuleDependencyIndexImpl(private val project: Project): ModuleDependencyI
       val messageBusConnection = project.messageBus.connect(this)
       messageBusConnection.subscribe(ProjectJdkTable.JDK_TABLE_TOPIC, jdkChangeListener)
     }
+
+    CustomLibraryTableDescription.CUSTOM_TABLES_EP.point.addExtensionPointListener(
+      // We need a priority listener here because it's important to unsubscribe before the custom table will be removed at
+      // [LibraryTablesRegistrarImpl.getCustomLibrariesMap]
+      object : ExtensionPointListener<CustomLibraryTableDescription>, ExtensionPointPriorityListener {
+        override fun extensionRemoved(extension: CustomLibraryTableDescription, pluginDescriptor: PluginDescriptor) {
+          LibraryTablesRegistrar.getInstance().getLibraryTableByLevel(extension.tableLevel, project)?.let { table ->
+            libraryTablesListener.unsubscribeFromCustomTableOnDispose(table)
+          }
+        }
+      }, true, project)
   }
 
   override fun addListener(listener: ModuleDependencyListener) {
@@ -153,8 +168,12 @@ class ModuleDependencyIndexImpl(private val project: Project): ModuleDependencyI
         eventDispatcher.multicaster.referencedLibraryChanged(wrapper)
       }
       else {
-        require(wrapper is Supplier<*>) { "Unexpected root provider $wrapper does not implement Supplier<Sdk>" }
-        val value = wrapper.get()
+        val value = if (wrapper is Sdk) {
+          wrapper
+        } else {
+          require(wrapper is Supplier<*>) { "Unexpected root provider $wrapper does not implement Supplier<Sdk>" }
+          wrapper.get()
+        }
         require(value is Sdk) { "Unexpected root provider $wrapper does not implement Supplier<Sdk>" }
         eventDispatcher.multicaster.referencedSdkChanged(value)
       }
@@ -265,11 +284,21 @@ class ModuleDependencyIndexImpl(private val project: Project): ModuleDependencyI
       }
       librariesPerModuleMap.clear()
     }
+
+    fun unsubscribeFromCustomTableOnDispose(libraryTable: LibraryTable) {
+      libraryTablesListener.getLibraryLevels().forEach { libraryLevel ->
+        if (libraryTable.tableLevel != libraryLevel) return@forEach
+        libraryTable.libraryIterator.forEach {
+          it.rootProvider.removeRootSetChangedListener(rootSetChangeListener)
+        }
+        libraryTable.removeListener(libraryTablesListener)
+      }
+    }
   }
 
   private inner class JdkChangeListener : ProjectJdkTable.Listener, ProjectRootManagerEx.ProjectJdkListener {
     private val sdkDependencies = MultiMap.createSet<ModuleDependencyItem, ModuleId>()
-    private val watchedSdks = HashSet<RootProvider>()
+    private val watchedSdks = HashSet<Sdk>()
     private var watchedProjectSdk: Sdk? = null
     private var projectJdkListenerAdded = false
 
@@ -282,7 +311,7 @@ class ModuleDependencyIndexImpl(private val project: Project): ModuleDependencyI
         if (hasProjectSdkDependency() && isProjectSdk(jdk)) {
           watchedProjectSdk = jdk
         }
-        if (watchedSdks.add(jdk.rootProvider)) {
+        if (watchedSdks.add(jdk)) {
           eventDispatcher.multicaster.addedDependencyOn(jdk)
           jdk.rootProvider.addRootSetChangedListener(rootSetChangeListener)
         }
@@ -314,7 +343,7 @@ class ModuleDependencyIndexImpl(private val project: Project): ModuleDependencyI
       if (hasProjectSdkDependency() && isProjectSdk(jdk)) {
         watchedProjectSdk = null
       }
-      if (watchedSdks.remove(jdk.rootProvider)) {
+      if (watchedSdks.remove(jdk)) {
         jdk.rootProvider.removeRootSetChangedListener(rootSetChangeListener)
         eventDispatcher.multicaster.removedDependencyOn(jdk)
       }
@@ -345,7 +374,7 @@ class ModuleDependencyIndexImpl(private val project: Project): ModuleDependencyI
       if (watchedSdks.isEmpty()) {
         eventDispatcher.multicaster.firstDependencyOnSdkAdded()
       }
-      if (watchedSdks.add(sdk.rootProvider)) {
+      if (watchedSdks.add(sdk)) {
         eventDispatcher.multicaster.addedDependencyOn(sdk)
         sdk.rootProvider.addRootSetChangedListener(rootSetChangeListener)
       }
@@ -363,7 +392,7 @@ class ModuleDependencyIndexImpl(private val project: Project): ModuleDependencyI
     }
 
     private fun removeTrackedJdk(sdk: Sdk) {
-      if (!hasDependencyOn(sdk) && watchedSdks.remove(sdk.rootProvider)) {
+      if (!hasDependencyOn(sdk) && watchedSdks.remove(sdk)) {
         sdk.rootProvider.removeRootSetChangedListener(rootSetChangeListener)
         eventDispatcher.multicaster.removedDependencyOn(sdk)
         if (watchedSdks.isEmpty()) {
@@ -401,14 +430,13 @@ class ModuleDependencyIndexImpl(private val project: Project): ModuleDependencyI
       jdk.name == projectRootManager.projectSdkName && jdk.sdkType.name == projectRootManager.projectSdkTypeName
 
     fun unsubscribe(fireEvents: Boolean) {
-      watchedSdks.forEach {
+      watchedSdks.forEach { sdk ->
         if (fireEvents) {
-          @Suppress("UNCHECKED_CAST") val sdk = (it as Supplier<Sdk>).get()
           if (hasDependencyOn(sdk)) {
             eventDispatcher.multicaster.removedDependencyOn(sdk)
           }
         }
-        it.removeRootSetChangedListener(rootSetChangeListener)
+        sdk.rootProvider.removeRootSetChangedListener(rootSetChangeListener)
       }
       watchedSdks.clear()
     }

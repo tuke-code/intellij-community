@@ -27,6 +27,8 @@ import com.intellij.platform.workspace.storage.CachedValue
 import com.intellij.platform.workspace.storage.EntitySource
 import com.intellij.platform.workspace.storage.EntityStorage
 import com.intellij.platform.workspace.storage.MutableEntityStorage
+import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentationApi
+import com.intellij.platform.workspace.storage.instrumentation.MutableEntityStorageInstrumentation
 import com.intellij.platform.workspace.storage.url.VirtualFileUrl
 import com.intellij.platform.workspace.storage.url.VirtualFileUrlManager
 import com.intellij.util.ArrayUtilRt
@@ -76,7 +78,8 @@ class ModifiableRootModelBridgeImpl(
     return current.resolve(myModuleBridge.moduleEntityId) ?: myModuleBridge.findModuleEntity(current)
   }
 
-  override fun getModificationCount(): Long = diff.modificationCount
+  @OptIn(EntityStorageInstrumentationApi::class)
+  override fun getModificationCount(): Long = (diff as MutableEntityStorageInstrumentation).modificationCount
 
   private val extensionsDisposable = Disposer.newDisposable()
 
@@ -634,8 +637,9 @@ class ModifiableRootModelBridgeImpl(
   }
 
   // TODO compare by actual values
+  @OptIn(EntityStorageInstrumentationApi::class)
   override fun isChanged(): Boolean {
-    if (diff.hasChanges()) return true
+    if ((diff as MutableEntityStorageInstrumentation).hasChanges()) return true
 
     if (extensionsDelegate.isInitialized() && extensions.any { it.isChanged }) return true
 

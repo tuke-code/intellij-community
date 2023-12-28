@@ -10,9 +10,9 @@ import com.intellij.ide.plugins.PluginManagerCore;
 import com.intellij.ide.ui.UISettings;
 import com.intellij.jna.JnaLoader;
 import com.intellij.openapi.Disposable;
-import com.intellij.openapi.actionSystem.ActionManager;
 import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
+import com.intellij.openapi.actionSystem.ex.ActionRuntimeRegistrar;
 import com.intellij.openapi.actionSystem.impl.ActionConfigurationCustomizer;
 import com.intellij.openapi.actionSystem.impl.ActionMenu;
 import com.intellij.openapi.actionSystem.impl.ActionMenuItem;
@@ -29,6 +29,7 @@ import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.openapi.wm.impl.IdeRootPane;
 import com.intellij.openapi.wm.impl.LinuxGlobalMenuEventHandler;
 import com.intellij.ui.ExperimentalUI;
+import com.intellij.util.JavaCoroutines;
 import com.intellij.util.concurrency.ThreadingAssertions;
 import com.intellij.util.concurrency.annotations.RequiresEdt;
 import com.intellij.util.system.CpuArch;
@@ -37,10 +38,13 @@ import com.sun.jna.Callback;
 import com.sun.jna.Library;
 import com.sun.jna.Native;
 import com.sun.jna.Pointer;
+import kotlin.Unit;
+import kotlin.coroutines.Continuation;
 import kotlinx.coroutines.flow.MutableStateFlow;
 import kotlinx.coroutines.flow.StateFlowKt;
 import org.jetbrains.annotations.NonNls;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import javax.imageio.ImageIO;
 import javax.swing.Timer;
@@ -463,7 +467,7 @@ public final class GlobalMenuLinux implements LinuxGlobalMenuEventHandler, Dispo
         ourLib.releaseWindowOnMainLoop(windowHandle, onWindowReleased);
       }
 
-      setIdeMenuVisible(frame, true);
+      EventQueue.invokeLater(() -> setIdeMenuVisible(frame, true));
     }
   }
 
@@ -917,15 +921,22 @@ public final class GlobalMenuLinux implements LinuxGlobalMenuEventHandler, Dispo
     }
   }
 
-  static final class MyActionTuner implements ActionConfigurationCustomizer {
+  static final class MyActionTuner implements ActionConfigurationCustomizer, ActionConfigurationCustomizer.LightCustomizeStrategy {
     @Override
-    public void customize(@NotNull ActionManager actionManager) {
+    public @Nullable Object customize(@NotNull ActionRuntimeRegistrar actionRegistrar, @NotNull Continuation<? super Unit> $completion) {
+      return JavaCoroutines.suspendJava(jc -> {
+        doCustomize(actionRegistrar);
+        jc.resume(Unit.INSTANCE);
+      }, $completion);
+    }
+
+    private static void doCustomize(@NotNull ActionRuntimeRegistrar actionRegistrar) {
       if (!SystemInfoRt.isLinux || ApplicationManager.getApplication().isUnitTestMode() || !isPresented()) {
         return;
       }
 
       // register toggle-swing-menu action (to be able to enable swing menu when system applet is died)
-      actionManager
+      actionRegistrar
         .registerAction(TOGGLE_SWING_MENU_ACTION_ID, new AnAction(IdeBundle.message("action.toggle.global.menu.integration.text"),
                                                                   IdeBundle.message(
                                                                     "action.enable.disable.global.menu.integration.description"), null) {

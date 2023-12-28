@@ -227,7 +227,8 @@ class ImportQuickFix(
                     }
 
                     is KotlinCallableReferencePositionContext -> {
-                        // TODO
+                        add(CallableImportCandidatesProvider(positionContext, indexProvider))
+                        add(ConstructorReferenceImportCandidatesProvider(positionContext, indexProvider))
                     }
 
                     is KotlinImportDirectivePositionContext,

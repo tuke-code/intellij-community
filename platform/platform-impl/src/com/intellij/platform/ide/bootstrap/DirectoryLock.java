@@ -27,9 +27,7 @@ import java.io.IOException;
 import java.io.StreamCorruptedException;
 import java.net.*;
 import java.nio.ByteBuffer;
-import java.nio.channels.ClosedChannelException;
-import java.nio.channels.ServerSocketChannel;
-import java.nio.channels.SocketChannel;
+import java.nio.channels.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.util.ArrayList;
@@ -78,6 +76,7 @@ final class DirectoryLock {
   private final @Nullable Path myRedirectedPortFile;
   private final Function<List<String>, CliResult> myProcessor;
 
+  private long myTimeoutMs = Integer.getInteger("ij.dir.lock.timeout", 5_000);
   private volatile @Nullable ServerSocketChannel myServerChannel = null;
 
   DirectoryLock(@NotNull Path configPath, @NotNull Path systemPath, @NotNull Function<List<String>, CliResult> processor) {
@@ -199,7 +198,10 @@ final class DirectoryLock {
   }
 
   private CliResult tryConnect(List<String> args, Path currentDirectory) throws IOException {
-    try (var socketChannel = SocketChannel.open(myFallbackMode ? StandardProtocolFamily.INET : StandardProtocolFamily.UNIX)) {
+    var pf = myFallbackMode ? StandardProtocolFamily.INET : StandardProtocolFamily.UNIX;
+    try (var socketChannel = SocketChannel.open(pf); var selector = Selector.open()) {
+      socketChannel.configureBlocking(false);
+
       SocketAddress address;
       if (myFallbackMode) {
         var port = 0;
@@ -215,7 +217,12 @@ final class DirectoryLock {
       }
 
       if (LOG.isDebugEnabled()) LOG.debug("connecting to " + address);
-      socketChannel.connect(address);
+      socketChannel.register(selector, SelectionKey.OP_CONNECT);
+      if (!socketChannel.connect(address)) {
+        if (selector.select(myTimeoutMs) == 0) throw new SocketTimeoutException(BootstrapBundle.message("bootstrap.error.timeout", address));
+        socketChannel.finishConnect();
+      }
+      socketChannel.register(selector, SelectionKey.OP_READ);
 
       allowActivation();
 
@@ -224,6 +231,7 @@ final class DirectoryLock {
       request.addAll(args);
       sendLines(socketChannel, request);
 
+      if (selector.select(myTimeoutMs) == 0) throw new SocketTimeoutException(BootstrapBundle.message("bootstrap.error.timeout", address));
       var response = readLines(socketChannel);
       if (response.size() != 2) throw new IOException(BootstrapBundle.message("bootstrap.error.malformed.response", response));
       var exitCode = Integer.parseInt(response.get(0));
@@ -357,6 +365,12 @@ final class DirectoryLock {
   @VisibleForTesting
   @Nullable Path getRedirectedPortFile() {
     return myRedirectedPortFile;
+  }
+
+  @VisibleForTesting
+  DirectoryLock withConnectTimeout(long timeoutMs) {
+    myTimeoutMs = timeoutMs;
+    return this;
   }
 
   private static void sendLines(SocketChannel socketChannel, List<String> lines) throws IOException {

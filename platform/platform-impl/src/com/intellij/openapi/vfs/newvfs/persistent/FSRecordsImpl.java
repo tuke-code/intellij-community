@@ -21,6 +21,7 @@ import com.intellij.openapi.vfs.newvfs.FileAttribute;
 import com.intellij.openapi.vfs.newvfs.NewVirtualFileSystem;
 import com.intellij.openapi.vfs.newvfs.events.ChildInfo;
 import com.intellij.serviceContainer.ContainerUtilKt;
+import com.intellij.util.SystemProperties;
 import com.intellij.util.io.blobstorage.ByteBufferReader;
 import com.intellij.util.io.blobstorage.ByteBufferWriter;
 import com.intellij.openapi.vfs.newvfs.persistent.intercept.ConnectionInterceptor;
@@ -104,12 +105,19 @@ public final class FSRecordsImpl implements Closeable {
   private static final boolean USE_MRU_FILE_NAME_CACHE = "mru".equals(NAME_CACHE_IMPL);
 
 
-  private static final String CONTENT_STORAGE_IMPL = System.getProperty("vfs.content-storage.impl", "over-lock-free-page-cache");
+  private static final String CONTENT_STORAGE_IMPL = System.getProperty("vfs.content-storage.impl", "over-mmapped-file");
   public static final boolean USE_CONTENT_STORAGE_OVER_NEW_FILE_PAGE_CACHE = "over-lock-free-page-cache".equals(CONTENT_STORAGE_IMPL);
   public static final boolean USE_CONTENT_STORAGE_OVER_MMAPPED_FILE = "over-mmapped-file".equals(CONTENT_STORAGE_IMPL);
 
   private static final String CONTENT_HASH_IMPL = System.getProperty("vfs.content-hash-storage.impl", "over-mmapped-file");
   public static final boolean USE_CONTENT_HASH_STORAGE_OVER_MMAPPED_FILE = "over-mmapped-file".equals(CONTENT_HASH_IMPL);
+
+  /**
+   * Cutoff for VFSContentStorage: file content larger than this threshold store with compression.
+   * Range 4k-8k seems to be optimal, gauged by experiments on IntelliJ source tree:  with such thresholds only
+   * ~7-15% files are actually compressed, but total size is just ~10-20% more than if all files were compressed.
+   */
+  public static final int COMPRESS_CONTENT_IF_LARGER_THAN = SystemProperties.getIntProperty("vfs.content-storage.compress-if-larger", 8000);
 
   /**
    * Reuse fileIds deleted in a previous session.
@@ -580,6 +588,7 @@ public final class FSRecordsImpl implements Closeable {
     ids.add(fileId);
     for (int i = 0; i < ids.size(); i++) {
       int id = ids.getInt(i);
+      //FiXME RC: what if id is already deleted -> listIds(id) fails with 'attribute already deleted'?
       ids.addElements(ids.size(), listIds(id));
     }
     PersistentFSRecordsStorage records = connection.getRecords();
@@ -618,8 +627,9 @@ public final class FSRecordsImpl implements Closeable {
     try {
       return treeAccessor.findOrCreateRootRecord(rootUrl);
     }
-    catch (IOException e) {
-      throw handleError(e);
+    catch (Throwable t) {
+      //not only IOException: almost everything thrown from .findOrCreateRootRecord() is a sign of VFS structure corruption
+      throw handleError(t);
     }
   }
 
@@ -734,9 +744,9 @@ public final class FSRecordsImpl implements Closeable {
       // optimization: when converter returned unchanged children (see e.g. PersistentFSImpl.findChildInfo())
       // then do not save them back again unnecessarily
       if (!modifiedChildren.equals(children)) {
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("Update children for " + parent + " (id = " + parentId + "); old = " + children + ", new = " + modifiedChildren);
-        }
+        //if (LOG.isDebugEnabled()) {
+        //  LOG.debug("Update children for " + parent + " (id = " + parentId + "); old = " + children + ", new = " + modifiedChildren);
+        //}
         checkNotClosed();
 
         //TODO RC: why we update symlinks here, under the lock?
@@ -1033,15 +1043,15 @@ public final class FSRecordsImpl implements Closeable {
     }
   }
 
-  void setName(int fileId, @NotNull String name, int oldNameId) {
+  void setName(int fileId, @NotNull String name) {
     try {
       checkNotClosed();
       int nameId = getNameId(name);
 
-      connection.getRecords().setNameId(fileId, nameId);
+      int previousNameId = connection.getRecords().updateNameId(fileId, nameId);
       connection.markDirty();
 
-      invertedNameIndexLazy.getValue().updateFileName(fileId, nameId, oldNameId);
+      invertedNameIndexLazy.getValue().updateFileName(fileId, nameId, previousNameId);
       invertedNameIndexModCount.incrementAndGet();
     }
     catch (IOException e) {
@@ -1137,14 +1147,14 @@ public final class FSRecordsImpl implements Closeable {
                          int parentId,
                          @NotNull FileAttributes attributes,
                          @NotNull String name,
-                         boolean overwriteMissed) {
+                         boolean cleanAttributeRef) {
     int nameId = getNameId(name);
     long timestamp = attributes.lastModified;
     long length = attributes.isDirectory() ? -1L : attributes.length;
     int flags = PersistentFSImpl.fileAttributesToFlags(attributes);
 
     try {
-      fillRecord(fileId, timestamp, length, flags, nameId, parentId, overwriteMissed);
+      fillRecord(fileId, timestamp, length, flags, nameId, parentId, cleanAttributeRef);
     }
     catch (IOException e) {
       throw handleError(e);
@@ -1186,7 +1196,12 @@ public final class FSRecordsImpl implements Closeable {
   /** must be called under r or w lock */
   private @Nullable AttributeInputStream readAttribute(int fileId,
                                                        @NotNull FileAttribute attribute) throws IOException {
-    return attributeAccessor.readAttribute(fileId, attribute);
+    try {
+      return attributeAccessor.readAttribute(fileId, attribute);
+    }
+    catch (IOException e) {
+      throw handleError(e);
+    }
   }
 
   @NotNull

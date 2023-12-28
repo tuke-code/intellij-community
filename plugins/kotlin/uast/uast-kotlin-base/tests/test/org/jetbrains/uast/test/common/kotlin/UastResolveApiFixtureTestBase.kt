@@ -2,10 +2,12 @@
 package org.jetbrains.uast.test.common.kotlin
 
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.util.io.FileUtil
 import com.intellij.platform.uast.testFramework.env.findElementByText
 import com.intellij.platform.uast.testFramework.env.findElementByTextFromPsi
 import com.intellij.platform.uast.testFramework.env.findUElementByTextFromPsi
 import com.intellij.psi.*
+import com.intellij.psi.impl.source.PsiClassReferenceType
 import com.intellij.psi.search.GlobalSearchScope
 import com.intellij.testFramework.UsefulTestCase
 import com.intellij.testFramework.fixtures.JavaCodeInsightTestFixture
@@ -20,13 +22,18 @@ import org.jetbrains.kotlin.idea.base.test.JUnit4Assertions.assertSameElements
 import org.jetbrains.kotlin.idea.test.KotlinLightCodeInsightFixtureTestCaseBase
 import org.jetbrains.kotlin.idea.test.KotlinLightCodeInsightFixtureTestCaseBase.assertContainsElements
 import org.jetbrains.kotlin.idea.test.KotlinLightCodeInsightFixtureTestCaseBase.assertDoesntContain
+import org.jetbrains.kotlin.idea.test.MockLibraryFacility
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.util.OperatorNameConventions
 import org.jetbrains.kotlin.utils.addToStdlib.cast
 import org.jetbrains.uast.*
 import org.jetbrains.uast.kotlin.KotlinUFile
 import org.jetbrains.uast.kotlin.KotlinUFunctionCallExpression
+import org.jetbrains.uast.kotlin.psi.UastFakeLightMethodBase
 import org.jetbrains.uast.visitor.AbstractUastVisitor
+import kotlin.io.path.Path
+import kotlin.io.path.extension
+import kotlin.io.path.nameWithoutExtension
 
 interface UastResolveApiFixtureTestBase : UastPluginSelection {
     fun checkResolveStringFromUast(myFixture: JavaCodeInsightTestFixture, project: Project) {
@@ -113,10 +120,6 @@ interface UastResolveApiFixtureTestBase : UastPluginSelection {
         )
 
         TestCase.assertEquals("kotlin.Unit", functionCall.getExpressionType()?.canonicalText)
-
-        val firstArgument = main.findElementByText<UElement>("1")
-        val firstParameter = functionCall.getArgumentForParameter(0)
-        TestCase.assertEquals(firstArgument, firstParameter)
     }
 
     private fun methodSignature(psiMethod: PsiMethod): String {
@@ -164,10 +167,6 @@ interface UastResolveApiFixtureTestBase : UastPluginSelection {
         )
 
         TestCase.assertEquals(PsiTypes.voidType(), functionCall.getExpressionType())
-
-        val firstArgument = main.findElementByText<UElement>("1")
-        val firstParameter = functionCall.getArgumentForParameter(0)
-        TestCase.assertEquals(firstArgument, firstParameter)
     }
 
     fun checkResolveFromBaseJava(myFixture: JavaCodeInsightTestFixture) {
@@ -433,6 +432,45 @@ interface UastResolveApiFixtureTestBase : UastPluginSelection {
             .orFail("cant resolve from $uCallExpression")
         TestCase.assertTrue("Not resolved to local class default constructor", resolved.isConstructor)
         TestCase.assertEquals("LocalClass", resolved.name)
+    }
+
+    fun checkResolveJavaDefaultConstructor(myFixture: JavaCodeInsightTestFixture) {
+        myFixture.addClass(
+            """public class JavaClass { }
+            """.trimIndent()
+        )
+        myFixture.configureByText(
+            "main.kt", """
+                fun test() {
+                  val instance = Java<caret>Class()
+                }
+            """.trimIndent()
+        )
+        val uCallExpression = myFixture.file.findElementAt(myFixture.caretOffset).toUElement().getUCallExpression()
+            .orFail("cant convert to UCallExpression")
+        // KTIJ-21555
+        val notResolved = uCallExpression.resolve()
+        TestCase.assertNull(notResolved)
+        val resolved = uCallExpression.classReference?.resolve() as? PsiClass
+        TestCase.assertNotNull(resolved)
+        TestCase.assertEquals("JavaClass", resolved!!.name)
+    }
+
+    fun checkResolveKotlinDefaultConstructor(myFixture: JavaCodeInsightTestFixture) {
+        myFixture.configureByText(
+            "main.kt", """
+                class KotlinClass { }
+                fun test() {
+                  val instance = Kotlin<caret>Class()
+                }
+            """.trimIndent()
+        )
+        val uCallExpression = myFixture.file.findElementAt(myFixture.caretOffset).toUElement().getUCallExpression()
+            .orFail("cant convert to UCallExpression")
+        val resolved = uCallExpression.resolve()
+            .orFail("cant resolve from $uCallExpression")
+        TestCase.assertTrue("Not resolved to Kotlin class default constructor", resolved.isConstructor)
+        TestCase.assertEquals("KotlinClass", resolved.name)
     }
 
     fun checkResolveJavaClassAsAnonymousObjectSuperType(myFixture: JavaCodeInsightTestFixture) {
@@ -1407,7 +1445,7 @@ interface UastResolveApiFixtureTestBase : UastPluginSelection {
             object : AbstractUastVisitor() {
                 override fun visitClass(node: UClass): Boolean {
                     node.uastSuperTypes.forEach(::visitTypeReferenceExpression)
-                    return false
+                    return super.visitClass(node)
                 }
 
                 override fun visitTypeReferenceExpression(node: UTypeReferenceExpression): Boolean {
@@ -1417,7 +1455,65 @@ interface UastResolveApiFixtureTestBase : UastPluginSelection {
                     TestCase.assertNotNull(psiClass)
                     // Enum entry ENUM_ENTRY_1 is the only one that has an explicit super type: its containing enum class
                     TestCase.assertEquals("MyEnum", psiClass?.name)
-                    return false
+                    return super.visitTypeReferenceExpression(node)
+                }
+            }
+        )
+    }
+
+    fun checkResolveFunInterfaceSamWithValueClassInSignature(myFixture: JavaCodeInsightTestFixture, isK2: Boolean) {
+        // Test inspired from https://issuetracker.google.com/314048176
+        myFixture.configureByText(
+            "main.kt", """
+                @JvmInline
+                value class MyValue(val p: Int)
+
+                fun interface FunInterface {
+                  fun sam(): MyValue
+                }
+
+                fun itfConsumer(itf: FunInterface) {
+                  itf.sam().p
+                }
+
+                fun test() {
+                  itfConsumer {
+                    MyValue(42)
+                  }
+                }
+            """.trimIndent()
+        )
+
+        myFixture.file.toUElement()!!.accept(
+            object : AbstractUastVisitor() {
+                private fun PsiModifierListOwner.isAbstract(): Boolean =
+                    modifierList?.hasModifierProperty(PsiModifier.ABSTRACT) == true ||
+                            hasModifierProperty(PsiModifier.ABSTRACT)
+
+                override fun visitLambdaExpression(node: ULambdaExpression): Boolean {
+                    val superClass = (node.functionalInterfaceType as? PsiClassReferenceType)?.resolve()
+                    TestCase.assertNotNull(superClass)
+                    val superMethod = superClass!!.methods.singleOrNull { it.isAbstract() }
+                    if (isK2) {
+                        // SLC does not model a member with `value` class in its signature
+                        TestCase.assertNull(superMethod)
+                    } else {
+                        TestCase.assertNotNull(superMethod)
+                    }
+
+                    val superUClass = superClass.toUElementOfType<UClass>()
+                    TestCase.assertNotNull(superUClass)
+                    val superUMethod = superUClass!!.methods.singleOrNull { it.isAbstract() }
+                    TestCase.assertNotNull(superUMethod)
+                    if (isK2) {
+                        // In K2 UAST, we'll see a fake [UMethod].
+                        TestCase.assertTrue(superUMethod!!.javaPsi is UastFakeLightMethodBase)
+                    } else {
+                        // In K1 UAST, we'll see a [UMethod] that uses the ULC element.
+                        TestCase.assertEquals(superMethod, superUMethod!!.javaPsi)
+                    }
+
+                    return super.visitLambdaExpression(node)
                 }
             }
         )
@@ -1747,5 +1843,206 @@ interface UastResolveApiFixtureTestBase : UastPluginSelection {
                 }
             }
         )
+    }
+
+    fun checkResolvePropertiesInCompanionObjectFromBinaryDependency(myFixture: JavaCodeInsightTestFixture) {
+        val mockLibraryFacility = myFixture.configureLibraryByText(
+            "dependency.kt", """
+                package some
+
+                interface Flag<T>
+
+                class Dependency {
+                  companion object {
+                    @JvmField val JVM_FIELD_FLAG: Flag<*> = TODO()
+                    @JvmStatic val JVM_STATIC_FLAG: Flag<*> = TODO()
+                    val VAL_FLAG: Flag<*> = TODO()
+                    var varFlag: Flag<*> = TODO()
+                  }
+                }
+                
+                class OtherDependency {
+                  companion object Named {
+                      @JvmField val JVM_FIELD_FLAG: Flag<*> = TODO()
+                      @JvmStatic val JVM_STATIC_FLAG: Flag<*> = TODO()
+                      val VAL_FLAG: Flag<*> = TODO()
+                      var varFlag: Flag<*> = TODO()
+                  }
+                }
+                
+                object DependencyObject {
+                  val VAL_FLAG: Flag<*> = TODO()
+                  var varFlag: Flag<*> = TODO()
+                }
+
+                val DEPENDENCY_TOP_LEVEL_VAL_FLAG: Flag<*> = TODO()
+            """.trimIndent()
+        )
+        myFixture.configureByText(
+            "main.kt", """
+                package some
+
+                private fun consumeFlag(p: Flag<*>) {
+                  println(p)
+                }
+
+                fun test() {
+                  consumeFlag(Dependency.JVM_FIELD_FLAG)
+                  consumeFlag(Dependency.JVM_STATIC_FLAG)
+                  consumeFlag(Dependency.VAL_FLAG)
+                  consumeFlag(Dependency.varFlag)
+                  consumeFlag(OtherDependency.JVM_FIELD_FLAG)
+                  consumeFlag(OtherDependency.JVM_STATIC_FLAG)
+                  consumeFlag(OtherDependency.VAL_FLAG)
+                  consumeFlag(OtherDependency.varFlag)
+                  consumeFlag(DependencyObject.VAL_FLAG)
+                  consumeFlag(DependencyObject.varFlag)
+                  consumeFlag(DEPENDENCY_TOP_LEVEL_VAL_FLAG)
+                }
+            """.trimIndent()
+        )
+
+        val containingClassQueue = buildList {
+            repeat(4) { add("Dependency") }
+            repeat(4) { add("OtherDependency") }
+            repeat(2) { add("DependencyObject") }
+            add("DependencyKt")
+        }
+        val fieldQueue = buildList {
+            repeat(2) {
+                add("JVM_FIELD_FLAG")
+                add("JVM_STATIC_FLAG")
+                add("VAL_FLAG")
+                add("varFlag")
+            }
+            add("VAL_FLAG")
+            add("varFlag")
+            add("DEPENDENCY_TOP_LEVEL_VAL_FLAG")
+        }
+
+        myFixture.file.toUElement()!!.accept(
+            PropertyFromBinaryDependencyVisitor(containingClassQueue, fieldQueue)
+        )
+
+        mockLibraryFacility.tearDown(myFixture.module)
+    }
+
+    fun checkResolvePropertiesInInnerClassFromBinaryDependency(myFixture: JavaCodeInsightTestFixture) {
+        val mockLibraryFacility = myFixture.configureLibraryByText(
+            "dependency.kt", """
+                package some
+
+                interface Flag<T>
+
+                class Outer {
+                  val VAL_FLAG: Flag<*> = TODO()
+                  var varFlag: Flag<*> = TODO()
+
+                  inner class Inner {
+                    val VAL_FLAG: Flag<*> = TODO()
+                    var varFlag: Flag<*> = TODO()
+                  }
+                  
+                  object O {
+                    val VAL_FLAG: Flag<*> = TODO()
+                    var varFlag: Flag<*> = TODO()
+                  }
+                }
+            """.trimIndent()
+        )
+        myFixture.configureByText(
+            "main.kt", """
+                package some
+
+                private fun consumeFlag(p: Flag<*>) {
+                  println(p)
+                }
+
+                fun test() {
+                  val o = Outer()
+                  consumeFlag(o.VAL_FLAG)
+                  consumeFlag(o.varFlag)
+                  val i = o.Inner()
+                  consumeFlag(i.VAL_FLAG)
+                  consumeFlag(i.varFlag)
+                  consumeFlag(Outer.O.VAL_FLAG)
+                  consumeFlag(Outer.O.varFlag)
+                }
+            """.trimIndent()
+        )
+
+        val containingClassQueue = buildList {
+            repeat(2) { add("Outer") }
+            repeat(2) { add("Inner") }
+            repeat(2) { add("O") }
+        }
+        val fieldQueue = buildList {
+            repeat(3) {
+                add("VAL_FLAG")
+                add("varFlag")
+            }
+        }
+
+        myFixture.file.toUElement()!!.accept(
+            PropertyFromBinaryDependencyVisitor(containingClassQueue, fieldQueue)
+        )
+
+        mockLibraryFacility.tearDown(myFixture.module)
+    }
+
+    private class PropertyFromBinaryDependencyVisitor(
+        val containingClassQueue: List<String>,
+        val fieldQueue: List<String>
+    ) : AbstractUastVisitor() {
+        init {
+            assert(containingClassQueue.size == fieldQueue.size)
+        }
+
+        var count = 0
+
+        override fun visitCallExpression(node: UCallExpression): Boolean {
+            val arg = node.valueArguments.singleOrNull()
+                ?: return super.visitCallExpression(node)
+            if (arg.sourcePsi?.text == "p") {
+                // Test call-sites of `consumeFlag`, not `consumeFlag` itself.
+                return super.visitCallExpression(node)
+            }
+
+            val selector = when (arg) {
+                is UQualifiedReferenceExpression -> arg.selector
+                is UParenthesizedExpression -> arg.expression
+                else -> arg
+            } as USimpleNameReferenceExpression
+            val resolved = selector.resolve()
+            TestCase.assertNotNull(node.asRenderString(), resolved)
+            TestCase.assertTrue(resolved is PsiField)
+
+            val fieldName = fieldQueue[count]
+            TestCase.assertEquals(fieldName, (resolved as PsiField).name)
+            val className = containingClassQueue[count]
+            TestCase.assertEquals(className, resolved.containingClass?.name)
+            count++
+
+            return super.visitCallExpression(node)
+        }
+
+        override fun afterVisitFile(node: UFile) {
+            TestCase.assertEquals(containingClassQueue.size, count)
+
+            super.afterVisitFile(node)
+        }
+    }
+
+    private fun JavaCodeInsightTestFixture.configureLibraryByText(
+        fileName: String,
+        text: String,
+    ): MockLibraryFacility {
+        val path = Path(fileName)
+        val file = FileUtil.createTempFile(path.nameWithoutExtension, "." + path.extension)
+        file.writeText(text)
+        file.deleteOnExit()
+        val mockLibraryFacility = MockLibraryFacility(file, attachSources = false)
+        mockLibraryFacility.setUp(module)
+        return mockLibraryFacility
     }
 }

@@ -29,11 +29,9 @@ import com.intellij.ui.components.panels.ListLayout
 import com.intellij.ui.components.panels.Wrapper
 import com.intellij.util.ui.JBUI.Borders
 import com.intellij.util.ui.StyleSheetUtil
-import com.intellij.util.ui.update.UiNotifyConnector
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import org.jetbrains.annotations.Nls
@@ -113,12 +111,15 @@ internal object GitLabMergeRequestTimelineComponentFactory {
     val addAsDraftAction = editVm.submitAsDraftActionIn(noteCs, CollaborationToolsBundle.message("review.comments.save-as-draft.action"),
                                                         project, NewGitLabNoteType.STANDALONE,
                                                         GitLabStatistics.MergeRequestNoteActionPlace.TIMELINE)
-
     val actions = CommentInputActionsComponentFactory.Config(
       primaryAction = editVm.primarySubmitActionIn(noteCs, addAction, addAsDraftAction),
       secondaryActions = editVm.secondarySubmitActionIn(noteCs, addAction, addAsDraftAction),
-      submitHint = MutableStateFlow(CollaborationToolsBundle.message("review.comments.reply.hint",
-                                                                     CommentInputActionsComponentFactory.submitShortcutText))
+      submitHint = editVm.submitActionHintIn(noteCs,
+                                             CollaborationToolsBundle.message("review.comment.hint",
+                                                                              CommentInputActionsComponentFactory.submitShortcutText),
+                                             GitLabBundle.message("merge.request.details.action.draft.comment.hint",
+                                                                  CommentInputActionsComponentFactory.submitShortcutText)
+      )
     )
 
     val itemType = ComponentType.FULL

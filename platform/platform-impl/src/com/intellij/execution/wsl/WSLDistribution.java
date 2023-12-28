@@ -11,8 +11,10 @@ import com.intellij.execution.configurations.PathEnvironmentVariableUtil;
 import com.intellij.execution.configurations.PtyCommandLine;
 import com.intellij.execution.process.*;
 import com.intellij.ide.IdeBundle;
+import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.util.Key;
 import com.intellij.openapi.util.NlsContexts;
 import com.intellij.openapi.util.NlsSafe;
@@ -22,7 +24,6 @@ import com.intellij.openapi.util.registry.Registry;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.openapi.util.text.Strings;
 import com.intellij.openapi.vfs.impl.wsl.WslConstants;
-import com.intellij.platform.ijent.IjentApi;
 import com.intellij.util.Consumer;
 import com.intellij.util.ExceptionUtil;
 import com.intellij.util.Functions;
@@ -71,7 +72,7 @@ public class WSLDistribution implements AbstractWslDistribution {
   private static final String DEFAULT_WSL_IP = "127.0.0.1";
   private static final int RESOLVE_SYMLINK_TIMEOUT = 10000;
   private static final String RUN_PARAMETER = "run";
-  private static final String DEFAULT_SHELL = "/bin/sh";
+  static final String DEFAULT_SHELL = "/bin/sh";
   static final int DEFAULT_TIMEOUT = SystemProperties.getIntProperty("ide.wsl.probe.timeout", 20_000);
   private static final String SHELL_PARAMETER = "$SHELL";
   public static final String WSL_EXE = "wsl.exe";
@@ -227,20 +228,16 @@ public class WSLDistribution implements AbstractWslDistribution {
                                                                     @Nullable Project project,
                                                                     @NotNull WSLCommandLineOptions options) throws ExecutionException {
     if (mustRunCommandLineWithIjent(options)) {
-      commandLine.withEscapingForLocalRun(false);
-      if (commandLine instanceof PtyCommandLine) {
-        commandLine.setProcessCreator((processBuilder) -> {
-          var ptyOptions = ((PtyCommandLine)commandLine).getPtyOptions();
-          var ijentPty = new IjentApi.Pty(ptyOptions.getInitialColumns(), ptyOptions.getInitialRows(), !ptyOptions.getConsoleMode());
-
-          return WslIjentManager.getInstance().runProcessBlocking(this, project, processBuilder, ijentPty, options.isSudo());
-        });
+      LocalPtyOptions ptyOptions;
+      if (commandLine instanceof PtyCommandLine ptyCommandLine) {
+        ptyOptions = ptyCommandLine.getPtyOptions();
       }
       else {
-        commandLine.setProcessCreator((processBuilder) -> {
-          return WslIjentManager.getInstance().runProcessBlocking(this, project, processBuilder, null, options.isSudo());
-        });
+        ptyOptions = null;
       }
+      commandLine.setProcessCreator((processBuilder) -> {
+        return WslIjentJavaUtil.runProcessBlocking(WslIjentManager.getInstance(), project, this, processBuilder, options, ptyOptions);
+      });
     }
     else {
       doPatchCommandLine(commandLine, project, options);
@@ -251,7 +248,7 @@ public class WSLDistribution implements AbstractWslDistribution {
 
   @VisibleForTesting
   public static boolean mustRunCommandLineWithIjent(@NotNull WSLCommandLineOptions options) {
-    return WslIjentManager.isIjentAvailable() && !options.isLaunchWithWslExe();
+    return WslIjentManager.getInstance().isIjentAvailable() && !options.isLaunchWithWslExe();
   }
 
   final @NotNull <T extends GeneralCommandLine> T doPatchCommandLine(@NotNull T commandLine,
@@ -304,7 +301,10 @@ public class WSLDistribution implements AbstractWslDistribution {
       prependCommand(linuxCommand, "cd", CommandLineUtil.posixQuote(options.getRemoteWorkingDirectory()), "&&");
     }
     if (executeCommandInShell && !options.isPassEnvVarsUsingInterop()) {
-      commandLine.getEnvironment().forEach((key, val) -> {
+      Comparator<Map.Entry<String, String>> comparator = Map.Entry.<String, String>comparingByKey().reversed();
+      commandLine.getEnvironment().entrySet().stream().sorted(comparator).forEach((entry) -> {
+        String key = entry.getKey();
+        String val = entry.getValue();
         if (ENV_VARIABLE_NAME_PATTERN.matcher(key).matches()) {
           prependCommand(linuxCommand, "export", key + "=" + CommandLineUtil.posixQuote(val), "&&");
         }
@@ -418,7 +418,19 @@ public class WSLDistribution implements AbstractWslDistribution {
     }
   }
 
+  private static @Nullable Path testOverriddenWslExe;
+
+  @TestOnly
+  public static void testOverriddenWslExe(@NotNull Path path, @NotNull Disposable disposable) {
+    Disposer.register(disposable, () -> {
+      testOverriddenWslExe = null;
+    });
+    testOverriddenWslExe = path;
+  }
+
   public static @Nullable Path findWslExe() {
+    if (testOverriddenWslExe != null) return testOverriddenWslExe;
+
     File file = PathEnvironmentVariableUtil.findInPath(WSL_EXE);
     return file != null ? file.toPath() : null;
   }
@@ -431,14 +443,14 @@ public class WSLDistribution implements AbstractWslDistribution {
   // https://blogs.msdn.microsoft.com/commandline/2017/12/22/share-environment-vars-between-wsl-and-windows/
   private static void passEnvironmentUsingInterop(@NotNull GeneralCommandLine commandLine) {
     StringBuilder builder = new StringBuilder();
-    for (String envName : commandLine.getEnvironment().keySet()) {
+    commandLine.getEnvironment().keySet().stream().sorted().forEach((envName) -> {
       if (StringUtil.isNotEmpty(envName)) {
         if (builder.length() > 0) {
           builder.append(":");
         }
         builder.append(envName).append("/u");
       }
-    }
+    });
     if (builder.length() > 0) {
       String prevValue = commandLine.getEnvironment().get(WslConstants.WSLENV);
       if (prevValue == null) {
@@ -502,8 +514,8 @@ public class WSLDistribution implements AbstractWslDistribution {
    * @return environment map of the default user in wsl
    */
   public @Nullable Map<String, String> getEnvironment() {
-    if (WslIjentManager.isIjentAvailable()) {
-      return WslIjentManager.getInstance().fetchLoginShellEnv(this, null, false);
+    if (WslIjentManager.getInstance().isIjentAvailable()) {
+      return WslIjentJavaUtil.fetchLoginShellEnv(WslIjentManager.getInstance(), this, null, false);
     }
     try {
       ProcessOutput processOutput = WslExecution.executeInShellAndGetCommandOnlyStdout(
@@ -666,8 +678,11 @@ public class WSLDistribution implements AbstractWslDistribution {
   /**
    * Windows IP address. See class doc before using it, because this is probably not what you are looking for.
    *
+   * @deprecated use {@link com.intellij.execution.wsl.WslProxy} because Windows IP address is almost always closed by firewall and this method also uses `eth0` address which also might be broken
+   *
    * @throws ExecutionException if IP can't be obtained (see logs for more info)
    */
+  @Deprecated
   public final @NotNull InetAddress getHostIpAddress() throws ExecutionException {
     final var hostIpOrException = getValueWithLogging(myLazyHostIp, "host IP");
     if (hostIpOrException == null) {
@@ -776,7 +791,7 @@ public class WSLDistribution implements AbstractWslDistribution {
 
   public @NonNls @Nullable String getEnvironmentVariable(String name) {
     if (Registry.is("wsl.use.remote.agent.for.launch.processes")) {
-      Map<String, String> map = WslIjentManager.getInstance().fetchLoginShellEnv(this, null, false);
+      Map<String, String> map = WslIjentJavaUtil.fetchLoginShellEnv(WslIjentManager.getInstance(), this, null, false);
       return map.get(name);
     }
     WSLCommandLineOptions options = new WSLCommandLineOptions()
@@ -791,7 +806,12 @@ public class WSLDistribution implements AbstractWslDistribution {
     return coalesce(getValueWithLogging(myLazyShellPath, "user's shell path"), DEFAULT_SHELL);
   }
 
+  @VisibleForTesting
+  protected @Nullable String testOverriddenShellPath;
+
   private @NlsSafe @Nullable String readShellPath() {
+    if (testOverriddenShellPath != null) return testOverriddenShellPath;
+
     WSLCommandLineOptions options = new WSLCommandLineOptions().setExecuteCommandInDefaultShell(true).setLaunchWithWslExe(true);
     return WslExecution.executeInShellAndGetCommandOnlyStdout(this, new GeneralCommandLine("printenv", "SHELL"), options, DEFAULT_TIMEOUT,
                                                               true);

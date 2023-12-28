@@ -18,7 +18,7 @@ import static org.jetbrains.plugins.textmate.bundles.VSCBundleReaderKt.readVSCBu
 
 public final class TestUtil {
   @NonNls public static final String BAT = "bat";
-
+  @NonNls public static final String GO = "go";
   @NonNls public static final String TERRAFORM = "terraform";
   @NonNls public static final String MAKE = "make";
   @NonNls public static final String JAVA = "java";
@@ -48,6 +48,7 @@ public final class TestUtil {
   @NonNls public static final String SMARTY = "smarty";
   @NonNls public static final String TURTLE = "turtle";
   @NonNls public static final String GIT = "git";
+  @NonNls public static final String RESTRUCTURED_TEXT = "restructuredtext";
 
   public static Path getBundleDirectory(String bundleName) {
     Path bundleDirectory = Path.of(getCommunityHomePath() + "/plugins/textmate/testData/bundles", bundleName);

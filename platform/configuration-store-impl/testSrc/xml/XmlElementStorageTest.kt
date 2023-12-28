@@ -31,14 +31,14 @@ class XmlElementStorageTest {
     val newState = Element("component").setAttribute("name", "test").addContent(Element("bar"))
     val externalizationSession = storage.createSaveSessionProducer()!!
     externalizationSession.setState(null, "test", newState)
-    externalizationSession.createSaveSession()!!.save()
+    externalizationSession.createSaveSession()!!.saveBlocking()
     assertThat(storage.savedElement).isNotNull
     assertThat(storage.savedElement!!.getChild("component").getChild("bar")).isNotNull
     assertThat(storage.savedElement!!.getChild("component").getChild("foo")).isNull()
   }
 
   private class MyXmlElementStorage(private val element: Element)
-    : XmlElementStorage(fileSpec = "", rootElementName = "root", roamingType = RoamingType.DEFAULT) {
+    : XmlElementStorage(fileSpec = "", rootElementName = "root", storageRoamingType = RoamingType.DEFAULT) {
     var savedElement: Element? = null
 
     override fun loadLocalData() = element

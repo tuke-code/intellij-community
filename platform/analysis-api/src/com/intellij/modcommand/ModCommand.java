@@ -15,6 +15,7 @@ import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.intellij.util.containers.ContainerUtil;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NonNls;
 import org.jetbrains.annotations.NotNull;
 
@@ -117,6 +118,22 @@ public sealed interface ModCommand
   }
 
   /**
+   * @param target element to move to
+   * @return a command that navigates to a given element in the editor, assuming that it's opened in the editor
+   */
+  static @NotNull ModCommand moveTo(@NotNull PsiElement target) {
+    PsiFile psiFile = target.getContainingFile();
+    TextRange range = target.getTextRange();
+    Document document = psiFile.getViewProvider().getDocument();
+    if (document instanceof DocumentWindow window) {
+      range = window.injectedToHost(range);
+      psiFile = InjectedLanguageManager.getInstance(psiFile.getProject()).getTopLevelFile(psiFile);
+    }
+    VirtualFile file = psiFile.getVirtualFile();
+    return new ModNavigate(file, range.getStartOffset(), range.getStartOffset(), range.getStartOffset());
+  }
+
+  /**
    * @param attributes attributes to use for highlighting 
    * @param elements elements to highlight
    * @return a command to highlight the elements, assuming that nothing will be changed in the file
@@ -157,6 +174,7 @@ public sealed interface ModCommand
    * @return a command that updates the given option
    * @see OptionControllerProvider for details
    */
+  @ApiStatus.Experimental
   static @NotNull ModCommand updateOption(
     @NotNull PsiElement context, @NotNull @NonNls String bindId, @NotNull Object newValue) {
     Object oldValue = OptionControllerProvider.getOption(context, bindId);
@@ -170,6 +188,7 @@ public sealed interface ModCommand
    * @return a command that updates the given option
    * @see OptionControllerProvider for details
    */
+  @ApiStatus.Experimental
   static @NotNull ModCommand updateOptionList(
     @NotNull PsiElement context, @NotNull @NonNls String bindId, @NotNull Consumer<@NotNull List<@NotNull String>> listUpdater) {
     @SuppressWarnings("unchecked") 
@@ -309,6 +328,7 @@ public sealed interface ModCommand
    * @param leanRight if true, lean to right side when the text was inserted right at the caret position
    * @return an updated command which tries to navigate inside the specified file, taking into account the modifications inside that file
    */
+  @ApiStatus.Experimental
   static @NotNull ModCommand moveCaretAfter(@NotNull ModCommand command, @NotNull PsiFile file, int offset, boolean leanRight) {
     VirtualFile virtualFile = file.getVirtualFile();
     ModCommand finalCommand = nop();
@@ -335,6 +355,7 @@ public sealed interface ModCommand
    * @param elements all elements to select from
    * @param nextCommand a function to compute the subsequent command based on the selection; will be executed in read-action
    */
+  @ApiStatus.Experimental
   static @NotNull ModCommand chooseMultipleMembers(@NotNull @NlsContexts.PopupTitle String title,
                                                    @NotNull List<? extends @NotNull MemberChooserElement> elements,
                                                    @NotNull Function<@NotNull List<? extends @NotNull MemberChooserElement>, ? extends @NotNull ModCommand> nextCommand) {
@@ -350,6 +371,7 @@ public sealed interface ModCommand
    * @param defaultSelection default selection
    * @param nextCommand a function to compute the subsequent command based on the selection; will be executed in read-action
    */
+  @ApiStatus.Experimental
   static @NotNull ModCommand chooseMultipleMembers(@NotNull @NlsContexts.PopupTitle String title,
                                                    @NotNull List<? extends @NotNull MemberChooserElement> elements,
                                                    @NotNull List<? extends @NotNull MemberChooserElement> defaultSelection,
@@ -364,7 +386,7 @@ public sealed interface ModCommand
    * @param conflicts conflicts to show
    */
   static @NotNull ModCommand showConflicts(@NotNull Map<@NotNull PsiElement, ModShowConflicts.@NotNull Conflict> conflicts) {
-    return new ModShowConflicts(conflicts);
+    return conflicts.isEmpty() ? nop() : new ModShowConflicts(conflicts);
   }
 
   /**

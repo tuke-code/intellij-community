@@ -168,7 +168,7 @@ public final class CachedIntentions implements IntentionContainer {
     myGutters.clear();
 
     Predicate<IntentionAction> filter = action -> ContainerUtil.and(
-      IntentionActionFilter.EXTENSION_POINT_NAME.getExtensionList(), f -> f.accept(action, myFile));
+      IntentionActionFilter.EXTENSION_POINT_NAME.getExtensionList(), f -> f.accept(action, myFile, myOffset));
 
     PresentationFactory presentationFactory = new PresentationFactory();
     List<AnAction> actions = Utils.expandActionGroup(
@@ -276,7 +276,7 @@ public final class CachedIntentions implements IntentionContainer {
     IntentionActionWithTextCaching cachedAction =
       new IntentionActionWithTextCaching(
         descriptor.getAction(), descriptor.getDisplayName(), descriptor.getIcon(), descriptor.getToolId(),
-        descriptor.getProblemRange(), (cached, action) -> {
+        descriptor.getFixRange(), (cached, action) -> {
           if (QuickFixWrapper.unwrap(action) != null) {
             // remove only inspection fixes after invocation,
             // since intention actions might be still available
@@ -345,7 +345,7 @@ public final class CachedIntentions implements IntentionContainer {
   @Override
   public @NotNull IntentionGroup getGroup(@NotNull IntentionActionWithTextCaching action) {
     if (myErrorFixes.contains(action)) {
-      TextRange problemRange = action.getProblemRange();
+      TextRange problemRange = action.getFixRange();
       return problemRange == null || problemRange.contains(getOffset()) ? IntentionGroup.ERROR : IntentionGroup.REMOTE_ERROR;
     }
     if (myInspectionFixes.contains(action)) {

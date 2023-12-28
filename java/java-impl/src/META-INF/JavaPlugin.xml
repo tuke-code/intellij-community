@@ -398,6 +398,7 @@
 
     <renameHandler implementation="com.intellij.ide.projectView.impl.RenameModuleHandler"/>
     <renameHandler implementation="com.intellij.refactoring.rename.RenameModuleAndDirectoryHandler"/>
+    <renameHandler implementation="com.intellij.refactoring.rename.RenameJavaImplicitClassRenamer"/>
     <renameHandler implementation="com.intellij.openapi.roots.impl.libraries.RenameLibraryHandler"/>
     <packaging.sourceItemProvider
         implementation="com.intellij.openapi.roots.ui.configuration.artifacts.sourceItems.ModulesAndLibrariesSourceItemsProvider"/>
@@ -1039,7 +1040,7 @@
     <renameInputValidator implementation="com.intellij.refactoring.rename.PsiPackageRenameValidator"/>
     <renameInputValidator implementation="com.intellij.refactoring.rename.JavaModuleRenameValidator"/>
     <renameInputValidator implementation="com.intellij.refactoring.rename.JavaTypeRenameValidator"/>
-    <testDiffProvider language="JAVA" implementationClass="com.intellij.execution.testframework.JavaTestDiffProvider"/>
+    <testDiffProvider language="JAVA" implementationClass="com.intellij.execution.testframework.JvmTestDiffProvider"/>
     <renamePsiElementProcessor implementation="com.intellij.refactoring.rename.RenamePsiPackageProcessor"/>
     <renamePsiElementProcessor implementation="com.intellij.refactoring.rename.RenamePsiDirectoryProcessor"/>
     <renamePsiElementProcessor implementation="com.intellij.refactoring.rename.RenameJavaClassProcessor"/>
@@ -1742,7 +1743,7 @@
     <localInspection groupPathKey="group.path.names.java.language.level.specific.issues.and.migration.aids" language="JAVA" shortName="UseHashCodeMethodInspection"
                      groupKey="group.names.language.level.specific.issues.and.migration.aids8" groupBundle="messages.InspectionsBundle" enabledByDefault="true" level="WARNING"
                      implementationClass="com.intellij.codeInspection.UseHashCodeMethodInspection"
-                     key="inspection.convert.2.streamapi.display.name" bundle="messages.JavaBundle"/>
+                     key="inspection.name.can.be.replaced.with.long.hashcode" bundle="messages.JavaAnalysisBundle"/>
     <localInspection groupPath="Java" language="JAVA" shortName="FuseStreamOperations"
                      bundle="messages.JavaBundle" key="inspection.fuse.stream.operations.display.name"
                      groupKey="group.names.code.style.issues" groupBundle="messages.InspectionsBundle" enabledByDefault="true" level="WARNING"

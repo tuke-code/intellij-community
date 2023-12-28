@@ -172,6 +172,7 @@
       "startBorderColor": "Grey5",
       "endBorderColor": "Grey5",
       "focusedBorderColor": "Grey2",
+      "minimumSize": "72,28",
       "shadowColor": "#00000000",
 
       "default": {
@@ -192,6 +193,12 @@
       }
     },
 
+    "CheckBox": {
+      "borderInsets": "4,4,4,4",
+      "iconSize": 24,
+      "textIconGap": 4
+    },
+
     "SegmentedButton": {
       "selectedStartBorderColor": "Grey5",
       "selectedEndBorderColor": "Grey5",
@@ -204,6 +211,7 @@
         "background": "Grey2",
         "nonEditableBackground": "Grey3"
       },
+      "minimumSize": "49,28",
       "nonEditableBackground": "Grey3"
     },
 
@@ -244,9 +252,8 @@
       "Gray": "#35363B"
     },
 
-    "TextField.background": "Grey2",
-
     "Component": {
+      "arc": "8",
       "borderColor": "Grey5",
       "focusedBorderColor": "Grey2",
       "errorFocusColor": "Red5",
@@ -292,7 +299,8 @@
         "successBorder": "Green2",
         "warningBackground": "Yellow1",
         "warningBorder": "Yellow2",
-        "iconHoverBackground": "#FFFFFF1A"
+        "iconHoverBackground": "#FFFFFF1A",
+        "selectionBackground": "Grey2"
       }
     },
 
@@ -417,7 +425,23 @@
 
     "OnePixelDivider.background": "Grey3",
 
-    "Plugins.SectionHeader.background": "Grey3",
+    "Plugins": {
+      "SectionHeader.background": "Grey3",
+      "Button": {
+        "installFillForeground": "Grey14",
+        "installFillBackground": "Green5",
+        "installBorderColor": "Green5",
+        "installForeground": "Green7",
+        "updateBackground": "Blue5",
+        "updateBorderColor": "Blue5",
+        "updateForeground": "Grey14"
+      },
+      "tagForeground": "Grey9",
+      "tagBackground": "Grey4",
+      "paidTagBackground": "Blue2",
+      "trialTagBackground": "Green3",
+      "eapTagBackground": "Red3"
+    },
 
     "Popup": {
       "borderWidth": 1,
@@ -475,7 +499,12 @@
       "failedEndColor": "Red9",
       "trackColor": "Grey4"
     },
-    "ToolBar.separatorColor": "Grey4",
+
+    "RadioButton": {
+      "borderInsets": "4,4,4,4",
+      "iconSize": 24,
+      "iconTextGap": 4
+    },
 
     "SearchField": {
       "errorForeground": "Red7",
@@ -511,6 +540,10 @@
       "errorForeground": "Red7"
     },
 
+    "Spinner": {
+      "minimumSize": "72,28"
+    },
+
     "StatusBar": {
       "Widget": {
         "foreground": "Grey9",
@@ -543,6 +576,13 @@
     },
 
     "Tag.background": "Grey3",
+
+    "TextField": {
+      "background": "Grey2",
+      "minimumSize": "49,28"
+    },
+
+    "ToolBar.separatorColor": "Grey4",
 
     "ToolTip":{
       "background": "Grey3",
@@ -961,10 +1001,21 @@
   },
 
   "icons": {
-    "/com/intellij/ide/ui/laf/icons/darcula/checkBox.svg": "/themes/expUI/icons/dark/checkBoxTemp.svg",
-    "/com/intellij/ide/ui/laf/icons/darcula/checkBoxFocused.svg": "/themes/expUI/icons/dark/checkBoxFocusedTemp.svg",
-    "/com/intellij/ide/ui/laf/icons/darcula/radio.svg": "/themes/expUI/icons/dark/radioTemp.svg",
-    "/com/intellij/ide/ui/laf/icons/darcula/radioFocused.svg": "/themes/expUI/icons/dark/radioFocusedTemp.svg",
+    "/com/intellij/ide/ui/laf/icons/darcula/checkBox.svg": "/themes/expUI/icons/dark/checkBox.svg",
+    "/com/intellij/ide/ui/laf/icons/darcula/checkBoxDisabled.svg": "/themes/expUI/icons/dark/checkBoxDisabled.svg",
+    "/com/intellij/ide/ui/laf/icons/darcula/checkBoxFocused.svg": "/themes/expUI/icons/dark/checkBoxFocused.svg",
+    "/com/intellij/ide/ui/laf/icons/darcula/checkBoxIndeterminateSelected.svg": "/themes/expUI/icons/dark/checkBoxIndeterminateSelected.svg",
+    "/com/intellij/ide/ui/laf/icons/darcula/checkBoxIndeterminateSelectedDisabled.svg": "/themes/expUI/icons/dark/checkBoxIndeterminateSelectedDisabled.svg",
+    "/com/intellij/ide/ui/laf/icons/darcula/checkBoxIndeterminateSelectedFocused.svg": "/themes/expUI/icons/dark/checkBoxIndeterminateSelectedFocused.svg",
+    "/com/intellij/ide/ui/laf/icons/darcula/checkBoxSelected.svg": "/themes/expUI/icons/dark/checkBoxSelected.svg",
+    "/com/intellij/ide/ui/laf/icons/darcula/checkBoxSelectedDisabled.svg": "/themes/expUI/icons/dark/checkBoxSelectedDisabled.svg",
+    "/com/intellij/ide/ui/laf/icons/darcula/checkBoxSelectedFocused.svg": "/themes/expUI/icons/dark/checkBoxSelectedFocused.svg",
+    "/com/intellij/ide/ui/laf/icons/darcula/radio.svg": "/themes/expUI/icons/dark/radio.svg",
+    "/com/intellij/ide/ui/laf/icons/darcula/radioDisabled.svg": "/themes/expUI/icons/dark/radioDisabled.svg",
+    "/com/intellij/ide/ui/laf/icons/darcula/radioFocused.svg": "/themes/expUI/icons/dark/radioFocused.svg",
+    "/com/intellij/ide/ui/laf/icons/darcula/radioSelected.svg": "/themes/expUI/icons/dark/radioSelected.svg",
+    "/com/intellij/ide/ui/laf/icons/darcula/radioSelectedDisabled.svg": "/themes/expUI/icons/dark/radioSelectedDisabled.svg",
+    "/com/intellij/ide/ui/laf/icons/darcula/radioSelectedFocused.svg": "/themes/expUI/icons/dark/radioSelectedFocused.svg",
 
     "ColorPalette": {
       "Checkbox.Background.Default.Dark": "Grey2",

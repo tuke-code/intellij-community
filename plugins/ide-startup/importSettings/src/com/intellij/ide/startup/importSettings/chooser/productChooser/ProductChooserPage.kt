@@ -11,11 +11,13 @@ import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.ActionPlaces
 import com.intellij.openapi.actionSystem.DefaultActionGroup
 import com.intellij.openapi.actionSystem.impl.ActionToolbarImpl
+import com.intellij.openapi.rd.createLifetime
 import com.intellij.platform.ide.bootstrap.StartupWizardStage
 import com.intellij.ui.components.panels.VerticalLayout
 import com.intellij.ui.scale.JBUIScale
 import com.intellij.ui.util.preferredHeight
 import com.intellij.util.ui.JBUI
+import com.jetbrains.rd.util.lifetime.intersect
 import java.awt.*
 import javax.swing.JComponent
 import javax.swing.JLabel
@@ -25,9 +27,26 @@ import javax.swing.SwingConstants
 class ProductChooserPage(val controller: ImportSettingsController) : ImportSettingsPage {
 
   override val stage = StartupWizardStage.ProductChoicePage
+  override fun confirmExit(parentComponent: Component?): Boolean {
+    return true
+  }
+
+  private val lifetime = controller.lifetime.createNested().intersect(this.createLifetime())
 
   private val accountLabel = JLabel("user.name").apply {
     icon = AllIcons.General.User
+
+    val settService = SettingsService.getInstance()
+
+    settService.jbAccount.advise(lifetime) {
+      isVisible = it != null
+      if (!isVisible) {
+        return@advise
+      }
+
+      text = it?.loginName
+    }
+
   }
 
   private val pane = JPanel(VerticalLayout(JBUI.scale(26), SwingConstants.CENTER)).apply {
@@ -59,42 +78,21 @@ class ProductChooserPage(val controller: ImportSettingsController) : ImportSetti
     act.targetComponent = pane
 
     pane.add(act.component)
-
-    prepareSubscriptions()
-  }
-
-  private fun prepareSubscriptions() {
-    val settService = SettingsService.getInstance()
-
-    settService.jbAccount.advise(controller.lifetime) {
-      accountLabel.isVisible = it != null
-      if (!accountLabel.isVisible) {
-        return@advise
-      }
-
-      accountLabel.text = it?.loginName
-    }
   }
 
   private val south = JPanel(BorderLayout()).apply {
     val group = DefaultActionGroup()
     group.add(OtherOptions(controller))
 
-    val at = object : ActionToolbarImpl(ActionPlaces.IMPORT_SETTINGS_DIALOG, group, true) {
-
-      override fun getPreferredSize(): Dimension {
-        val dm = super.getPreferredSize()
-        dm.width -= 15
-        return dm
-      }
-    }
-
+    val at = ActionToolbarImpl(ActionPlaces.IMPORT_SETTINGS_DIALOG, group, true)
+    at.setReservePlaceAutoPopupIcon(false)
     at.targetComponent = pane
+
     add(accountLabel, BorderLayout.WEST)
     add(at.component, BorderLayout.EAST)
 
     border = JBUI.Borders.empty(0, 20, 10, 0)
-    preferredHeight = 47
+    preferredHeight = JBUI.scale(47)
   }
 
   private val contentPage = JPanel(GridBagLayout()).apply {

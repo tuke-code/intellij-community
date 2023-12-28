@@ -29,7 +29,7 @@ abstract class KotlinChangeSignatureHandlerBase : ChangeSignatureHandler {
     }
 
     abstract fun asInvokeOperator(call: KtCallElement?): PsiElement?
-    abstract fun invokeChangeSignature(element: KtElement, context: KtElement, project: Project, editor: Editor?)
+    abstract fun invokeChangeSignature(element: KtElement, context: PsiElement, project: Project, editor: Editor?, dataContext: DataContext?)
 
     override fun findTargetMember(element: PsiElement) = findTargetForRefactoring(element)
 
@@ -42,7 +42,7 @@ abstract class KotlinChangeSignatureHandlerBase : ChangeSignatureHandler {
             it.withAttachment("element", element)
         }
 
-        invokeChangeSignature(element, elementAtCaret as KtElement, project, editor)
+        invokeChangeSignature(element, elementAtCaret as KtElement, project, editor, dataContext)
     }
 
     override fun invoke(project: Project, elements: Array<PsiElement>, dataContext: DataContext?) {
@@ -52,7 +52,8 @@ abstract class KotlinChangeSignatureHandlerBase : ChangeSignatureHandler {
         }
 
         val editor = dataContext?.let { CommonDataKeys.EDITOR.getData(it) }
-        invokeChangeSignature(element, element, project, editor)
+        val context = dataContext?.let { CommonDataKeys.PSI_FILE.getData(it) } ?: element
+        invokeChangeSignature(element, context, project, editor, dataContext)
     }
 
     override fun getTargetNotFoundMessage() = KotlinBundle.message("error.wrong.caret.position.function.or.constructor.name")
@@ -65,6 +66,8 @@ abstract class KotlinChangeSignatureHandlerBase : ChangeSignatureHandler {
 
         if (elementParent is KtProperty && elementParent.valOrVarKeyword === element) return elementParent
         if (elementParent is KtConstructor<*> && elementParent.getConstructorKeyword() === element) return elementParent
+
+        element.parentOfType<KtDestructuringDeclaration>()?.let { return null }
 
         element.parentOfType<KtParameterList>()?.let { parameterList ->
             return PsiTreeUtil.getParentOfType(parameterList, KtFunction::class.java, KtProperty::class.java, KtClass::class.java)

@@ -19,7 +19,7 @@ import javax.swing.JComponent
 @Suppress("unused")
 class PlainTerminalView(
   project: Project,
-  private val session: TerminalSession,
+  private val session: BlockTerminalSession,
   settings: JBTerminalSystemSettingsProviderBase
 ) : TerminalContentView {
   override val component: JComponent
@@ -62,7 +62,7 @@ class PlainTerminalView(
   }
 
   override fun sendCommandToExecute(shellCommand: String) {
-    session.sendCommandToExecute(shellCommand)
+    session.commandManager.sendCommandToExecute(shellCommand)
   }
 
   override fun dispose() {}

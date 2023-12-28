@@ -38,12 +38,11 @@ import com.intellij.psi.*;
 import com.intellij.psi.codeStyle.VariableKind;
 import com.intellij.psi.impl.PsiImplUtil;
 import com.intellij.psi.impl.PsiSuperMethodImplUtil;
+import com.intellij.psi.impl.java.stubs.index.JavaImplicitClassIndex;
 import com.intellij.psi.impl.light.LightRecordMethod;
-import com.intellij.psi.impl.source.resolve.JavaResolveUtil;
 import com.intellij.psi.impl.source.resolve.graphInference.InferenceSession;
 import com.intellij.psi.impl.source.resolve.graphInference.PsiPolyExpressionUtil;
 import com.intellij.psi.impl.source.tree.ElementType;
-import com.intellij.psi.impl.source.tree.java.PsiReferenceExpressionImpl;
 import com.intellij.psi.javadoc.PsiDocComment;
 import com.intellij.psi.scope.PatternResolveState;
 import com.intellij.psi.scope.processor.VariablesNotProcessor;
@@ -89,13 +88,55 @@ public final class HighlightUtil {
 
   private static final Logger LOG = Logger.getInstance(HighlightUtil.class);
 
-  private static final Map<String, Set<String>> ourInterfaceIncompatibleModifiers = new HashMap<>(9);
-  private static final Map<String, Set<String>> ourMethodIncompatibleModifiers = new HashMap<>(11);
-  private static final Map<String, Set<String>> ourFieldIncompatibleModifiers = new HashMap<>(8);
-  private static final Map<String, Set<String>> ourClassIncompatibleModifiers = new HashMap<>(10);
-  private static final Map<String, Set<String>> ourClassInitializerIncompatibleModifiers = new HashMap<>(1);
-  private static final Map<String, Set<String>> ourModuleIncompatibleModifiers = new HashMap<>(1);
-  private static final Map<String, Set<String>> ourRequiresIncompatibleModifiers = new HashMap<>(2);
+  private static final Map<String, Set<String>> ourInterfaceIncompatibleModifiers = Map.of(
+    PsiModifier.ABSTRACT, Set.of(),
+    PsiModifier.PACKAGE_LOCAL, Set.of(PsiModifier.PRIVATE, PsiModifier.PUBLIC, PsiModifier.PROTECTED),
+    PsiModifier.PRIVATE, Set.of(PsiModifier.PACKAGE_LOCAL, PsiModifier.PUBLIC, PsiModifier.PROTECTED),
+    PsiModifier.PUBLIC, Set.of(PsiModifier.PACKAGE_LOCAL, PsiModifier.PRIVATE, PsiModifier.PROTECTED),
+    PsiModifier.PROTECTED, Set.of(PsiModifier.PACKAGE_LOCAL, PsiModifier.PUBLIC, PsiModifier.PRIVATE),
+    PsiModifier.STRICTFP, Set.of(),
+    PsiModifier.STATIC, Set.of(),
+    PsiModifier.SEALED, Set.of(PsiModifier.NON_SEALED),
+    PsiModifier.NON_SEALED, Set.of(PsiModifier.SEALED));
+  private static final Map<String, Set<String>> ourMethodIncompatibleModifiers = Map.ofEntries(
+    Map.entry(PsiModifier.ABSTRACT, Set.of(
+      PsiModifier.NATIVE, PsiModifier.STATIC, PsiModifier.FINAL, PsiModifier.PRIVATE, PsiModifier.STRICTFP, PsiModifier.SYNCHRONIZED,
+      PsiModifier.DEFAULT)),
+    Map.entry(PsiModifier.NATIVE, Set.of(PsiModifier.ABSTRACT, PsiModifier.STRICTFP)),
+    Map.entry(PsiModifier.PACKAGE_LOCAL, Set.of(PsiModifier.PRIVATE, PsiModifier.PUBLIC, PsiModifier.PROTECTED)),
+    Map.entry(PsiModifier.PRIVATE, Set.of(PsiModifier.PACKAGE_LOCAL, PsiModifier.PUBLIC, PsiModifier.PROTECTED)),
+    Map.entry(PsiModifier.PUBLIC, Set.of(PsiModifier.PACKAGE_LOCAL, PsiModifier.PRIVATE, PsiModifier.PROTECTED)),
+    Map.entry(PsiModifier.PROTECTED, Set.of(PsiModifier.PACKAGE_LOCAL, PsiModifier.PUBLIC, PsiModifier.PRIVATE)),
+    Map.entry(PsiModifier.STATIC, Set.of(PsiModifier.ABSTRACT, PsiModifier.DEFAULT)),
+    Map.entry(PsiModifier.DEFAULT, Set.of(PsiModifier.ABSTRACT, PsiModifier.STATIC, PsiModifier.PRIVATE)),
+    Map.entry(PsiModifier.SYNCHRONIZED, Set.of(PsiModifier.ABSTRACT)),
+    Map.entry(PsiModifier.STRICTFP, Set.of(PsiModifier.ABSTRACT)),
+    Map.entry(PsiModifier.FINAL, Set.of(PsiModifier.ABSTRACT)));
+  private static final Map<String, Set<String>> ourFieldIncompatibleModifiers = Map.of(
+    PsiModifier.FINAL, Set.of(PsiModifier.VOLATILE),
+    PsiModifier.PACKAGE_LOCAL, Set.of(PsiModifier.PRIVATE, PsiModifier.PUBLIC, PsiModifier.PROTECTED),
+    PsiModifier.PRIVATE, Set.of(PsiModifier.PACKAGE_LOCAL, PsiModifier.PUBLIC, PsiModifier.PROTECTED),
+    PsiModifier.PUBLIC, Set.of(PsiModifier.PACKAGE_LOCAL, PsiModifier.PRIVATE, PsiModifier.PROTECTED),
+    PsiModifier.PROTECTED, Set.of(PsiModifier.PACKAGE_LOCAL, PsiModifier.PUBLIC, PsiModifier.PRIVATE),
+    PsiModifier.STATIC, Set.of(),
+    PsiModifier.TRANSIENT, Set.of(),
+    PsiModifier.VOLATILE, Set.of(PsiModifier.FINAL));
+  private static final Map<String, Set<String>> ourClassIncompatibleModifiers = Map.of(
+    PsiModifier.ABSTRACT, Set.of(PsiModifier.FINAL),
+    PsiModifier.FINAL, Set.of(PsiModifier.ABSTRACT, PsiModifier.SEALED, PsiModifier.NON_SEALED),
+    PsiModifier.PACKAGE_LOCAL, Set.of(PsiModifier.PRIVATE, PsiModifier.PUBLIC, PsiModifier.PROTECTED),
+    PsiModifier.PRIVATE, Set.of(PsiModifier.PACKAGE_LOCAL, PsiModifier.PUBLIC, PsiModifier.PROTECTED),
+    PsiModifier.PUBLIC, Set.of(PsiModifier.PACKAGE_LOCAL, PsiModifier.PRIVATE, PsiModifier.PROTECTED),
+    PsiModifier.PROTECTED, Set.of(PsiModifier.PACKAGE_LOCAL, PsiModifier.PUBLIC, PsiModifier.PRIVATE),
+    PsiModifier.STRICTFP, Set.of(),
+    PsiModifier.STATIC, Set.of(),
+    PsiModifier.SEALED, Set.of(PsiModifier.FINAL, PsiModifier.NON_SEALED),
+    PsiModifier.NON_SEALED, Set.of(PsiModifier.FINAL, PsiModifier.SEALED));
+  private static final Map<String, Set<String>> ourClassInitializerIncompatibleModifiers = Map.of(PsiModifier.STATIC, Set.of());
+  private static final Map<String, Set<String>> ourModuleIncompatibleModifiers = Map.of(PsiModifier.OPEN, Set.of());
+  private static final Map<String, Set<String>> ourRequiresIncompatibleModifiers = Map.of(
+    PsiModifier.STATIC, Set.of(),
+    PsiModifier.TRANSITIVE, Set.of());
 
   private static final Set<String> ourConstructorNotAllowedModifiers =
     Set.of(PsiModifier.ABSTRACT, PsiModifier.STATIC, PsiModifier.NATIVE, PsiModifier.FINAL, PsiModifier.STRICTFP, PsiModifier.SYNCHRONIZED);
@@ -103,64 +144,6 @@ public final class HighlightUtil {
   private static final String SERIAL_PERSISTENT_FIELDS_FIELD_NAME = "serialPersistentFields";
   public static final TokenSet BRACKET_TOKENS = TokenSet.create(JavaTokenType.LBRACKET, JavaTokenType.RBRACKET);
   private static final String ANONYMOUS = "anonymous";
-
-  static {
-    ourClassIncompatibleModifiers.put(PsiModifier.ABSTRACT, Set.of(PsiModifier.FINAL));
-    ourClassIncompatibleModifiers.put(PsiModifier.FINAL, Set.of(PsiModifier.ABSTRACT, PsiModifier.SEALED, PsiModifier.NON_SEALED));
-    ourClassIncompatibleModifiers.put(PsiModifier.PACKAGE_LOCAL, Set.of(PsiModifier.PRIVATE, PsiModifier.PUBLIC, PsiModifier.PROTECTED));
-    ourClassIncompatibleModifiers.put(PsiModifier.PRIVATE, Set.of(PsiModifier.PACKAGE_LOCAL, PsiModifier.PUBLIC, PsiModifier.PROTECTED));
-    ourClassIncompatibleModifiers.put(PsiModifier.PUBLIC, Set.of(PsiModifier.PACKAGE_LOCAL, PsiModifier.PRIVATE, PsiModifier.PROTECTED));
-    ourClassIncompatibleModifiers.put(PsiModifier.PROTECTED, Set.of(PsiModifier.PACKAGE_LOCAL, PsiModifier.PUBLIC, PsiModifier.PRIVATE));
-    ourClassIncompatibleModifiers.put(PsiModifier.STRICTFP, Set.of());
-    ourClassIncompatibleModifiers.put(PsiModifier.STATIC, Set.of());
-    ourClassIncompatibleModifiers.put(PsiModifier.SEALED, Set.of(PsiModifier.FINAL, PsiModifier.NON_SEALED));
-    ourClassIncompatibleModifiers.put(PsiModifier.NON_SEALED, Set.of(PsiModifier.FINAL, PsiModifier.SEALED));
-
-    ourInterfaceIncompatibleModifiers.put(PsiModifier.ABSTRACT, Set.of());
-    ourInterfaceIncompatibleModifiers
-      .put(PsiModifier.PACKAGE_LOCAL, Set.of(PsiModifier.PRIVATE, PsiModifier.PUBLIC, PsiModifier.PROTECTED));
-    ourInterfaceIncompatibleModifiers
-      .put(PsiModifier.PRIVATE, Set.of(PsiModifier.PACKAGE_LOCAL, PsiModifier.PUBLIC, PsiModifier.PROTECTED));
-    ourInterfaceIncompatibleModifiers
-      .put(PsiModifier.PUBLIC, Set.of(PsiModifier.PACKAGE_LOCAL, PsiModifier.PRIVATE, PsiModifier.PROTECTED));
-    ourInterfaceIncompatibleModifiers
-      .put(PsiModifier.PROTECTED, Set.of(PsiModifier.PACKAGE_LOCAL, PsiModifier.PUBLIC, PsiModifier.PRIVATE));
-    ourInterfaceIncompatibleModifiers.put(PsiModifier.STRICTFP, Set.of());
-    ourInterfaceIncompatibleModifiers.put(PsiModifier.STATIC, Set.of());
-    ourInterfaceIncompatibleModifiers.put(PsiModifier.SEALED, Set.of(PsiModifier.NON_SEALED));
-    ourInterfaceIncompatibleModifiers.put(PsiModifier.NON_SEALED, Set.of(PsiModifier.SEALED));
-
-    ourMethodIncompatibleModifiers.put(PsiModifier.ABSTRACT, Set.of(
-      PsiModifier.NATIVE, PsiModifier.STATIC, PsiModifier.FINAL, PsiModifier.PRIVATE, PsiModifier.STRICTFP, PsiModifier.SYNCHRONIZED,
-      PsiModifier.DEFAULT));
-    ourMethodIncompatibleModifiers.put(PsiModifier.NATIVE, Set.of(PsiModifier.ABSTRACT, PsiModifier.STRICTFP));
-    ourMethodIncompatibleModifiers.put(PsiModifier.PACKAGE_LOCAL, Set.of(PsiModifier.PRIVATE, PsiModifier.PUBLIC, PsiModifier.PROTECTED));
-    ourMethodIncompatibleModifiers.put(PsiModifier.PRIVATE, Set.of(PsiModifier.PACKAGE_LOCAL, PsiModifier.PUBLIC, PsiModifier.PROTECTED));
-    ourMethodIncompatibleModifiers.put(PsiModifier.PUBLIC, Set.of(PsiModifier.PACKAGE_LOCAL, PsiModifier.PRIVATE, PsiModifier.PROTECTED));
-    ourMethodIncompatibleModifiers.put(PsiModifier.PROTECTED, Set.of(PsiModifier.PACKAGE_LOCAL, PsiModifier.PUBLIC, PsiModifier.PRIVATE));
-    ourMethodIncompatibleModifiers.put(PsiModifier.STATIC, Set.of(PsiModifier.ABSTRACT, PsiModifier.DEFAULT));
-    ourMethodIncompatibleModifiers
-      .put(PsiModifier.DEFAULT, Set.of(PsiModifier.ABSTRACT, PsiModifier.STATIC, PsiModifier.PRIVATE));
-    ourMethodIncompatibleModifiers.put(PsiModifier.SYNCHRONIZED, Set.of(PsiModifier.ABSTRACT));
-    ourMethodIncompatibleModifiers.put(PsiModifier.STRICTFP, Set.of(PsiModifier.ABSTRACT));
-    ourMethodIncompatibleModifiers.put(PsiModifier.FINAL, Set.of(PsiModifier.ABSTRACT));
-
-    ourFieldIncompatibleModifiers.put(PsiModifier.FINAL, Set.of(PsiModifier.VOLATILE));
-    ourFieldIncompatibleModifiers.put(PsiModifier.PACKAGE_LOCAL, Set.of(PsiModifier.PRIVATE, PsiModifier.PUBLIC, PsiModifier.PROTECTED));
-    ourFieldIncompatibleModifiers.put(PsiModifier.PRIVATE, Set.of(PsiModifier.PACKAGE_LOCAL, PsiModifier.PUBLIC, PsiModifier.PROTECTED));
-    ourFieldIncompatibleModifiers.put(PsiModifier.PUBLIC, Set.of(PsiModifier.PACKAGE_LOCAL, PsiModifier.PRIVATE, PsiModifier.PROTECTED));
-    ourFieldIncompatibleModifiers.put(PsiModifier.PROTECTED, Set.of(PsiModifier.PACKAGE_LOCAL, PsiModifier.PUBLIC, PsiModifier.PRIVATE));
-    ourFieldIncompatibleModifiers.put(PsiModifier.STATIC, Set.of());
-    ourFieldIncompatibleModifiers.put(PsiModifier.TRANSIENT, Set.of());
-    ourFieldIncompatibleModifiers.put(PsiModifier.VOLATILE, Set.of(PsiModifier.FINAL));
-
-    ourClassInitializerIncompatibleModifiers.put(PsiModifier.STATIC, Set.of());
-
-    ourModuleIncompatibleModifiers.put(PsiModifier.OPEN, Set.of());
-
-    ourRequiresIncompatibleModifiers.put(PsiModifier.STATIC, Set.of());
-    ourRequiresIncompatibleModifiers.put(PsiModifier.TRANSITIVE, Set.of());
-  }
 
   private HighlightUtil() { }
 
@@ -926,6 +909,7 @@ public final class HighlightUtil {
     String description = getUnhandledExceptionsDescriptor(unhandled);
     HighlightInfo.Builder info = HighlightInfo.newHighlightInfo(highlightType).range(textRange).descriptionAndTooltip(description);
     HighlightFixUtil.registerUnhandledExceptionFixes(element, info);
+    ErrorFixExtensionPoint.registerFixes(info, element, "unhandled.exceptions");
     return info;
   }
 
@@ -2693,6 +2677,7 @@ public final class HighlightUtil {
     PsiClass referencedClass;
     String resolvedName;
     PsiType type;
+    PsiElement parent = expression.getParent();
     if (expression instanceof PsiJavaCodeReferenceElement) {
       // redirected ctr
       if (PsiKeyword.THIS.equals(((PsiJavaCodeReferenceElement)expression).getReferenceName())
@@ -2704,7 +2689,7 @@ public final class HighlightUtil {
       type = qualifier instanceof PsiExpression ? ((PsiExpression)qualifier).getType() : null;
       referencedClass = PsiUtil.resolveClassInType(type);
 
-      boolean isSuperCall = JavaPsiConstructorUtil.isSuperConstructorCall(expression.getParent());
+      boolean isSuperCall = JavaPsiConstructorUtil.isSuperConstructorCall(parent);
       if (resolved == null && isSuperCall) {
         if (qualifier instanceof PsiReferenceExpression) {
           resolved = ((PsiReferenceExpression)qualifier).resolve();
@@ -2761,6 +2746,7 @@ public final class HighlightUtil {
         }
       }
       else if (resolved instanceof PsiClass aClass) {
+        if (expression instanceof PsiReferenceExpression) return null;
         if (aClass.hasModifierProperty(PsiModifier.STATIC)) return null;
         referencedClass = aClass.getContainingClass();
         if (referencedClass == null) return null;
@@ -2791,7 +2777,7 @@ public final class HighlightUtil {
       return null;
     }
 
-    PsiElement element = expression.getParent();
+    PsiElement element = parent;
     while (element != null) {
       // check if expression inside super()/this() call
 
@@ -2801,31 +2787,44 @@ public final class HighlightUtil {
           return null;
         }
 
-        // only this class/superclasses instance methods are not allowed to call
-        if (PsiUtil.isInnerClass(parentClass) && referencedClass == parentClass.getContainingClass()) return null;
+        // references to private methods from the outer class are not calls to super methods
+        // even if the outer class is the super class
+        if (resolved instanceof PsiMember member && member.hasModifierProperty(PsiModifier.PRIVATE) && referencedClass != parentClass) {
+          return null;
+        }
         // field or method should be declared in this class or super
         if (!InheritanceUtil.isInheritorOrSelf(parentClass, referencedClass, true)) return null;
         // and point to our instance
-        if (expression instanceof PsiReferenceExpression &&
-            !isThisOrSuperReference(((PsiReferenceExpression)expression).getQualifierExpression(), parentClass)) {
-          return null;
+        if (expression instanceof PsiReferenceExpression ref) {
+          PsiExpression qualifier = ref.getQualifierExpression();
+          if (!isThisOrSuperReference(qualifier, parentClass)) {
+            return null;
+          }
+          else if (qualifier instanceof PsiThisExpression || qualifier instanceof PsiSuperExpression) {
+            if (((PsiQualifiedExpression)qualifier).getQualifier() != null) return null;
+          }
         }
 
-        if (expression instanceof PsiJavaCodeReferenceElement &&
-            !parentClass.equals(PsiTreeUtil.getParentOfType(expression, PsiClass.class)) &&
-            PsiTreeUtil.getParentOfType(expression, PsiTypeElement.class) != null) {
-          return null;
+        if (expression instanceof PsiThisExpression || expression instanceof PsiSuperExpression) {
+          if (referencedClass != parentClass) return null;
         }
 
-        if (expression instanceof PsiJavaCodeReferenceElement &&
-            PsiTreeUtil.getParentOfType(expression, PsiClassObjectAccessExpression.class) != null) {
-          return null;
-        }
+        if (expression instanceof PsiJavaCodeReferenceElement) {
+          if (!parentClass.equals(PsiTreeUtil.getParentOfType(expression, PsiClass.class)) &&
+              PsiTreeUtil.getParentOfType(expression, PsiTypeElement.class) != null) {
+            return null;
+          }
 
-        if (expression instanceof PsiJavaCodeReferenceElement &&
-            expression.getParent() instanceof PsiNewExpression newExpression &&
-            newExpression.isArrayCreation() && newExpression.getClassOrAnonymousClassReference() == expression) {
-          return null;
+          if (PsiTreeUtil.getParentOfType(expression, PsiClassObjectAccessExpression.class) != null) {
+            return null;
+          }
+
+          if (parent instanceof PsiNewExpression newExpression &&
+              newExpression.isArrayCreation() &&
+              newExpression.getClassOrAnonymousClassReference() == expression) {
+            return null;
+          }
+          if (parent instanceof PsiThisExpression || parent instanceof PsiSuperExpression) return null;
         }
 
         HighlightInfo.Builder builder = createMemberReferencedError(resolvedName, expression.getTextRange());
@@ -2842,24 +2841,14 @@ public final class HighlightUtil {
         return builder;
       }
 
-      if (element instanceof PsiReferenceExpression ref) {
-        PsiElement resolve;
-        if (element instanceof PsiReferenceExpressionImpl referenceExpression) {
-          JavaResolveResult[] results = JavaResolveUtil
-            .resolveWithContainingFile(referenceExpression, PsiReferenceExpressionImpl.OurGenericsResolver.INSTANCE, true, false,
-                                       containingFile);
-          resolve = results.length == 1 ? results[0].getElement() : null;
-        }
-        else {
-          resolve = ref.resolve();
-        }
-        if (resolve instanceof PsiField field && field.hasModifierProperty(PsiModifier.STATIC)) {
-          return null;
-        }
-      }
-
       element = element.getParent();
-      if (element instanceof PsiClass && InheritanceUtil.isInheritorOrSelf((PsiClass)element, referencedClass, true)) return null;
+      if (element instanceof PsiClass && InheritanceUtil.isInheritorOrSelf((PsiClass)element, referencedClass, true)) {
+        if ((expression instanceof PsiThisExpression || expression instanceof PsiSuperExpression) &&
+            ((PsiQualifiedExpression)expression).getQualifier() != null) {
+          continue;
+        }
+        return null;
+      }
     }
     return null;
   }
@@ -3477,6 +3466,9 @@ public final class HighlightUtil {
             description = JavaErrorBundle.message("cannot.access.member.on.type", qualifierExpression.getText(),
                                                   primitiveType.getPresentableText(false));
           }
+        }
+        if (!JavaImplicitClassIndex.getInstance().getElements(ref.getQualifiedName(), ref.getProject(), ref.getResolveScope()).isEmpty()) {
+          description = JavaErrorBundle.message("implicit.class.can.not.be.referenced", ref.getText());
         }
       }
 

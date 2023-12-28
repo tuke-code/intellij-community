@@ -21,11 +21,8 @@ public final class CustomInspectionActions {
   public static DefaultActionGroup getAddActionGroup(SingleInspectionProfilePanel panel) {
     final DefaultActionGroup actionGroup = new DefaultActionGroup();
     InspectionProfileActionProvider.EP_NAME.getExtensionList().forEach(provider -> {
-      final var groupInfo = provider.getAddActions(panel);
-      if (groupInfo != null) {
-        ActionManager.getInstance().replaceAction(groupInfo.second, groupInfo.first);
-        actionGroup.add(groupInfo.first);
-      }
+      final var group = provider.getAddActions(panel);
+      if (group != null) actionGroup.add(group);
     });
     if (actionGroup.getChildrenCount() == 0) return null;
     actionGroup.setPopup(true);

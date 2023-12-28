@@ -18,7 +18,7 @@ import javax.swing.*;
 /**
  * @author Egor
  */
-public class JavaWildcardMethodBreakpointType extends JavaBreakpointTypeBase<JavaMethodBreakpointProperties> {
+public final class JavaWildcardMethodBreakpointType extends JavaBreakpointTypeBase<JavaMethodBreakpointProperties> {
   public JavaWildcardMethodBreakpointType() {
     super("java-wildcard-method", JavaDebuggerBundle.message("method.breakpoints.tab.title"));
   }
@@ -48,7 +48,7 @@ public class JavaWildcardMethodBreakpointType extends JavaBreakpointTypeBase<Jav
   }
 
   //@Override
-  protected String getHelpID() {
+  private static String getHelpID() {
     return HelpID.METHOD_BREAKPOINTS;
   }
 

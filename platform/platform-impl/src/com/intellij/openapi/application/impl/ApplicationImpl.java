@@ -125,7 +125,7 @@ public final class ApplicationImpl extends ClientAwareComponentManager implement
     super(GlobalScope.INSTANCE);
 
     Extensions.setRootArea(getExtensionArea());
-    myLock = IdeEventQueue.getInstance().getRwLockHolder().lock;
+    myLock = RwLockHolder.lock;
 
     registerFakeServices(this);
 
@@ -837,7 +837,7 @@ public final class ApplicationImpl extends ClientAwareComponentManager implement
                                                                        @Nullable Project project,
                                                                        @Nullable JComponent parentComponent,
                                                                        @NotNull java.util.function.Consumer<? super ProgressIndicator> action) {
-    return getThreadingSupport().runWriteActionWithNonCancellableProgressInDispatchThread(title, project, parentComponent, action);
+    return getThreadingSupport().runWriteActionWithCancellableProgressInDispatchThread(title, project, parentComponent, action);
   }
 
   @Override
@@ -1121,7 +1121,7 @@ public final class ApplicationImpl extends ClientAwareComponentManager implement
 
   @ApiStatus.Internal
   public static void postInit(@NotNull ApplicationImpl app) {
-    app.myLock = IdeEventQueue.getInstance().getRwLockHolder().lock;
+    app.myLock = RwLockHolder.lock;
     AtomicBoolean reported = new AtomicBoolean();
     IdeEventQueue.getInstance().addPostprocessor(e -> {
       if (app.isWriteAccessAllowed() && reported.compareAndSet(false, true)) {

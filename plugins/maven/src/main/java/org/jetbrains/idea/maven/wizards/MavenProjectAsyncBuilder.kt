@@ -24,6 +24,7 @@ import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.platform.backend.observation.trackActivity
 import com.intellij.platform.ide.progress.runWithModalProgressBlocking
 import com.intellij.platform.ide.progress.withBackgroundProgress
+import com.intellij.platform.util.progress.rawProgressReporter
 import com.intellij.platform.util.progress.withRawProgressReporter
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -37,7 +38,7 @@ import org.jetbrains.idea.maven.server.MavenWrapperSupport.Companion.getWrapperD
 import org.jetbrains.idea.maven.utils.*
 import java.nio.file.Path
 
-internal class MavenProjectAsyncBuilder {
+class MavenProjectAsyncBuilder {
   fun commitSync(project: Project, projectFile: VirtualFile, modelsProvider: IdeModifiableModelsProvider?): List<Module> {
     if (ApplicationManager.getApplication().isDispatchThread) {
       return runWithModalProgressBlocking(project, MavenProjectBundle.message("maven.reading")) {
@@ -49,6 +50,10 @@ internal class MavenProjectAsyncBuilder {
         commit(project, projectFile, modelsProvider)
       }
     }
+  }
+
+  suspend fun commit(project: Project, projectFile: VirtualFile) {
+    commit(project, projectFile, null)
   }
 
   suspend fun commit(project: Project,
@@ -126,10 +131,7 @@ internal class MavenProjectAsyncBuilder {
 
     withBackgroundProgress(project, MavenProjectBundle.message("maven.reading"), false) {
       withRawProgressReporter {
-        coroutineToIndicator {
-          val indicator = ProgressManager.getGlobalProgressIndicator()
-          tree.updateAll(false, generalSettings, indicator)
-        }
+        tree.updateAll(false, generalSettings, rawProgressReporter!!)
       }
     }
 

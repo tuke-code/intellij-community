@@ -14,7 +14,7 @@ import com.intellij.openapi.roots.libraries.LibraryTablesRegistrar
 import com.intellij.platform.PlatformProjectOpenProcessor.Companion.PROJECT_LOADED_FROM_CACHE_BUT_HAS_NO_MODULES
 import com.intellij.platform.backend.workspace.WorkspaceModel
 import com.intellij.platform.backend.workspace.WorkspaceModelTopics
-import com.intellij.platform.diagnostic.telemetry.helpers.addElapsedTimeMs
+import com.intellij.platform.diagnostic.telemetry.helpers.addElapsedTimeMillis
 import com.intellij.platform.diagnostic.telemetry.impl.span
 import com.intellij.platform.workspace.jps.entities.ModuleEntity
 import com.intellij.platform.workspace.storage.MutableEntityStorage
@@ -27,7 +27,6 @@ import com.intellij.workspaceModel.ide.impl.jps.serialization.JpsProjectModelSyn
 import com.intellij.workspaceModel.ide.impl.jpsMetrics
 import com.intellij.workspaceModel.ide.impl.legacyBridge.library.ProjectLibraryTableBridgeImpl
 import com.intellij.workspaceModel.ide.impl.legacyBridge.project.ProjectRootManagerBridge
-import com.intellij.workspaceModel.ide.legacyBridge.GlobalLibraryTableBridge
 import io.opentelemetry.api.metrics.Meter
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
@@ -39,14 +38,13 @@ private val LOG: Logger
 private val moduleLoadingTimeMs = AtomicLong().also { setupOpenTelemetryReporting(jpsMetrics.meter) }
 
 private fun setupOpenTelemetryReporting(meter: Meter) {
-  val modulesLoadingTimeGauge = meter.gaugeBuilder("workspaceModel.moduleBridgeLoader.loading.modules.ms")
-    .ofLongs().setDescription("Total time spent in method").buildObserver()
+  val modulesLoadingTimeCounter = meter.counterBuilder("workspaceModel.moduleBridgeLoader.loading.modules.ms").buildObserver()
 
   meter.batchCallback(
     {
-      modulesLoadingTimeGauge.record(moduleLoadingTimeMs.get())
+      modulesLoadingTimeCounter.record(moduleLoadingTimeMs.get())
     },
-    modulesLoadingTimeGauge
+    modulesLoadingTimeCounter
   )
 }
 
@@ -73,11 +71,9 @@ private class ModuleBridgeLoaderService : ProjectServiceContainerInitializedList
                       targetUnloadedEntitiesBuilder = null,
                       loadedFromCache = workspaceModel.loadedFromCache)
         }
-        if (GlobalLibraryTableBridge.isEnabled()) {
-          val globalWorkspaceModel = serviceAsync<GlobalWorkspaceModel>()
-          writeAction {
-            globalWorkspaceModel.applyStateToProject(project)
-          }
+        val globalWorkspaceModel = serviceAsync<GlobalWorkspaceModel>()
+        writeAction {
+          globalWorkspaceModel.applyStateToProject(project)
         }
       }
       else {
@@ -111,7 +107,7 @@ private class ModuleBridgeLoaderService : ProjectServiceContainerInitializedList
         (project.serviceAsync<WorkspaceFileIndex>() as WorkspaceFileIndexEx).initialize()
       }
 
-      moduleLoadingTimeMs.addElapsedTimeMs(start)
+      moduleLoadingTimeMs.addElapsedTimeMillis(start)
     }
     WorkspaceModelTopics.getInstance(project).notifyModulesAreLoaded()
   }

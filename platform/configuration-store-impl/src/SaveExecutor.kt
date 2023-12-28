@@ -1,6 +1,4 @@
-// Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
-@file:Suppress("ReplaceGetOrSet", "ReplacePutWithAssignment")
-
+// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.configurationStore
 
 import com.intellij.openapi.application.writeAction
@@ -12,9 +10,6 @@ import org.jetbrains.annotations.ApiStatus
 import java.util.*
 
 internal interface SaveExecutor {
-  /**
-   * @return was something really saved
-   */
   suspend fun save(): SaveResult
 }
 
@@ -22,11 +17,11 @@ internal interface SaveExecutor {
 open class SaveSessionProducerManager : SaveExecutor {
   private val producers = Collections.synchronizedMap(LinkedHashMap<StateStorage, SaveSessionProducer>())
 
-  // actually, all storages for component store share the same value, but for flexibility and to simplify code, just compute on the fly
+  // actually, all storages for component store share the same value, but for flexibility and to simplify code, compute on the fly
   private var isVfsRequired = false
 
   fun getProducer(storage: StateStorage): SaveSessionProducer? {
-    var producer = producers.get(storage)
+    var producer = producers[storage]
     if (producer == null) {
       producer = storage.createSaveSessionProducer() ?: return null
       val prev = producers.put(storage, producer)
@@ -65,7 +60,7 @@ open class SaveSessionProducerManager : SaveExecutor {
     val result = SaveResult()
     if (isVfsRequired) {
       writeAction {
-        saveSessions(saveSessions, result)
+        blockingSaveSessions(saveSessions, result)
       }
     }
     else {
@@ -75,15 +70,40 @@ open class SaveSessionProducerManager : SaveExecutor {
   }
 }
 
-internal fun saveSessions(saveSessions: Collection<SaveSession>, result: SaveResult) {
+internal suspend fun saveSessions(saveSessions: Collection<SaveSession>, result: SaveResult) {
   for (saveSession in saveSessions) {
     executeSave(saveSession, result)
   }
 }
 
-internal fun executeSave(session: SaveSession, result: SaveResult) {
+internal fun blockingSaveSessions(saveSessions: Collection<SaveSession>, result: SaveResult) {
+  for (saveSession in saveSessions) {
+    executeSaveBlocking(saveSession, result)
+  }
+}
+
+private suspend fun executeSave(session: SaveSession, result: SaveResult) {
   try {
     session.save()
+  }
+  catch (e: ReadOnlyModificationException) {
+    LOG.warn(e)
+    result.addReadOnlyFile(SaveSessionAndFile(e.session ?: session, e.file))
+  }
+  catch (e: ProcessCanceledException) {
+    throw e
+  }
+  catch (e: CancellationException) {
+    throw e
+  }
+  catch (e: Exception) {
+    result.addError(e)
+  }
+}
+
+private fun executeSaveBlocking(session: SaveSession, result: SaveResult) {
+  try {
+    session.saveBlocking()
   }
   catch (e: ReadOnlyModificationException) {
     LOG.warn(e)

@@ -48,7 +48,7 @@ class GradleTestExecutionTest : GradleExecutionTestCase() {
         |}
       """.trimMargin())
 
-      executeTasks(":test :additionalTest", isRunAsTest = true)
+      executeTasks(":test :additionalTest --continue", isRunAsTest = true)
       assertTestViewTree {
         assertNode("AppTest") {
           assertNode("test")
@@ -662,10 +662,9 @@ class GradleTestExecutionTest : GradleExecutionTestCase() {
             server = "https://something.com"
         }
 
-        rootProject.name = 'gradle-test-demo-system-exit'
+        rootProject.name = '${project.name}'
         include('lib')
       """.trimIndent())
-
       appendText("build.gradle", """
         tasks.withType(Test).configureEach() {
           distribution {
@@ -675,12 +674,11 @@ class GradleTestExecutionTest : GradleExecutionTestCase() {
           }
         }
       """.trimMargin())
-
       writeText("src/test/java/org/example/AppTest.java", """
         |package org.example;
         |import $jUnitTestAnnotationClass;
         |public class AppTest {
-        |   @Test public void test1() {}
+        |   @Test public void testApp() {}
         |}
       """.trimMargin())
       writeText("src/test/java/org/example/LibTest.java", """
@@ -690,20 +688,18 @@ class GradleTestExecutionTest : GradleExecutionTestCase() {
         |   @Test public void testLib() {}
         |}
       """.trimMargin())
+
       executeTasks(":test", isRunAsTest = true)
       assertTestViewTree {
         assertNode("Distributed Test Run :test") {
+          assertNode("AppTest") {
+            assertNode("testApp")
+          }
           assertNode("LibTest") {
             assertNode("testLib")
-          }
-          assertNode("AppTest") {
-            assertNode("test1")
           }
         }
       }
     }
   }
-
-
-
 }

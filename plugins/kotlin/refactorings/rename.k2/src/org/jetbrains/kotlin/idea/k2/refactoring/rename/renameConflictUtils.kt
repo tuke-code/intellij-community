@@ -9,12 +9,12 @@ import com.intellij.usageView.UsageInfo
 import org.jetbrains.kotlin.analysis.api.KtAnalysisSession
 import org.jetbrains.kotlin.analysis.api.analyze
 import org.jetbrains.kotlin.analysis.api.calls.*
-import org.jetbrains.kotlin.analysis.api.scopes.KtScope
 import org.jetbrains.kotlin.analysis.api.symbols.*
 import org.jetbrains.kotlin.analysis.api.symbols.markers.KtNamedSymbol
 import org.jetbrains.kotlin.analysis.api.types.KtErrorType
 import org.jetbrains.kotlin.idea.base.resources.KotlinBundle
-import org.jetbrains.kotlin.idea.refactoring.conflicts.findSiblingsByName
+import org.jetbrains.kotlin.idea.refactoring.conflicts.filterCandidates
+import org.jetbrains.kotlin.idea.refactoring.conflicts.registerRetargetJobOnPotentialCandidates
 import org.jetbrains.kotlin.idea.refactoring.conflicts.renderDescription
 import org.jetbrains.kotlin.idea.refactoring.rename.BasicUnresolvableCollisionUsageInfo
 import org.jetbrains.kotlin.idea.refactoring.rename.UsageInfoWithFqNameReplacement
@@ -101,7 +101,8 @@ fun checkCallableShadowing(
         if (refElement.getStrictParentOfType<KtTypeReference>() != null ||
             refElement.getStrictParentOfType<KtImportDirective>() != null) continue
 
-        val callExpression = refElement.parent as? KtCallExpression ?: refElement.parent as? KtQualifiedExpression ?: refElement
+        val parent = refElement.parent
+        val callExpression = parent as? KtCallExpression ?: parent as? KtQualifiedExpression ?: parent as? KtCallableReferenceExpression ?: refElement
         val topLevel = PsiTreeUtil.getTopmostParentOfType(refElement, KtQualifiedExpression::class.java) ?: callExpression
         val offsetInCopy = callExpression.textRange.shiftLeft(topLevel.textRange.startOffset)
 
@@ -123,6 +124,8 @@ fun checkCallableShadowing(
                 getter
             } else {
                 val element = resolvedSymbol?.psi
+                    //callable references are ignored now by resolveCall() in AA, thus they require separate treatment here
+                    ?: (copyCallExpression as? KtCallableReferenceExpression)?.callableReference?.mainReference?.resolve()
                 externalDeclarations.addIfNotNull(element)
                 element
             }
@@ -235,6 +238,11 @@ private fun KtPsiFactory.createCodeFragmentWithNewName(
             topLevelCopy
         }
 
+        is KtCallableReferenceExpression -> {
+            copiedExpression.callableReference.replace(replacement)
+            topLevelCopy
+        }
+
         else -> {
             val sameTopLevel = topLevel == callExpression
             val expression = copiedExpression.replace(replacement) as KtExpression
@@ -332,23 +340,5 @@ private fun reportShadowing(
 context(KtAnalysisSession)
 private fun retargetExternalDeclarations(declaration: KtNamedDeclaration, name: String, retargetJob: (KtDeclarationSymbol) -> Unit) {
     val declarationSymbol = declaration.getSymbol()
-
-    val nameAsName = Name.identifier(name)
-    fun KtScope.processScope(containingSymbol: KtDeclarationSymbol?) {
-        findSiblingsByName(declarationSymbol, nameAsName, containingSymbol).forEach(retargetJob)
-    }
-
-    var classOrObjectSymbol = declarationSymbol.getContainingSymbol()
-    while (classOrObjectSymbol != null) {
-        (classOrObjectSymbol as? KtClassOrObjectSymbol)?.getMemberScope()?.processScope(classOrObjectSymbol)
-
-        val companionObject = (classOrObjectSymbol as? KtNamedClassOrObjectSymbol)?.companionObject
-        companionObject?.getMemberScope()?.processScope(companionObject)
-
-        classOrObjectSymbol = classOrObjectSymbol.getContainingSymbol()
-    }
-
-    val file = declaration.containingKtFile
-    getPackageSymbolIfPackageExists(file.packageFqName)?.getPackageScope()?.processScope(null)
-    file.getImportingScopeContext().getCompositeScope().processScope(null)
+    registerRetargetJobOnPotentialCandidates(declaration, name, { filterCandidates(declarationSymbol, it) }, retargetJob)
 }

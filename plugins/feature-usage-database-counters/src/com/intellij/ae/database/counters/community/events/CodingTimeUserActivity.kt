@@ -1,26 +1,30 @@
 // Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.ae.database.counters.community.events
 
+import com.intellij.ae.database.activities.WritableDatabaseBackedTimeSpanUserActivity
+import com.intellij.ae.database.createMap
+import com.intellij.ae.database.runUpdateEvent
+import com.intellij.ae.database.utils.InstantUtils
 import com.intellij.lang.Language
-import com.intellij.openapi.application.EDT
+import com.intellij.openapi.application.readAction
+import com.intellij.openapi.command.CommandEvent
+import com.intellij.openapi.command.CommandListener
+import com.intellij.openapi.components.Service
+import com.intellij.openapi.editor.Document
 import com.intellij.openapi.editor.event.DocumentEvent
 import com.intellij.openapi.editor.event.DocumentListener
 import com.intellij.openapi.editor.event.EditorFactoryEvent
 import com.intellij.openapi.editor.event.EditorFactoryListener
 import com.intellij.openapi.editor.ex.EditorEx
 import com.intellij.openapi.editor.ex.util.EditorUtil
+import com.intellij.openapi.fileEditor.FileDocumentManager
+import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.validOrNull
-import com.intellij.platform.ae.database.activities.WritableDatabaseBackedTimeSpanUserActivity
-import com.intellij.platform.ae.database.createMap
-import com.intellij.platform.ae.database.runUpdateEvent
-import com.intellij.platform.ae.database.utils.InstantUtils
 import com.intellij.psi.impl.PsiManagerEx
 import com.intellij.psi.util.validOrNull
 import com.intellij.util.io.DigestUtil
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import org.jetbrains.sqlite.ObjectBinderFactory
 import java.math.BigInteger
 import java.time.Instant
@@ -93,7 +97,28 @@ data class LanguageWrapper(
   val id: String
 )
 
-private class CodingTimeUserActivityEditorFactoryListener : EditorFactoryListener {
+@Service(Service.Level.PROJECT)
+private class DocumentHolder {
+  companion object {
+    fun getInstance(project: Project) = project.getService(DocumentHolder::class.java)
+  }
+
+  private val urls = mutableSetOf<String>()
+
+  fun submit(vf: VirtualFile) {
+    urls.add(vf.url)
+  }
+
+  fun remove(vf: VirtualFile) {
+    urls.remove(vf.url)
+  }
+
+  fun isAllowed(vf: VirtualFile): Boolean {
+    return urls.contains(vf.url)
+  }
+}
+
+internal class CodingTimeUserActivityEditorFactoryListener : EditorFactoryListener {
   override fun editorCreated(event: EditorFactoryEvent) {
     val editor = event.editor as EditorEx
     val project = editor.project ?: return
@@ -104,14 +129,40 @@ private class CodingTimeUserActivityEditorFactoryListener : EditorFactoryListene
 
     editor.document.addDocumentListener(object : DocumentListener {
       override fun documentChanged(event: DocumentEvent) {
-        FeatureUsageDatabaseCountersScopeProvider.getScope().runUpdateEvent(CodingTimeUserActivity) {
-          val vf = editor.virtualFile?.validOrNull() ?: return@runUpdateEvent
-          val psiFile = withContext(Dispatchers.EDT) {
-            PsiManagerEx.getInstance(project).findFile(vf)?.validOrNull()
-          } ?: return@runUpdateEvent
-          it.write(editorId, psiFile.language, vf)
+        val vf = editor.virtualFile?.validOrNull() ?: return
+        if (DocumentHolder.getInstance(project).isAllowed(vf)) {
+          FeatureUsageDatabaseCountersScopeProvider.getScope().runUpdateEvent(CodingTimeUserActivity) {
+            val psiFile = readAction {
+              PsiManagerEx.getInstance(project).findFile(vf)?.validOrNull()
+            } ?: return@runUpdateEvent
+            it.write(editorId, psiFile.language, vf)
+          }
         }
       }
     }, disposable)
+  }
+}
+
+internal class CodingTimeUserActivityCommandListener : CommandListener {
+  override fun commandStarted(event: CommandEvent) {
+    val doc = event.commandGroupId as? Document
+    if (doc != null) {
+      val vf = FileDocumentManager.getInstance().getFile(doc)
+      val project = event.project
+      if (vf != null && project != null) {
+        DocumentHolder.getInstance(project).submit(vf)
+      }
+    }
+  }
+
+  override fun commandFinished(event: CommandEvent) {
+    val doc = event.commandGroupId as? Document
+    if (doc != null) {
+      val vf = FileDocumentManager.getInstance().getFile(doc)
+      val project = event.project
+      if (vf != null && project != null) {
+        DocumentHolder.getInstance(project).remove(vf)
+      }
+    }
   }
 }

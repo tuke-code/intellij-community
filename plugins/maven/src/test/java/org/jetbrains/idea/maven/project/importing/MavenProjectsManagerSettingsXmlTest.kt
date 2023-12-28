@@ -112,7 +112,7 @@ class MavenProjectsManagerSettingsXmlTest : MavenMultiVersionImportingTestCase()
                        <version>1</version>
                        """.trimIndent())
     importProjectAsync()
-    assertUnorderedElementsAreEqual(projectsTree.getAvailableProfiles())
+    assertUnorderedElementsAreEqual(projectsTree.availableProfiles)
     waitForImportWithinTimeout {
       createSettingsXml("""
                         <profiles>
@@ -123,13 +123,13 @@ class MavenProjectsManagerSettingsXmlTest : MavenMultiVersionImportingTestCase()
                         """.trimIndent())
     }
 
-    assertUnorderedElementsAreEqual(projectsTree.getAvailableProfiles(), "one")
+    assertUnorderedElementsAreEqual(projectsTree.availableProfiles, "one")
     deleteSettingsXmlAndWaitForImport()
-    assertUnorderedElementsAreEqual(projectsTree.getAvailableProfiles())
+    assertUnorderedElementsAreEqual(projectsTree.availableProfiles)
   }
 
   private suspend fun deleteSettingsXmlAndWaitForImport() {
-    val f = LocalFileSystem.getInstance().refreshAndFindFileByIoFile(File(myDir, "settings.xml"))!!
+    val f = LocalFileSystem.getInstance().refreshAndFindFileByIoFile(File(dir, "settings.xml"))!!
     waitForImportWithinTimeout {
       writeAction {
         f.delete(this)

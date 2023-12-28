@@ -1,8 +1,8 @@
 // Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.jetbrains.python.requirements
 
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.projectRoots.Sdk
-import com.intellij.openapi.projectRoots.impl.MockSdk
 import com.intellij.testFramework.ExtensionTestUtil
 import com.intellij.testFramework.LightProjectDescriptor
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
@@ -63,7 +63,12 @@ class RequirementsCompletionTest : BasePlatformTestCase() {
         val sdk: Sdk = PythonMockSdk.create("Mock ${PyNames.PYTHON_SDK_ID_NAME} ${languageLevel.toPythonVersion()}",
                                             "${PythonTestUtil.getTestDataPath()}/MockSdk", PythonSdkType.getInstance(), languageLevel,
                                             *additionalRoots)
-        (sdk as MockSdk).sdkAdditionalData = PythonSdkAdditionalData()
+        sdk.sdkModificator.let {
+          it.sdkAdditionalData = PythonSdkAdditionalData()
+          ApplicationManager.getApplication().runWriteAction {
+            it.commitChanges()
+          }
+        }
         return sdk
       }
     }

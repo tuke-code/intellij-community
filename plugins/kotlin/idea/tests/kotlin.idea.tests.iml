@@ -36,7 +36,6 @@
     <orderEntry type="module" module-name="kotlin.test-framework" exported="" scope="TEST" />
     <orderEntry type="module" module-name="kotlin.tests-common" scope="TEST" />
     <orderEntry type="module" module-name="kotlin.repl" scope="TEST" />
-    <orderEntry type="module" module-name="kotlin.line-indent-provider" scope="TEST" />
     <orderEntry type="module" module-name="kotlin.native" scope="TEST" />
     <orderEntry type="library" scope="TEST" name="kotlinc.kotlin-compiler-common" level="project" />
     <orderEntry type="library" scope="TEST" name="kotlinc.kotlin-compiler-fe10" level="project" />
@@ -64,7 +63,7 @@
     <orderEntry type="module" module-name="kotlin.compiler-plugins.kotlinx-serialization.common" scope="RUNTIME" />
     <orderEntry type="module" module-name="kotlin.compiler-plugins.kotlinx-serialization.gradle" scope="RUNTIME" />
     <orderEntry type="module" module-name="kotlin.compiler-plugins.kotlinx-serialization.maven" scope="RUNTIME" />
-    <orderEntry type="module" module-name="kotlin.compiler-plugins.allopen.common" scope="RUNTIME" />
+    <orderEntry type="module" module-name="kotlin.compiler-plugins.allopen.common-k1" scope="RUNTIME" />
     <orderEntry type="module" module-name="kotlin.compiler-plugins.allopen.gradle" scope="RUNTIME" />
     <orderEntry type="module" module-name="kotlin.compiler-plugins.allopen.maven" scope="RUNTIME" />
     <orderEntry type="module" module-name="kotlin.compiler-plugins.parcelize.common" scope="RUNTIME" />
@@ -137,5 +136,6 @@
     <orderEntry type="module" module-name="kotlin.highlighting.k1" scope="TEST" />
     <orderEntry type="module" module-name="kotlin.refactorings.common.tests" scope="TEST" />
     <orderEntry type="module" module-name="intellij.platform.analysis" scope="TEST" />
+    <orderEntry type="module" module-name="intellij.platform.projectModel" scope="TEST" />
   </component>
 </module>

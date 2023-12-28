@@ -11,7 +11,7 @@ import org.jetbrains.intellij.build.SoftwareBillOfMaterials.Companion.Suppliers
  */
 object CommunityLibraryLicenses {
   @JvmStatic
-  @SuppressWarnings("SpellCheckingInspection")
+  @Suppress("SpellCheckingInspection")
   val LICENSES_LIST: List<LibraryLicense> = java.util.List.of(
     LibraryLicense(name = "A fast Java JSON schema validator", libraryName = "json-schema-validator",
                    url = "https://github.com/networknt/json-schema-validator")
@@ -734,6 +734,7 @@ object CommunityLibraryLicenses {
                    url = "https://github.com/Kotlin/kotlinx.coroutines")
       .apache("https://github.com/Kotlin/kotlinx.coroutines/blob/master/LICENSE.txt")
       .suppliedByOrganizations(Suppliers.JETBRAINS),
+
     LibraryLicense(name = "Kotlin multiplatform / multi-format serialization",
                    libraryName = "kotlinx-serialization-core",
                    url = "https://github.com/Kotlin/kotlinx.serialization")
@@ -749,6 +750,12 @@ object CommunityLibraryLicenses {
                    url = "https://github.com/Kotlin/kotlinx.serialization")
       .apache("https://github.com/Kotlin/kotlinx.serialization/blob/master/LICENSE.txt")
       .suppliedByOrganizations(Suppliers.JETBRAINS),
+    LibraryLicense(name = "Kotlin multiplatform / multi-format serialization",
+                   libraryName = "kotlinx-serialization-cbor",
+                   url = "https://github.com/Kotlin/kotlinx.serialization")
+      .apache("https://github.com/Kotlin/kotlinx.serialization/blob/master/LICENSE.txt")
+      .suppliedByOrganizations(Suppliers.JETBRAINS),
+
     LibraryLicense(name = "Kotlin reflection library",
                    libraryName = "kotlin-reflect",
                    url = "https://github.com/JetBrains/kotlin")
@@ -885,8 +892,8 @@ object CommunityLibraryLicenses {
     LibraryLicense(name = "morfologik-stemming", libraryName = "org.carrot2:morfologik-stemming",
                    url = "https://github.com/morfologik/morfologik-stemming").simplifiedBsd()
       .suppliedByPersons("Dawid Weiss", "Marcin Miłkowski"),
-    //LibraryLicense(name = "Moshi", libraryName = "moshi", url = "https://github.com/square/moshi")
-    //  .apache("https://github.com/square/moshi/blob/master/LICENSE.txt"),
+    LibraryLicense(libraryName = "mvstore", url = "https://github.com/h2database/h2database")
+      .eplV1("https://github.com/h2database/h2database/blob/master/LICENSE.txt"),
 
     LibraryLicense(name = "NanoXML", license = "zlib/libpng", version = "2.2.3",
                    url = "https://central.sonatype.com/artifact/be.cyberelf.nanoxml/nanoxml/2.2.3",
@@ -1255,7 +1262,6 @@ object CommunityLibraryLicenses {
     jetbrainsLibrary("kotlinc.high-level-api-impl-base"),
     jetbrainsLibrary("kotlinc.high-level-api-impl-base-tests"),
     jetbrainsLibrary("kotlinc.incremental-compilation-impl-tests"),
-    jetbrainsLibrary("kotlinc.kotlin-backend-native"),
     jetbrainsLibrary("kotlinc.kotlin-build-common-tests"),
     jetbrainsLibrary("kotlinc.kotlin-compiler-cli"),
     jetbrainsLibrary("kotlinc.kotlin-compiler-common"),
@@ -1267,6 +1273,7 @@ object CommunityLibraryLicenses {
     jetbrainsLibrary("kotlinc.kotlin-gradle-statistics"),
     jetbrainsLibrary("kotlinc.kotlin-jps-common"),
     jetbrainsLibrary("kotlinc.kotlin-jps-plugin-classpath"),
+    jetbrainsLibrary("kotlinc.kotlin-objcexport-header-generator"),
     jetbrainsLibrary("kotlinc.kotlin-script-runtime"),
     jetbrainsLibrary("kotlinc.kotlin-scripting-common"),
     jetbrainsLibrary("kotlinc.kotlin-scripting-compiler-impl"),

@@ -12,14 +12,31 @@ import java.awt.*;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.lang.reflect.InvocationTargetException;
-import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.*;
 import java.util.List;
-import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 
 public class SwingUpdaterUI implements UpdaterUI {
+  public static SwingUpdaterUI createUI() {
+    var font = UIManager.get("OptionPane.messageFont");
+    if (font != null && !Objects.equals(font, UIManager.get("Label.font"))) {
+      Runner.LOG.info("using " + font + " instead of " + UIManager.get("Label.font"));
+      var keys = UIManager.getDefaults().keys();
+      while (keys.hasMoreElements()) {
+        var key = keys.nextElement();
+        if (UIManager.get(key) instanceof Font) {
+          UIManager.put(key, font);
+        }
+      }
+    }
+
+    var result = new AtomicReference<SwingUpdaterUI>();
+    invokeAndWait(() -> result.set(new SwingUpdaterUI()));
+    return result.get();
+  }
+
   private static final EmptyBorder FRAME_BORDER = new EmptyBorder(8, 8, 8, 8);
-  private static final EmptyBorder LABEL_BORDER = new EmptyBorder(0, 0, 5, 0);
+  private static final EmptyBorder LABEL_BORDER = new EmptyBorder(0, 0, 8, 0);
   private static final EmptyBorder BUTTONS_BORDER = new EmptyBorder(5, 0, 0, 0);
 
   private static final Color VALIDATION_ERROR_COLOR = new Color(255, 175, 175);
@@ -34,7 +51,7 @@ public class SwingUpdaterUI implements UpdaterUI {
   private volatile boolean myCancelled = false;
   private volatile boolean myPaused = false;
 
-  public SwingUpdaterUI() {
+  private SwingUpdaterUI() {
     myProcessTitle = new JLabel(" ");
     myProcessProgress = new JProgressBar(0, 100);
     myProcessStatus = new JLabel(" ");
@@ -74,8 +91,6 @@ public class SwingUpdaterUI implements UpdaterUI {
     myFrame.pack();
     myFrame.setLocationRelativeTo(null);
     myFrame.setVisible(true);
-
-    invokeAndWait(() -> {});
   }
 
   private void doCancel() {
@@ -128,12 +143,12 @@ public class SwingUpdaterUI implements UpdaterUI {
 
   @Override
   public void showError(String message) {
-    String html = "<html>" + message.replace("\n", "<br>") + "</html>";
+    var html = convertToHtml(message);
     invokeAndWait(() -> JOptionPane.showMessageDialog(myFrame, html, UpdaterUI.message("error.title"), JOptionPane.ERROR_MESSAGE));
   }
 
   @Override
-  @SuppressWarnings("SSBasedInspection")
+  @SuppressWarnings({"SSBasedInspection", "RedundantSuppression"})
   public Map<String, ValidationResult.Option> askUser(List<ValidationResult> validationResults) throws OperationCancelledException {
     boolean canProceed = validationResults.stream().noneMatch(r -> r.options.contains(ValidationResult.Option.NONE));
     Map<String, ValidationResult.Option> result = new HashMap<>();
@@ -182,18 +197,16 @@ public class SwingUpdaterUI implements UpdaterUI {
         columnModel.getColumn(i).setPreferredWidth(MyTableModel.getColumnWidth(i, 1000));
       }
 
-      String message = "<html>" + UpdaterUI.message("conflicts.header") + "<br><br>";
-      if (canProceed) {
-        message += UpdaterUI.message("conflicts.text.1");
-      }
-      else {
-        message += UpdaterUI.message("conflicts.text.2");
-      }
-      message += "</html>";
-      JLabel label = new JLabel(message);
-      label.setBorder(LABEL_BORDER);
+      var msgPanel = new JPanel();
+      msgPanel.setLayout(new BoxLayout(msgPanel, BoxLayout.Y_AXIS));
+      msgPanel.setBorder(LABEL_BORDER);
+      var header = new JLabel(UpdaterUI.message("conflicts.header"));
+      header.setBorder(LABEL_BORDER);
+      msgPanel.add(header);
+      var message = canProceed ? UpdaterUI.message("conflicts.text.1") : UpdaterUI.message("conflicts.text.2");
+      msgPanel.add(new JLabel(convertToHtml(message)));
 
-      dialog.add(label, BorderLayout.NORTH);
+      dialog.add(msgPanel, BorderLayout.NORTH);
       dialog.add(new JScrollPane(table), BorderLayout.CENTER);
       dialog.add(buttonsPanel, BorderLayout.SOUTH);
       dialog.getRootPane().setBorder(FRAME_BORDER);
@@ -212,6 +225,10 @@ public class SwingUpdaterUI implements UpdaterUI {
   @Override
   public String bold(String text) {
     return "<b>" + text + "</b>";
+  }
+
+  private static String convertToHtml(String message) {
+    return "<html>" + message.replace("\n", "<br>") + "</html>";
   }
 
   private static void invokeLater(Runnable runnable) {

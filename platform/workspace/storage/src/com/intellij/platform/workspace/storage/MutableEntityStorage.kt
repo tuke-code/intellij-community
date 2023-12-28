@@ -6,8 +6,6 @@ import com.intellij.openapi.diagnostic.trace
 import com.intellij.platform.workspace.storage.impl.EntityStorageSnapshotImpl
 import com.intellij.platform.workspace.storage.impl.MutableEntityStorageImpl
 import com.intellij.platform.workspace.storage.impl.currentStackTrace
-import com.intellij.platform.workspace.storage.query.StorageQuery
-import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.NonNls
 
 /**
@@ -135,12 +133,6 @@ import org.jetbrains.annotations.NonNls
  */
 public interface MutableEntityStorage : EntityStorage {
   /**
-   * Returns `true` if there are changes recorded in this storage after its creation. Note, that this method may return `true` if these
-   * changes actually don't modify the resulting set of entities, you may use [hasSameEntities] to perform more sophisticated check.
-   */
-  public fun hasChanges(): Boolean
-
-  /**
    * Add the given entity to the storage. All children of the entity will also be added.
    *
    * If any of the children exists in a different storage, this child will be copied with all sub-children and added to the storage.
@@ -180,31 +172,12 @@ public interface MutableEntityStorage : EntityStorage {
   public fun replaceBySource(sourceFilter: (EntitySource) -> Boolean, replaceWith: EntityStorage)
 
   /**
-   * Return changes in entities recorded in this instance. [original] parameter is used to get the old instances of modified
-   * and removed entities.
-   * 
-   * This function isn't supported to be used by client code directly. In order to subscribe to changes in entities inside the IDE process,
-   * use [WorkspaceModelTopics][com.intellij.platform.backend.workspace.WorkspaceModelTopics].
-   *
-   * To understand how the changes are collected see the KDoc for [com.intellij.platform.backend.workspace.WorkspaceModelChangeListener]
-   */
-  @ApiStatus.Internal
-  public fun collectChanges(): Map<Class<*>, List<EntityChange<*>>>
-
-  /**
    * Merges changes from [diff] to this storage. 
    * It's supposed that [diff] was created either via [MutableEntityStorage.create] function, or via [MutableEntityStorage.from] with the 
    * same base storage as this one. 
    * Calling the function for a mutable storage with a different base storage may lead to unpredictable results.
    */
   public fun addDiff(diff: MutableEntityStorage)
-
-  /**
-   * Returns `true` if this instance contains entities with the same properties as [original] storage it was created from. 
-   * The difference from [hasChanges] is that this method will return `true` in cases when an entity was removed, and then a new entity
-   * with the same properties was added.
-   */
-  public fun hasSameEntities(): Boolean
 
   /**
    * Returns an existing or create a new mapping with the given [identifier].
@@ -216,17 +189,9 @@ public interface MutableEntityStorage : EntityStorage {
   public fun <T> getMutableExternalMapping(identifier: @NonNls String): MutableExternalEntityMapping<T>
 
   /**
-   * Returns a number which is incremented after each change in the storage.
+   * Returns a snapshot of the current state. It won't be affected by future changes.
    */
-  public val modificationCount: Long
-
-  /**
-   * This function is under development, please don't use it.
-   *
-   * Calculates a value of [query] and caches it until the builder is modified
-   */
-  @ApiStatus.Experimental
-  public fun <T> calculate(query: StorageQuery<T>): T
+  public fun toSnapshot(): EntityStorageSnapshot
 
   public companion object {
     private val LOG = logger<MutableEntityStorage>()

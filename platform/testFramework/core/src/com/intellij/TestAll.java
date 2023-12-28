@@ -2,6 +2,7 @@
 package com.intellij;
 
 import com.intellij.concurrency.IdeaForkJoinWorkerThreadFactory;
+import com.intellij.idea.IJIgnore;
 import com.intellij.idea.IgnoreJUnit3;
 import com.intellij.openapi.application.PathManager;
 import com.intellij.openapi.diagnostic.Logger;
@@ -84,7 +85,7 @@ public class TestAll implements Test {
   private static final Filter NOT_IGNORED = new Filter() {
     @Override
     public boolean shouldRun(Description description) {
-      return description.getAnnotation(IgnoreJUnit3.class) == null;
+      return description.getAnnotation(IgnoreJUnit3.class) == null && description.getAnnotation(IJIgnore.class) == null;
     }
 
     @Override
@@ -105,8 +106,7 @@ public class TestAll implements Test {
   }
 
   public TestAll(String rootPackage, List<? extends Path> classesRoots) throws ClassNotFoundException {
-    String classFilterName = "tests/testGroups.properties";
-    myTestCaseLoader = new TestCaseLoader(classFilterName);
+    myTestCaseLoader = new TestCaseLoader(COMMON_TEST_GROUPS_RESOURCE_NAME);
     if (shouldAddFirstAndLastTests()) {
       myTestCaseLoader.addFirstTest(Class.forName("_FirstInSuiteTest"));
       myTestCaseLoader.addLastTest(Class.forName("_LastInSuiteTest"));
@@ -214,6 +214,9 @@ public class TestAll implements Test {
   public int countTestCases() {
     // counting test cases involves parallel directory scan now
     IdeaForkJoinWorkerThreadFactory.setupForkJoinCommonPool(true);
+    if (!hasRealTests()) {
+      return 0;
+    }
     int count = 0;
     for (Class<?> aClass : myTestCaseLoader.getClasses()) {
       Test test = getTest(aClass);
@@ -236,6 +239,9 @@ public class TestAll implements Test {
 
   @Override
   public void run(TestResult testResult) {
+    if (!hasRealTests()) {
+      return;
+    }
     final TestListener testListener = loadDiscoveryListener();
     if (testListener != null) {
       testResult.addListener(testListener);
@@ -281,6 +287,10 @@ public class TestAll implements Test {
     }
 
     TestCaseLoader.sendTestRunResultsToNastradamus();
+  }
+
+  private boolean hasRealTests() {
+    return ContainerUtil.exists(myTestCaseLoader.getClasses(false), aClass -> getTest(aClass) != null);
   }
 
   private static TestListener loadDiscoveryListener() {
@@ -339,7 +349,7 @@ public class TestAll implements Test {
   @Nullable
   private Test getTest(@NotNull final Class<?> testCaseClass) {
     try {
-      if ((testCaseClass.getModifiers() & Modifier.PUBLIC) == 0) {
+      if (!Modifier.isPublic(testCaseClass.getModifiers())) {
         return null;
       }
 
@@ -389,7 +399,7 @@ public class TestAll implements Test {
 
             Method method = findTestMethod((TestCase)test);
 
-            if (method != null && method.getAnnotation(IgnoreJUnit3.class) != null) {
+            if (method != null && (method.getAnnotation(IgnoreJUnit3.class) != null || method.getAnnotation(IJIgnore.class) != null)) {
               return;
             }
             doAddTest(test);

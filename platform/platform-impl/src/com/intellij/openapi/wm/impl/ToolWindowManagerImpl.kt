@@ -42,7 +42,6 @@ import com.intellij.openapi.keymap.KeymapManager
 import com.intellij.openapi.keymap.KeymapManagerListener
 import com.intellij.openapi.options.advanced.AdvancedSettings
 import com.intellij.openapi.progress.ProcessCanceledException
-import com.intellij.openapi.project.DumbService
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.ProjectCloseListener
 import com.intellij.openapi.project.ex.ProjectEx
@@ -564,7 +563,6 @@ open class ToolWindowManagerImpl @NonInjectable @TestOnly internal constructor(
         anchor = getToolWindowAnchor(factory, bean),
         sideTool = bean.secondary || bean.side,
         canCloseContent = bean.canCloseContents,
-        canWorkInDumbMode = DumbService.isDumbAware(factory),
         shouldBeAvailable = factory.shouldBeAvailable(project),
         contentFactory = factory,
         stripeTitle = getStripeTitleSupplier(id = bean.id, project = project, pluginDescriptor = plugin)
@@ -1720,7 +1718,7 @@ open class ToolWindowManagerImpl @NonInjectable @TestOnly internal constructor(
     val balloonBuilder = JBPopupFactory.getInstance()
       .createHtmlTextBalloonBuilder(content, options.icon, foreground, background, listenerWrapper)
       .setBorderColor(borderColor)
-      .setHideOnClickOutside(false)
+      .setHideOnClickOutside(true)
       .setHideOnFrameResize(false)
 
     options.balloonCustomizer?.accept(balloonBuilder)
@@ -1732,6 +1730,7 @@ open class ToolWindowManagerImpl @NonInjectable @TestOnly internal constructor(
 
     val balloon = balloonBuilder.createBalloon()
     if (balloon is BalloonImpl) {
+      balloon.setHideOnClickOutside(false)
       NotificationsManagerImpl.frameActivateBalloonListener(balloon) {
         coroutineScope.launch {
           delay(100.milliseconds)

@@ -166,6 +166,9 @@
                  defaultValue="true"/>
     <applicationService serviceInterface="com.intellij.execution.wsl.WslDistributionManager"
                         serviceImplementation="com.intellij.execution.wsl.WslDistributionManagerImpl"/>
+    <applicationService serviceInterface="com.intellij.execution.wsl.WslIjentManager"
+                        serviceImplementation="com.intellij.execution.wsl.ProductionWslIjentManager"/>
+
     <executionTargetType implementation="com.intellij.execution.wsl.target.WslTargetType"/>
     <registryKey key="wsl.obtain.windows.host.ip.alternatively" os="windows" defaultValue="true" restartRequired="true"
                  description="Obtain Windows host machine IP alternatively (not using the recommended 'cat /etc/resolv.conf | grep nameserver')."/>
@@ -197,6 +200,10 @@
                         serviceImplementation="com.intellij.configurationStore.ApplicationPathMacroManager"/>
 
     <applicationService serviceImplementation="com.intellij.configurationStore.DefaultProjectExportableAndSaveTrigger"/>
+
+    <projectService serviceInterface="com.intellij.configurationStore.ProjectIdManager"
+                    serviceImplementation="com.intellij.configurationStore.ProjectIdManagerImpl"
+                    testServiceImplementation="com.intellij.configurationStore.MockProjectIdManager"/>
 
     <applicationService serviceInterface="com.intellij.openapi.wm.impl.FrameTitleBuilder"
                         serviceImplementation="com.intellij.openapi.wm.impl.PlatformFrameTitleBuilder"/>
@@ -259,6 +266,7 @@
 
     <cachesInvalidator implementation="com.intellij.openapi.vfs.newvfs.FSRecordsCacheInvalidator" order="after rootCachesInvalidator"/>
     <cachesInvalidator id="rootCachesInvalidator" implementation="com.intellij.ide.actions.RootCachesInvalidator" order="first"/>
+    <logsPreprocessor implementation="com.intellij.ide.logsUploader.DefaultLogsProcessor"/>
 
     <applicationService serviceImplementation="com.intellij.ui.popup.LocalPopupComponentFactory"
                         serviceInterface="com.intellij.ui.popup.PopupComponentFactory"
@@ -443,11 +451,6 @@
 
     <applicationService serviceInterface="com.intellij.credentialStore.CredentialStoreUiService"
                         serviceImplementation="com.intellij.credentialStore.CredentialStoreUiServiceImpl"/>
-
-    <applicationService serviceInterface="com.intellij.execution.process.ElevationService"
-                        serviceImplementation="com.intellij.execution.process.elevation.ElevationServiceImpl"/>
-    <applicationService serviceInterface="com.intellij.execution.process.ElevationServiceAvailability"
-                        serviceImplementation="com.intellij.execution.process.elevation.ElevationServiceAvailabilityImpl"/>
 
     <applicationService serviceInterface="com.intellij.openapi.options.SchemeManagerFactory"
                         serviceImplementation="com.intellij.configurationStore.schemeManager.SchemeManagerFactoryBase$ApplicationSchemeManagerFactory"/>
@@ -922,8 +925,7 @@
     <statistics.counterUsagesCollector implementationClass="com.intellij.featureStatistics.fusCollectors.FileEditorCollector"/>
     <statistics.counterUsagesCollector
       implementationClass="com.intellij.openapi.editor.impl.EditorGutterComponentImpl$GutterIconClickCollectors"/>
-    <statistics.counterUsagesCollector
-      implementationClass="com.intellij.codeInsight.daemon.impl.analysis.HighlightingSettingsPerFile$InspectionWidgetUsageCollector"/>
+    <statistics.counterUsagesCollector implementationClass="com.intellij.featureStatistics.fusCollectors.InspectionWidgetUsageCollector"/>
     <statistics.counterUsagesCollector implementationClass="com.intellij.ide.actions.cache.CacheRecoveryUsageCollector"/>.
     <statistics.counterUsagesCollector groupId="new.project.wizard" version="3"/>
     <statistics.counterUsagesCollector implementationClass="com.intellij.diagnostic.WindowsDefenderStatisticsCollector"/>
@@ -1279,11 +1281,6 @@
         <component>ToolbarClicksCollector</component>
       </components>
     </obsoleteStorage>
-    <obsoleteStorage file="statistics.main_menu.xml">
-      <components>
-        <component>MainMenuCollector</component>
-      </components>
-    </obsoleteStorage>
     <obsoleteStorage file="statistics.shortcuts.xml">
       <components>
         <component>ShortcutsCollector</component>
@@ -1303,7 +1300,6 @@
         <component>ToolWindowsCollector</component>
         <component>ShortcutsCollector</component>
         <component>ToolbarClicksCollector</component>
-        <component>MainMenuCollector</component>
         <component>IntentionsCollector</component>
         <component>ActionsCollector</component>
         <component>FUSApplicationUsageTrigger</component>
@@ -1504,6 +1500,8 @@
                        key="notification.group.defender.config"/>
     <notificationGroup id="BrowserCfgProblems" displayType="BALLOON" bundle="messages.IdeBundle"
                        key="notification.group.browser.config.problems"/>
+    <notificationGroup id="Failed to generate module descriptors" displayType="BALLOON" bundle="messages.IdeBundle"
+                       key="notification.group.failed.to.generate.module.descriptors"/>
 
     <defaultHighlightingSettingProvider implementation="com.intellij.codeInsight.actions.ReaderModeHighlightingSettingsProvider"/>
     <registryKey key="html.editor.timeout" defaultValue="15000" description="HTML editor content loading timeout, ms"/>
@@ -1738,6 +1736,8 @@
     <registryKey key="rdct.new.async.actions"
                  defaultValue="false"
                  description="Turns on the new async action system"/>
+
+    <actionConfigurationCustomizer implementation="com.intellij.platform.ide.impl.presentationAssistant.PresentationAssistantListenerRegistrar"/>
   </extensions>
 
   <applicationListeners>
@@ -1789,11 +1789,6 @@
     <listener class="com.intellij.ide.ProjectWindowCustomizerListener"
               topic="com.intellij.ide.ui.UISettingsListener"/>
     <listener class="com.intellij.ui.MacCustomAppIconStartupService" topic="com.intellij.ide.AppLifecycleListener"/>
-    <listener class="com.intellij.platform.ide.impl.presentationAssistant.PresentationAssistantListenerRegistrar"
-              topic="com.intellij.ide.AppLifecycleListener"/>
-    <listener class="com.intellij.platform.ide.impl.presentationAssistant.PresentationAssistantListenerRegistrar"
-              topic="com.intellij.ide.plugins.DynamicPluginListener"/>
-
     <listener class="com.intellij.openapi.editor.actions.ResetFontSizeAppInitListener" topic="com.intellij.ide.AppLifecycleListener"/>
 
     <listener class="com.intellij.ide.ui.laf.LafAndEditorColorSchemeDynamicPluginListener"

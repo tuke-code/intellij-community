@@ -3,9 +3,9 @@ package com.intellij.openapi.vfs.newvfs.persistent.intercept
 
 import com.intellij.openapi.vfs.newvfs.AttributeOutputStream
 import com.intellij.openapi.vfs.newvfs.FileAttribute
-import com.intellij.openapi.vfs.newvfs.persistent.AbstractAttributesStorage
 import com.intellij.openapi.vfs.newvfs.persistent.PersistentFSConnection
 import com.intellij.openapi.vfs.newvfs.persistent.PersistentFSRecordsStorage
+import com.intellij.openapi.vfs.newvfs.persistent.VFSAttributesStorage
 import com.intellij.util.io.storage.VFSContentStorage
 
 object InterceptorInjection {
@@ -52,8 +52,8 @@ object InterceptorInjection {
     }
   }
 
-  fun injectInAttributes(storage: AbstractAttributesStorage,
-                         interceptors: List<AttributesInterceptor>): AbstractAttributesStorage = interceptors.run {
+  fun injectInAttributes(storage: VFSAttributesStorage,
+                         interceptors: List<AttributesInterceptor>): VFSAttributesStorage = interceptors.run {
     if (isEmpty()) {
       return storage
     }
@@ -62,7 +62,7 @@ object InterceptorInjection {
     val deleteAttributes = intercept(storage::deleteAttributes, AttributesInterceptor::onDeleteAttributes)
     val setVersion = intercept(storage::setVersion, AttributesInterceptor::onSetVersion)
 
-    object : AbstractAttributesStorage by storage {
+    object : VFSAttributesStorage by storage {
       override fun deleteAttributes(connection: PersistentFSConnection, fileId: Int) = deleteAttributes(connection, fileId)
 
       override fun writeAttribute(connection: PersistentFSConnection, fileId: Int, attribute: FileAttribute): AttributeOutputStream =
@@ -81,7 +81,7 @@ object InterceptorInjection {
     val allocateRecord = intercept(storage::allocateRecord, RecordsInterceptor::onAllocateRecord)
     val setAttributeRecordId = intercept(storage::setAttributeRecordId, RecordsInterceptor::onSetAttributeRecordId)
     val setParent = intercept(storage::setParent, RecordsInterceptor::onSetParent)
-    val setNameId = intercept(storage::setNameId, RecordsInterceptor::onSetNameId)
+    val updateNameId = intercept(storage::updateNameId, RecordsInterceptor::onUpdateNameId)
     val setFlags = intercept(storage::setFlags, RecordsInterceptor::onSetFlags)
     val setLength = intercept(storage::setLength, RecordsInterceptor::onSetLength)
     val setTimestamp = intercept(storage::setTimestamp, RecordsInterceptor::onSetTimestamp)
@@ -98,7 +98,7 @@ object InterceptorInjection {
 
       override fun setParent(fileId: Int, parentId: Int) = setParent(fileId, parentId)
 
-      override fun setNameId(fileId: Int, nameId: Int) = setNameId(fileId, nameId)
+      override fun updateNameId(fileId: Int, nameId: Int): Int = updateNameId(fileId, nameId)
 
       override fun setFlags(fileId: Int, flags: Int): Boolean = setFlags(fileId, flags)
 

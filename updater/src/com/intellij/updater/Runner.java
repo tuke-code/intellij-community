@@ -41,8 +41,9 @@ public final class Runner {
           effectiveArgs.add(arg);
         }
       }
-      //noinspection SSBasedInspection
-      _main(effectiveArgs.toArray(new String[0]));
+      @SuppressWarnings({"SSBasedInspection", "RedundantSuppression"})
+      var array = effectiveArgs.toArray(new String[0]);
+      _main(array);
     }
     catch (Throwable t) {
       LOG.log(Level.SEVERE, "internal error", t);
@@ -89,11 +90,13 @@ public final class Runner {
       }
     };
 
-    FileHandler cumulativeLog = new FileHandler(logPath, 0, 1, true);
+    var cumulativeLog = new FileHandler(logPath, 0L, 1, true);
+    cumulativeLog.setEncoding("UTF-8");
     cumulativeLog.setLevel(Level.ALL);
     cumulativeLog.setFormatter(formatter);
 
-    FileHandler errorLog = new FileHandler(errorLogPath, 0, 1, false);
+    var errorLog = new FileHandler(errorLogPath, 0L, 1, false);
+    cumulativeLog.setEncoding("UTF-8");
     errorLog.setLevel(Level.SEVERE);
     errorLog.setFormatter(formatter);
 
@@ -182,7 +185,7 @@ public final class Runner {
 
       LOG.info("destination: " + destPath + " (" + destDirectory + "), case-sensitive: " + ourCaseSensitiveFs);
 
-      var ui = "apply".equals(args[0]) ? new ConsoleUpdaterUI(hasArgument(args, "force-replace")) : new SwingUpdaterUI();
+      var ui = "apply".equals(args[0]) ? new ConsoleUpdaterUI(hasArgument(args, "force-replace")) : SwingUpdaterUI.createUI();
 
       boolean backup = !hasArgument(args, "no-backup");
       boolean success;

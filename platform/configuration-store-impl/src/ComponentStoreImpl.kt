@@ -93,6 +93,8 @@ abstract class ComponentStoreImpl : IComponentStore {
 
   internal fun getComponents(): Map<String, ComponentInfo> = components
 
+  fun getComponentNames(): Set<String> = HashSet(components.keys)
+
   override fun clearCaches() {
     components.values.forEach(Consumer {
       it.updateModificationCount(-1)
@@ -295,12 +297,23 @@ abstract class ComponentStoreImpl : IComponentStore {
 
         val saveResult = saveManager.save()
         saveResult.throwIfErrored()
-
-        if (!saveResult.isChanged) {
-          LOG.info("saveApplicationComponent is called for ${stateSpec.name} but nothing to save")
-        }
       }
     }
+  }
+
+  @TestOnly
+  suspend fun saveNonVfsComponent(component: PersistentStateComponent<*>): Boolean {
+    val stateSpec = getStateSpec(component)
+    val saveManager = createSaveSessionProducerManager()
+
+    commitComponent(session = saveManager,
+                    info = getComponents().entries.first { it.key == stateSpec.name }.value,
+                    componentName = null,
+                    modificationCountChanged = false)
+
+    val saveResult = saveManager.save()
+    saveResult.throwIfErrored()
+    return saveResult != SaveResult.EMPTY
   }
 
   open fun createSaveSessionProducerManager() = SaveSessionProducerManager()
@@ -543,7 +556,7 @@ abstract class ComponentStoreImpl : IComponentStore {
   }
 
   protected open fun isUseLoadedStateAsExisting(storage: StateStorage): Boolean {
-    return (storage as? XmlElementStorage)?.roamingType != RoamingType.DISABLED && isUseLoadedStateAsExistingVmProperty
+    return (storage as? XmlElementStorage)?.rawRoamingType != RoamingType.DISABLED && isUseLoadedStateAsExistingVmProperty
   }
 
   protected open fun getPathMacroManagerForDefaults(): PathMacroManager? = null

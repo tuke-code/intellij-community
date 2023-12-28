@@ -25,11 +25,21 @@ class PyDetectedSdkAdditionalData(override val targetEnvironmentConfiguration: T
  */
 internal fun createDetectedSdk(name: String, isLocal: Boolean): PyDetectedSdk {
   val sdk = PyDetectedSdk(name)
-  if (!isLocal) sdk.sdkAdditionalData = PyDetectedSdkAdditionalData(targetEnvironmentConfiguration = null, flavor = null)
+  if (!isLocal) {
+    val sdkModificator = sdk.sdkModificator
+    sdkModificator.sdkAdditionalData = PyDetectedSdkAdditionalData(targetEnvironmentConfiguration = null, flavor = null)
+    sdkModificator.commitChanges()
+  }
   return sdk
 }
 
 internal fun createDetectedSdk(name: String,
                                targetEnvironmentConfiguration: TargetEnvironmentConfiguration?,
-                               flavor: PythonSdkFlavor<*>? = null): PyDetectedSdk =
-  PyDetectedSdk(name).apply { sdkAdditionalData = PyDetectedSdkAdditionalData(targetEnvironmentConfiguration, flavor) }
+                               flavor: PythonSdkFlavor<*>? = null): PyDetectedSdk {
+  val detectedSdk = PyDetectedSdk(name)
+  with(detectedSdk.sdkModificator) {
+    sdkAdditionalData = PyDetectedSdkAdditionalData(targetEnvironmentConfiguration, flavor)
+    applyChangesWithoutWriteAction()
+  }
+  return detectedSdk
+}

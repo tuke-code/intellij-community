@@ -234,7 +234,7 @@ public class JavaCoverageEngine extends CoverageEngine {
 
   @Override
   protected void deleteAssociatedTraces(CoverageSuite suite) {
-    if (suite.isBranchCoverage()) {
+    if (suite.isCoverageByTestEnabled()) {
       File tracesDirectory = getTracesDirectory(suite);
       if (tracesDirectory.exists()) {
         FileUtil.delete(tracesDirectory);
@@ -245,7 +245,7 @@ public class JavaCoverageEngine extends CoverageEngine {
   @NotNull
   @Override
   public CoverageEnabledConfiguration createCoverageEnabledConfiguration(@NotNull final RunConfigurationBase conf) {
-    return new JavaCoverageEnabledConfiguration(conf, this);
+    return new JavaCoverageEnabledConfiguration(conf);
   }
 
   @Nullable
@@ -265,18 +265,22 @@ public class JavaCoverageEngine extends CoverageEngine {
   }
 
   @Override
-  public CoverageSuite createCoverageSuite(@NotNull final CoverageRunner covRunner,
-                                           @NotNull final String name,
-                                           @NotNull final CoverageFileProvider coverageDataFileProvider,
-                                           @NotNull final CoverageEnabledConfiguration config) {
+  public CoverageSuite createCoverageSuite(@NotNull CoverageRunner covRunner,
+                                           @NotNull String name,
+                                           @NotNull CoverageFileProvider coverageDataFileProvider,
+                                           @NotNull CoverageEnabledConfiguration config) {
     if (config instanceof JavaCoverageEnabledConfiguration javaConfig) {
-      return createSuite(covRunner, name, coverageDataFileProvider,
+      Project project = config.getConfiguration().getProject();
+      JavaCoverageOptionsProvider optionsProvider = JavaCoverageOptionsProvider.getInstance(project);
+      return createSuite(optionsProvider.getCoverageRunner(),
+                         name, coverageDataFileProvider,
                          javaConfig.getPatterns(),
                          javaConfig.getExcludePatterns(),
-                         new Date().getTime(),
-                         javaConfig.isTrackPerTestCoverage() && javaConfig.isBranchCoverageEnabled(),
-                         javaConfig.isBranchCoverageEnabled(),
-                         javaConfig.isTrackTestFolders(), config.getConfiguration().getProject());
+                         javaConfig.createTimestamp(),
+                         optionsProvider.getTestTracking() && canHavePerTestCoverage(config.getConfiguration()),
+                         optionsProvider.getBranchCoverage(),
+                         optionsProvider.getTestModulesCoverage(),
+                         project);
     }
     return null;
   }
@@ -666,14 +670,16 @@ public class JavaCoverageEngine extends CoverageEngine {
                                          String testName,
                                          String className,
                                          PsiManager psiManager) {
-    PsiClass psiClass = ClassUtil.findPsiClass(psiManager, className);
-    if (psiClass == null) return;
-    TestFramework testFramework = TestFrameworks.detectFramework(psiClass);
-    if (testFramework == null) return;
-    Arrays.stream(psiClass.getAllMethods())
-      .filter(method -> testFramework.isTestMethod(method) &&
-                        testName.equals(CoverageListener.sanitize(method.getName(), className.length())))
-      .forEach(elements::add);
+    ReadAction.run(() -> {
+      PsiClass psiClass = ClassUtil.findPsiClass(psiManager, className);
+      if (psiClass == null) return;
+      TestFramework testFramework = TestFrameworks.detectFramework(psiClass);
+      if (testFramework == null) return;
+      Arrays.stream(psiClass.getAllMethods())
+        .filter(method -> testFramework.isTestMethod(method) &&
+                          testName.equals(CoverageListener.sanitize(method.getName(), className.length())))
+        .forEach(elements::add);
+    });
   }
 
 
@@ -696,16 +702,16 @@ public class JavaCoverageEngine extends CoverageEngine {
     return hasDefault;
   }
 
-  protected JavaCoverageSuite createSuite(CoverageRunner acceptedCovRunner,
-                                          String name, CoverageFileProvider coverageDataFileProvider,
-                                          String[] filters,
-                                          String[] excludePatterns,
-                                          long lastCoverageTimeStamp,
-                                          boolean coverageByTestEnabled,
-                                          boolean branchCoverage,
-                                          boolean trackTestFolders, Project project) {
-    return new JavaCoverageSuite(name, coverageDataFileProvider, filters, excludePatterns, lastCoverageTimeStamp, coverageByTestEnabled, branchCoverage,
-                                 trackTestFolders, acceptedCovRunner, this, project);
+  public JavaCoverageSuite createSuite(CoverageRunner acceptedCovRunner,
+                                       String name, CoverageFileProvider coverageDataFileProvider,
+                                       String[] filters,
+                                       String[] excludePatterns,
+                                       long lastCoverageTimeStamp,
+                                       boolean coverageByTestEnabled,
+                                       boolean branchCoverage,
+                                       boolean trackTestFolders, Project project) {
+    return new JavaCoverageSuite(name, coverageDataFileProvider, filters, excludePatterns, lastCoverageTimeStamp,
+                                 coverageByTestEnabled, branchCoverage, trackTestFolders, acceptedCovRunner, this, project);
   }
 
   @NotNull

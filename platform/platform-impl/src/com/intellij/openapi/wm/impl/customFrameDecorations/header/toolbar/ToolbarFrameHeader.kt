@@ -4,7 +4,6 @@ package com.intellij.openapi.wm.impl.customFrameDecorations.header.toolbar
 import com.intellij.ide.ProjectWindowCustomizerService
 import com.intellij.ide.ui.UISettings
 import com.intellij.ide.ui.UISettingsListener
-import com.intellij.ide.ui.customization.CustomActionsSchema
 import com.intellij.openapi.actionSystem.ActionToolbar
 import com.intellij.openapi.application.EDT
 import com.intellij.openapi.application.ModalityState
@@ -19,7 +18,6 @@ import com.intellij.openapi.wm.impl.customFrameDecorations.header.titleLabel.Sim
 import com.intellij.openapi.wm.impl.getPreferredWindowHeaderHeight
 import com.intellij.openapi.wm.impl.headertoolbar.MainToolbar
 import com.intellij.openapi.wm.impl.headertoolbar.computeMainActionGroups
-import com.intellij.openapi.wm.impl.headertoolbar.isToolbarInHeader
 import com.intellij.platform.ide.menu.IdeJMenuBar
 import com.intellij.platform.ide.menu.collectGlobalMenu
 import com.intellij.platform.util.coroutines.childScope
@@ -109,7 +107,7 @@ internal class ToolbarFrameHeader(private val coroutineScope: CoroutineScope,
             updateLayout()
           }
 
-          isCompactHeader = rootPane.isCompactHeader { computeMainActionGroups(CustomActionsSchema.getInstanceAsync()) }
+          isCompactHeader = rootPane.isCompactHeader { computeMainActionGroups() }
 
           when (mode) {
             ShowMode.TOOLBAR -> doUpdateToolbar(isCompactHeader)
@@ -190,7 +188,7 @@ internal class ToolbarFrameHeader(private val coroutineScope: CoroutineScope,
   }
 
   private val mode: ShowMode
-    get() = if (isToolbarInHeader()) ShowMode.TOOLBAR else ShowMode.MENU
+    get() = if (rootPane.isToolbarInHeader()) ShowMode.TOOLBAR else ShowMode.MENU
 
   private fun wrap(comp: JComponent): NonOpaquePanel {
     return object : NonOpaquePanel(comp) {

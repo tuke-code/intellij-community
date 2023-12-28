@@ -3061,4 +3061,87 @@ public class NormalCompletionTest extends NormalCompletionTestCase {
     LookupElement[] elements = myFixture.completeBasic();
     assertEquals(0, elements.length);
   }
+
+  @NeedsIndex.ForStandardLibrary
+  public void testSwitchUncompletedDefault() {
+    myFixture.configureByText("Test.java", """
+        class Test {
+            void test(Integer o) {
+                switch (o) {
+                    d<caret>:
+                        break;
+                }
+            }
+        }
+      """);
+    myFixture.complete(CompletionType.BASIC);
+    myFixture.type('\n');
+    myFixture.checkResult("""
+        class Test {
+            void test(Integer o) {
+                switch (o) {
+                    default:
+                        <caret>
+                        break;
+                }
+            }
+        }
+      """);  }
+
+  @NeedsIndex.Full
+  public void testNestedImplicitClass() {
+    myFixture.configureByText("Test.java", """
+        public static class NestedClass{
+        
+        }
+        
+        public static void main(String[] args) {
+             NestedCla<caret>
+        }
+      """);
+    myFixture.complete(CompletionType.BASIC);
+    myFixture.checkResult("""
+        public static class NestedClass{
+        
+        }
+        
+        public static void main(String[] args) {
+             NestedClass
+        }
+      """);  }
+
+  @NeedsIndex.Full
+  public void testNestedQualifierImplicitClass() {
+    myFixture.configureByText("Test.java", """
+        public static class Nested {
+            public static class Nested2ClassMore {
+            }
+        }
+        
+        
+        public void main(String[] args) {
+            Nested nested = new Nested();
+        }
+        
+        public void t(Nested2ClassMo<caret> nested2) {
+        
+        }
+      """);
+    myFixture.complete(CompletionType.BASIC);
+    myFixture.type('\n');
+    myFixture.checkResult("""
+        public static class Nested {
+            public static class Nested2ClassMore {
+            }
+        }
+        
+        
+        public void main(String[] args) {
+            Nested nested = new Nested();
+        }
+        
+        public void t(Nested.Nested2ClassMore nested2) {
+        
+        }
+      """);  }
 }

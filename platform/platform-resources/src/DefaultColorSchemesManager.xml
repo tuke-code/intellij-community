@@ -113,6 +113,8 @@
       <option name="ScrollBar.Mac.Transparent.hoverTrackColor" value="8080801A"/>
       <option name="ScrollBar.Mac.Transparent.hoverThumbColor" value="00000080"/>
       <option name="ScrollBar.Mac.Transparent.hoverThumbBorderColor" value="00000080"/>
+      <option name="Scrollbar.Tabs.TransparentThumbColor" value="ABABAB00"/>
+      <option name="Scrollbar.Tabs.ThumbColor" value="ABABABFF"/>
       <option name="ActionButton.hoverBackground" value="dfdfdf"/>
       <option name="ActionButton.pressedBackground" value="cfcfcf"/>
       <option name="ActionButton.iconTextForeground" value="6e6e6e"/>
@@ -1273,7 +1275,7 @@
         </option>
         <option name="BLOCK_TERMINAL_GREEN_BRIGHT">
           <value>
-            <option name="FOREGROUND" value="55F255" />
+            <option name="FOREGROUND" value="3DCC3D" />
             <option name="BACKGROUND" value="4FE34F" />
             <option name="FONT_TYPE" value="0" />
             <option name="EFFECT_COLOR" />
@@ -1283,7 +1285,7 @@
         </option>
         <option name="BLOCK_TERMINAL_YELLOW_BRIGHT">
           <value>
-            <option name="FOREGROUND" value="FFF64D" />
+            <option name="FOREGROUND" value="D4BB00" />
             <option name="BACKGROUND" value="FFCD1A" />
             <option name="FONT_TYPE" value="0" />
             <option name="EFFECT_COLOR" />
@@ -1313,7 +1315,7 @@
         </option>
         <option name="BLOCK_TERMINAL_CYAN_BRIGHT">
           <value>
-            <option name="FOREGROUND" value="4DF6FF" />
+            <option name="FOREGROUND" value="31C4B3" />
             <option name="BACKGROUND" value="2EDCE5" />
             <option name="FONT_TYPE" value="0" />
             <option name="EFFECT_COLOR" />
@@ -1551,6 +1553,8 @@
       <option name="ScrollBar.Mac.Transparent.hoverTrackColor" value="8080801A"/>
       <option name="ScrollBar.Mac.Transparent.hoverThumbColor" value="8080808C"/>
       <option name="ScrollBar.Mac.Transparent.hoverThumbBorderColor" value="2626268C"/>
+      <option name="Scrollbar.Tabs.TransparentThumbColor" value="44434300"/>
+      <option name="Scrollbar.Tabs.ThumbColor" value="444343FF"/>
       <option name="ActionButton.hoverBackground" value="4c5052"/>
       <option name="ActionButton.pressedBackground" value="5c6164"/>
       <option name="ActionButton.iconTextForeground" value="bbbbbb"/>

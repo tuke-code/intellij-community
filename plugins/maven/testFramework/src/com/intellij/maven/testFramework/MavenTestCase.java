@@ -1,6 +1,7 @@
 // Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.maven.testFramework;
 
+import com.intellij.diagnostic.ThreadDumper;
 import com.intellij.execution.wsl.WSLDistribution;
 import com.intellij.execution.wsl.WslDistributionManager;
 import com.intellij.ide.DataManager;
@@ -27,7 +28,7 @@ import com.intellij.openapi.util.io.FileUtil;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.openapi.vfs.LocalFileSystem;
 import com.intellij.openapi.vfs.VirtualFile;
-import com.intellij.rt.execution.junit.FileComparisonFailure;
+import com.intellij.rt.execution.junit.FileComparisonData;
 import com.intellij.testFramework.*;
 import com.intellij.testFramework.fixtures.IdeaProjectTestFixture;
 import com.intellij.testFramework.fixtures.IdeaTestFixtureFactory;
@@ -45,9 +46,10 @@ import org.jetbrains.idea.maven.server.MavenServerConnector;
 import org.jetbrains.idea.maven.server.MavenServerConnectorImpl;
 import org.jetbrains.idea.maven.server.MavenServerManager;
 import org.jetbrains.idea.maven.server.RemotePathTransformerFactory;
+import org.jetbrains.idea.maven.utils.MavenLog;
 import org.jetbrains.idea.maven.utils.MavenProgressIndicator;
 import org.jetbrains.idea.maven.utils.MavenUtil;
-import org.junit.Assume;
+import org.junit.AssumptionViolatedException;
 
 import java.awt.*;
 import java.io.File;
@@ -71,23 +73,67 @@ public abstract class MavenTestCase extends UsefulTestCase {
     """;
   private MavenProgressIndicator myProgressIndicator;
   private WSLDistribution myWSLDistribution;
-  protected RemotePathTransformerFactory.Transformer myPathTransformer;
+  private RemotePathTransformerFactory.Transformer myPathTransformer;
 
   private File ourTempDir;
 
-  protected IdeaProjectTestFixture myTestFixture;
+  private IdeaProjectTestFixture myTestFixture;
 
-  @NotNull
-  protected Project myProject;
+  private Project myProject;
 
-  protected File myDir;
-  protected VirtualFile myProjectRoot;
+  private File myDir;
+  private VirtualFile myProjectRoot;
 
-  protected VirtualFile myProjectPom;
-  protected List<VirtualFile> myAllPoms = new ArrayList<>();
+  private VirtualFile myProjectPom;
+  private List<VirtualFile> myAllPoms = new ArrayList<>();
 
   protected static final boolean preimportTestMode = Boolean.getBoolean("MAVEN_TEST_PREIMPORT");
 
+  @NotNull
+  public RemotePathTransformerFactory.Transformer getPathTransformer() {
+    return myPathTransformer;
+  }
+
+  @NotNull
+  public IdeaProjectTestFixture getTestFixture() {
+    return myTestFixture;
+  }
+
+  public void setTestFixture(@NotNull IdeaProjectTestFixture testFixture) {
+    myTestFixture = testFixture;
+  }
+
+  public void setTestFixtureNull() {
+    myTestFixture = null;
+  }
+
+  @NotNull
+  public Project getProject() {
+    return myProject;
+  }
+
+  @NotNull
+  public File getDir() {
+    return myDir;
+  }
+
+  @NotNull
+  public VirtualFile getProjectRoot() {
+    return myProjectRoot;
+  }
+
+  @NotNull
+  public VirtualFile getProjectPom() {
+    return myProjectPom;
+  }
+
+  public void setProjectPom(@NotNull VirtualFile projectPom) {
+    myProjectPom = projectPom;
+  }
+
+  public List<VirtualFile> getAllPoms() {
+    return myAllPoms;
+  }
 
   @Override
   protected void setUp() throws Exception {
@@ -138,9 +184,13 @@ public abstract class MavenTestCase extends UsefulTestCase {
   public static void assumeTestCanBeReusedForPreimport(Class<?> aClass, String testName) {
     if (!preimportTestMode) return;
     try {
-      if (aClass.getDeclaredAnnotation(InstantImportCompatible.class) == null) {
+      InstantImportCompatible annotation = aClass.getDeclaredAnnotation(InstantImportCompatible.class);
+      if (annotation == null) {
         Method testMethod = aClass.getMethod(testName);
-        Assume.assumeNotNull(testMethod.getDeclaredAnnotation(InstantImportCompatible.class));
+        annotation = testMethod.getDeclaredAnnotation(InstantImportCompatible.class);
+        if (annotation == null) {
+          throw new AssumptionViolatedException("No InstantImportCompatible annotation present on class and method in pre-import testing mode, skipping test");
+        }
       }
     }
     catch (NoSuchMethodException ignore) {
@@ -244,7 +294,14 @@ public abstract class MavenTestCase extends UsefulTestCase {
 
 
   private static void checkAllMavenConnectorsDisposed() {
-    assertEmpty("all maven connectors should be disposed", MavenServerManager.getInstance().getAllConnectors());
+    Collection<MavenServerConnector> connectors = MavenServerManager.getInstance().getAllConnectors();
+    if (!connectors.isEmpty()) {
+      MavenLog.LOG.warn("Connectors not empty, printing thread dump");
+      MavenLog.LOG.warn("===============================================");
+      MavenLog.LOG.warn(ThreadDumper.getThreadDumpInfo(ThreadDumper.getThreadInfos(), false).getRawDump());
+      MavenLog.LOG.warn("===============================================");
+      fail("all maven connectors should be disposed but got " + connectors);
+    }
   }
 
   private void ensureTempDirCreated() throws IOException {
@@ -584,8 +641,20 @@ public abstract class MavenTestCase extends UsefulTestCase {
     }
   }
 
-  protected static <T, U> void assertOrderedElementsAreEqual(Collection<U> actual, Collection<T> expected) {
-    assertOrderedElementsAreEqual(actual, expected.toArray());
+  protected static <T> void assertOrderedElementsAreEqual(Collection<T> actual, List<T> expected) {
+    String s = "\nexpected: " + expected + "\nactual: " + actual;
+    assertEquals(s, expected.size(), actual.size());
+
+    List<T> actualList = new ArrayList<>(actual);
+    for (int i = 0; i < expected.size(); i++) {
+      T expectedElement = expected.get(i);
+      T actualElement = actualList.get(i);
+      assertEquals(s, expectedElement, actualElement);
+    }
+  }
+
+  protected static <T> void assertOrderedElementsAreEqual(Collection<T> actual, T... expected) {
+    assertOrderedElementsAreEqual(actual, Arrays.asList(expected));
   }
 
   protected static <T> void assertUnorderedElementsAreEqual(@NotNull Collection<T> actual, @NotNull Collection<T> expected) {
@@ -593,8 +662,7 @@ public abstract class MavenTestCase extends UsefulTestCase {
   }
 
   protected static void assertUnorderedPathsAreEqual(Collection<String> actual, Collection<String> expected) {
-    assertEquals(new SetWithToString<>(CollectionFactory.createFilePathSet(expected)),
-                 new SetWithToString<>(CollectionFactory.createFilePathSet(actual)));
+    assertEquals((CollectionFactory.createFilePathSet(expected)), (CollectionFactory.createFilePathSet(actual)));
   }
 
   protected static <T> void assertUnorderedElementsAreEqual(T[] actual, T... expected) {
@@ -603,18 +671,6 @@ public abstract class MavenTestCase extends UsefulTestCase {
 
   protected static <T> void assertUnorderedElementsAreEqual(Collection<T> actual, T... expected) {
     assertUnorderedElementsAreEqual(actual, Arrays.asList(expected));
-  }
-
-  protected static <T, U> void assertOrderedElementsAreEqual(Collection<U> actual, T... expected) {
-    String s = "\nexpected: " + Arrays.asList(expected) + "\nactual: " + new ArrayList<>(actual);
-    assertEquals(s, expected.length, actual.size());
-
-    List<U> actualList = new ArrayList<>(actual);
-    for (int i = 0; i < expected.length; i++) {
-      T expectedElement = expected[i];
-      U actualElement = actualList.get(i);
-      assertEquals(s, expectedElement, actualElement);
-    }
   }
 
   protected static <T> void assertContain(Collection<? extends T> actual, T... expected) {
@@ -636,9 +692,10 @@ public abstract class MavenTestCase extends UsefulTestCase {
     try {
       assertSameLinesWithFile(filePath, expectedText);
     }
-    catch (FileComparisonFailure e) {
-      String expected = e.getExpectedStringPresentation();
-      String actual = e.getActualStringPresentation();
+    catch (AssertionError e) {
+      if (!(e instanceof FileComparisonData fcf)) throw e;
+      String expected = fcf.getExpectedStringPresentation();
+      String actual = fcf.getActualStringPresentation();
       assertUnorderedElementsAreEqual(expected.split("\n"), actual.split("\n"));
     }
   }
@@ -658,7 +715,7 @@ public abstract class MavenTestCase extends UsefulTestCase {
     assertTrue("Connector is Dummy!", connector instanceof MavenServerConnectorImpl);
     long timeout = TimeUnit.SECONDS.toMillis(10);
     long start = System.currentTimeMillis();
-    while (connector.getState() == MavenServerConnectorImpl.State.STARTING) {
+    while (connector.getState() == MavenServerConnector.State.STARTING) {
       if (System.currentTimeMillis() > start + timeout) {
         throw new RuntimeException("Server connector not connected in 10 seconds");
       }
@@ -702,45 +759,5 @@ public abstract class MavenTestCase extends UsefulTestCase {
       }
       return defaultContext.getData(dataId);
     };
-  }
-
-  private static class SetWithToString<T> extends AbstractSet<T> {
-
-    private final Set<T> myDelegate;
-
-    SetWithToString(@NotNull Set<T> delegate) {
-      myDelegate = delegate;
-    }
-
-    @Override
-    public int size() {
-      return myDelegate.size();
-    }
-
-    @Override
-    public boolean contains(Object o) {
-      return myDelegate.contains(o);
-    }
-
-    @NotNull
-    @Override
-    public Iterator<T> iterator() {
-      return myDelegate.iterator();
-    }
-
-    @Override
-    public boolean containsAll(Collection<?> c) {
-      return myDelegate.containsAll(c);
-    }
-
-    @Override
-    public boolean equals(Object o) {
-      return myDelegate.equals(o);
-    }
-
-    @Override
-    public int hashCode() {
-      return myDelegate.hashCode();
-    }
   }
 }

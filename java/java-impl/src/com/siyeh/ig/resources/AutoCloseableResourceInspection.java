@@ -39,7 +39,7 @@ import static com.intellij.util.ObjectUtils.tryCast;
 /**
  * @author Bas Leijdekkers
  */
-public class AutoCloseableResourceInspection extends ResourceInspection {
+public final class AutoCloseableResourceInspection extends ResourceInspection {
 
 
   private static final CallMatcher CLOSE = CallMatcher.instanceCall(CommonClassNames.JAVA_LANG_AUTO_CLOSEABLE, "close");
@@ -60,7 +60,7 @@ public class AutoCloseableResourceInspection extends ResourceInspection {
                   "org.springframework.context.ConfigurableApplicationContext",
                   "io.micronaut.context.ApplicationContext");
 
-  protected final MethodMatcher myMethodMatcher;
+  final MethodMatcher myMethodMatcher;
   final List<String> ignoredTypes = new ArrayList<>(DEFAULT_IGNORED_TYPES);
   @SuppressWarnings("PublicField")
   public boolean ignoreFromMethodCall = false;

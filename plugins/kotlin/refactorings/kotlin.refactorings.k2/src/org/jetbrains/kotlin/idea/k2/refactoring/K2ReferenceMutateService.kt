@@ -34,10 +34,13 @@ import org.jetbrains.kotlin.psi.psiUtil.getQualifiedElement
  */
 @Suppress("UNCHECKED_CAST")
 internal class K2ReferenceMutateService : KtReferenceMutateServiceBase() {
-    override fun bindToElement(ktReference: KtReference, element: PsiElement): PsiElement = when (ktReference) {
-        is KtSimpleNameReference -> bindToElement(ktReference, element, KtSimpleNameReference.ShorteningMode.FORCED_SHORTENING)
-        is KDocReference -> bindToElement(ktReference, element, KtSimpleNameReference.ShorteningMode.FORCED_SHORTENING)
-        else -> throw IncorrectOperationException()
+    override fun bindToElement(ktReference: KtReference, element: PsiElement): PsiElement {
+        if (ktReference.isReferenceTo(element)) return element
+        return when (ktReference) {
+            is KtSimpleNameReference -> bindToElement(ktReference, element, KtSimpleNameReference.ShorteningMode.FORCED_SHORTENING)
+            is KDocReference -> bindToElement(ktReference, element, KtSimpleNameReference.ShorteningMode.FORCED_SHORTENING)
+            else -> throw IncorrectOperationException()
+        }
     }
 
     private fun KtFile.unusedImports(): Set<KtImportDirective> =
@@ -53,6 +56,8 @@ internal class K2ReferenceMutateService : KtReferenceMutateServiceBase() {
                 val importsToRemove =  unusedImportsAfter - unusedImportsBefore
                 importsToRemove.forEach(PsiElement::delete)
                 return if (shorten) {
+                    // TODO Reference shortening should be done BEFORE removing the obsolete imports
+                    // (but currently it is blocked by KTIJ-28004 and KTIJ-27841)
                     val newShortenings = analyze(newElement) {
                         collectPossibleReferenceShorteningsInElement(newElement)
                     }
@@ -87,6 +92,9 @@ internal class K2ReferenceMutateService : KtReferenceMutateServiceBase() {
     ): PsiElement {
         val expression = simpleNameReference.expression
         if (fqName.isRoot) return expression
+        val oldTarget = simpleNameReference.resolve()
+        val isImportable = (oldTarget as? KtCallableDeclaration)?.receiverTypeReference == null || oldTarget is KtClassLikeDeclaration
+        if (isImportable && oldTarget?.kotlinFqName == fqName) return expression
         val parent = expression.parent
         val writableFqn = if (parent is KtCallableReferenceExpression && parent.callableReference == expression) {
             FqName.topLevel(fqName.shortName())
@@ -117,7 +125,12 @@ internal class K2ReferenceMutateService : KtReferenceMutateServiceBase() {
                 ?: error("Could not create type from $fqName")
             replaced(newReference)
         } else {
-            if (!fqName.isRoot) qualifier?.replaceWith(fqName.parent()) // do recursive short name replacement to preserve type arguments
+            val parentFqn = fqName.parent()
+            if (parentFqn.isRoot) {
+                deleteQualifier()
+            }  else {
+                qualifier?.replaceWith(parentFqn) // do recursive short name replacement to preserve type arguments
+            }
             referenceExpression?.replaceShortName(fqName)?.parent as KtUserType
         }
     }

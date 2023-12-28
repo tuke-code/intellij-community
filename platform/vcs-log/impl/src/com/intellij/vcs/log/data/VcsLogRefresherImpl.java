@@ -255,8 +255,8 @@ public class VcsLogRefresherImpl implements VcsLogRefresher, Disposable {
             return VcsLogProperties.SUPPORTS_INCREMENTAL_REFRESH.getOrDefault(provider);
           });
 
-          smallDataPack =
-            optimize && supportsIncrementalRefresh && SMALL_DATA_PACK_COMMITS_COUNT >= 0 ? buildSmallDataPack() : DataPack.EMPTY;
+          smallDataPack = optimize && supportsIncrementalRefresh && SMALL_DATA_PACK_COMMITS_COUNT > 0
+                          ? buildSmallDataPack() : DataPack.EMPTY;
 
           if (smallDataPack != DataPack.EMPTY) {
             myDataPackUpdateHandler.accept(smallDataPack);
@@ -434,7 +434,6 @@ public class VcsLogRefresherImpl implements VcsLogRefresher, Disposable {
         return DataPack.EMPTY;
       });
     }
-
   }
 
   private static class RefreshRequest {

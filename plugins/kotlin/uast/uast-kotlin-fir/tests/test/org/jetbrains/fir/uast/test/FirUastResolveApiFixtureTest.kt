@@ -108,6 +108,14 @@ class FirUastResolveApiFixtureTest : KotlinLightCodeInsightFixtureTestCase(), Ua
         checkResolveLocalDefaultConstructor(myFixture)
     }
 
+    fun testResolveJavaDefaultConstructor() {
+        checkResolveJavaDefaultConstructor(myFixture)
+    }
+
+    fun testResolveKotlinDefaultConstructor() {
+        checkResolveKotlinDefaultConstructor(myFixture)
+    }
+
     fun testResolveJavaClassAsAnonymousObjectSuperType() {
         checkResolveJavaClassAsAnonymousObjectSuperType(myFixture)
     }
@@ -208,6 +216,10 @@ class FirUastResolveApiFixtureTest : KotlinLightCodeInsightFixtureTestCase(), Ua
         checkResolveEnumEntrySuperType(myFixture)
     }
 
+    fun testResolveFunInterfaceSamWithValueClassInSignature() {
+        checkResolveFunInterfaceSamWithValueClassInSignature(myFixture, isK2 = true)
+    }
+
     fun testResolveLambdaInvoke() {
         checkLambdaInvoke(myFixture)
     }
@@ -242,5 +254,13 @@ class FirUastResolveApiFixtureTest : KotlinLightCodeInsightFixtureTestCase(), Ua
 
     fun testResolveThisExpressionAsLambdaReceiver() {
         checkResolveThisExpressionAsLambdaReceiver(myFixture)
+    }
+
+    fun testResolvePropertiesInCompanionObjectFromBinaryDependency() {
+        checkResolvePropertiesInCompanionObjectFromBinaryDependency(myFixture)
+    }
+
+    fun testResolvePropertiesInInnerClassFromBinaryDependency() {
+        checkResolvePropertiesInInnerClassFromBinaryDependency(myFixture)
     }
 }

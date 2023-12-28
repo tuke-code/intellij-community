@@ -5,7 +5,6 @@ import com.intellij.platform.workspace.jps.entities.ModuleEntity
 import com.intellij.platform.workspace.storage.*
 import com.intellij.platform.workspace.storage.EntityInformation
 import com.intellij.platform.workspace.storage.EntitySource
-import com.intellij.platform.workspace.storage.EntityStorage
 import com.intellij.platform.workspace.storage.GeneratedCodeApiVersion
 import com.intellij.platform.workspace.storage.GeneratedCodeImplVersion
 import com.intellij.platform.workspace.storage.MutableEntityStorage
@@ -19,6 +18,8 @@ import com.intellij.platform.workspace.storage.impl.WorkspaceEntityBase
 import com.intellij.platform.workspace.storage.impl.WorkspaceEntityData
 import com.intellij.platform.workspace.storage.impl.extractOneToOneParent
 import com.intellij.platform.workspace.storage.impl.updateOneToOneParentOfChild
+import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentation
+import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentationApi
 import com.intellij.platform.workspace.storage.metadata.model.EntityMetadata
 import com.intellij.platform.workspace.storage.url.VirtualFileUrl
 import org.jetbrains.annotations.NonNls
@@ -41,21 +42,41 @@ open class JavaModuleSettingsEntityImpl(private val dataSource: JavaModuleSettin
   override val module: ModuleEntity
     get() = snapshot.extractOneToOneParent(MODULE_CONNECTION_ID, this)!!
 
-  override val inheritedCompilerOutput: Boolean get() = dataSource.inheritedCompilerOutput
-  override val excludeOutput: Boolean get() = dataSource.excludeOutput
+  override val inheritedCompilerOutput: Boolean
+    get() {
+      readField("inheritedCompilerOutput")
+      return dataSource.inheritedCompilerOutput
+    }
+  override val excludeOutput: Boolean
+    get() {
+      readField("excludeOutput")
+      return dataSource.excludeOutput
+    }
   override val compilerOutput: VirtualFileUrl?
-    get() = dataSource.compilerOutput
+    get() {
+      readField("compilerOutput")
+      return dataSource.compilerOutput
+    }
 
   override val compilerOutputForTests: VirtualFileUrl?
-    get() = dataSource.compilerOutputForTests
+    get() {
+      readField("compilerOutputForTests")
+      return dataSource.compilerOutputForTests
+    }
 
   override val languageLevelId: String?
-    get() = dataSource.languageLevelId
+    get() {
+      readField("languageLevelId")
+      return dataSource.languageLevelId
+    }
 
   override var manifestAttributes: Map<String, String> = dataSource.manifestAttributes
 
   override val entitySource: EntitySource
-    get() = dataSource.entitySource
+    get() {
+      readField("entitySource")
+      return dataSource.entitySource
+    }
 
   override fun connectionIdList(): List<ConnectionId> {
     return connections
@@ -244,11 +265,13 @@ class JavaModuleSettingsEntityData : WorkspaceEntityData<JavaModuleSettingsEntit
     return modifiable
   }
 
-  override fun createEntity(snapshot: EntityStorage): JavaModuleSettingsEntity {
-    return getCached(snapshot) {
+  @OptIn(EntityStorageInstrumentationApi::class)
+  override fun createEntity(snapshot: EntityStorageInstrumentation): JavaModuleSettingsEntity {
+    val entityId = createEntityId()
+    return snapshot.initializeEntity(entityId) {
       val entity = JavaModuleSettingsEntityImpl(this)
       entity.snapshot = snapshot
-      entity.id = createEntityId()
+      entity.id = entityId
       entity
     }
   }

@@ -27,7 +27,7 @@ import java.util.List;
 import static com.intellij.application.options.JavaDocFormattingPanel.*;
 import static com.intellij.psi.codeStyle.CodeStyleSettingsCustomizableOptions.getInstance;
 
-public class JavaLanguageCodeStyleSettingsProvider extends LanguageCodeStyleSettingsProvider {
+public final class JavaLanguageCodeStyleSettingsProvider extends LanguageCodeStyleSettingsProvider {
   @NotNull
   @Override
   public CodeStyleConfigurable createConfigurable(@NotNull CodeStyleSettings settings, @NotNull CodeStyleSettings modelSettings) {
@@ -201,6 +201,9 @@ public class JavaLanguageCodeStyleSettingsProvider extends LanguageCodeStyleSett
                                 "WRAP_SEMICOLON_AFTER_CALL_CHAIN",
                                 JavaBundle.message("wrapping.semicolon.after.call.chain"),
                                 getInstance().WRAPPING_CALL_CHAIN);
+
+      consumer.showCustomOption(JavaCodeStyleSettings.class, "ENUM_FIELD_ANNOTATION_WRAP", JavaBundle.message("wrapping.annotation.enums"),
+                                null, getInstance().WRAP_OPTIONS, CodeStyleSettingsCustomizable.WRAP_VALUES);
 
       consumer.showCustomOption(JavaCodeStyleSettings.class,
                                 "ANNOTATION_PARAMETER_WRAP",

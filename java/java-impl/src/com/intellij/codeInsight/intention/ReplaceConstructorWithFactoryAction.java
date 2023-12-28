@@ -16,6 +16,7 @@ import com.intellij.psi.impl.source.resolve.JavaResolveUtil;
 import com.intellij.psi.search.searches.ReferencesSearch;
 import com.intellij.psi.util.PsiFormatUtil;
 import com.intellij.psi.util.PsiFormatUtilBase;
+import com.intellij.psi.util.PsiTreeUtil;
 import com.intellij.psi.util.PsiUtil;
 import com.intellij.util.ObjectUtils;
 import com.intellij.util.VisibilityUtil;
@@ -28,10 +29,10 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
 
-public class ReplaceConstructorWithFactoryAction implements ModCommandAction {
+public final class ReplaceConstructorWithFactoryAction implements ModCommandAction {
   @NotNull
   @Override
-  public final String getFamilyName() {
+  public String getFamilyName() {
     return JavaRefactoringBundle.message("replace.constructor.with.factory.method");
   }
 
@@ -237,13 +238,14 @@ public class ReplaceConstructorWithFactoryAction implements ModCommandAction {
     PsiClass containingClass = ClassUtils.getContainingClass(element);
     if (!isSuitableClass(containingClass)) return null;
     PsiElement lBrace = containingClass.getLBrace();
-    if (lBrace != null && element.getTextRange().getStartOffset() >= lBrace.getTextRange().getStartOffset()) return null;
+    if (lBrace == null || element.getTextRange().getStartOffset() >= lBrace.getTextRange().getStartOffset()) return null;
     if (containingClass.getConstructors().length > 0) return null;
     return containingClass;
   }
 
   private static boolean isSuitableClass(PsiClass containingClass) {
     return containingClass != null && !containingClass.isInterface() && !containingClass.isEnum() && !containingClass.isRecord() &&
-            !containingClass.hasModifierProperty(PsiModifier.ABSTRACT) && containingClass.getQualifiedName() != null;
+           !(containingClass instanceof PsiImplicitClass) && !containingClass.hasModifierProperty(PsiModifier.ABSTRACT) && 
+           containingClass.getQualifiedName() != null;
   }
 }

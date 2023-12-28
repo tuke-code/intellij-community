@@ -20,8 +20,6 @@ import kotlinx.coroutines.runBlocking
 import org.junit.Test
 
 class MavenJGitBuildNumberTest : MavenDomTestCase() {
-  override fun runInDispatchThread() = true
-
   @Test
   fun testCompletion() = runBlocking {
     importProjectAsync("""
@@ -59,7 +57,7 @@ class MavenJGitBuildNumberTest : MavenDomTestCase() {
                        """.trimIndent()
     )
 
-    val variants = getCompletionVariants(myProjectPom)
+    val variants = getCompletionVariants(projectPom)
 
     assertContain(variants, "git.commitsCount")
   }

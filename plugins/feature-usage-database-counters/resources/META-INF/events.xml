@@ -1,8 +1,10 @@
 <!-- Events should be registered in this file -->
 <idea-plugin>
-  <extensions defaultExtensionNs="com.intellij.platform.ae.database">
-    <fusBasedCounterUserActivity implementation="com.intellij.ae.database.counters.community.events.PluginsInstalledUserActivity$Factory"/>
-    <fusBasedCounterUserActivity implementation="com.intellij.ae.database.counters.community.events.AltEnterActionInvocation$Factory"/>
+  <extensions defaultExtensionNs="com.intellij.ae.database">
+    <fusEventCatcher implementation="com.intellij.ae.database.counters.community.events.AltEnterActionInvocation$Factory"/>
+
+    <fusEventCatcher implementation="com.intellij.ae.database.counters.community.events.PluginInstalledFusListener"/>
+    <fusEventCatcher implementation="com.intellij.ae.database.counters.community.events.PluginUninstalledFusListener"/>
   </extensions>
 
   <extensions defaultExtensionNs="com.intellij">
@@ -10,15 +12,21 @@
     <editorFactoryListener implementation="com.intellij.ae.database.counters.community.events.CodingTimeUserActivityEditorFactoryListener"/>
     <postStartupActivity implementation="com.intellij.ae.database.counters.community.events.BuildListenerProjectActivity"/>
     <checkinHandlerFactory implementation="com.intellij.ae.database.counters.community.events.VcsListenerFactory"/>
+    <postStartupActivity implementation="com.intellij.ae.database.counters.community.events.ProjectOpenedTimeSpanUserActivityProjectOpenListener"/>
   </extensions>
 
   <applicationListeners>
     <listener class="com.intellij.ae.database.counters.community.events.IdeStartedUserActivityListener"
               topic="com.intellij.ide.AppLifecycleListener"/>
-
     <listener class="com.intellij.ae.database.counters.community.events.CompletionCharactersSparedListener"
               topic="com.intellij.featureStatistics.FeatureStatisticsUpdateListener"/>
-
-    <listener class="com.intellij.ae.database.counters.community.events.RunConfigurationListener" topic="com.intellij.execution.ExecutionListener"/>
+    <listener class="com.intellij.ae.database.counters.community.events.RunConfigurationListener"
+              topic="com.intellij.execution.ExecutionListener"/>
+    <listener class="com.intellij.ae.database.counters.community.events.PluginInstalledUserActivityServiceInitializer"
+              topic="com.intellij.ide.AppLifecycleListener"/>
+    <listener class="com.intellij.ae.database.counters.community.events.ProjectOpenedTimeSpanUserActivityProjectCloseListener"
+              topic="com.intellij.openapi.project.ProjectCloseListener"/>
+    <listener class="com.intellij.ae.database.counters.community.events.CodingTimeUserActivityCommandListener"
+              topic="com.intellij.openapi.command.CommandListener"/>
   </applicationListeners>
 </idea-plugin>

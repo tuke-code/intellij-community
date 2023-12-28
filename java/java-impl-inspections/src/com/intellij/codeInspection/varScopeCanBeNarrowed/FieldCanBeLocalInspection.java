@@ -39,7 +39,7 @@ import java.util.*;
 
 import static com.intellij.codeInspection.options.OptPane.*;
 
-public class FieldCanBeLocalInspection extends AbstractBaseJavaLocalInspectionTool {
+public final class FieldCanBeLocalInspection extends AbstractBaseJavaLocalInspectionTool {
   @NonNls public static final String SHORT_NAME = "FieldCanBeLocal";
   public final JDOMExternalizableStringList EXCLUDE_ANNOS = new JDOMExternalizableStringList();
   public boolean IGNORE_FIELDS_USED_IN_MULTIPLE_METHODS = true;
@@ -438,7 +438,7 @@ public class FieldCanBeLocalInspection extends AbstractBaseJavaLocalInspectionTo
       if (variable == null) return;
       final List<PsiElement> newDeclarations = moveDeclaration(variable);
       if (newDeclarations.isEmpty()) return;
-      updater.moveTo(newDeclarations.get(newDeclarations.size() - 1));
+      updater.moveCaretTo(newDeclarations.get(newDeclarations.size() - 1));
       newDeclarations.forEach(declaration -> inlineRedundant(declaration));
     }
 

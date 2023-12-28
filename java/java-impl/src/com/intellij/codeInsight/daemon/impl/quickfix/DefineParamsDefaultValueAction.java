@@ -28,7 +28,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
 
-public class DefineParamsDefaultValueAction extends PsiBasedModCommandAction<PsiElement> {
+public final class DefineParamsDefaultValueAction extends PsiBasedModCommandAction<PsiElement> {
   private static final Logger LOG = Logger.getInstance(DefineParamsDefaultValueAction.class);
 
   public DefineParamsDefaultValueAction() {
@@ -95,7 +95,7 @@ public class DefineParamsDefaultValueAction extends PsiBasedModCommandAction<Psi
     if (containingClass == null) return;
     final PsiMethod existingMethod = containingClass.findMethodBySignature(methodPrototype, false);
     if (existingMethod != null) {
-      updater.moveTo(existingMethod.getTextOffset());
+      updater.moveCaretTo(existingMethod.getTextOffset());
       updater.message(JavaBundle.message("default.param.value.warning",
                                          existingMethod.isConstructor() ? 0 : 1));
       return;

@@ -1,6 +1,8 @@
 // Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.openapi.projectRoots;
 
+import com.intellij.openapi.application.Application;
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.project.ProjectBundle;
 import com.intellij.openapi.projectRoots.impl.SdkVersionUtil;
 import com.intellij.openapi.util.Comparing;
@@ -33,8 +35,12 @@ public class SimpleJavaSdkType extends SdkType implements JavaSdkType {
   public Sdk createJdk(@NotNull String jdkName, @NotNull String home) {
     Sdk jdk = ProjectJdkTable.getInstance().createSdk(jdkName, this);
     SdkModificator sdkModificator = jdk.getSdkModificator();
-    sdkModificator.setHomePath(FileUtil.toSystemIndependentName(home));
-    sdkModificator.commitChanges();
+    String homePath = FileUtil.toSystemIndependentName(home);
+    sdkModificator.setHomePath(homePath);
+    sdkModificator.setVersionString(this.getVersionString(homePath));
+
+    // This SDK not in the storage, so it's OK to apply changes from `SdkModificator` to the storage, related to SDK only, not global WSM
+    sdkModificator.applyChangesWithoutWriteAction();
     return jdk;
   }
 

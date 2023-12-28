@@ -1,13 +1,13 @@
 // Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.openapi.project
 
-import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.progress.blockingContext
 import com.intellij.openapi.roots.ex.ProjectRootManagerEx
 import com.intellij.openapi.vfs.newvfs.RefreshQueue
 import com.intellij.openapi.vfs.newvfs.monitoring.VfsUsageCollector
+import com.intellij.util.application
 import com.intellij.util.awaitCancellationAndInvoke
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -22,18 +22,21 @@ class InitialVfsRefreshService(private val project: Project, private val scope: 
   private val started: AtomicBoolean = AtomicBoolean(false)
   private val future = CompletableDeferred<Unit>()
 
+  @Suppress("DuplicatedCode")
   fun scheduleInitialVfsRefresh() {
     if (started.getAndSet(true)) return
 
-    scope.launch {
-      val projectId = project.getLocationHash()
-      val logger = logger<InitialVfsRefreshService>()
+    val projectId = project.getLocationHash()
+    val logger = logger<InitialVfsRefreshService>()
+    if (System.getProperty("ij.indexes.skip.initial.refresh").toBoolean() || application.isUnitTestMode()) {
+      logger.debug("${projectId}: initial VFS refresh skipped")
+      future.complete(Unit)
+      return
+    }
 
-      if (System.getProperty("ij.indexes.skip.initial.refresh").toBoolean() || ApplicationManager.getApplication().isUnitTestMode()) {
-        logger.debug("${projectId}: initial VFS refresh skipped")
-      }
-      else {
-        logger.info("$projectId: marking roots for initial VFS refresh")
+    scope.launch {
+      try {
+        logger.info("${projectId}: marking roots for initial VFS refresh")
         val roots = ProjectRootManagerEx.getInstanceEx(project).markRootsForRefresh()
         logger.info("${projectId}: starting initial VFS refresh of ${roots.size} roots")
         val session = RefreshQueue.getInstance().createSession(false, true, null)
@@ -47,12 +50,43 @@ class InitialVfsRefreshService(private val project: Project, private val scope: 
         logger.info("${projectId}: initial VFS refresh finished in ${duration} ms")
         VfsUsageCollector.logInitialRefresh(project, duration)
       }
+      finally {
+        future.complete(Unit)
+      }
+    }
+  }
 
+  @Suppress("DuplicatedCode")
+  fun runInitialVfsRefresh() {
+    if (started.getAndSet(true)) return
+
+    val projectId = project.getLocationHash()
+    val logger = logger<InitialVfsRefreshService>()
+    if (System.getProperty("ij.indexes.skip.initial.refresh").toBoolean() || application.isUnitTestMode()) {
+      logger.debug("${projectId}: initial VFS refresh skipped")
+      future.complete(Unit)
+      return
+    }
+
+    try {
+      logger.info("${projectId}: marking roots for initial VFS refresh")
+      val roots = ProjectRootManagerEx.getInstanceEx(project).markRootsForRefresh()
+      logger.info("${projectId}: starting initial VFS refresh of ${roots.size} roots")
+      val session = RefreshQueue.getInstance().createSession(false, true, null)
+      scope.awaitCancellationAndInvoke { session.cancel() }
+      session.addAllFiles(roots)
+      val t = System.nanoTime()
+      session.launch()
+      val duration = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - t)
+      logger.info("${projectId}: initial VFS refresh finished in ${duration} ms")
+      VfsUsageCollector.logInitialRefresh(project, duration)
+    }
+    finally {
       future.complete(Unit)
     }
   }
 
   fun isInitialVfsRefreshFinished(): Boolean = future.isCompleted
 
-  suspend fun awaitInitialVfsRefreshFinished(): Unit  = future.await()
+  suspend fun awaitInitialVfsRefreshFinished(): Unit = future.await()
 }

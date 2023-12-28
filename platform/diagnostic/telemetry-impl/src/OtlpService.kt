@@ -17,6 +17,7 @@ import kotlinx.coroutines.selects.onTimeout
 import kotlinx.coroutines.selects.select
 import kotlinx.serialization.encodeToByteArray
 import kotlinx.serialization.protobuf.ProtoBuf
+import java.net.ConnectException
 import java.nio.ByteBuffer
 import java.time.ZoneOffset
 import java.time.ZonedDateTime
@@ -54,7 +55,7 @@ internal class OtlpService {
       val scopeToSpans = HashMap<Scope, ScopeSpans>()
       try {
         var counter = 0
-        while (isActive) {
+        while (true) {
           val finished = select {
             spans.onReceive { span ->
               if (span == null) {
@@ -87,15 +88,7 @@ internal class OtlpService {
 
               if (counter++ >= chunkSize) {
                 counter = 0
-                try {
-                  flush(scopeToSpans = scopeToSpans, resource = resource, endpoint = endpoint, batchSpanProcessor = batchSpanProcessor)
-                }
-                catch (e: CancellationException) {
-                  throw e
-                }
-                catch (e: Throwable) {
-                  thisLogger().error("Cannot flush", e)
-                }
+                flush(scopeToSpans = scopeToSpans, resource = resource, endpoint = endpoint, batchSpanProcessor = batchSpanProcessor)
               }
 
               false
@@ -139,29 +132,39 @@ internal class OtlpService {
       return
     }
 
-    batchSpanProcessor?.flushOtlp(scopeToSpans.values)
+    try {
+      batchSpanProcessor?.flushOtlp(scopeToSpans.values)
 
-    if (endpoint != null) {
-      val data = TracesData(
-        resourceSpans = java.util.List.of(
-          ResourceSpans(
-            resource = resource,
-            scopeSpans = java.util.List.copyOf(scopeToSpans.values),
+      if (endpoint != null) {
+        val data = TracesData(
+          resourceSpans = java.util.List.of(
+            ResourceSpans(
+              resource = resource,
+              scopeSpans = java.util.List.copyOf(scopeToSpans.values),
+            ),
           ),
-        ),
-      )
-
-      httpPost(url = endpoint, contentType = ContentType.XProtobuf, body = ProtoBuf.encodeToByteArray(data))
+        )
+        httpPost(url = endpoint, contentType = ContentType.XProtobuf, body = ProtoBuf.encodeToByteArray(data))
+      }
+      scopeToSpans.clear()
     }
-    scopeToSpans.clear()
+    catch (e: CancellationException) {
+      throw e
+    }
+    catch (e: ConnectException) {
+      thisLogger().warn("Cannot flush: ${e.message}")
+    }
+    catch (e: Throwable) {
+      thisLogger().error("Cannot flush: ${e.message}", e)
+    }
   }
 
   fun add(activity: ActivityImpl) {
     spans.trySend(activity)
   }
 
-  fun stop() {
-    spans.trySend(null)
+  suspend fun stop() {
+    spans.send(null)
     spans.close()
   }
 }

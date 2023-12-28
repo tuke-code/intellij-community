@@ -9,6 +9,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.util.registry.Registry
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
+import com.intellij.util.EnvironmentUtil
 import com.intellij.util.execution.ParametersListUtil
 import com.jediterm.core.util.TermSize
 import com.jediterm.terminal.RequestOrigin
@@ -16,7 +17,7 @@ import org.jetbrains.plugins.terminal.LocalBlockTerminalRunner
 import org.jetbrains.plugins.terminal.ShellStartupOptions
 import org.jetbrains.plugins.terminal.exp.ShellCommandListener
 import org.jetbrains.plugins.terminal.exp.TerminalModel
-import org.jetbrains.plugins.terminal.exp.TerminalSession
+import org.jetbrains.plugins.terminal.exp.BlockTerminalSession
 import org.jetbrains.plugins.terminal.exp.ui.BlockTerminalColorPalette
 import org.junit.Assume
 import java.nio.file.Path
@@ -28,19 +29,21 @@ object TerminalSessionTestUtil {
   fun startBlockTerminalSession(project: Project,
                                 shellPath: String,
                                 parentDisposable: Disposable,
-                                initialTermSize: TermSize = TermSize(200, 20)): TerminalSession {
+                                initialTermSize: TermSize = TermSize(200, 20)): BlockTerminalSession {
     Registry.get(LocalBlockTerminalRunner.BLOCK_TERMINAL_REGISTRY).setValue(true, parentDisposable)
     Registry.get(LocalBlockTerminalRunner.BLOCK_TERMINAL_FISH_REGISTRY).setValue(true, parentDisposable)
     Registry.get(LocalBlockTerminalRunner.BLOCK_TERMINAL_POWERSHELL_REGISTRY).setValue(true, parentDisposable)
     val runner = LocalBlockTerminalRunner(project)
-    val baseOptions = ShellStartupOptions.Builder().shellCommand(listOf(shellPath, "-i")).initialTermSize(initialTermSize).build()
+    val baseOptions = ShellStartupOptions.Builder().shellCommand(listOf(shellPath)).initialTermSize(initialTermSize)
+      .envVariables(mapOf(EnvironmentUtil.DISABLE_OMZ_AUTO_UPDATE to "true"))
+      .build()
     val configuredOptions = runner.configureStartupOptions(baseOptions)
     assumeBlockShellIntegration(configuredOptions)
     val process = runner.createProcess(configuredOptions)
     val ttyConnector = runner.createTtyConnector(process)
 
     val colorPalette = BlockTerminalColorPalette(EditorColorsManager.getInstance().globalScheme)
-    val session = TerminalSession(runner.settingsProvider, colorPalette, configuredOptions.shellIntegration)
+    val session = BlockTerminalSession(runner.settingsProvider, colorPalette, configuredOptions.shellIntegration!!)
     Disposer.register(parentDisposable, session)
     session.controller.resize(initialTermSize, RequestOrigin.User)
     val model: TerminalModel = session.model

@@ -39,9 +39,9 @@ import java.util.List;
 
 import static com.intellij.codeInspection.options.OptPane.*;
 
-public class InstanceVariableUninitializedUseInspection extends BaseInspection {
+public final class InstanceVariableUninitializedUseInspection extends BaseInspection {
 
-  protected final List<String> annotationNames = new ArrayList<>();
+  private final List<String> annotationNames = new ArrayList<>();
   /**
    * @noinspection PublicField
    */

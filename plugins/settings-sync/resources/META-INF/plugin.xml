@@ -49,6 +49,7 @@
     <statistics.applicationUsagesCollector implementation="com.intellij.settingsSync.statistics.SettingsSyncStateStatistics"/>
     <statistics.counterUsagesCollector implementationClass="com.intellij.settingsSync.statistics.SettingsSyncEventsStatistics"/>
     <iconMapper mappingFile="SettingsSyncIconMappings.json"/>
+
     </extensions>
 
   <applicationListeners>

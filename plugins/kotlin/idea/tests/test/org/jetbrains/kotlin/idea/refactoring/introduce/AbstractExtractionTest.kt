@@ -4,6 +4,7 @@ package org.jetbrains.kotlin.idea.refactoring.introduce
 
 import com.intellij.codeInsight.CodeInsightUtil
 import com.intellij.codeInsight.completion.JavaCompletionUtil
+import com.intellij.codeInsight.template.impl.TemplateManagerImpl
 import com.intellij.ide.DataManager
 import com.intellij.openapi.application.runReadAction
 import com.intellij.openapi.editor.Editor
@@ -15,6 +16,7 @@ import com.intellij.psi.codeStyle.JavaCodeStyleManager
 import com.intellij.psi.codeStyle.VariableKind
 import com.intellij.refactoring.BaseRefactoringProcessor.ConflictsInTestsException
 import com.intellij.refactoring.IntroduceParameterRefactoring
+import com.intellij.refactoring.RefactoringActionHandler
 import com.intellij.refactoring.introduceField.ElementToWorkOn
 import com.intellij.refactoring.introduceParameter.IntroduceParameterProcessor
 import com.intellij.refactoring.introduceParameter.Util
@@ -46,7 +48,7 @@ import org.jetbrains.kotlin.idea.refactoring.introduce.introduceProperty.KotlinI
 import org.jetbrains.kotlin.idea.refactoring.introduce.introduceTypeAlias.IntroduceTypeAliasDescriptor
 import org.jetbrains.kotlin.idea.refactoring.introduce.introduceTypeAlias.KotlinIntroduceTypeAliasHandler
 import org.jetbrains.kotlin.idea.refactoring.introduce.introduceTypeParameter.KotlinIntroduceTypeParameterHandler
-import org.jetbrains.kotlin.idea.refactoring.introduce.introduceVariable.KotlinIntroduceVariableHandler
+import org.jetbrains.kotlin.idea.refactoring.introduce.introduceVariable.K1IntroduceVariableHandler
 import org.jetbrains.kotlin.idea.refactoring.markMembersInfo
 import org.jetbrains.kotlin.idea.refactoring.memberInfo.extractClassMembers
 import org.jetbrains.kotlin.idea.refactoring.selectElement
@@ -54,6 +56,7 @@ import org.jetbrains.kotlin.idea.test.*
 import org.jetbrains.kotlin.idea.test.util.findElementByCommentPrefix
 import org.jetbrains.kotlin.idea.util.ElementKind
 import org.jetbrains.kotlin.idea.util.IdeDescriptorRenderers
+import org.jetbrains.kotlin.idea.util.application.executeCommand
 import org.jetbrains.kotlin.lexer.KtModifierKeywordToken
 import org.jetbrains.kotlin.parsing.KotlinParserDefinition
 import org.jetbrains.kotlin.psi.*
@@ -71,16 +74,25 @@ abstract class AbstractExtractionTest : KotlinLightCodeInsightFixtureTestCase() 
 
     val fixture: JavaCodeInsightTestFixture get() = myFixture
 
+    protected open fun getIntroduceVariableHandler(): RefactoringActionHandler = K1IntroduceVariableHandler
+
     protected open fun doIntroduceVariableTest(unused: String) {
         doTestIfNotDisabledByFileDirective { file ->
+            TemplateManagerImpl.setTemplateTesting(getTestRootDisposable())
+
             file as KtFile
 
-            KotlinIntroduceVariableHandler.invoke(
+            getIntroduceVariableHandler().invoke(
                 fixture.project,
                 fixture.editor,
                 file,
                 DataManager.getInstance().getDataContext(fixture.editor.component)
             )
+
+            val templateState = TemplateManagerImpl.getTemplateState(editor)
+            if (templateState?.isFinished() == false) {
+                project.executeCommand("") { templateState.gotoEnd(false) }
+            }
         }
     }
 
@@ -195,7 +207,7 @@ abstract class AbstractExtractionTest : KotlinLightCodeInsightFixtureTestCase() 
                 localVar,
                 true,
                 suggestedNames.first(),
-                IntroduceVariableBase.JavaReplaceChoice.ALL, 
+                IntroduceVariableBase.JavaReplaceChoice.ALL,
                 IntroduceParameterRefactoring.REPLACE_FIELDS_WITH_GETTERS_NONE,
                 false,
                 false,

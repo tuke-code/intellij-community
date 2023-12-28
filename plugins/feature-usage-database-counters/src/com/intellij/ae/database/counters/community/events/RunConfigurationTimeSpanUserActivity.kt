@@ -1,6 +1,10 @@
 // Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.ae.database.counters.community.events
 
+import com.intellij.ae.database.activities.WritableDatabaseBackedTimeSpanUserActivity
+import com.intellij.ae.database.dbs.timespan.TimeSpanUserActivityDatabaseManualKind
+import com.intellij.ae.database.runUpdateEvent
+import com.intellij.ae.database.utils.InstantUtils
 import com.intellij.build.BuildProgressListener
 import com.intellij.build.BuildViewManager
 import com.intellij.build.events.BuildEvent
@@ -8,19 +12,15 @@ import com.intellij.build.events.FinishBuildEvent
 import com.intellij.build.events.StartBuildEvent
 import com.intellij.execution.ExecutionListener
 import com.intellij.execution.executors.DefaultDebugExecutor
-import com.intellij.execution.executors.DefaultRunExecutor
 import com.intellij.execution.process.ProcessHandler
 import com.intellij.execution.runners.ExecutionEnvironment
 import com.intellij.openapi.components.serviceAsync
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.startup.ProjectActivity
-import com.intellij.platform.ae.database.AEDatabaseLifetime
-import com.intellij.platform.ae.database.activities.WritableDatabaseBackedTimeSpanUserActivity
-import com.intellij.platform.ae.database.dbs.timespan.TimeSpanUserActivityDatabaseManualKind
-import com.intellij.platform.ae.database.runUpdateEvent
-import com.intellij.platform.ae.database.utils.InstantUtils
 import org.jetbrains.sqlite.ObjectBinderFactory
 import java.time.Instant
+
+// todo check all run configurations (run with profile, run coverage)
 
 /**
  * Writes events related to run configurations.
@@ -31,7 +31,7 @@ object RunConfigurationTimeSpanUserActivity : WritableDatabaseBackedTimeSpanUser
   override val id = "runconfig.running"
 
   // TODO pass time from build infra?
-  internal suspend fun writeStart(kind: RunConfigurationEventKind, id: Int) {
+  internal suspend fun writeRunConfigurationStart(kind: RunConfigurationEventKind, id: Int) {
     val data = mapOf("act" to kind.eventName)
     submitManual(id.toString(), TimeSpanUserActivityDatabaseManualKind.Start, data)
   }
@@ -96,18 +96,21 @@ enum class RunConfigurationEventKind(val eventName: String) {
 internal class RunConfigurationListener : ExecutionListener {
   override fun processStarted(executorId: String, env: ExecutionEnvironment, handler: ProcessHandler) {
     val id = System.identityHashCode(handler) // not the best ID out there, but it works
-    if (env.runProfile.name.let { it.contains("[build") || it.lowercase().startsWith("build ") }) { // Skip Gradle build
-      return
-    }
-    when (env.executor) {
-      is DefaultDebugExecutor -> {
+
+    when {
+      env.runProfile.name.let { it.contains("[build", true) || it.startsWith("build ", true) } -> {
         FeatureUsageDatabaseCountersScopeProvider.getScope().runUpdateEvent(RunConfigurationTimeSpanUserActivity) {
-          it.writeStart(RunConfigurationEventKind.Debug, id)
+          it.writeRunConfigurationStart(RunConfigurationEventKind.Build, id)
         }
       }
-      is DefaultRunExecutor -> {
+      env.executor is DefaultDebugExecutor || env.executor.id.contains("debug", true) -> {
         FeatureUsageDatabaseCountersScopeProvider.getScope().runUpdateEvent(RunConfigurationTimeSpanUserActivity) {
-          it.writeStart(RunConfigurationEventKind.Run, id)
+          it.writeRunConfigurationStart(RunConfigurationEventKind.Debug, id)
+        }
+      }
+      else -> {
+        FeatureUsageDatabaseCountersScopeProvider.getScope().runUpdateEvent(RunConfigurationTimeSpanUserActivity) {
+          it.writeRunConfigurationStart(RunConfigurationEventKind.Run, id)
         }
       }
     }
@@ -138,7 +141,7 @@ internal class BuildListener : BuildProgressListener {
         // Skip Gradle initial loading
         if (event.buildDescriptor.title == "Classes up-to-date check") return
         FeatureUsageDatabaseCountersScopeProvider.getScope().runUpdateEvent(RunConfigurationTimeSpanUserActivity) {
-          it.writeStart(RunConfigurationEventKind.Build, id)
+          it.writeRunConfigurationStart(RunConfigurationEventKind.Build, id)
         }
       }
       is FinishBuildEvent -> {

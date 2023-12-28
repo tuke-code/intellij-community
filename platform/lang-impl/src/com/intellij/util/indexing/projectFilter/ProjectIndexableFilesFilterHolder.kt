@@ -8,7 +8,6 @@ import com.intellij.openapi.progress.util.ProgressIndicatorUtils
 import com.intellij.openapi.project.DumbService
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.ProjectCloseListener
-import com.intellij.openapi.util.text.StringUtil
 import com.intellij.util.SystemProperties
 import com.intellij.util.indexing.*
 import com.intellij.util.indexing.projectFilter.ProjectIndexableFilesFilter.HealthCheckError
@@ -115,11 +114,15 @@ internal class IncrementalProjectIndexableFilesFilterHolder : ProjectIndexableFi
           error.fix()
         }
 
-        val message = StringUtil.first(errors!!.take(100).joinToString(", ") { ReadAction.nonBlocking(Callable { it.presentableText }).executeSynchronously() },
-          300,
-          true)
-        FileBasedIndexImpl.LOG.error("Project indexable filter health check found ${errors!!.size} errors: $message")
+        val summary = errors!!
+          .groupBy { it::class.java }
+          .entries.joinToString("\n") { (clazz, e) ->
+            "${e.size} ${clazz.simpleName} errors. Examples:\n" + e.take(10).joinToString("\n") { error ->
+              ReadAction.nonBlocking(Callable { error.presentableText }).executeSynchronously()
+            }
+          }
 
+        FileBasedIndexImpl.LOG.warn("${filter.javaClass.simpleName} health check found ${errors!!.size} errors in project ${project.name}:\n$summary")
       }
     }
     catch (_: ProcessCanceledException) {

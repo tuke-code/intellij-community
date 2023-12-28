@@ -5,11 +5,17 @@ import com.intellij.core.JavaPsiBundle;
 import com.intellij.openapi.projectRoots.JavaSdkVersion;
 import com.intellij.openapi.util.Key;
 import com.intellij.util.lang.JavaVersion;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.Nls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.Map;
+import java.util.Objects;
+import java.util.function.Function;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * Represents a language level (i.e. features available) of a Java code.
@@ -41,7 +47,21 @@ public enum LanguageLevel {
   JDK_20_PREVIEW(JavaPsiBundle.messagePointer("jdk.20.preview.language.level.description"), 20),
   JDK_21(JavaPsiBundle.messagePointer("jdk.21.language.level.description"), 21),
   JDK_21_PREVIEW(JavaPsiBundle.messagePointer("jdk.21.preview.language.level.description"), 21),
-  JDK_X(JavaPsiBundle.messagePointer("jdk.X.language.level.description"), 22),;
+  JDK_22(JavaPsiBundle.messagePointer("jdk.22.language.level.description"), 22),
+  JDK_22_PREVIEW(JavaPsiBundle.messagePointer("jdk.22.preview.language.level.description"), 22),
+  JDK_X(JavaPsiBundle.messagePointer("jdk.X.language.level.description"), 23),
+
+  // Unsupported
+  // Marked as obsolete to draw attention, as they should not be normally used in code or in tests,
+  // except the tests that explicitly test the obsolete levels
+
+  @ApiStatus.Obsolete
+  JDK_17_PREVIEW(17, JDK_20_PREVIEW),
+  @ApiStatus.Obsolete
+  JDK_18_PREVIEW(18, JDK_20_PREVIEW),
+  @ApiStatus.Obsolete
+  JDK_19_PREVIEW(19, JDK_20_PREVIEW),
+  ;
 
   /**
    * Should point to the latest released JDK.
@@ -51,15 +71,49 @@ public enum LanguageLevel {
   private final Supplier<@Nls String> myPresentableText;
   private final JavaVersion myVersion;
   private final boolean myPreview;
+  private final @Nullable LanguageLevel myAlias;
+  private static final Map<Integer, LanguageLevel> ourStandardVersions =
+    Stream.of(values()).filter(ver -> !ver.isPreview())
+      .collect(Collectors.toMap(ver -> ver.myVersion.feature, Function.identity()));
 
   LanguageLevel(Supplier<@Nls String> presentableTextSupplier, int major) {
+    this(presentableTextSupplier, major, null);
+  }
+
+  LanguageLevel(int major, @NotNull LanguageLevel alias) {
+    this(JavaPsiBundle.messagePointer("jdk.unsupported.preview.language.level.description", major), major, alias);
+  }
+
+  LanguageLevel(Supplier<@Nls String> presentableTextSupplier, int major, @Nullable LanguageLevel alias) {
     myPresentableText = presentableTextSupplier;
     myVersion = JavaVersion.compose(major);
+    if (alias != null && alias.isUnsupported()) {
+      throw new IllegalArgumentException("Cannot alias to unsupported version");
+    }
+    myAlias = alias;
     myPreview = name().endsWith("_PREVIEW") || name().endsWith("_X");
   }
 
   public boolean isPreview() {
     return myPreview;
+  }
+
+  /**
+   * @return true if this language level is not supported anymore. It's still possible to invoke compiler or launch the program
+   * using this language level. However, it's not guaranteed that the code insight features will work correctly.
+   * All the code insight features will use the {@linkplain #getSupportedLevel() alias level} instead
+   */
+  public boolean isUnsupported() {
+    return myAlias != null;
+  }
+
+  /**
+   * @return the closest supported language level for the unsupported level;
+   * returns this for supported level
+   */
+  @ApiStatus.Experimental
+  public @NotNull LanguageLevel getSupportedLevel() {
+    return myAlias == null ? this : myAlias;
   }
 
   /**
@@ -73,6 +127,14 @@ public enum LanguageLevel {
     catch (IllegalArgumentException e) {
       return null;
     }
+  }
+
+  /**
+   * @return corresponding non-preview level; this if this level is non-preview already
+   */
+  public @NotNull LanguageLevel getNonPreviewLevel() {
+    if (!myPreview) return this;
+    return Objects.requireNonNull(ourStandardVersions.get(myVersion.feature));
   }
 
   @NotNull
@@ -104,6 +166,16 @@ public enum LanguageLevel {
       }
     }
     return null;
+  }
+
+  /**
+   * @param feature major Java language level number
+   * @return a {@link LanguageLevel} constant that correspond to the specified level (non-preview).
+   * Returns null for unknown/unsupported input. May return {@link #JDK_X} if language level is one level
+   * higher than maximal supported.
+   */
+  public static @Nullable LanguageLevel forFeature(int feature) {
+    return ourStandardVersions.get(feature);
   }
 
   public static final Key<LanguageLevel> FILE_LANGUAGE_LEVEL_KEY = Key.create("FORCE_LANGUAGE_LEVEL");

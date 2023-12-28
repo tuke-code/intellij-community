@@ -1944,6 +1944,7 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
     if (!Registry.is("editor.dumb.mode.available")) return;
     putUserData(BUFFER, null);
     Rectangle rect = ((JViewport)myEditorComponent.getParent()).getViewRect();
+    if (rect.isEmpty()) return;
     // The LCD text loop is enabled only for opaque images
     BufferedImage image = UIUtil.createImage(myEditorComponent, rect.width, rect.height, BufferedImage.TYPE_INT_RGB);
     Graphics imageGraphics = image.createGraphics();
@@ -3972,6 +3973,11 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
               doc.deleteString(composedRangeMarker.getStartOffset(), composedRangeMarker.getEndOffset());
             }
           });
+          if (composedRangeMarker.isValid()) {
+            // IDEA-331578: Deleting a string from a document may move the range marker to the left (i.e. during inline rename)
+            // We must use the new `startOffset` value here if the range marker is still valid
+            composedStartIndex = composedRangeMarker.getStartOffset();
+          }
         }
         composedRangeMarker.dispose();
         composedRangeMarker = null;

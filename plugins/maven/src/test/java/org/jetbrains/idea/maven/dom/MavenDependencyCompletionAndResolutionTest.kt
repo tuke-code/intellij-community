@@ -2,13 +2,16 @@
 package org.jetbrains.idea.maven.dom
 
 import com.intellij.codeInsight.intention.IntentionActionDelegate
+import com.intellij.openapi.application.EDT
 import com.intellij.openapi.application.WriteAction
 import com.intellij.openapi.util.io.FileUtil
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.psi.codeStyle.CodeStyleSettingsManager
 import com.intellij.psi.codeStyle.CommonCodeStyleSettings
 import com.intellij.psi.formatter.xml.XmlCodeStyleSettings
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import org.jetbrains.idea.maven.MavenCustomRepositoryHelper
 import org.jetbrains.idea.maven.dom.converters.MavenDependencyCompletionUtil
 import org.jetbrains.idea.maven.dom.intentions.ChooseFileIntentionAction
@@ -19,7 +22,6 @@ import java.io.File
 import java.io.IOException
 
 class MavenDependencyCompletionAndResolutionTest : MavenDomWithIndicesTestCase() {
-  override fun runInDispatchThread() = true
   override fun importProjectOnSetup(): Boolean {
     return true
   }
@@ -37,7 +39,7 @@ class MavenDependencyCompletionAndResolutionTest : MavenDomWithIndicesTestCase()
                        </dependencies>
                        """.trimIndent())
 
-    assertCompletionVariantsInclude(myProjectPom, RENDERING_TEXT, "junit", "jmock", "test")
+    assertCompletionVariantsInclude(projectPom, RENDERING_TEXT, "junit", "jmock", "test")
   }
 
   @Test
@@ -54,7 +56,7 @@ class MavenDependencyCompletionAndResolutionTest : MavenDomWithIndicesTestCase()
                        </dependencies>
                        """.trimIndent())
 
-    assertCompletionVariants(myProjectPom, RENDERING_TEXT, "junit")
+    assertCompletionVariants(projectPom, RENDERING_TEXT, "junit")
   }
 
   @Test
@@ -71,7 +73,7 @@ class MavenDependencyCompletionAndResolutionTest : MavenDomWithIndicesTestCase()
                        </dependencies>
                        """.trimIndent())
 
-    assertCompletionVariants(myProjectPom)
+    assertCompletionVariants(projectPom)
   }
 
   @Test
@@ -89,7 +91,7 @@ class MavenDependencyCompletionAndResolutionTest : MavenDomWithIndicesTestCase()
                        </dependencies>
                        """.trimIndent())
 
-    val variants = getCompletionVariants(myProjectPom)
+    val variants = getCompletionVariants(projectPom)
     assertEquals(mutableListOf("4.0", "3.8.2", "3.8.1"), variants)
   }
 
@@ -106,7 +108,7 @@ class MavenDependencyCompletionAndResolutionTest : MavenDomWithIndicesTestCase()
                        </dependencies>
                        """.trimIndent())
 
-    assertCompletionVariants(myProjectPom) // should not throw
+    assertCompletionVariants(projectPom) // should not throw
   }
 
   @Test
@@ -316,12 +318,12 @@ class MavenDependencyCompletionAndResolutionTest : MavenDomWithIndicesTestCase()
                           </dependencies>
                           """.trimIndent())
 
-    importProjectsWithErrors(myProjectPom, m)
+    importProjectsWithErrors(projectPom, m)
 
-    assertCompletionVariants(myProjectPom, RENDERING_TEXT, "m1")
+    assertCompletionVariants(projectPom, RENDERING_TEXT, "m1")
 
     createModulePom("m1", "")
-    importProjectsWithErrors(myProjectPom, m)
+    importProjectsWithErrors(projectPom, m)
 
     configureProjectPom("""
                           <groupId>test</groupId>
@@ -335,7 +337,7 @@ class MavenDependencyCompletionAndResolutionTest : MavenDomWithIndicesTestCase()
                           </dependencies>
                           """.trimIndent())
 
-    assertCompletionVariants(myProjectPom)
+    assertCompletionVariants(projectPom)
   }
 
   @Test
@@ -366,17 +368,17 @@ class MavenDependencyCompletionAndResolutionTest : MavenDomWithIndicesTestCase()
                           </dependencies>
                           """.trimIndent())
 
-    importProjectsWithErrors(myProjectPom, m1, m2)
+    importProjectsWithErrors(projectPom, m1, m2)
 
-    assertCompletionVariantsInclude(myProjectPom, RENDERING_TEXT, "m1", "m2")
-    assertCompletionVariantsInclude(myProjectPom, LOOKUP_STRING, "project-group:m1:1", "project-group:m2:1")
+    assertCompletionVariantsInclude(projectPom, RENDERING_TEXT, "m1", "m2")
+    assertCompletionVariantsInclude(projectPom, LOOKUP_STRING, "project-group:m1:1", "project-group:m2:1")
 
     WriteAction.runAndWait<IOException> { m1.delete(null) }
 
     configConfirmationForYesAnswer()
 
-    assertCompletionVariantsInclude(myProjectPom, RENDERING_TEXT, "m2")
-    assertCompletionVariantsInclude(myProjectPom, LOOKUP_STRING, "project-group:m2:1")
+    assertCompletionVariantsInclude(projectPom, RENDERING_TEXT, "m2")
+    assertCompletionVariantsInclude(projectPom, LOOKUP_STRING, "project-group:m2:1")
   }
 
   @Test
@@ -396,7 +398,9 @@ class MavenDependencyCompletionAndResolutionTest : MavenDomWithIndicesTestCase()
 
     val filePath = myIndicesFixture!!.repositoryHelper.getTestDataPath("local1/junit/junit/4.0/junit-4.0.pom")
     val f = LocalFileSystem.getInstance().refreshAndFindFileByPath(filePath)
-    assertResolved(myProjectPom, findPsiFile(f))
+    withContext(Dispatchers.EDT){
+      assertResolved(projectPom, findPsiFile(f))
+    }
   }
 
   @Test
@@ -404,7 +408,7 @@ class MavenDependencyCompletionAndResolutionTest : MavenDomWithIndicesTestCase()
     val filePath = myIndicesFixture!!.repositoryHelper.getTestDataPath("local1/org/example/1.0/example-1.0.pom")
 
     val relativePathUnixSeparator =
-      FileUtil.getRelativePath(File(myProjectRoot.getPath()), File(filePath))!!.replace("\\\\".toRegex(), "/")
+      FileUtil.getRelativePath(File(projectRoot.getPath()), File(filePath))!!.replace("\\\\".toRegex(), "/")
 
     createProjectPom("""<groupId>test</groupId>
 <artifactId>project</artifactId>
@@ -419,7 +423,9 @@ $relativePathUnixSeparator<caret></relativePath>
     )
 
     val f = LocalFileSystem.getInstance().refreshAndFindFileByPath(filePath)
-    assertResolved(myProjectPom, findPsiFile(f))
+    withContext(Dispatchers.EDT){
+      assertResolved(projectPom, findPsiFile(f))
+    }
   }
 
   @Test
@@ -448,12 +454,14 @@ $relativePathUnixSeparator<caret></relativePath>
 
     val filePath = myIndicesFixture!!.repositoryHelper.getTestDataPath("local1/junit/junit/4.0/junit-4.0.pom")
     val f = LocalFileSystem.getInstance().refreshAndFindFileByPath(filePath)
-    assertResolved(myProjectPom, findPsiFile(f))
+    withContext(Dispatchers.EDT){
+      assertResolved(projectPom, findPsiFile(f))
+    }
   }
 
   @Test
   fun testResolveLATESTDependency() = runBlocking {
-    val helper = MavenCustomRepositoryHelper(myDir, "local1")
+    val helper = MavenCustomRepositoryHelper(dir, "local1")
     val repoPath = helper.getTestDataPath("local1")
     repositoryPath = repoPath
 
@@ -486,7 +494,9 @@ $relativePathUnixSeparator<caret></relativePath>
     val filePath = myIndicesFixture!!.repositoryHelper.getTestDataPath("local1/junit/junit/4.0/junit-4.0.pom")
     val f = LocalFileSystem.getInstance().refreshAndFindFileByPath(filePath)
 
-    assertResolved(myProjectPom, findPsiFile(f))
+    withContext(Dispatchers.EDT){
+      assertResolved(projectPom, findPsiFile(f))
+    }
   }
 
   @Test
@@ -507,7 +517,10 @@ $relativePathUnixSeparator<caret></relativePath>
 
     val filePath = myIndicesFixture!!.repositoryHelper.getTestDataPath("local1/junit/junit/4.0/junit-4.0.pom")
     val f = LocalFileSystem.getInstance().refreshAndFindFileByPath(filePath)
-    assertResolved(myProjectPom, findPsiFile(f))
+
+    withContext(Dispatchers.EDT){
+      assertResolved(projectPom, findPsiFile(f))
+    }
   }
 
   @Test
@@ -526,7 +539,7 @@ $relativePathUnixSeparator<caret></relativePath>
                                        <version>1</version>
                                        """.trimIndent())
 
-    importProjects(myProjectPom, m1, m2)
+    importProjectsAsync(projectPom, m1, m2)
 
     createModulePom("m1",
                     """
@@ -542,7 +555,9 @@ $relativePathUnixSeparator<caret></relativePath>
                       </dependencies>
                       """.trimIndent())
 
-    assertResolved(m1, findPsiFile(m2))
+    withContext(Dispatchers.EDT){
+      assertResolved(m1, findPsiFile(m2))
+    }
   }
 
   @Test
@@ -564,7 +579,9 @@ $libPath</systemPath>
 </dependencies>
 """)
 
-    assertResolved(myProjectPom, findPsiFile(LocalFileSystem.getInstance().refreshAndFindFileByPath(libPath)))
+    withContext(Dispatchers.EDT){
+      assertResolved(projectPom, findPsiFile(LocalFileSystem.getInstance().refreshAndFindFileByPath(libPath)))
+    }
     checkHighlighting()
   }
 
@@ -630,7 +647,9 @@ $libPath</depPath>
 </dependencies>
 """)
 
-    assertResolved(myProjectPom, findPsiFile(LocalFileSystem.getInstance().refreshAndFindFileByPath(libPath)))
+    withContext(Dispatchers.EDT){
+      assertResolved(projectPom, findPsiFile(LocalFileSystem.getInstance().refreshAndFindFileByPath(libPath)))
+    }
     checkHighlighting()
   }
 
@@ -656,7 +675,7 @@ ${File(libPath).getParent()}</depDir>
 </dependencies>
 """)
 
-    assertCompletionVariants(myProjectPom, RENDERING_TEXT, "junit-4.0.jar")
+    assertCompletionVariants(projectPom, RENDERING_TEXT, "junit-4.0.jar")
   }
 
   @Test
@@ -678,7 +697,9 @@ $libPath<caret></systemPath>
 </dependencies>
 """)
 
-    assertResolved(myProjectPom, findPsiFile(LocalFileSystem.getInstance().refreshAndFindFileByPath(libPath)))
+    withContext(Dispatchers.EDT){
+      assertResolved(projectPom, findPsiFile(LocalFileSystem.getInstance().refreshAndFindFileByPath(libPath)))
+    }
     checkHighlighting()
   }
 
@@ -704,26 +725,28 @@ $libPath<caret></systemPath>
     val libPath = myIndicesFixture!!.repositoryHelper.getTestDataPath("local1/junit/junit/4.0/junit-4.0.jar")
     val libFile = LocalFileSystem.getInstance().refreshAndFindFileByPath(libPath)
 
-    val intentionAction = IntentionActionDelegate.unwrap(action)
+    val intentionAction = IntentionActionDelegate.unwrap(action!!)
     (intentionAction as ChooseFileIntentionAction).setFileChooser { arrayOf(libFile) }
     val xmlSettings =
-      CodeStyleSettingsManager.getInstance(myProject).getCurrentSettings().getCustomSettings(XmlCodeStyleSettings::class.java)
+      CodeStyleSettingsManager.getInstance(project).getCurrentSettings().getCustomSettings(XmlCodeStyleSettings::class.java)
 
     val prevValue = xmlSettings.XML_TEXT_WRAP
     try {
       // prevent file path from wrapping.
       xmlSettings.XML_TEXT_WRAP = CommonCodeStyleSettings.DO_NOT_WRAP
-      myFixture.launchAction(action)
+      fixture.launchAction(action)
     }
     finally {
       xmlSettings.XML_TEXT_WRAP = prevValue
       intentionAction.setFileChooser(null)
     }
 
-    val model = MavenDomUtil.getMavenDomProjectModel(myProject, myProjectPom)
-    val dep = model!!.getDependencies().getDependencies()[0]
+    withContext(Dispatchers.EDT) {
+      val model = MavenDomUtil.getMavenDomProjectModel(project, projectPom)
+      val dep = model!!.getDependencies().getDependencies()[0]
 
-    assertEquals(findPsiFile(libFile), dep.getSystemPath().getValue())
+      assertEquals(findPsiFile(libFile), dep.getSystemPath().getValue())
+    }
   }
 
   @Test
@@ -759,7 +782,7 @@ $libPath<caret></systemPath>
                           </dependencies>
                           """.trimIndent())
 
-    assertCompletionVariants(myProjectPom, RENDERING_TEXT, "jar", "test-jar", "pom", "ear", "ejb", "ejb-client", "war", "bundle",
+    assertCompletionVariants(projectPom, RENDERING_TEXT, "jar", "test-jar", "pom", "ear", "ejb", "ejb-client", "war", "bundle",
                              "jboss-har", "jboss-sar", "maven-plugin")
   }
 
@@ -795,7 +818,7 @@ $libPath<caret></systemPath>
                        </dependencies>
                        """.trimIndent())
 
-    assertCompletionVariants(myProjectPom, RENDERING_TEXT, "compile", "provided", "runtime", "test", "system")
+    assertCompletionVariants(projectPom, RENDERING_TEXT, "compile", "provided", "runtime", "test", "system")
   }
 
   @Test
@@ -1137,7 +1160,7 @@ $libPath<caret></systemPath>
                        </dependencies>
                        """.trimIndent())
 
-    assertCompletionVariants(myProjectPom, RENDERING_TEXT, "jmock")
+    assertCompletionVariants(projectPom, RENDERING_TEXT, "jmock")
   }
 
 
@@ -1246,12 +1269,14 @@ $libPath<caret></systemPath>
         </dependency>
       </dependencies>
       """.trimIndent())
-    importProjectWithErrors()
+    importProjectAsync()
 
-    val model = MavenDomUtil.getMavenDomModel(myProject, myProjectPom, MavenDomProjectModel::class.java)
+    withContext(Dispatchers.EDT) {
+      val model = MavenDomUtil.getMavenDomModel(project, projectPom, MavenDomProjectModel::class.java)
 
-    val dependency = MavenDependencyCompletionUtil.findManagedDependency(model, myProject, "org.example", "something")
-    assertNotNull(dependency)
-    assertEquals("42", dependency.getVersion().getStringValue())
+      val dependency = MavenDependencyCompletionUtil.findManagedDependency(model, project, "org.example", "something")
+      assertNotNull(dependency)
+      assertEquals("42", dependency.getVersion().getStringValue())
+    }
   }
 }

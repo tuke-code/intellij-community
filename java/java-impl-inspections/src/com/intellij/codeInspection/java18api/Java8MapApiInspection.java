@@ -42,7 +42,7 @@ import static com.siyeh.ig.psiutils.EquivalenceChecker.getCanonicalPsiEquivalenc
 import static com.siyeh.ig.psiutils.Java8MigrationUtils.*;
 import static com.siyeh.ig.psiutils.Java8MigrationUtils.MapCheckCondition.fromConditional;
 
-public class Java8MapApiInspection extends AbstractBaseJavaLocalInspectionTool {
+public final class Java8MapApiInspection extends AbstractBaseJavaLocalInspectionTool {
   private static final Logger LOG = Logger.getInstance(Java8MapApiInspection.class);
   public static final String SHORT_NAME = "Java8MapApi";
   private static final CallMatcher KEY_VALUE_GET_METHODS =
@@ -199,7 +199,7 @@ public class Java8MapApiInspection extends AbstractBaseJavaLocalInspectionTool {
       private static boolean hasMapUsages(@NotNull MapLoopCondition condition, @Nullable PsiExpression value) {
         return !VariableAccessUtils.getVariableReferences(condition.getMap(), value).stream()
           .map(ExpressionUtils::getCallForQualifier)
-          .allMatch(call -> condition.isValueAccess(call));
+          .allMatch(call -> call != null && condition.isValueAccess(call));
       }
 
       private static boolean isUsedAsReference(@NotNull PsiElement value, @NotNull MapLoopCondition condition) {

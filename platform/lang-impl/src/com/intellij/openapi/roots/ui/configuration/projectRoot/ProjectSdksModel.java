@@ -12,7 +12,6 @@ import com.intellij.openapi.project.DumbAwareAction;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.project.ProjectBundle;
 import com.intellij.openapi.projectRoots.*;
-import com.intellij.openapi.projectRoots.impl.ProjectJdkImpl;
 import com.intellij.openapi.projectRoots.impl.SdkConfigurationUtil;
 import com.intellij.openapi.roots.ProjectRootManager;
 import com.intellij.openapi.ui.MasterDetailsComponent;
@@ -85,7 +84,7 @@ public class ProjectSdksModel implements SdkModel {
 
       Sdk editableCopy;
       try {
-        editableCopy = (Sdk)sdk.clone();
+        editableCopy = sdk.clone();
       }
       catch (CloneNotSupportedException e) {
         LOG.error(e);
@@ -105,7 +104,7 @@ public class ProjectSdksModel implements SdkModel {
     final Sdk[] projectSdks = jdkTable.getAllJdks();
     for (Sdk sdk : projectSdks) {
       try {
-        Sdk editable = (Sdk)sdk.clone();
+        Sdk editable = sdk.clone();
         myProjectSdks.put(sdk, editable);
         SdkDownloadTracker.getInstance().registerEditableSdk(sdk, editable);
       }
@@ -468,8 +467,13 @@ public class ProjectSdksModel implements SdkModel {
   private static Sdk createSdkInternal(@NotNull SdkType type,
                                        @NotNull String newSdkName,
                                        @NotNull String home) {
-    final ProjectJdkImpl newJdk = new ProjectJdkImpl(newSdkName, type);
-    newJdk.setHomePath(home);
+    final Sdk newJdk = ProjectJdkTable.getInstance().createSdk(newSdkName, type);
+    SdkModificator sdkModificator = newJdk.getSdkModificator();
+    sdkModificator.setHomePath(home);
+    sdkModificator.setVersionString(type.getVersionString(home));
+    ApplicationManager.getApplication().runWriteAction(() -> {
+      sdkModificator.commitChanges();
+    });
     return newJdk;
   }
 
@@ -518,7 +522,7 @@ public class ProjectSdksModel implements SdkModel {
   public void doAdd(@NotNull Sdk newSdk, @Nullable java.util.function.Consumer<? super Sdk> updateTree) {
     myModified = true;
     try {
-      Sdk editableCopy = (Sdk)newSdk.clone();
+      Sdk editableCopy = newSdk.clone();
       myProjectSdks.put(newSdk, editableCopy);
       if (updateTree != null) {
         updateTree.accept(editableCopy);

@@ -17,10 +17,8 @@ import com.intellij.openapi.actionSystem.ex.CustomComponentAction
 import com.intellij.openapi.actionSystem.impl.ActionButton
 import com.intellij.openapi.actionSystem.impl.ActionToolbarImpl
 import com.intellij.openapi.application.EDT
-import com.intellij.openapi.components.serviceAsync
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.keymap.impl.ui.ActionsTreeUtil
-import com.intellij.openapi.progress.runBlockingCancellable
 import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.util.IconLoader
 import com.intellij.openapi.util.SystemInfoRt
@@ -34,6 +32,7 @@ import com.intellij.platform.diagnostic.telemetry.impl.span
 import com.intellij.ui.*
 import com.intellij.ui.components.panels.HorizontalLayout
 import com.intellij.ui.mac.touchbar.TouchbarSupport
+import com.intellij.util.concurrency.annotations.RequiresBlockingContext
 import com.intellij.util.containers.ContainerUtil
 import com.intellij.util.ui.JBInsets
 import com.intellij.util.ui.JBUI
@@ -43,7 +42,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.withContext
-import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.ApiStatus.Internal
 import java.awt.*
 import java.awt.event.MouseEvent
@@ -81,7 +79,7 @@ private class MenuButtonInToolbarMainToolbarFlavor(coroutineScope: CoroutineScop
 
 private data object DefaultMainToolbarFlavor : MainToolbarFlavor
 
-@ApiStatus.Internal
+@Internal
 class MainToolbar(
   private val coroutineScope: CoroutineScope,
   private val frame: JFrame,
@@ -202,7 +200,7 @@ class MainToolbar(
 
   override fun paintComponent(g: Graphics?) {
     super.paintComponent(g)
-    if (!isToolbarInHeader()) {
+    if ((frame.rootPane as? IdeRootPane)?.isToolbarInHeader() == false) {
       ProjectWindowCustomizerService.getInstance().paint(frame, this, g as Graphics2D)
     }
   }
@@ -292,12 +290,13 @@ private fun addWidget(widget: JComponent, parent: JComponent, position: Horizont
 }
 
 internal class MyActionToolbarImpl(group: ActionGroup, customizationGroup: ActionGroup?)
-  : ActionToolbarImpl(ActionPlaces.MAIN_TOOLBAR, group, true, false, true, customizationGroup, MAIN_TOOLBAR_ID) {
+  : ActionToolbarImpl(ActionPlaces.MAIN_TOOLBAR, group, true, false, false) {
   private val iconUpdater = HeaderIconUpdater()
 
   init {
     updateFont()
     ClientProperty.put(this, IdeBackgroundUtil.NO_BACKGROUND, true)
+    installPopupHandler(true, customizationGroup, MAIN_TOOLBAR_ID)
   }
 
   override fun updateActionsOnAdd() {
@@ -414,18 +413,23 @@ internal class MyActionToolbarImpl(group: ActionGroup, customizationGroup: Actio
 
 internal suspend fun computeMainActionGroups(): List<Pair<ActionGroup, HorizontalLayout.Group>> {
   return span("toolbar action groups computing") {
-    serviceAsync<ActionManager>()
-    val customActionSchema = CustomActionsSchema.getInstanceAsync()
-    computeMainActionGroups(customActionSchema)
+    computeMainActionGroups(CustomActionsSchema.getInstanceAsync())
   }
 }
 
-internal fun computeMainActionGroups(customActionSchema: CustomActionsSchema): List<Pair<ActionGroup, HorizontalLayout.Group>> {
-  return sequenceOf(
-    GroupInfo("MainToolbarLeft", ActionsTreeUtil.getMainToolbarLeft(), HorizontalLayout.Group.LEFT),
-    GroupInfo("MainToolbarCenter", ActionsTreeUtil.getMainToolbarCenter(), HorizontalLayout.Group.CENTER),
-    GroupInfo("MainToolbarRight", ActionsTreeUtil.getMainToolbarRight(), HorizontalLayout.Group.RIGHT)
-  )
+private suspend fun computeMainActionGroups(customActionSchema: CustomActionsSchema): List<Pair<ActionGroup, HorizontalLayout.Group>> {
+  val result = ArrayList<Pair<ActionGroup, HorizontalLayout.Group>>(3)
+  for (info in getMainToolbarGroups()) {
+    customActionSchema.getCorrectedActionAsync(info.id, info.name)?.let {
+      result.add(it to info.align)
+    }
+  }
+  return result
+}
+
+@RequiresBlockingContext
+internal fun blockingComputeMainActionGroups(customActionSchema: CustomActionsSchema): List<Pair<ActionGroup, HorizontalLayout.Group>> {
+  return getMainToolbarGroups()
     .mapNotNull { info ->
       customActionSchema.getCorrectedAction(info.id, info.name)?.let {
         it to info.align
@@ -434,17 +438,25 @@ internal fun computeMainActionGroups(customActionSchema: CustomActionsSchema): L
     .toList()
 }
 
-internal fun isToolbarInHeader(): Boolean {
+private fun getMainToolbarGroups(): Sequence<GroupInfo> {
+  return sequenceOf(
+    GroupInfo("MainToolbarLeft", ActionsTreeUtil.getMainToolbarLeft(), HorizontalLayout.Group.LEFT),
+    GroupInfo("MainToolbarCenter", ActionsTreeUtil.getMainToolbarCenter(), HorizontalLayout.Group.CENTER),
+    GroupInfo("MainToolbarRight", ActionsTreeUtil.getMainToolbarRight(), HorizontalLayout.Group.RIGHT)
+  )
+}
+
+internal fun isToolbarInHeader(isFullscreen: Boolean): Boolean {
   if (IdeFrameDecorator.isCustomDecorationAvailable) {
     if (SystemInfoRt.isMac) {
       return true
     }
     val settings = UISettings.getInstance()
-    if (SystemInfoRt.isWindows && !settings.separateMainMenu && settings.mergeMainMenuWithWindowTitle) {
+    if (SystemInfoRt.isWindows && !settings.separateMainMenu && settings.mergeMainMenuWithWindowTitle && !isFullscreen) {
       return true
     }
   }
-  if (IdeRootPane.hideNativeLinuxTitle && !UISettings.getInstance().separateMainMenu) {
+  if (IdeRootPane.hideNativeLinuxTitle && !UISettings.getInstance().separateMainMenu && !isFullscreen) {
     return true
   }
   return false
@@ -469,23 +481,21 @@ private class HeaderIconUpdater {
 private data class GroupInfo(@JvmField val id: String, @JvmField val name: String, @JvmField val align: HorizontalLayout.Group)
 
 @Internal
-@Suppress("HardCodedStringLiteral")
+@Suppress("HardCodedStringLiteral", "ActionPresentationInstantiatedInCtor")
 class RemoveMainToolbarActionsAction private constructor() : DumbAwareAction("Remove Actions From Main Toolbar") {
   override fun actionPerformed(e: AnActionEvent) {
-    runBlockingCancellable {
-      val schema = CustomActionsSchema.getInstanceAsync()
-      val groups = computeMainActionGroups(schema)
+    val schema = CustomActionsSchema.getInstance()
+    val groups = blockingComputeMainActionGroups(schema)
 
-      val mainToolbarName = schema.getDisplayName(MAIN_TOOLBAR_ID)!!
-      val mainToolbarPath = listOf("root", mainToolbarName)
+    val mainToolbarName = schema.getDisplayName(MAIN_TOOLBAR_ID)!!
+    val mainToolbarPath = listOf("root", mainToolbarName)
 
-      for (group in groups) {
-        val actionsToRemove = group.first.getChildren(null)
-        val fromPath = ArrayList(mainToolbarPath + group.first.templatePresentation.text)
-        for (action in actionsToRemove) {
-          val actionId = ActionManager.getInstance().getId(action)
-          schema.addAction(ActionUrl(fromPath, actionId, ActionUrl.DELETED, 0))
-        }
+    for (group in groups) {
+      val actionsToRemove = group.first.getChildren(null)
+      val fromPath = ArrayList(mainToolbarPath + group.first.templatePresentation.text)
+      for (action in actionsToRemove) {
+        val actionId = ActionManager.getInstance().getId(action)
+        schema.addAction(ActionUrl(fromPath, actionId, ActionUrl.DELETED, 0))
       }
     }
 
@@ -498,8 +508,9 @@ class RemoveMainToolbarActionsAction private constructor() : DumbAwareAction("Re
 }
 
 private fun schemaChanged() {
-  CustomActionsSchema.getInstance().initActionIcons()
-  CustomActionsSchema.setCustomizationSchemaForCurrentProjects()
+  val customActionsSchema = CustomActionsSchema.getInstance()
+  customActionsSchema.initActionIcons()
+  customActionsSchema.setCustomizationSchemaForCurrentProjects()
   if (SystemInfoRt.isMac) {
     TouchbarSupport.reloadAllActions()
   }

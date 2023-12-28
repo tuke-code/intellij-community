@@ -75,7 +75,7 @@ public class JavaDifferentiateStrategy extends JvmDifferentiateStrategyImpl {
           msg.append("Possibly duplicated classes in the same compilation chunk; Scheduling for recompilation sources: ");
           for (NodeSource candidate : candidates) {
             context.affectNodeSource(candidate);
-            msg.append(candidate.getPath()).append("; ");
+            msg.append(candidate).append("; ");
           }
           debug(msg.toString());
           continue; // if duplicates are found, do not perform further checks for classes with the same short name
@@ -194,7 +194,7 @@ public class JavaDifferentiateStrategy extends JvmDifferentiateStrategyImpl {
         if (!removedTargets.isEmpty()) {
           debug("Removed some annotation targets, adding annotation query");
           TypeRepr.ClassType classType = new TypeRepr.ClassType(changedClass.getName());
-          context.affectUsage((node, usage) -> {
+          context.affectUsage(asIterable(changedClass.getReferenceID()), (node, usage) -> {
             if (usage instanceof AnnotationUsage) {
               AnnotationUsage annotUsage = (AnnotationUsage)usage;
               if (classType.equals(annotUsage.getClassType())) {
@@ -334,7 +334,7 @@ public class JavaDifferentiateStrategy extends JvmDifferentiateStrategyImpl {
           debug("Class is annotation, default value is removed => adding annotation query");
           String argName = changedMethod.getName();
           TypeRepr.ClassType annotType = new TypeRepr.ClassType(changedClass.getName());
-          context.affectUsage((node, usage) -> {
+          context.affectUsage(asIterable(changedClass.getReferenceID()), (node, usage) -> {
             if (usage instanceof AnnotationUsage) {
               // need to find annotation usages that do not use arguments this annotation uses
               AnnotationUsage au = (AnnotationUsage)usage;
@@ -572,11 +572,10 @@ public class JavaDifferentiateStrategy extends JvmDifferentiateStrategyImpl {
 
       if (!isEmpty(addedMethod.getArgTypes()) && !present.hasOverriddenMethods(changedClass, addedMethod)) {
         debug("Conservative case on overriding methods, affecting method usages");
-        context.affectUsage(addedMethod.createUsageQuery(changedClass.getReferenceID()));
+        context.affectUsage(asIterable(changedClass.getReferenceID()), addedMethod.createUsageQuery(changedClass.getReferenceID()));
         if (!addedMethod.isConstructor()) { // do not propagate constructors access, since constructors are always concrete and not accessible via references to subclasses
           for (JvmNodeReferenceID id : propagated) {
-            context.affectUsage(new AffectionScopeMetaUsage(id));
-            context.affectUsage(addedMethod.createUsageQuery(id));
+            context.affectUsage(asIterable(id), addedMethod.createUsageQuery(id));
           }
         }
       }
@@ -631,7 +630,7 @@ public class JavaDifferentiateStrategy extends JvmDifferentiateStrategyImpl {
           }))) {
             if (future.isMethodVisible(outerClass, addedMethod)  || future.inheritsFromLibraryClass(outerClass)) {
               for (NodeSource source : filter(sources, context.getParams().affectionFilter()::test)) {
-                debug("Affecting file due to local overriding: ", source.getPath());
+                debug("Affecting file due to local overriding: ", source);
                 context.affectNodeSource(source);
               }
             }
@@ -687,13 +686,9 @@ public class JavaDifferentiateStrategy extends JvmDifferentiateStrategyImpl {
       if (!addedField.isPrivate() && addedField.isStatic()) {
         affectStaticMemberOnDemandUsages(context, subClass, Collections.emptyList());
       }
-      else {
-        // ensure analysis scope includes classes that depend on the subclass
-        context.affectUsage(new AffectionScopeMetaUsage(subClass));
-      }
     }
 
-    context.affectUsage((n, u) -> {
+    context.affectUsage(changedClassWithSubclasses, (n, u) -> {
       // affect all clients that access fields with the same name via subclasses,
       // if the added field is not visible to the client
       if (!(u instanceof FieldUsage) || !(n instanceof JvmClass)) {
@@ -977,16 +972,16 @@ public class JavaDifferentiateStrategy extends JvmDifferentiateStrategyImpl {
     for (NodeSource source : filter(context.getGraph().getSources(clsId), affectionFilter::test)) {
       if (forceAffect || !context.isCompiled(source) && !deletedSources.contains(source)) {
         context.affectNodeSource(source);
-        debug(affectReason, source.getPath());
+        debug(affectReason, source);
       }
     }
   }
 
   private void affectModule(DifferentiateContext context, Utils utils, JvmModule mod) {
     debug("Affecting module ", mod.getName());
-    for (NodeSource source : filter(utils.getNodeSources(mod.getReferenceID()), context.getParams().affectionFilter()::test)) {
+    for (NodeSource source : utils.getNodeSources(mod.getReferenceID())) {
       context.affectNodeSource(source);
-      debug("Affected source ", source.getPath());
+      debug("Affected source ", source);
     }
   }
 
@@ -1009,10 +1004,4 @@ public class JavaDifferentiateStrategy extends JvmDifferentiateStrategyImpl {
     }
   }
 
-  @Override
-  protected void debug(String message) {
-    if (isDebugEnabled()) {
-      super.debug("JavaStrategy: " + message);
-    }
-  }
 }

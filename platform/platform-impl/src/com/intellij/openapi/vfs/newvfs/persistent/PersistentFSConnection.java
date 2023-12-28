@@ -8,6 +8,7 @@ import com.intellij.notification.NotificationGroupManager;
 import com.intellij.openapi.Forceable;
 import com.intellij.openapi.actionSystem.ActionManager;
 import com.intellij.openapi.actionSystem.AnAction;
+import com.intellij.openapi.application.Application;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.util.IntRef;
@@ -96,7 +97,7 @@ public final class PersistentFSConnection {
 
   private final @NotNull PersistentFSPaths persistentFSPaths;
 
-  private final @NotNull AbstractAttributesStorage attributesStorage;
+  private final @NotNull VFSAttributesStorage attributesStorage;
   private final @NotNull VFSContentStorage contentStorage;
 
   private final @NotNull PersistentFSRecordsStorage records;
@@ -122,7 +123,7 @@ public final class PersistentFSConnection {
   PersistentFSConnection(@NotNull PersistentFSPaths paths,
                          @NotNull PersistentFSRecordsStorage records,
                          @NotNull ScannableDataEnumeratorEx<String> names,
-                         @NotNull AbstractAttributesStorage attributes,
+                         @NotNull VFSAttributesStorage attributes,
                          @NotNull VFSContentStorage contents,
                          @NotNull SimpleStringPersistentEnumerator enumeratedAttributes,
                          @Nullable VfsLogEx vfsLog,
@@ -157,7 +158,7 @@ public final class PersistentFSConnection {
     return InterceptorInjection.INSTANCE.injectInContents(contents, contentInterceptors);
   }
 
-  private static AbstractAttributesStorage wrapAttributes(AbstractAttributesStorage attributes, List<ConnectionInterceptor> interceptors) {
+  private static VFSAttributesStorage wrapAttributes(VFSAttributesStorage attributes, List<ConnectionInterceptor> interceptors) {
     var attributesInterceptors = interceptors.stream()
       .filter(AttributesInterceptor.class::isInstance)
       .map(AttributesInterceptor.class::cast)
@@ -173,18 +174,21 @@ public final class PersistentFSConnection {
     return InterceptorInjection.INSTANCE.injectInRecords(records, recordsInterceptors);
   }
 
-  @Nullable VfsLogEx getVfsLog() { return vfsLog; }
+  @Nullable
+  VfsLogEx getVfsLog() { return vfsLog; }
 
   @NotNull("Vfs must be initialized")
   SimpleStringPersistentEnumerator getEnumeratedAttributes() {
     return enumeratedAttributes;
   }
 
-  @NotNull VFSContentStorage getContents() {
+  @NotNull
+  VFSContentStorage getContents() {
     return contentStorage;
   }
 
-  @NotNull AbstractAttributesStorage getAttributes() {
+  @NotNull
+  VFSAttributesStorage getAttributes() {
     return attributesStorage;
   }
 
@@ -308,7 +312,7 @@ public final class PersistentFSConnection {
 
   static void closeStorages(@Nullable PersistentFSRecordsStorage records,
                             @Nullable ScannableDataEnumeratorEx<String> names,
-                            @Nullable AbstractAttributesStorage attributes,
+                            @Nullable VFSAttributesStorage attributes,
                             @Nullable VFSContentStorage contents,
                             @Nullable VfsLogEx vfsLog) throws IOException {
     if (names instanceof Closeable) {//implies != null
@@ -334,10 +338,10 @@ public final class PersistentFSConnection {
 
   int getAttributeId(@NotNull String attributeId) {
     int enumeratedAttributeId = enumeratedAttributes.enumerate(attributeId);
-    if (enumeratedAttributeId > AbstractAttributesStorage.MAX_ATTRIBUTE_ID) {
+    if (enumeratedAttributeId > VFSAttributesStorage.MAX_ATTRIBUTE_ID) {
       throw new IllegalStateException(
         "attribute[" + attributeId + "] assigned id[" + enumeratedAttributeId + "] which is above max " +
-        AbstractAttributesStorage.MAX_ATTRIBUTE_ID +
+        VFSAttributesStorage.MAX_ATTRIBUTE_ID +
         ". Current list of attributes: " + enumeratedAttributes.dumpToString()
       );
     }
@@ -348,14 +352,15 @@ public final class PersistentFSConnection {
     try {
       int corruptions = corruptionsDetected.incrementAndGet();
       records.setErrorsAccumulated(corruptions);
+      Application app = ApplicationManager.getApplication();
       if (corruptions == 1) {
-        if (!ApplicationManager.getApplication().isHeadlessEnvironment()) {
+        if (app != null && !app.isHeadlessEnvironment()) {
           showCorruptionNotification(/*insist: */ false);
         }
         doForce();//forces ErrorsAccumulated to be written on disk
       }
       else if (corruptions % INSIST_TO_RESTART_AFTER_ERRORS_COUNT == INSIST_TO_RESTART_AFTER_ERRORS_COUNT - 1) {
-        if (!ApplicationManager.getApplication().isHeadlessEnvironment()) {
+        if (app != null && !app.isHeadlessEnvironment()) {
           showCorruptionNotification(/*insist: */ true);
         }
       }
@@ -424,10 +429,10 @@ public final class PersistentFSConnection {
     assert id > 0 : id;
   }
 
-  /**@throws IndexOutOfBoundsException if fileId is outside already allocated file ids */
-  void ensureFileIdIsValid(int fileId) throws IndexOutOfBoundsException{
+  /** @throws IndexOutOfBoundsException if fileId is outside already allocated file ids */
+  void ensureFileIdIsValid(int fileId) throws IndexOutOfBoundsException {
     int maxAllocatedID = records.maxAllocatedID();
-    if (fileId <= 0 || fileId > maxAllocatedID) {
+    if (fileId <= FSRecords.NULL_FILE_ID || fileId > maxAllocatedID) {
       throw new IndexOutOfBoundsException("fileId[" + fileId + "] is outside valid/allocated ids range [1.." + maxAllocatedID + "]");
     }
   }

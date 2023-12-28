@@ -122,24 +122,19 @@ public class GradleProjectResolver implements ExternalSystemProjectResolver<Grad
         throw new ExternalSystemException("Unsupported project resolver policy: " + resolverPolicy.getClass().getName());
       }
     }
+
+    // Create project preview model w/o request to gradle, there are two main reasons for the it:
+    // * Slow project open - even the simplest project info provided by gradle can be gathered too long (mostly because of new gradle distribution download and downloading build script dependencies)
+    // * Ability to open  an invalid projects (e.g. with errors in build scripts)
     if (isPreviewMode) {
-      // Create project preview model w/o request to gradle, there are two main reasons for the it:
-      // * Slow project open - even the simplest project info provided by gradle can be gathered too long (mostly because of new gradle distribution download and downloading build script dependencies)
-      // * Ability to open  an invalid projects (e.g. with errors in build scripts)
-      String projectName = new File(projectPath).getName();
-      ProjectData projectData = new ProjectData(GradleConstants.SYSTEM_ID, projectName, projectPath, projectPath);
-      DataNode<ProjectData> projectDataNode = new DataNode<>(ProjectKeys.PROJECT, projectData, null);
+      GradlePreviewCustomizer customizer = GradlePreviewCustomizer.Companion.getCustomizer(projectPath);
 
-      final String ideProjectPath = settings == null ? null : settings.getIdeProjectPath();
-      final String mainModuleFileDirectoryPath = ideProjectPath == null ? projectPath : ideProjectPath;
+      if (customizer != null) {
+        DataNode<ProjectData> previewRoot = customizer.perform(projectPath, settings);
+        if (previewRoot != null) return previewRoot;
+      }
 
-      ModuleData moduleData = new ModuleData(projectName, GradleConstants.SYSTEM_ID, getDefaultModuleTypeId(),
-                                             projectName, mainModuleFileDirectoryPath, projectPath);
-      GradleModuleDataKt.setGradleIdentityPath(moduleData, ":");
-      projectDataNode
-        .createChild(ProjectKeys.MODULE, moduleData)
-        .createChild(ProjectKeys.CONTENT_ROOT, new ContentRootData(GradleConstants.SYSTEM_ID, projectPath));
-      return projectDataNode;
+      return DefaultGradlePreviewCustomizer.INSTANCE.perform(projectPath, settings);
     }
 
     DefaultProjectResolverContext resolverContext =
@@ -231,7 +226,7 @@ public class GradleProjectResolver implements ExternalSystemProjectResolver<Grad
       executionSettings = new GradleExecutionSettings(null, null, DistributionType.BUNDLED, false);
     }
 
-    configureExecutionArgumentsAndVmOptions(executionSettings, resolverCtx, isBuildSrcProject);
+    configureExecutionArgumentsAndVmOptions(executionSettings, resolverCtx, gradleVersion, isBuildSrcProject);
     final Set<Class<?>> toolingExtensionClasses = new HashSet<>();
     for (GradleProjectResolverExtension resolverExtension = tracedResolverChain;
          resolverExtension != null;
@@ -565,13 +560,15 @@ public class GradleProjectResolver implements ExternalSystemProjectResolver<Grad
 
   private static void configureExecutionArgumentsAndVmOptions(@NotNull GradleExecutionSettings executionSettings,
                                                               @NotNull DefaultProjectResolverContext resolverCtx,
+                                                              @Nullable GradleVersion gradleVersion,
                                                               boolean isBuildSrcProject) {
     executionSettings.withArgument("-Didea.gradle.download.sources=" + executionSettings.isDownloadSources());
     executionSettings.withArgument("-Didea.sync.active=true");
     if (resolverCtx.isResolveModulePerSourceSet()) {
       executionSettings.withArgument("-Didea.resolveSourceSetDependencies=true");
     }
-    if (executionSettings.isParallelModelFetch() && isGradleVersionAtLeast("7.4", resolverCtx)) {
+    GradleVersion usedGradleVersion = Objects.requireNonNullElseGet(gradleVersion, GradleVersion::current);
+    if (executionSettings.isParallelModelFetch() && usedGradleVersion.compareTo(GradleVersion.version("7.4")) >= 0) {
       executionSettings.withArgument("-Didea.parallelModelFetch.enabled=true");
     }
     if (!isBuildSrcProject) {
@@ -593,14 +590,6 @@ public class GradleProjectResolver implements ExternalSystemProjectResolver<Grad
       // collect extra command-line arguments
       executionSettings.withArguments(extension.getExtraCommandLineArgs());
     });
-  }
-
-  private static boolean isGradleVersionAtLeast(@NotNull String requiredVersion, @NotNull DefaultProjectResolverContext ctx) {
-    String versionStr = ctx.getProjectGradleVersion();
-    if (versionStr != null) {
-      return GradleVersion.version(versionStr).compareTo(GradleVersion.version(requiredVersion)) >= 0;
-    }
-    return false;
   }
 
   @NotNull

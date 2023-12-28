@@ -20,8 +20,6 @@ import kotlinx.coroutines.runBlocking
 import org.junit.Test
 
 class MavenPackagingCompletionTest : MavenDomTestCase() {
-  override fun runInDispatchThread() = true
-
   @Test
   fun testVariants() = runBlocking {
     importProjectAsync("""
@@ -37,7 +35,7 @@ class MavenPackagingCompletionTest : MavenDomTestCase() {
                        <packaging><caret></packaging>
                        """.trimIndent())
 
-    assertCompletionVariants(myProjectPom, "jar", "pom", "war", "ejb", "ejb-client", "ear", "bundle", "maven-plugin")
+    assertCompletionVariants(projectPom, "jar", "pom", "war", "ejb", "ejb-client", "ear", "bundle", "maven-plugin")
   }
 
   @Test

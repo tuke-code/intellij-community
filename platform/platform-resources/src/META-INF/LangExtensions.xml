@@ -221,10 +221,6 @@
 
     <pathMacroFilter implementation="com.intellij.find.impl.FindInProjectSettingsBase$FindInProjectPathMacroFilter"/>
 
-    <applicationService serviceInterface="com.intellij.openapi.roots.impl.libraries.ApplicationLibraryTable"
-                        serviceImplementation="com.intellij.openapi.roots.impl.libraries.ExportableApplicationLibraryTable"
-                        overrides="true"/>
-
     <applicationService serviceInterface="com.intellij.psi.codeStyle.CodeStyleSchemes"
                         serviceImplementation="com.intellij.psi.impl.source.codeStyle.PersistableCodeStyleSchemes"/>
 
@@ -700,7 +696,7 @@
     <applicationService serviceInterface="com.intellij.ide.navigationToolbar.NavBarModelBuilder"
                         serviceImplementation="com.intellij.ide.navigationToolbar.NavBarModelBuilderImpl"/>
     <applicationService serviceInterface="com.intellij.modcommand.ModCommandExecutor"
-                        serviceImplementation="com.intellij.lang.impl.modcommand.ModCommandExecutorImpl"/>
+                        serviceImplementation="com.intellij.lang.impl.modcommand.ModCommandExecutorImpl" overrides="true"/>
 
     <navbar.item.provider implementation="com.intellij.ide.navbar.impl.DefaultNavBarItemProvider" order="last"/>
 
@@ -868,6 +864,8 @@
                                implementationClass="com.intellij.codeInsight.codeVision.ui.renderers.providers.AdditionalCodeVisionEntryPainter"/>
     <codeVisionPainterProvider forClass="com.intellij.codeInsight.codeVision.ui.model.RichTextCodeVisionEntry"
                                implementationClass="com.intellij.codeInsight.codeVision.ui.renderers.providers.RichTextCodeVisionEntryPainter"/>
+    <codeVisionPainterProvider forClass="com.intellij.codeInsight.codeVision.ui.model.ZombieCodeVisionEntry"
+                               implementationClass="com.intellij.codeInsight.codeVision.ui.renderers.providers.ZombieCodeVisionEntryPainter"/>
 
     <optionsApplicabilityFilter implementation="com.intellij.application.options.GlobalOptionsApplicabilityFilter" order="last"
                                 id="global"/>
@@ -1027,6 +1025,7 @@
     <applicationService serviceImplementation="com.intellij.ide.projectView.impl.ProjectViewSharedSettings"/>
     <projectService serviceInterface="com.intellij.ide.projectView.ProjectView"
                     serviceImplementation="com.intellij.ide.projectView.impl.ProjectViewImpl"/>
+    <pathMacroFilter implementation="com.intellij.ide.projectView.impl.ProjectViewPathMacroFilter"/>
     <projectService serviceImplementation="com.intellij.ide.projectView.impl.ProjectViewState"/>
     <projectService serviceInterface="com.intellij.execution.ui.RunnerLayoutUi$Factory"
                     serviceImplementation="com.intellij.execution.ui.layout.impl.RunnerLayoutUiFactoryImpl"/>
@@ -1416,6 +1415,13 @@
                             order="last"/>
     <statusBarWidgetFactory id="Memory" implementation="com.intellij.openapi.wm.impl.status.MemoryIndicatorWidgetFactory"
                             order="last"/>
+    <registryKey key="idea.memory.usage.tooltip.show.more"
+                 description="Show additional info in a memory-usage bar's tooltip"
+                 defaultValue="true"/>
+    <registryKey key="idea.memory.usage.show.total.memory.estimation"
+                 description="Show total memory usage estimation (instead of -Xmx) info in a memory-usage bar"
+                 defaultValue="true"/>
+
     <statusBarWidgetFactory id="settingsEntryPointWidget" implementation="com.intellij.ide.actions.SettingsEntryPointAction$StatusBarManager"
                             order="last"/>
     <statusBarWidgetFactory id="SmartModeIndicator" implementation="com.intellij.openapi.wm.impl.status.SmartModeIndicatorWidgetFactory"/>
@@ -1462,6 +1468,11 @@
       nameKey="settings.export.inspection.profile.xml"
       schemeClass="com.intellij.codeInspection.ex.InspectionProfileModifiableModel"
       implementationClass="com.intellij.application.options.schemes.SerializableSchemeExporter"/>
+    <schemeImporter
+      nameBundle="messages.ApplicationBundle"
+      nameKey="settings.import.inspection.profile.xml"
+      schemeClass="com.intellij.codeInspection.ex.InspectionProfileModifiableModel"
+      implementationClass="com.intellij.profile.codeInspection.ui.InspectionProfileImporter"/>
 
     <nonProjectFileWritingAccessExtension implementation="com.intellij.ide.actions.EditCustomPropertiesAction$AccessExtension"/>
     <nonProjectFileWritingAccessExtension implementation="com.intellij.ide.actions.EditCustomVmOptionsAction$AccessExtension"/>
@@ -1658,6 +1669,8 @@
                        key="inspection.incorrect.formatting.notification.group"/>
 
     <codeInsight.lineMarkerProvider language="" implementationClass="com.intellij.codeInsight.documentation.render.DocRenderDummyLineMarkerProvider"/>
+    <platform.backend.documentation.inlineDocumentationProvider id="defaultInlineDocumentationProvider"
+      implementation="com.intellij.codeInsight.documentation.render.PsiInlineDocumentationProvider"/>
 
     <psi.treeChangeListener implementation="com.intellij.openapi.fileEditor.impl.FileEditorPsiTreeChangeListener"/>
 

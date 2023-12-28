@@ -64,10 +64,6 @@ abstract class ClientSessionImpl(
     sessionConstructorMethodType,
   ).addAll(super.supportedSignaturesOfLightServiceConstructors)
 
-  fun registerServices() {
-    registerComponents()
-  }
-
   fun preloadServices(syncScope: CoroutineScope) {
     assert(containerState.get() == ContainerState.PRE_INIT)
     val exceptionHandler = CoroutineExceptionHandler { _, exception ->
@@ -152,6 +148,8 @@ abstract class ClientSessionImpl(
 
   override val componentStore: IComponentStore
     get() = sharedComponentManager.componentStore
+
+  final override suspend fun _getComponentStore(): IComponentStore = componentStore
 
   @Deprecated("sessions don't have their own message bus", level = DeprecationLevel.ERROR)
   final override fun getMessageBus(): MessageBus {

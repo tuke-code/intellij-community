@@ -6,7 +6,6 @@ import com.intellij.formatting.Block;
 import com.intellij.formatting.Wrap;
 import com.intellij.formatting.WrapType;
 import com.intellij.lang.ASTNode;
-import com.intellij.openapi.project.DumbService;
 import com.intellij.psi.*;
 import com.intellij.psi.codeStyle.CommonCodeStyleSettings;
 import com.intellij.psi.codeStyle.JavaCodeStyleSettings;
@@ -18,15 +17,12 @@ import com.intellij.psi.impl.source.tree.ElementType;
 import com.intellij.psi.impl.source.tree.JavaElementType;
 import com.intellij.psi.tree.IElementType;
 import com.intellij.psi.tree.TokenSet;
-import com.intellij.psi.util.PsiTreeUtil;
 import com.intellij.util.ArrayUtil;
 import com.intellij.util.containers.ContainerUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
-
-import static com.intellij.psi.impl.PsiImplUtil.isTypeAnnotation;
 
 public final class JavaFormatterUtil {
   /**
@@ -263,7 +259,6 @@ public final class JavaFormatterUtil {
       if (role == ChildRole.CLOSING_SEMICOLON) return null;
       return suggestedWrap;
     }
-
     else if (nodeType == JavaElementType.REFERENCE_EXPRESSION) {
       if (role == ChildRole.DOT) {
         return reservedWrapsProvider.getReservedWrap(JavaElementType.REFERENCE_EXPRESSION);
@@ -292,15 +287,14 @@ public final class JavaFormatterUtil {
       if (prev != null && prev.getElementType() == JavaElementType.MODIFIER_LIST) {
         ASTNode last = prev.getLastChildNode();
         if (last != null && last.getElementType() == JavaElementType.ANNOTATION) {
-          if (isTypeAnnotationOrFalseIfDumb(last) ||
-              javaSettings.DO_NOT_WRAP_AFTER_SINGLE_ANNOTATION && isModifierListWithSingleAnnotation(prev, JavaElementType.FIELD) ||
+          if (javaSettings.DO_NOT_WRAP_AFTER_SINGLE_ANNOTATION && isModifierListWithSingleAnnotation(prev, JavaElementType.FIELD) ||
               javaSettings.DO_NOT_WRAP_AFTER_SINGLE_ANNOTATION_IN_PARAMETER && isModifierListWithSingleAnnotation(prev, JavaElementType.PARAMETER) ||
               isAnnotationAfterKeyword(last)
           ) {
             return Wrap.createWrap(WrapType.NONE, false);
           }
           else {
-            return Wrap.createWrap(getWrapType(getAnnotationWrapType(parent, child, settings)), true);
+            return Wrap.createWrap(getWrapType(getAnnotationWrapType(parent, child, settings, javaSettings)), true);
           }
         }
       }
@@ -315,13 +309,7 @@ public final class JavaFormatterUtil {
           return null;
         }
 
-        if (isTypeAnnotationOrFalseIfDumb(child)) {
-          if (prev == null || prev.getElementType() != JavaElementType.ANNOTATION || isTypeAnnotationOrFalseIfDumb(prev)) {
-            return Wrap.createWrap(WrapType.NONE, false);
-          }
-        }
-
-        return Wrap.createWrap(getWrapType(getAnnotationWrapType(parent.getTreeParent(), child, settings)), true);
+        return Wrap.createWrap(getWrapType(getAnnotationWrapType(parent.getTreeParent(), child, settings, javaSettings)), true);
       }
       else if (childType == JavaTokenType.END_OF_LINE_COMMENT) {
         return Wrap.createWrap(WrapType.NORMAL, true);
@@ -332,7 +320,7 @@ public final class JavaFormatterUtil {
         if (javaSettings.DO_NOT_WRAP_AFTER_SINGLE_ANNOTATION && isModifierListWithSingleAnnotation(parent, JavaElementType.FIELD)) {
           return Wrap.createWrap(WrapType.NONE, false);
         }
-        Wrap wrap = Wrap.createWrap(getWrapType(getAnnotationWrapType(parent.getTreeParent(), child, settings)), true);
+        Wrap wrap = Wrap.createWrap(getWrapType(getAnnotationWrapType(parent.getTreeParent(), child, settings, javaSettings)), true);
         putPreferredWrapInParentBlock(reservedWrapsProvider, wrap);
         return wrap;
       }
@@ -438,14 +426,6 @@ public final class JavaFormatterUtil {
     return prev != null && prev.getElementType() != JavaElementType.BLOCK_STATEMENT;
   }
 
-  private static boolean isTypeAnnotationOrFalseIfDumb(@NotNull ASTNode child) {
-    PsiElement node = child.getPsi();
-    if (node.getProject().isDefault()) return false;
-    PsiElement next = PsiTreeUtil.skipSiblingsForward(node, PsiWhiteSpace.class, PsiAnnotation.class);
-    if (next instanceof PsiKeyword) return false;
-    return !DumbService.isDumb(node.getProject()) && isTypeAnnotation(node);
-  }
-
   private static void putPreferredWrapInParentBlock(@NotNull AbstractJavaBlock block, @NotNull Wrap preferredWrap) {
     AbstractJavaBlock parentBlock = block.getParentBlock();
     if (parentBlock != null) {
@@ -470,7 +450,7 @@ public final class JavaFormatterUtil {
     return false;
   }
 
-  private static int getAnnotationWrapType(ASTNode parent, ASTNode child, CommonCodeStyleSettings settings) {
+  private static int getAnnotationWrapType(ASTNode parent, ASTNode child, CommonCodeStyleSettings settings, JavaCodeStyleSettings javaSettings) {
     IElementType nodeType = parent.getElementType();
 
     if (nodeType == JavaElementType.METHOD) {
@@ -515,6 +495,10 @@ public final class JavaFormatterUtil {
 
     if (nodeType == JavaElementType.MODULE) {
       return settings.CLASS_ANNOTATION_WRAP;
+    }
+
+    if (nodeType == JavaElementType.ENUM_CONSTANT) {
+      return javaSettings.ENUM_FIELD_ANNOTATION_WRAP;
     }
 
     return CommonCodeStyleSettings.DO_NOT_WRAP;

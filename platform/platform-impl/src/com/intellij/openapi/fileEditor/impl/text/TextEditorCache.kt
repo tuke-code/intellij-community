@@ -17,18 +17,17 @@ import java.nio.file.Path
 abstract class TextEditorCache<T>(private val project: Project, private val scope: CoroutineScope) {
   protected val cache: ManagedCache<Int, T> = createCache()
 
-  abstract fun graveName(): String
-  abstract fun valueExternalizer(): DataExternalizer<T>
-  abstract fun serdeVersion(): Int
+  abstract fun namePrefix(): String
+  abstract fun valueExternalizer(): VersionedExternalizer<T>
   abstract fun useHeapCache(): Boolean
 
   companion object {
-    fun contentHash(document: Document): Int = Hashing.komihash5_0().hashCharsToInt(document.immutableCharSequence)
+    fun Document.contentHash(): Int = Hashing.komihash5_0().hashCharsToInt(this.immutableCharSequence)
     fun cachePath(): Path = PathManager.getSystemDir().resolve("editor")
   }
 
   private fun createCache(): ManagedCache<Int, T> {
-    val graveName = graveName()
+    val graveName = namePrefix()
     val projectName = project.uniqueProjectName()
     val cacheName = "$graveName-$projectName"
     val cachePath = cachePath().resolve(graveName).resolve(projectName)
@@ -36,7 +35,7 @@ abstract class TextEditorCache<T>(private val project: Project, private val scop
       cachePath,
       EnumeratorIntegerDescriptor.INSTANCE,
       valueExternalizer()
-    ).withVersion(serdeVersion())
+    ).withVersion(valueExternalizer().serdeVersion())
     val cache = if (useHeapCache()) {
       ManagedHeapPersistentCache(cacheName, builder)
     } else {

@@ -728,7 +728,7 @@ open class ProjectManagerImpl : ProjectManagerEx(), Disposable {
         throw e
       }
 
-      LOG.error(e)
+      LOG.error("project loading failed", e)
       failedToOpenProject(frameAllocator = frameAllocator, exception = e, options = options)
       return null
     }
@@ -1077,10 +1077,8 @@ private fun ensureCouldCloseIfUnableToSave(project: Project): Boolean {
     return true
   }
 
-  val message: @NlsContexts.DialogMessage StringBuilder = StringBuilder()
-  message.append("${ApplicationNamesInfo.getInstance().productName} was unable to save some project files," +
-                 "\nare you sure you want to close this project anyway?")
-  message.append("\n\nRead-only files:\n")
+  val message: @NlsContexts.DialogMessage StringBuilder = StringBuilder(
+    IdeBundle.message("dialog.message.was.unable.to.save.some.project.files", ApplicationNamesInfo.getInstance().productName))
   var count = 0
   val files = notifications.first().files
   for (file in files) {
@@ -1192,11 +1190,11 @@ private suspend fun initProject(file: Path,
   try {
     coroutineContext.ensureActive()
 
-    val registerComponentActivity = createActivity(project) { "project ${StartUpMeasurer.Activities.REGISTER_COMPONENTS_SUFFIX}" }
-
-    if (!PROJECT_PATH.isIn(project)) {
-      PROJECT_PATH.set(project, file)
+    val registerComponentActivity = createActivity(project) {
+      "project ${StartUpMeasurer.Activities.REGISTER_COMPONENTS_SUFFIX}"
     }
+
+    project.putUserDataIfAbsent(PROJECT_PATH, file)
     project.registerComponents()
     registerComponentActivity?.end()
 

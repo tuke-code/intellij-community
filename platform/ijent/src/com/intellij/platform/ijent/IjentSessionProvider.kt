@@ -34,6 +34,8 @@ interface IjentSessionProvider {
    * When calling the method, there's no need to wire [communicationCoroutineScope] to [epCoroutineScope],
    * since it is already performed by factory methods.
    *
+   * [communicationCoroutineScope] must be a supervisor scope.
+   *
    * Automatically registers the result in [IjentSessionRegistry].
    */
   @OverrideOnly
@@ -100,7 +102,7 @@ interface IjentSessionProvider {
               }
               finally {
                 if (process.isAlive) {
-                  LOG.debug { "The process $ijentId is still alive, it will be killed" }
+                  LOG.warn("The process $ijentId is still alive, it will be killed")
                   process.destroy()
                 }
               }
@@ -146,7 +148,7 @@ interface IjentSessionProvider {
      * All requests and data transfer with the remote machine is performed through stdin and stdout of [shellProcess].
      *
      * It is recommended to always use `/bin/sh` for [shellProcess], but any other POSIX-compliant interpreter is accepted too. The shell
-     * is later changed to the default user's shell before starting IJent, in order that [IjentApi.fetchLoginShellEnvVariables] returns
+     * is later changed to the default user's shell before starting IJent, in order that [IjentExecApi.fetchLoginShellEnvVariables] returns
      * the variables from the appropriate shell configs.
      *
      * [shellProcess] must have stdin, stdout and stderr piped.
@@ -230,21 +232,21 @@ private suspend fun bootstrapOverShellSession(
     // There are two arguments in `uname` that can show the process architecture: `-m` and `-p`. According to `man uname`, `-p` is more
     // verbose, and that information may be sufficient for choosing the right binary.
     // https://man.freebsd.org/cgi/man.cgi?query=uname&sektion=1
-    outputStream.write("set -ex; echo $boundary; uname -p\n".toByteArray())
+    outputStream.write("set -ex; echo $boundary; uname -pm\n".toByteArray())
     outputStream.flush()
 
     do {
       val line = readLineWithoutBuffering(inputStream, tracingLabel = "stdout")
       LOG.trace { "Received greeting line from stdout: $line" }
     }
-    while (line != boundary);
+    while (line != boundary)
 
     readLineWithoutBuffering(inputStream, tracingLabel = "stdout")
-  }
+  }.split(" ")
 
-  val targetPlatform = when (arch) {
-    "x86_64" -> IjentExecFileProvider.SupportedPlatform.X86_64__LINUX
-    "aarch64" -> IjentExecFileProvider.SupportedPlatform.AARCH64__LINUX
+  val targetPlatform = when  {
+    "x86_64" in arch -> IjentExecFileProvider.SupportedPlatform.X86_64__LINUX
+    "aarch64" in arch -> IjentExecFileProvider.SupportedPlatform.AARCH64__LINUX
     else -> error("No binary for architecture $arch")  // TODO Some good exception class with an error message in UI.
   }
 

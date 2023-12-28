@@ -547,14 +547,16 @@ public final class PsiTestUtil {
   public static Sdk modifyJdkRoots(@NotNull Sdk sdk, Consumer<? super SdkModificator> modifier) {
     Sdk clone;
     try {
-      clone = (Sdk)sdk.clone();
+      clone = sdk.clone();
     }
     catch (CloneNotSupportedException e) {
       throw new RuntimeException(e);
     }
     SdkModificator sdkModificator = clone.getSdkModificator();
     modifier.accept(sdkModificator);
-    sdkModificator.commitChanges();
+    ApplicationManager.getApplication().runWriteAction(() -> {
+      sdkModificator.commitChanges();
+    });
     return clone;
   }
 

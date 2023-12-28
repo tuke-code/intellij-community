@@ -59,7 +59,9 @@ object TerminalUiUtils {
       isCaretRowShown = false
       additionalLinesCount = 0
       additionalColumnsCount = 0
+      isAdditionalPageAtBottom = false
       isBlockCursor = true
+      isWhitespacesShown = false
     }
 
     editor.contextMenuGroupId = "Terminal.OutputContextMenu"

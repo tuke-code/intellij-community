@@ -3613,6 +3613,48 @@ public class DaemonRespondToChangesTest extends DaemonAnalyzerTestCase {
     assertOneElement(myDaemonCodeAnalyzer.getFileLevelHighlights(getProject(), getFile()));
   }
 
+  public void testFileLevelWithEverChangingDescriptionMustUpdateOnTyping() {
+    class XXXIdentifierFileLevelInspection extends MyFegnaInspection {
+      @NotNull
+      @Override
+      public PsiElementVisitor buildVisitor(@NotNull ProblemsHolder holder, boolean isOnTheFly) {
+        return new JavaElementVisitor() {
+          @Override
+          public void visitIdentifier(@NotNull PsiIdentifier identifier) {
+            super.visitIdentifier(identifier);
+            if (identifier.getText().contains("xxx")) {
+              holder.registerProblem(identifier.getContainingFile(),"xxx: "+identifier.getText(), ProblemHighlightType.WARNING);
+            }
+          }
+        };
+      }
+    }
+
+    registerInspection(new XXXIdentifierFileLevelInspection());
+    @Language("JAVA")
+    String text = """
+      class X {
+        void foo() {
+          int xxx<caret>;
+        }
+      }""";
+    configureByText(JavaFileType.INSTANCE, text);
+
+    assertEmpty(highlightErrors());
+    HighlightInfo info = assertOneElement(myDaemonCodeAnalyzer.getFileLevelHighlights(getProject(), getFile()));
+    assertEquals("xxx: xxx", info.getDescription());
+
+    type('2');
+    assertEmpty(highlightErrors());
+    info = assertOneElement(myDaemonCodeAnalyzer.getFileLevelHighlights(getProject(), getFile()));
+    assertEquals("xxx: xxx2", info.getDescription());
+
+    type('y');
+    assertEmpty(highlightErrors());
+    info = assertOneElement(myDaemonCodeAnalyzer.getFileLevelHighlights(getProject(), getFile()));
+    assertEquals("xxx: xxx2y", info.getDescription());
+  }
+
   public void testInspectionMustRemoveItsObsoleteHighlightsImmediatelyAfterFinished() {
     @Language("JAVA")
     String text = """
@@ -3631,7 +3673,12 @@ public class DaemonRespondToChangesTest extends DaemonAnalyzerTestCase {
     LocalInspectionTool slowTool = new MyFegnaInspection() {
       @Override
       public void inspectionFinished(@NotNull LocalInspectionToolSession session, @NotNull ProblemsHolder problemsHolder) {
-        slowToolFinished.set(true);
+        // invoke later because we are checking this flag in EDT below, and
+        // we do not want a race between contextFinishedCallback.accept(context); in inspection thread
+        // and querying markup model in EDT
+        ApplicationManager.getApplication().invokeLater(() -> {
+          slowToolFinished.set(true);
+        });
       }
       @NotNull
       @Override
@@ -3658,7 +3705,12 @@ public class DaemonRespondToChangesTest extends DaemonAnalyzerTestCase {
     LocalInspectionTool fastTool = new MyFegnaInspection() {
       @Override
       public void inspectionFinished(@NotNull LocalInspectionToolSession session, @NotNull ProblemsHolder problemsHolder) {
-        fastToolFinished.set(true);
+        // invoke later because we are checking this flag in EDT below, and
+        // we do not want a race between contextFinishedCallback.accept(context); in inspection thread
+        // and querying markup model in EDT
+        ApplicationManager.getApplication().invokeLater(() -> {
+          fastToolFinished.set(true);
+        });
       }
       @NotNull
       @Override

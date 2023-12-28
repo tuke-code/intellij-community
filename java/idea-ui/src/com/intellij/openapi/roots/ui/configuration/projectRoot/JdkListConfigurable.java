@@ -10,7 +10,6 @@ import com.intellij.openapi.project.DumbAware;
 import com.intellij.openapi.projectRoots.Sdk;
 import com.intellij.openapi.projectRoots.SdkModel;
 import com.intellij.openapi.projectRoots.SdkTypeId;
-import com.intellij.openapi.projectRoots.impl.ProjectJdkImpl;
 import com.intellij.openapi.roots.ProjectRootManager;
 import com.intellij.openapi.roots.ui.configuration.ProjectStructureConfigurable;
 import com.intellij.openapi.roots.ui.configuration.SdkPopupFactory;
@@ -89,7 +88,7 @@ public class JdkListConfigurable extends BaseStructureConfigurable {
   protected void loadTree() {
     final Map<Sdk,Sdk> sdks = myJdksTreeModel.getProjectSdks();
     for (Sdk sdk : sdks.keySet()) {
-      final JdkConfigurable configurable = new JdkConfigurable((ProjectJdkImpl)sdks.get(sdk), myJdksTreeModel, TREE_UPDATER, myHistory,
+      final JdkConfigurable configurable = new JdkConfigurable(sdks.get(sdk), myJdksTreeModel, TREE_UPDATER, myHistory,
                                                                myProject);
       addNode(new MyNode(configurable), myRoot);
     }
@@ -104,16 +103,14 @@ public class JdkListConfigurable extends BaseStructureConfigurable {
     return result;
   }
 
-  public boolean addJdkNode(final Sdk jdk, final boolean selectInTree) {
+  public void addJdkNode(final Sdk jdk, final boolean selectInTree) {
     if (!myUiDisposed) {
       myContext.getDaemonAnalyzer().queueUpdate(new SdkProjectStructureElement(myContext, jdk));
-      addNode(new MyNode(new JdkConfigurable((ProjectJdkImpl)jdk, myJdksTreeModel, TREE_UPDATER, myHistory, myProject)), myRoot);
+      addNode(new MyNode(new JdkConfigurable(jdk, myJdksTreeModel, TREE_UPDATER, myHistory, myProject)), myRoot);
       if (selectInTree) {
         selectNodeInTree(MasterDetailsComponent.findNodeByObject(myRoot, jdk));
       }
-      return true;
     }
-    return false;
   }
 
   @Override

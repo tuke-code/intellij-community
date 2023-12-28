@@ -24,6 +24,7 @@ import com.intellij.psi.util.JavaPsiPatternUtil;
 import com.intellij.psi.util.PsiTreeUtil;
 import com.intellij.psi.util.PsiUtil;
 import com.intellij.psi.util.PsiUtilCore;
+import com.intellij.refactoring.JavaRefactoringSettings;
 import com.intellij.refactoring.RefactoringBundle;
 import com.intellij.refactoring.listeners.RefactoringEventData;
 import com.intellij.refactoring.listeners.RefactoringEventListener;
@@ -41,7 +42,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
 
-public class InlineLocalHandler extends JavaInlineActionHandler {
+public final class InlineLocalHandler extends JavaInlineActionHandler {
   private enum InlineMode {
     CHECK_CONFLICTS,
     ASK,
@@ -99,7 +100,11 @@ public class InlineLocalHandler extends JavaInlineActionHandler {
       element = context.findLeafOnTheLeft();
     }
     final PsiReferenceExpression refExpr = PsiTreeUtil.getParentOfType(element, PsiReferenceExpression.class);
-    return doInline(context, (PsiVariable)Objects.requireNonNull(context.element()), refExpr, InlineMode.CHECK_CONFLICTS);
+    InlineMode mode;
+    if (JavaRefactoringSettings.getInstance().INLINE_LOCAL_THIS) mode = InlineMode.INLINE_ONE;
+    else mode = InlineMode.CHECK_CONFLICTS;
+
+    return doInline(context, (PsiVariable)Objects.requireNonNull(context.element()), refExpr, mode);
   }
 
   private static ModCommand doInline(@NotNull ActionContext context,

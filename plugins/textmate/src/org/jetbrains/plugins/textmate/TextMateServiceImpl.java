@@ -231,6 +231,12 @@ public final class TextMateServiceImpl extends TextMateService {
   }
 
   @Override
+  public @NotNull Map<TextMateFileNameMatcher, CharSequence> getFileNameMatcherToScopeNameMapping() {
+    ensureInitialized();
+    return Collections.unmodifiableMap(myExtensionMapping);
+  }
+
+  @Override
   public @Nullable TextMateBundleReader readBundle(@Nullable Path directory) {
     if (directory != null) {
       BundleType bundleType = BundleType.detectBundleType(directory);
@@ -311,7 +317,8 @@ public final class TextMateServiceImpl extends TextMateService {
                                                           internedSmartTypingPairs,
                                                           internedSurroundingPairs,
                                                           preferences.getAutoCloseBefore(),
-                                                          preferences.getIndentationRules()));
+                                                          preferences.getIndentationRules(),
+                                                          preferences.getOnEnterRules()));
       for (TextMateShellVariable variable : preferences.getVariables()) {
         myShellVariablesRegistry.addVariable(variable);
       }

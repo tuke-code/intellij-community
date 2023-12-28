@@ -96,7 +96,7 @@ public class SingleInspectionProfilePanel extends JPanel {
 
   private final Map<String, ToolDescriptors> myInitialToolDescriptors = new HashMap<>();
   private final InspectionConfigTreeNode myRoot = new InspectionConfigTreeNode.Group(InspectionsBundle.message("inspection.root.node.title"));
-  private List<InspectionTreeAdvertiser.CustomGroup> myCustomGroups = new ArrayList<>();
+  private final List<InspectionTreeAdvertiser.CustomGroup> myCustomGroups = new ArrayList<>();
   private final Alarm myAlarm = new Alarm();
   private final ProjectInspectionProfileManager myProjectProfileManager;
   @NotNull
@@ -117,7 +117,7 @@ public class SingleInspectionProfilePanel extends JPanel {
   private InspectionsConfigTreeTable myTreeTable;
   private TreeExpander myTreeExpander;
   private boolean myIsInRestore;
-  private DefaultActionGroup myCreateInspectionActions;
+  private final DefaultActionGroup myCreateInspectionActions;
 
   private List<String> myInitialScopesOrder;
   private Disposable myDisposable = Disposer.newDisposable();
@@ -129,6 +129,10 @@ public class SingleInspectionProfilePanel extends JPanel {
     myProjectProfileManager = projectProfileManager;
     myProfile = profile;
 
+    myCustomGroups.add(new InspectionTreeAdvertiser.CustomGroup(
+      new String[]{InspectionsBundle.message("group.names.user.defined")},
+      InspectionsBundle.message("group.descriptions.user.defined")
+    ));
     for (InspectionTreeAdvertiser advertiser : InspectionTreeAdvertiser.EP_NAME.getExtensionList()) {
       myCustomGroups.addAll(advertiser.getCustomGroups());
     }
@@ -1122,7 +1126,11 @@ public class SingleInspectionProfilePanel extends JPanel {
     myDisposable = null;
   }
 
-  public static HyperlinkAdapter createSettingsHyperlinkListener(Project project){
+  public static HyperlinkAdapter createSettingsHyperlinkListener(Project project) {
+    return createSettingsHyperlinkListener(project, null);
+  }
+
+  public static HyperlinkAdapter createSettingsHyperlinkListener(Project project, SingleInspectionProfilePanel panel) {
     return new HyperlinkAdapter() {
       @Override
       protected void hyperlinkActivated(@NotNull HyperlinkEvent e) {
@@ -1145,10 +1153,14 @@ public class SingleInspectionProfilePanel extends JPanel {
               }
             }
           }
-          else if (url.getScheme().equals("action")) {
-            AnAction action = ActionManager.getInstance().getAction(url.getAuthority());
-            if (action != null) {
-              if (action instanceof ActionGroup group) {
+          else if (url.getScheme().equals("action") && panel != null) {
+            final var action = InspectionProfileActionProvider.EP_NAME.getExtensionList().stream()
+              .flatMap(provider -> provider.getActionsToRegister(panel).stream())
+              .filter(a -> a.actionId().equals(url.getAuthority()))
+              .findFirst();
+            if (action.isPresent()) {
+              final AnAction urlAction = action.get().action();
+              if (urlAction instanceof ActionGroup group) {
                 final ActionPopupMenu menu = ActionManager.getInstance().createActionPopupMenu(ActionPlaces.POPUP, group);
                 final Point point = new Point();
                 if (e.getInputEvent() instanceof MouseEvent mouseEvent) {
@@ -1160,7 +1172,7 @@ public class SingleInspectionProfilePanel extends JPanel {
                 final AnActionEvent event = AnActionEvent.createFromInputEvent(
                   e.getInputEvent(), ActionPlaces.UNKNOWN, null, DataContext.EMPTY_CONTEXT
                 );
-                action.actionPerformed(event);
+                action.get().action().actionPerformed(event);
               }
             }
           }
@@ -1178,7 +1190,7 @@ public class SingleInspectionProfilePanel extends JPanel {
   private JPanel createInspectionProfileSettingsPanel() {
 
     myDescription = new DescriptionEditorPane();
-    myDescription.addHyperlinkListener(createSettingsHyperlinkListener(getProject()));
+    myDescription.addHyperlinkListener(createSettingsHyperlinkListener(getProject(), this));
 
     initToolStates();
     fillTreeData(myProfileFilter != null ? myProfileFilter.getFilter() : null, true);

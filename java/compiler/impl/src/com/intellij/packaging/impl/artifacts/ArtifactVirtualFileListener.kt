@@ -18,11 +18,11 @@ import com.intellij.packaging.impl.artifacts.workspacemodel.ArtifactBridge
 import com.intellij.packaging.impl.artifacts.workspacemodel.ArtifactManagerBridge.Companion.artifactsMap
 import com.intellij.packaging.impl.elements.FileOrDirectoryCopyPackagingElement
 import com.intellij.platform.backend.workspace.WorkspaceModel.Companion.getInstance
-import com.intellij.platform.backend.workspace.useNewWorkspaceModelApi
+import com.intellij.platform.backend.workspace.useQueryCacheWorkspaceModelApi
 import com.intellij.platform.backend.workspace.workspaceModel
 import com.intellij.platform.diagnostic.telemetry.Compiler
 import com.intellij.platform.diagnostic.telemetry.TelemetryManager
-import com.intellij.platform.diagnostic.telemetry.helpers.addMeasuredTimeMs
+import com.intellij.platform.diagnostic.telemetry.helpers.addMeasuredTimeMillis
 import com.intellij.platform.workspace.storage.*
 import com.intellij.platform.workspace.storage.query.entities
 import com.intellij.platform.workspace.storage.query.flatMap
@@ -47,14 +47,14 @@ internal class ArtifactVirtualFileListener(private val project: Project) : BulkF
     }
   }
 
-  private fun filePathChanged(oldPath: String, newPath: String) = filePathChangedMs.addMeasuredTimeMs {
-    val artifactEntities = if (useNewWorkspaceModelApi()) {
-      val refs = parentPathToArtifactReferences[oldPath]?.asSequence() ?: return
+  private fun filePathChanged(oldPath: String, newPath: String) = filePathChangedMs.addMeasuredTimeMillis {
+    val artifactEntities = if (useQueryCacheWorkspaceModelApi()) {
+      val refs = parentPathToArtifactReferences[oldPath]?.asSequence() ?: return@addMeasuredTimeMillis
       val storage = project.workspaceModel.entityStorage.current
       refs.map { it.resolve(storage)!! }
     }
     else {
-      parentPathToArtifacts[oldPath]?.asSequence() ?: return
+      parentPathToArtifacts[oldPath]?.asSequence() ?: return@addMeasuredTimeMillis
     }
     val artifactManager = ArtifactManager.getInstance(project)
 
@@ -88,7 +88,7 @@ internal class ArtifactVirtualFileListener(private val project: Project) : BulkF
   private val parentPathToArtifacts: Map<String, List<ArtifactEntity>>
     get() = getInstance(project).entityStorage.cachedValue(parentPathsToArtifacts)
 
-  private fun propertyChanged(event: VFilePropertyChangeEvent) = propertyChangedMs.addMeasuredTimeMs {
+  private fun propertyChanged(event: VFilePropertyChangeEvent) = propertyChangedMs.addMeasuredTimeMillis {
     if (VirtualFile.PROP_NAME == event.propertyName) {
       val parent = event.file.parent
       if (parent != null) {
@@ -102,7 +102,7 @@ internal class ArtifactVirtualFileListener(private val project: Project) : BulkF
     private val LOG = Logger.getInstance(ArtifactVirtualFileListener::class.java)
 
     private val query = entities<ArtifactEntity>()
-      .flatMap { artifactEntity ->
+      .flatMap { artifactEntity, _ ->
         buildList {
           processFileOrDirectoryCopyElements(artifactEntity) { entity ->
             var path = VfsUtilCore.urlToPath(entity.filePath.url)

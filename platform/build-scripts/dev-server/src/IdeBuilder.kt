@@ -160,7 +160,10 @@ internal suspend fun buildProduct(productConfiguration: ProductConfiguration, re
                             homePath = request.homePath)
     }
   }
-
+    .invokeOnCompletion {
+    // close debug logging to prevent locking of output directory on Windows
+    context.messages.close()
+  }
   return runDir
 }
 
@@ -297,9 +300,6 @@ private suspend fun createBuildContext(productConfiguration: ProductConfiguratio
           if (options.enableEmbeddedJetBrainsClient) {
             options.enableEmbeddedJetBrainsClient = false
           }
-
-          // it downloads binaries from TC - it is bad
-          options.buildStepsToSkip.add(BuildOptions.IJENT_EXECUTABLE_DOWNLOADING)
         }
 
         options.generateRuntimeModuleRepository = options.generateRuntimeModuleRepository && request.generateRuntimeModuleRepository

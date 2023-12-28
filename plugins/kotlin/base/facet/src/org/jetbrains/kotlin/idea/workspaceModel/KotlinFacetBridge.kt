@@ -23,6 +23,7 @@ class KotlinFacetBridge(
         val moduleEntity = mutableStorage.resolve(existingFacetEntity.moduleId)!!
         val kotlinSettingsEntity = config.getEntity(moduleEntity)
         mutableStorage.modifyEntity(existingFacetEntity) {
+            if (kotlinSettingsEntity.flushNeeded) flushNeeded = false
             name = kotlinSettingsEntity.name
             sourceRoots = kotlinSettingsEntity.sourceRoots.toMutableList()
             configFileItems = kotlinSettingsEntity.configFileItems.toMutableList()
@@ -47,7 +48,7 @@ class KotlinFacetBridge(
     }
 
     override fun getExternalSource(): ProjectModelExternalSource? {
-        return if (configuration.settings.externalProjectId.isEmpty()) return null
+        return super.getExternalSource() ?: if (configuration.settings.externalProjectId.isEmpty()) return null
         else ExternalProjectSystemRegistry.getInstance().getSourceById(configuration.settings.externalProjectId)
     }
 }

@@ -6,11 +6,13 @@ import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.diagnostic.trace
 import com.intellij.platform.workspace.storage.WorkspaceEntity
 import com.intellij.platform.workspace.storage.impl.exceptions.AddDiffException
+import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentationApi
 import java.util.*
 
+@OptIn(EntityStorageInstrumentationApi::class)
 internal class AddDiffOperation(val target: MutableEntityStorageImpl, val diff: MutableEntityStorageImpl) {
 
-  private val replaceMap = HashBiMap.create<NotThisEntityId, ThisEntityId>()
+  internal val replaceMap = HashBiMap.create<NotThisEntityId, ThisEntityId>()
   private val diffLog = diff.changeLog.changeLog
 
   var shaker = -1L
@@ -59,13 +61,16 @@ internal class AddDiffOperation(val target: MutableEntityStorageImpl, val diff: 
           // Restore links to soft references
           if (targetEntityData is SoftLinkable) target.indexes.updateSoftLinksIndex(targetEntityData)
 
+          // Keep adding "add" event before updating children and parents. Otherwise, we'll get a weird behaviour when we try to add
+          //   "add" event on top of "modify" event that was generated while adding references.
+          target.changeLog.addAddEvent(targetEntityId.id, targetEntityData)
+
           addRestoreChildren(sourceEntityId, targetEntityId)
 
           // Restore parent references
           addRestoreParents(sourceEntityId, targetEntityId)
 
           target.indexes.updateIndices(change.entityData.createEntityId(), targetEntityData, diff)
-          target.changeLog.addAddEvent(targetEntityId.id, targetEntityData)
         }
         is ChangeEntry.RemoveEntity -> {
           LOG.trace { "addDiff: remove entity. ${change.id}" }

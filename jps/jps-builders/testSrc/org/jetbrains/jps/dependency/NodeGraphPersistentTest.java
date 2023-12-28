@@ -7,7 +7,7 @@ import org.jetbrains.jps.dependency.diff.DiffCapable;
 import org.jetbrains.jps.dependency.impl.Containers;
 import org.jetbrains.jps.dependency.impl.DependencyGraphImpl;
 import org.jetbrains.jps.dependency.impl.DifferentiateParametersBuilder;
-import org.jetbrains.jps.dependency.impl.FileSource;
+import org.jetbrains.jps.dependency.impl.PathSource;
 import org.jetbrains.jps.dependency.java.JVMFlags;
 import org.jetbrains.jps.dependency.java.JvmClass;
 import org.jetbrains.jps.dependency.serializer.JvmClassTestUtil;
@@ -21,10 +21,9 @@ public class NodeGraphPersistentTest extends BasePlatformTestCase {
   public void testPersistentNodeGraph() throws IOException {
     // Create and fill out the graph
     File tempDirectory = FileUtil.createTempDirectory("persistent", "map");
-    DependencyGraphImpl graph = new DependencyGraphImpl(Containers.createPersistentContainerFactory(tempDirectory.getAbsolutePath()));
-    try {
-      FileSource aSrc = createNodeSource("A");
-      FileSource bSrc = createNodeSource("B");
+    try (DependencyGraphImpl graph = new DependencyGraphImpl(Containers.createPersistentContainerFactory(tempDirectory.getAbsolutePath()))) {
+      NodeSource aSrc = createNodeSource("A");
+      NodeSource bSrc = createNodeSource("B");
 
       // This should be executed before compiler run
       Delta delta = graph.createDelta(Arrays.asList(aSrc, bSrc), null);
@@ -44,11 +43,10 @@ public class NodeGraphPersistentTest extends BasePlatformTestCase {
       JvmClass jvmClassFromGraph = graph.getNodes(nodeSourcesFromGraph.get(0), JvmClass.class).iterator().next();
       JvmClass jvmClassFromGraphByDifferentSource = graph.getNodes(nodeSourcesFromGraph.get(1), JvmClass.class).iterator().next();
       JvmClassTestUtil.checkJvmClassEquals(jvmClassFromGraph, jvmClassFromGraphByDifferentSource);
-      
+
       JvmClassTestUtil.checkJvmClassEquals(jvmClassNode, jvmClassFromGraph);
     }
     finally {
-      graph.close();
       FileUtil.delete(tempDirectory);
     }
   }
@@ -56,15 +54,14 @@ public class NodeGraphPersistentTest extends BasePlatformTestCase {
   public void testIntegrateNodesWithSameID() throws IOException {
     // Create and fill out the graph
     File tempDirectory = FileUtil.createTempDirectory("persistent", "map");
-    DependencyGraphImpl graph = new DependencyGraphImpl(Containers.createPersistentContainerFactory(tempDirectory.getAbsolutePath()));
-    try {
-      FileSource aSrc = createNodeSource("A");
-      FileSource bSrc = createNodeSource("B");
+    try (DependencyGraphImpl graph = new DependencyGraphImpl(Containers.createPersistentContainerFactory(tempDirectory.getAbsolutePath()))) {
+      NodeSource aSrc = createNodeSource("A");
+      NodeSource bSrc = createNodeSource("B");
 
       Delta initialDelta = graph.createDelta(Arrays.asList(aSrc, bSrc), null);
-      JvmClass clsNodeA = new JvmClass(JVMFlags.EMPTY, "", "com.ppp.aClass", "out/modA/cls", "", "", Collections.emptyList(), Collections.emptyList(), Collections.emptyList(), Collections.emptyList(), Collections.emptyList(), null, Collections.emptyList());
+      JvmClass clsNodeA = new JvmClass(JVMFlags.EMPTY, "", "com.ppp.aClass", "out/modA/cls", "", "", Collections.emptyList(), Collections.emptyList(), Collections.emptyList(), Collections.emptyList(), Collections.emptyList(), null, Collections.emptyList(), Collections.emptyList());
       initialDelta.associate(clsNodeA, List.of(aSrc));
-      JvmClass clsNodeB = new JvmClass(JVMFlags.EMPTY, "", "com.ppp.aClass", "out/modB/cls", "", "", Collections.emptyList(), Collections.emptyList(), Collections.emptyList(), Collections.emptyList(), Collections.emptyList(), null, Collections.emptyList());
+      JvmClass clsNodeB = new JvmClass(JVMFlags.EMPTY, "", "com.ppp.aClass", "out/modB/cls", "", "", Collections.emptyList(), Collections.emptyList(), Collections.emptyList(), Collections.emptyList(), Collections.emptyList(), null, Collections.emptyList(), Collections.emptyList());
       initialDelta.associate(clsNodeB, List.of(bSrc));
 
       DifferentiateResult differentiateResult = graph.differentiate(initialDelta, DifferentiateParametersBuilder.create().calculateAffected(false).get());
@@ -86,7 +83,7 @@ public class NodeGraphPersistentTest extends BasePlatformTestCase {
 
       // emulate contents of aSrc changed and now a node with different changeID is associated with this source
       Delta delta = graph.createDelta(Arrays.asList(aSrc), null);
-      JvmClass clsNodeAChanged = new JvmClass(JVMFlags.EMPTY, "", "com.ppp.aChangedClass", "out/modA/cls", "", "", Collections.emptyList(), Collections.emptyList(), Collections.emptyList(), Collections.emptyList(), Collections.emptyList(), null, Collections.emptyList());
+      JvmClass clsNodeAChanged = new JvmClass(JVMFlags.EMPTY, "", "com.ppp.aChangedClass", "out/modA/cls", "", "", Collections.emptyList(), Collections.emptyList(), Collections.emptyList(), Collections.emptyList(), Collections.emptyList(), null, Collections.emptyList(), Collections.emptyList());
       delta.associate(clsNodeAChanged, List.of(aSrc));
       DifferentiateResult changes = graph.differentiate(delta, DifferentiateParametersBuilder.create().calculateAffected(false).get());
       graph.integrate(changes);
@@ -101,12 +98,11 @@ public class NodeGraphPersistentTest extends BasePlatformTestCase {
       assertTrue(nodesFromGraphAfterChange.contains(clsNodeB));
     }
     finally {
-      graph.close();
       FileUtil.delete(tempDirectory);
     }
   }
 
-  private static FileSource createNodeSource(String fileName) {
-    return new FileSource(new File("src/" + fileName + ".java"));
+  private static NodeSource createNodeSource(String fileName) {
+    return new PathSource("src/" + fileName + ".java");
   }
 }

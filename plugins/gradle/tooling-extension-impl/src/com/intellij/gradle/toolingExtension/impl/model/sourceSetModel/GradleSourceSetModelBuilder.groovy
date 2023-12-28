@@ -1,12 +1,14 @@
 // Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.gradle.toolingExtension.impl.model.sourceSetModel
 
+import com.intellij.gradle.toolingExtension.impl.model.dependencyDownloadPolicyModel.GradleDependencyDownloadPolicy
+import com.intellij.gradle.toolingExtension.impl.model.dependencyDownloadPolicyModel.GradleDependencyDownloadPolicyCache
 import com.intellij.gradle.toolingExtension.impl.model.resourceFilterModel.GradleResourceFilterModelBuilder
 import com.intellij.gradle.toolingExtension.impl.modelBuilder.Messages
-import com.intellij.gradle.toolingExtension.impl.util.GradleDependencyArtifactPolicyUtil
 import com.intellij.gradle.toolingExtension.impl.util.GradleObjectUtil
 import com.intellij.gradle.toolingExtension.impl.util.collectionUtil.GradleCollectionVisitor
 import com.intellij.gradle.toolingExtension.impl.util.javaPluginUtil.JavaPluginUtil
+import com.intellij.gradle.toolingExtension.util.GradleNegotiationUtil
 import com.intellij.openapi.externalSystem.model.project.ExternalSystemSourceType
 import groovy.transform.CompileDynamic
 import org.codehaus.groovy.runtime.DefaultGroovyMethods
@@ -19,7 +21,6 @@ import org.gradle.api.tasks.SourceSetOutput
 import org.gradle.api.tasks.bundling.AbstractArchiveTask
 import org.gradle.api.tasks.bundling.Jar
 import org.gradle.api.tasks.compile.JavaCompile
-import org.gradle.internal.metaobject.AbstractDynamicObject
 import org.gradle.jvm.toolchain.internal.JavaToolchain
 import org.gradle.plugins.ide.idea.IdeaPlugin
 import org.gradle.util.GradleVersion
@@ -44,7 +45,6 @@ class GradleSourceSetModelBuilder extends AbstractModelBuilderService {
 
   private static final GradleVersion gradleBaseVersion = GradleVersion.current().baseVersion
   private static final boolean is4OrBetter = gradleBaseVersion >= GradleVersion.version("4.0")
-  private static final boolean is44OrBetter = gradleBaseVersion >= GradleVersion.version("4.4")
   private static final boolean is67OrBetter = gradleBaseVersion >= GradleVersion.version("6.7")
   private static final boolean is74OrBetter = gradleBaseVersion >= GradleVersion.version("7.4")
   private static final boolean is80OrBetter = gradleBaseVersion >= GradleVersion.version("8.0")
@@ -233,9 +233,9 @@ class GradleSourceSetModelBuilder extends AbstractModelBuilderService {
     def ideaResourceDirs = null
     def ideaTestSourceDirs = null
     def ideaTestResourceDirs = null
-    final downloadSources = GradleDependencyArtifactPolicyUtil.shouldDownloadSources(project)
-    final downloadJavadoc = GradleDependencyArtifactPolicyUtil.shouldDownloadJavadoc(project)
-    GradleDependencyArtifactPolicyUtil.setPolicy(project, downloadSources, downloadJavadoc)
+
+    GradleDependencyDownloadPolicy dependencyDownloadPolicy = GradleDependencyDownloadPolicyCache.getInstance(context)
+      .getDependencyDownloadPolicy(project)
 
     def testSourceSets = []
 
@@ -514,7 +514,7 @@ class GradleSourceSetModelBuilder extends AbstractModelBuilderService {
       }
 
       if (resolveSourceSetDependencies) {
-        def dependencies = new DependencyResolverImpl(context, project, downloadJavadoc, downloadSources)
+        def dependencies = new DependencyResolverImpl(context, project, dependencyDownloadPolicy)
           .resolveDependencies(sourceSet)
         externalSourceSet.dependencies.addAll(dependencies)
       }
@@ -619,11 +619,7 @@ class GradleSourceSetModelBuilder extends AbstractModelBuilderService {
   }
 
   private static boolean isJarDescendant(Jar task) {
-    if (is44OrBetter) {
-      return task.getTaskIdentity().type != Jar
-    } else {
-      return (task.asDynamicObject as AbstractDynamicObject).publicType != Jar
-    }
+    return GradleNegotiationUtil.getTaskIdentityType(task) != Jar
   }
 
   /**

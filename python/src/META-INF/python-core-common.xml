@@ -150,6 +150,7 @@
     <xdebugger.attachDebuggerProvider implementation="com.jetbrains.python.debugger.attach.PyLocalAttachDebuggerProvider"/>
 
     <registryKey key="python.debugger.use.dispatcher" defaultValue="false" description="Use dispatcher in Python debugger"/>
+    <registryKey key="flask.new.run.config" defaultValue="true" description="Flask Server Run configurations new UI"/>
 
     <configurationType implementation="com.jetbrains.python.testing.PythonTestConfigurationType"/>
     <configurationType implementation="com.jetbrains.python.testing.tox.PyToxConfigurationType"/>
@@ -264,6 +265,7 @@
                                    implementationClass="com.jetbrains.python.codeInsight.mlcompletion.PyContextFeatureProvider"/>
     <completion.ml.elementFeatures language="Python"
                                    implementationClass="com.jetbrains.python.codeInsight.mlcompletion.PyElementFeatureProvider"/>
+    <mlCompletionCorrectnessSupporter implementationClass="com.jetbrains.python.codeInsight.mlcompletion.correctness.PythonMLCompletionCorrectnessSupporter"/>
     <completion.confidence language="Python" implementationClass="com.jetbrains.python.codeInsight.completion.PyCompletionConfidence"/>
     <completion.ml.model implementation="com.jetbrains.python.codeInsight.mlcompletion.PythonMLRankingProvider"/>
     <typedHandler implementation="com.jetbrains.python.console.completion.PythonConsoleAutopopupBlockingHandler" id="pydevBlockAutoPopup"
@@ -518,6 +520,9 @@
                        bundle="messages.PyBundle" key="notification.group.packaging.toolwindow"/>
     <notificationGroup id="pyproject.toml Watcher" displayType="STICKY_BALLOON" isLogByDefault="true" bundle="messages.PyBundle"
                        key="python.sdk.poetry.pip.file.watcher"/>
+    <notificationGroup id="Python interpreter installation" displayType="STICKY_BALLOON" isLogByDefault="true" bundle="messages.PyBundle"
+                       key="python.sdk.installation.notification.group"/>
+
 
     <completion.contributor language="TOML"
                             implementationClass="com.jetbrains.python.packaging.pyproject.PyprojectPackageCompletionContributor"/>

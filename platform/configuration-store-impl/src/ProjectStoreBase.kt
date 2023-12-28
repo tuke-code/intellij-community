@@ -5,25 +5,25 @@ import com.intellij.ide.highlighter.ProjectFileType
 import com.intellij.ide.highlighter.WorkspaceFileType
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.PathManager
-import com.intellij.openapi.application.appSystemDir
 import com.intellij.openapi.components.*
 import com.intellij.openapi.components.impl.stores.IProjectStore
 import com.intellij.openapi.diagnostic.getOrLogException
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.ProjectCoreUtil
-import com.intellij.openapi.project.doGetProjectFileName
 import com.intellij.openapi.project.ex.ProjectEx
 import com.intellij.openapi.project.ex.ProjectNameProvider
+import com.intellij.openapi.project.getProjectCacheFileName
+import com.intellij.openapi.project.projectsDataDir
 import com.intellij.openapi.vfs.VfsUtilCore
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.util.SmartList
 import com.intellij.util.io.Ksuid
-import com.intellij.util.io.systemIndependentPath
 import com.intellij.util.messages.MessageBus
 import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.NonNls
 import java.nio.file.Files
 import java.nio.file.Path
+import kotlin.io.path.invariantSeparatorsPathString
 
 @NonNls internal const val PROJECT_FILE = "\$PROJECT_FILE$"
 @NonNls internal const val PROJECT_CONFIG_DIR = "\$PROJECT_CONFIG_DIR$"
@@ -108,15 +108,15 @@ abstract class ProjectStoreBase(final override val project: Project) : Component
       path = projectFilePath
       prefix = projectName
     }
-    return "$prefix${Integer.toHexString(path.systemIndependentPath.hashCode())}"
+    return "$prefix${Integer.toHexString(path.invariantSeparatorsPathString.hashCode())}"
   }
 
   override fun getPresentableUrl(): String {
     if (isDirectoryBased) {
-      return (dirOrFile ?: throw IllegalStateException("setPath was not yet called")).systemIndependentPath
+      return (dirOrFile ?: throw IllegalStateException("setPath was not yet called")).invariantSeparatorsPathString
     }
     else {
-      return projectFilePath.systemIndependentPath
+      return projectFilePath.invariantSeparatorsPathString
     }
   }
 
@@ -164,22 +164,14 @@ abstract class ProjectStoreBase(final override val project: Project) : Component
     }
 
     val presentableUrl = if (dotIdea == null) file else projectBasePath
-    val cacheFileName = doGetProjectFileName(
-      presentableUrl = presentableUrl.systemIndependentPath,
-      name = (presentableUrl.fileName ?: "").toString().removeSuffix(ProjectFileType.DOT_DEFAULT_EXTENSION),
-      hashSeparator = ".",
-      extensionWithDot = ".xml",
-    )
-    macros.add(Macro(StoragePathMacros.CACHE_FILE, appSystemDir.resolve("workspace").resolve(cacheFileName)))
+
+    val cacheFileName = getProjectCacheFileName(presentableUrl = presentableUrl.invariantSeparatorsPathString, projectName = "")
+    macros.add(Macro(StoragePathMacros.CACHE_FILE, projectsDataDir.resolve(cacheFileName).resolve("cache-state.xml")))
 
     storageManager.setMacros(macros)
 
     if (template != null) {
       loadProjectFromTemplate(template)
-    }
-
-    if (isUnitTestMode) {
-      return
     }
 
     val projectIdManager = ProjectIdManager.getInstance(project)
@@ -188,6 +180,10 @@ abstract class ProjectStoreBase(final override val project: Project) : Component
       // do not use the project name as part of id, to ensure a project dir rename does not cause data loss
       projectWorkspaceId = Ksuid.generate()
       projectIdManager.id = projectWorkspaceId
+    }
+
+    if (isUnitTestMode) {
+      return
     }
 
     val productWorkspaceFile = PathManager.getConfigDir()
@@ -275,9 +271,9 @@ abstract class ProjectStoreBase(final override val project: Project) : Component
 
     val filePath = file.path
     if (!isDirectoryBased) {
-      return filePath == projectFilePath.systemIndependentPath || filePath == workspacePath.systemIndependentPath
+      return filePath == projectFilePath.invariantSeparatorsPathString || filePath == workspacePath.invariantSeparatorsPathString
     }
-    return VfsUtilCore.isAncestorOrSelf(projectFilePath.parent.systemIndependentPath, file)
+    return VfsUtilCore.isAncestorOrSelf(projectFilePath.parent.invariantSeparatorsPathString, file)
   }
 
   final override fun getDirectoryStorePath() = dotIdea

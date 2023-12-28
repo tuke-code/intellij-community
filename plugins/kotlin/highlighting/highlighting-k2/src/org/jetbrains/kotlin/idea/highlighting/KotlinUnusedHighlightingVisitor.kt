@@ -35,7 +35,6 @@ import org.jetbrains.kotlin.idea.references.mainReference
 import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.psi.*
 
-context(KtAnalysisSession)
 class KotlinUnusedHighlightingVisitor(private val ktFile: KtFile) {
     private val enabled: Boolean
     private val deadCodeKey: HighlightDisplayKey?
@@ -75,6 +74,7 @@ class KotlinUnusedHighlightingVisitor(private val ktFile: KtFile) {
         }
     }
 
+    context(KtAnalysisSession)
     private fun registerLocalReferences(elements: List<PsiElement>) {
         val registerDeclarationAccessVisitor = object : KtVisitorVoid() {
             override fun visitSimpleNameExpression(expression: KtSimpleNameExpression) {
@@ -140,6 +140,7 @@ class KotlinUnusedHighlightingVisitor(private val ktFile: KtFile) {
         }
     }
 
+    context(KtAnalysisSession)
     private fun handleDeclaration(declaration: KtNamedDeclaration,
                                   deadCodeInspection: LocalInspectionTool,
                                   deadCodeInfoType: HighlightInfoType.HighlightInfoTypeImpl,
@@ -154,12 +155,16 @@ class KotlinUnusedHighlightingVisitor(private val ktFile: KtFile) {
             return
         }
         val nameIdentifier = declaration.nameIdentifier
-        val problemPsiElement: PsiElement = if (mustBeLocallyReferenced && declaration.annotationEntries.isEmpty() //instead of slow implicit usages checks
+        val problemPsiElement =
+            if (mustBeLocallyReferenced
+                && declaration.annotationEntries.isEmpty() //instead of slow implicit usages checks
+                && declaration !is KtClass // look globally for private classes too, since they could be referenced from some fancy .xml
         ) {
             nameIdentifier ?: (declaration as? KtConstructor<*>)?.getConstructorKeyword() ?: declaration
         } else {
-            (KotlinUnusedSymbolUtil.getPsiToReportProblem(declaration) { javaInspection.isEntryPoint(it) } ?: return)
+            KotlinUnusedSymbolUtil.getPsiToReportProblem(declaration, javaInspection)
         }
+        if (problemPsiElement == null) return
         val description = declaration.describe() ?: return
         val message = KotlinBaseHighlightingBundle.message("inspection.message.never.used", description)
         val builder = UnusedSymbolUtil.createUnusedSymbolInfoBuilder(problemPsiElement, message, deadCodeInfoType, null)
