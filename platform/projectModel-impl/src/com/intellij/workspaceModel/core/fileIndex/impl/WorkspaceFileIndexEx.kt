@@ -1,4 +1,4 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.workspaceModel.core.fileIndex.impl
 
 import com.intellij.openapi.components.serviceIfCreated
@@ -8,7 +8,7 @@ import com.intellij.openapi.vfs.AsyncFileListener
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.VirtualFileFilter
 import com.intellij.openapi.vfs.newvfs.persistent.PersistentFsConnectionListener
-import com.intellij.platform.workspace.storage.EntityReference
+import com.intellij.platform.workspace.storage.EntityPointer
 import com.intellij.platform.workspace.storage.WorkspaceEntity
 import com.intellij.psi.search.GlobalSearchScope
 import com.intellij.util.Query
@@ -16,6 +16,7 @@ import com.intellij.workspaceModel.core.fileIndex.WorkspaceFileIndex
 import com.intellij.workspaceModel.core.fileIndex.WorkspaceFileSet
 import com.intellij.workspaceModel.core.fileIndex.WorkspaceFileSetData
 import com.intellij.workspaceModel.core.fileIndex.WorkspaceFileSetWithCustomData
+import com.intellij.workspaceModel.core.fileIndex.impl.WorkspaceFileInternalInfo.NonWorkspace
 import org.jetbrains.annotations.ApiStatus
 
 interface WorkspaceFileIndexEx : WorkspaceFileIndex {
@@ -29,6 +30,22 @@ interface WorkspaceFileIndexEx : WorkspaceFileIndex {
                   includeExternalSets: Boolean,
                   includeExternalSourceSets: Boolean,
                   includeCustomKindSets: Boolean): WorkspaceFileInternalInfo
+
+  /**
+   * Searches for the first parent of [file] (or [file] itself), which has an associated [WorkspaceFileSet]s (taking into account
+   * passed flags), and returns entities of type [E] from which these filesets were contributed.
+   * 
+   * Note that the result of this function depends on how exactly [com.intellij.workspaceModel.core.fileIndex.WorkspaceFileIndexContributor]
+   * for entities of type [E] are implemented.
+   * If the contributor is actually registered for a child entity of [E], the function will return nothing.
+   */
+  fun <E: WorkspaceEntity> findContainingEntities(file: VirtualFile, 
+                                                  entityClass: Class<E>, 
+                                                  honorExclusion: Boolean, 
+                                                  includeContentSets: Boolean, 
+                                                  includeExternalSets: Boolean,
+                                                  includeExternalSourceSets: Boolean,
+                                                  includeCustomKindSets: Boolean): Collection<E>
 
   /**
    * Holds references to the currently stored data.
@@ -135,5 +152,5 @@ interface WorkspaceFileSetVisitor {
 
 @ApiStatus.Internal
 interface VfsChangeApplier: AsyncFileListener.ChangeApplier {
-  val entitiesToReindex: Set<EntityReference<WorkspaceEntity>>
+  val entitiesToReindex: Set<EntityPointer<WorkspaceEntity>>
 }

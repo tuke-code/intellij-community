@@ -11,10 +11,10 @@ import com.intellij.debugger.jdi.ThreadReferenceProxyImpl
 import com.intellij.openapi.application.runReadAction
 import com.sun.jdi.*
 import org.jetbrains.kotlin.idea.debugger.base.util.*
+import org.jetbrains.kotlin.idea.debugger.base.util.evaluate.DefaultExecutionContext
 import org.jetbrains.kotlin.idea.debugger.core.canRunEvaluation
 import org.jetbrains.kotlin.idea.debugger.core.invokeInManagerThread
 import org.jetbrains.kotlin.idea.debugger.coroutine.data.SuspendExitMode
-import org.jetbrains.kotlin.idea.debugger.base.util.evaluate.DefaultExecutionContext
 import org.jetbrains.kotlin.idea.util.application.isUnitTestMode
 
 const val CREATION_STACK_TRACE_SEPARATOR = "\b\b\b" // the "\b\b\b" is used as creation stacktrace separator in kotlinx.coroutines
@@ -46,14 +46,8 @@ fun Location.getSuspendExitMode(): SuspendExitMode {
 fun Location.safeCoroutineExitPointLineNumber() =
   (wrapIllegalArgumentException { DebuggerUtilsEx.getLineNumber(this, false) } ?: -2) == -1
 
-fun ReferenceType.isContinuation() =
-    isBaseContinuationImpl() || isSubtype("kotlin.coroutines.Continuation")
-
 fun Type.isBaseContinuationImpl() =
     isSubtype("kotlin.coroutines.jvm.internal.BaseContinuationImpl")
-
-fun Type.isAbstractCoroutine() =
-    isSubtype("kotlinx.coroutines.AbstractCoroutine")
 
 fun Type.isCoroutineScope() =
     isSubtype("kotlinx.coroutines.CoroutineScope")
@@ -77,6 +71,9 @@ fun StackFrameProxyImpl.variableValue(variableName: String): ObjectReference? {
     val continuationVariable = safeVisibleVariableByName(variableName) ?: return null
     return getValue(continuationVariable) as? ObjectReference ?: return null
 }
+
+fun StackFrameProxyImpl.completionVariableValue(): ObjectReference? =
+    variableValue("\$completion")
 
 fun StackFrameProxyImpl.continuationVariableValue(): ObjectReference? =
     variableValue("\$continuation")

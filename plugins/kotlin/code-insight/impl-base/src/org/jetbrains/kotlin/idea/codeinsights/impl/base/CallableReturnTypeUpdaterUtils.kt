@@ -15,20 +15,19 @@ import com.intellij.psi.PsiComment
 import com.intellij.psi.PsiDocumentManager
 import com.intellij.psi.PsiElement
 import com.intellij.refactoring.suggested.endOffset
+import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.kotlin.analysis.api.KtAnalysisSession
 import org.jetbrains.kotlin.analysis.api.renderer.types.impl.KtTypeRendererForSource
 import org.jetbrains.kotlin.analysis.api.symbols.KtCallableSymbol
+import org.jetbrains.kotlin.analysis.api.types.KtErrorType
 import org.jetbrains.kotlin.analysis.api.types.KtType
 import org.jetbrains.kotlin.analysis.api.types.KtTypeNullability
 import org.jetbrains.kotlin.idea.base.analysis.api.utils.shortenReferences
 import org.jetbrains.kotlin.idea.codeinsight.api.applicators.KotlinApplicatorInput
 import org.jetbrains.kotlin.idea.codeinsight.utils.ChooseValueExpression
 import org.jetbrains.kotlin.idea.codeinsights.impl.base.CallableReturnTypeUpdaterUtils.TypeInfo.Companion.createByKtTypes
-import org.jetbrains.kotlin.psi.KtCallableDeclaration
-import org.jetbrains.kotlin.psi.KtElement
-import org.jetbrains.kotlin.psi.KtFunction
-import org.jetbrains.kotlin.psi.KtProperty
-import org.jetbrains.kotlin.psi.KtPsiFactory
+import org.jetbrains.kotlin.idea.util.application.isUnitTestMode
+import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.psi.psiUtil.findDescendantOfType
 import org.jetbrains.kotlin.types.Variance
 import org.jetbrains.kotlin.util.bfs
@@ -133,7 +132,8 @@ object CallableReturnTypeUpdaterUtils {
     }
 
     context(KtAnalysisSession)
-    fun getTypeInfo(declaration: KtCallableDeclaration): TypeInfo {
+    @ApiStatus.Internal
+    fun <T> calculateAllTypes(declaration: KtCallableDeclaration, allTypesConsumer: (KtType, Sequence<KtType>, Boolean) -> T?): T? {
         val declarationType = declaration.getReturnKtType()
         val overriddenTypes = (declaration.getSymbol() as? KtCallableSymbol)?.getDirectlyOverriddenSymbols()
             ?.map { it.returnType }
@@ -157,11 +157,15 @@ object CallableReturnTypeUpdaterUtils {
 
                     else -> types
                 }
-            }.toList()
+            }
+        return allTypesConsumer(declarationType, allTypes, cannotBeNull)
+    }
 
-        return with(TypeInfo) {
-            if (ApplicationManager.getApplication().isUnitTestMode) {
-                selectForUnitTest(declaration, allTypes)?.let { return it }
+    context(KtAnalysisSession)
+    fun getTypeInfo(declaration: KtCallableDeclaration): TypeInfo {
+        val calculateAllTypes = calculateAllTypes<TypeInfo>(declaration) { declarationType, allTypes, cannotBeNull ->
+            if (isUnitTestMode()) {
+                selectForUnitTest(declaration, allTypes.toList())?.let { return@calculateAllTypes it }
             }
 
             val approximatedDefaultType = declarationType.approximateToSuperPublicDenotableOrSelf(approximateLocalTypes = true).let {
@@ -174,6 +178,7 @@ object CallableReturnTypeUpdaterUtils {
                 useTemplate = true
             )
         }
+        return calculateAllTypes ?: error("unable to calculate all types for $declaration")
     }
 
     // The following logic is copied from FE1.0 at
@@ -207,7 +212,7 @@ object CallableReturnTypeUpdaterUtils {
         val otherTypes: List<Type> = emptyList(),
         val useTemplate: Boolean = false,
     ) : KotlinApplicatorInput {
-        class Type(val isUnit: Boolean, val longTypeRepresentation: String, val shortTypeRepresentation: String)
+        class Type(val isUnit: Boolean, val isError: Boolean, val longTypeRepresentation: String, val shortTypeRepresentation: String)
 
         override fun isValidFor(psi: PsiElement): Boolean = true
 
@@ -215,19 +220,20 @@ object CallableReturnTypeUpdaterUtils {
             context(KtAnalysisSession)
             fun createByKtTypes(
                 ktType: KtType,
-                otherTypes: List<KtType> = emptyList(),
+                otherTypes: Sequence<KtType> = emptySequence(),
                 useTemplate: Boolean = false
-            ): TypeInfo = TypeInfo(createTypeByKtType(ktType), otherTypes.map { createTypeByKtType(it) }, useTemplate)
+            ): TypeInfo = TypeInfo(createTypeByKtType(ktType), otherTypes.map { createTypeByKtType(it) }.toList(), useTemplate)
 
             context(KtAnalysisSession)
             private fun createTypeByKtType(ktType: KtType): Type = Type(
                 isUnit = ktType.isUnit,
+                isError = ktType is KtErrorType,
                 longTypeRepresentation = ktType.render(KtTypeRendererForSource.WITH_QUALIFIED_NAMES, position = Variance.OUT_VARIANCE),
                 shortTypeRepresentation = ktType.render(KtTypeRendererForSource.WITH_SHORT_NAMES, position = Variance.OUT_VARIANCE),
             )
 
-            val UNIT = Type(isUnit = true, longTypeRepresentation = "kotlin.Unit", shortTypeRepresentation = "Unit")
-            val ANY = Type(isUnit = false, longTypeRepresentation = "kotlin.Any", shortTypeRepresentation = "Any")
+            val UNIT = Type(isUnit = true, isError = false, longTypeRepresentation = "kotlin.Unit", shortTypeRepresentation = "Unit")
+            val ANY = Type(isUnit = false, isError = false, longTypeRepresentation = "kotlin.Any", shortTypeRepresentation = "Any")
         }
     }
 }

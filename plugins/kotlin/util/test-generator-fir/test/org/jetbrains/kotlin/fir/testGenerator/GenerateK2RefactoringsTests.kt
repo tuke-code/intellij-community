@@ -3,10 +3,13 @@ package org.jetbrains.kotlin.fir.testGenerator
 
 import org.jetbrains.kotlin.idea.k2.refactoring.bindToElement.AbstractK2BindToElementTest
 import org.jetbrains.kotlin.idea.k2.refactoring.inline.AbstractKotlinFirInlineTest
+import org.jetbrains.kotlin.idea.k2.refactoring.introduce.AbstractK2PsiUnifierTest
 import org.jetbrains.kotlin.idea.k2.refactoring.introduce.introduceVariable.AbstractK2IntroduceVariableTest
 import org.jetbrains.kotlin.idea.k2.refactoring.move.AbstractK2MoveTest
 import org.jetbrains.kotlin.idea.k2.refactoring.safeDelete.AbstractK2SafeDeleteTest
+import org.jetbrains.kotlin.idea.k2.refactoring.safeDelete.AbstractFirMultiModuleSafeDeleteTest
 import org.jetbrains.kotlin.testGenerator.model.*
+import org.jetbrains.kotlin.testGenerator.model.Patterns.TEST
 
 internal fun MutableTWorkspace.generateK2RefactoringsTests() {
     testGroup("refactorings/kotlin.refactorings.tests.k2", testDataPath = "../../idea/tests/testData") {
@@ -33,6 +36,11 @@ internal fun MutableTWorkspace.generateK2RefactoringsTests() {
             model("refactoring/safeDelete/deleteValueParameter/kotlinValueParameterWithJava",  testMethodName = "doValueParameterTestWithJava")
             model("refactoring/safeDelete/deleteValueParameter/javaParameterWithKotlin", pattern = Patterns.JAVA, testMethodName = "doJavaParameterTest")
         }
+
+        testClass<AbstractFirMultiModuleSafeDeleteTest> {
+            model("refactoring/safeDeleteMultiModule", pattern = TEST, flatten = true)
+        }
+
         testClass<AbstractK2BindToElementTest> {
             model("refactoring/bindToElement")
         }
@@ -55,6 +63,9 @@ internal fun MutableTWorkspace.generateK2RefactoringsTests() {
     testGroup("refactorings/kotlin.refactorings.introduce.k2", testDataPath = "../../idea/tests/testData") {
         testClass<AbstractK2IntroduceVariableTest> {
             model("refactoring/introduceVariable", pattern = Patterns.KT_OR_KTS_WITHOUT_DOTS, testMethodName = "doIntroduceVariableTest")
+        }
+        testClass<AbstractK2PsiUnifierTest> {
+            model("unifier")
         }
     }
 }

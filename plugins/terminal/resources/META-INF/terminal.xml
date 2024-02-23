@@ -4,7 +4,6 @@
                 factoryClass="org.jetbrains.plugins.terminal.TerminalToolWindowFactory"
                 secondary="false"
                 canCloseContents="true"/>
-    <projectService serviceImplementation="org.jetbrains.plugins.terminal.TerminalToolWindowManager"/>
     <applicationService serviceImplementation="org.jetbrains.plugins.terminal.DefaultTerminalRunnerFactory"/>
 
     <projectConfigurable groupId="tools" groupWeight="130"
@@ -15,9 +14,7 @@
     <fileEditorProvider id="terminal-session-editor" implementation="org.jetbrains.plugins.terminal.vfs.TerminalSessionEditorProvider"/>
 
     <applicationService serviceImplementation="org.jetbrains.plugins.terminal.TerminalOptionsProvider"/>
-    <projectService serviceImplementation="org.jetbrains.plugins.terminal.TerminalProjectOptionsProvider"/>
 
-    <projectService serviceImplementation="org.jetbrains.plugins.terminal.arrangement.TerminalArrangementManager"/>
     <applicationService serviceImplementation="org.jetbrains.plugins.terminal.arrangement.TerminalCommandHistoryManager"/>
     <statistics.counterUsagesCollector implementationClass="org.jetbrains.plugins.terminal.fus.TerminalUsageTriggerCollector"/>
 
@@ -27,10 +24,14 @@
                  description="Enable new terminal UI"/>
     <registryKey key="terminal.new.ui.fish" defaultValue="false"
                  description="Enable new terminal for Fish"/>
-    <registryKey key="terminal.new.ui.powershell" defaultValue="false"
-                 description="Enable new terminal for PowerShell"/>
+    <registryKey key="terminal.new.ui.powershell.win11" defaultValue="true"
+                 description="Enable new terminal for PowerShell on Windows 11"/>
+    <registryKey key="terminal.new.ui.powershell.win10" defaultValue="true"
+                 description="Enable new terminal for PowerShell on Windows 10"/>
+    <registryKey key="terminal.new.ui.show.promotion" defaultValue="false"
+                 description="Whether to show the GotIt tooltip with a proposal to try the New Terminal"/>
 
-    <experimentalFeature id="terminal.shell.command.handling" percentOfUsers="100"/>
+    <experimentalFeature id="terminal.shell.command.handling" percentOfUsers="0"/>
     <terminal.shellCommandHandler implementation="org.jetbrains.plugins.terminal.RunAnythingTerminalBridge"/>
     <terminal.shellCommandHandler implementation="org.jetbrains.plugins.terminal.OpenFileShellCommandHandler"/>
     <selectInTarget implementation="org.jetbrains.plugins.terminal.view.SelectInTerminal"/>
@@ -40,9 +41,9 @@
     <actionPromoter implementation="org.jetbrains.plugins.terminal.action.TerminalCtrlCActionsPromoter"/>
     <editorActionHandler action="EditorEnter" implementationClass="org.jetbrains.plugins.terminal.exp.TerminalEnterHandler"
                          id="terminalEnter" order="first"/>
-    <editorActionHandler action="EditorUp" implementationClass="org.jetbrains.plugins.terminal.exp.TerminalCaretUpHandler"
+    <editorActionHandler action="EditorUp" implementationClass="org.jetbrains.plugins.terminal.exp.history.TerminalCaretUpHandler"
                          id="terminalUp" order="first"/>
-    <editorActionHandler action="EditorDown" implementationClass="org.jetbrains.plugins.terminal.exp.TerminalCaretDownHandler"
+    <editorActionHandler action="EditorDown" implementationClass="org.jetbrains.plugins.terminal.exp.history.TerminalCaretDownHandler"
                          id="terminalDown" order="first"/>
     <editorActionHandler action="Find" implementationClass="org.jetbrains.plugins.terminal.exp.TerminalFindHandler"
                          id="terminalFind" order="first"/>
@@ -52,6 +53,9 @@
                          id="terminalFindPrevious" order="first"/>
     <editorActionHandler action="Replace" implementationClass="org.jetbrains.plugins.terminal.exp.TerminalReplaceHandler"
                          id="terminalReplace" order="first"/>
+    <editorActionHandler action="Terminal.SearchInCommandHistory"
+                         implementationClass="org.jetbrains.plugins.terminal.exp.history.CommandSearchSelectNextHandler"
+                         id="terminalCommandSearchSelectNext" order="first"/>
     <typedHandler implementation="org.jetbrains.plugins.terminal.exp.TerminalCompletionAutoPopupHandler"
                   id="terminalCompletionAutoPopup" order="first"/>
     <lookup.charFilter implementation="org.jetbrains.plugins.terminal.exp.TerminalCharFilter"
@@ -59,7 +63,11 @@
     <completion.contributor language="any"
                             id="terminalCommandSpec"
                             implementationClass="org.jetbrains.plugins.terminal.exp.completion.TerminalCommandSpecCompletionContributor"
-                            order="first, before shShebang, before liveTemplates"/>
+                            order="first, before terminalPowerShell, after ml_context"/>
+    <completion.contributor language="any"
+                            id="terminalPowerShell"
+                            implementationClass="org.jetbrains.plugins.terminal.exp.completion.powershell.PowerShellCompletionContributor"
+                            order="first, before shShebang, before liveTemplates, after ml_context"/>
     <weigher key="completion"
              id="terminalCommandSpec"
              order="before stats"
@@ -72,6 +80,7 @@
     <advancedSetting bundle="messages.TerminalBundle"  id="terminal.character.encoding" default="UTF-8" groupKey="group.advanced.settings.terminal"/>
     <applicationService serviceInterface="com.intellij.terminal.search.JediTermSearchComponentProvider"
                         serviceImplementation="org.jetbrains.plugins.terminal.search.JediTermSearchComponentProviderImpl"/>
+    <advancedSetting id="new.terminal.output.capacity.kb" default="1024" groupKey="group.advanced.settings.terminal"/>
   </extensions>
 
   <extensions defaultExtensionNs="org.jetbrains.plugins.terminal">

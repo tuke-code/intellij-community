@@ -37,8 +37,6 @@ public final class PyKnownDecoratorUtil {
     CLASSMETHOD(PyNames.CLASSMETHOD),
     PROPERTY(PyNames.PROPERTY),
 
-    CONTEXTLIB_CONTEXTMANAGER("contextlib.contextmanager"),
-
     FUNCTOOLS_LRU_CACHE("functools.lru_cache"),
     FUNCTOOLS_WRAPS("functools.wraps"),
     FUNCTOOLS_TOTAL_ORDERING("functools.total_ordering"),
@@ -90,7 +88,6 @@ public final class PyKnownDecoratorUtil {
     ATTRS_MUTABLE("attrs.mutable"),
     ATTRS_FROZEN("attrs.frozen"),
 
-    PYTEST_FIXTURE("pytest.fixture"),
     PYTEST_FIXTURES_FIXTURE("_pytest.fixtures.fixture");
 
     private final QualifiedName myQualifiedName;
@@ -241,12 +238,12 @@ public final class PyKnownDecoratorUtil {
       return true;
     }
 
-    return ContainerUtil.exists(decorators, d -> d == UNITTEST_MOCK_PATCH || d == CONTEXTLIB_CONTEXTMANAGER);
+    return ContainerUtil.exists(decorators, d -> d == UNITTEST_MOCK_PATCH);
   }
 
   public static boolean hasChangingReturnTypeDecorator(@NotNull PyDecoratable decoratable, @NotNull TypeEvalContext context) {
     final List<KnownDecorator> decorators = getKnownDecorators(decoratable, context);
-    return ContainerUtil.exists(decorators, d -> d == UNITTEST_MOCK_PATCH || d == CONTEXTLIB_CONTEXTMANAGER);
+    return ContainerUtil.exists(decorators, d -> d == UNITTEST_MOCK_PATCH);
   }
 
   public static boolean hasUnknownOrUpdatingAttributesDecorator(@NotNull PyDecoratable decoratable, @NotNull TypeEvalContext context) {

@@ -2,15 +2,19 @@
 package org.jetbrains.plugins.terminal.exp
 
 import com.intellij.openapi.Disposable
+import com.intellij.openapi.diagnostic.debug
 import com.intellij.openapi.diagnostic.logger
 import com.jediterm.terminal.TerminalCustomCommandListener
 import kotlinx.coroutines.CompletableDeferred
+import org.jetbrains.annotations.NonNls
 import org.jetbrains.plugins.terminal.TerminalUtil
 import java.util.*
 import java.util.concurrent.CopyOnWriteArrayList
-import java.util.concurrent.TimeUnit
+import kotlin.time.Duration
+import kotlin.time.TimeMark
+import kotlin.time.TimeSource
 
-class ShellCommandManager(session: BlockTerminalSession) {
+class ShellCommandManager(private val session: BlockTerminalSession) {
   private val listeners: CopyOnWriteArrayList<ShellCommandListener> = CopyOnWriteArrayList()
 
   @Volatile
@@ -21,10 +25,11 @@ class ShellCommandManager(session: BlockTerminalSession) {
     session.controller.addCustomCommandListener(TerminalCustomCommandListener {
       try {
         when (it.getOrNull(0)) {
-          "initialized" -> processInitialized(it)
+          "initialized" -> processInitialized()
           "prompt_shown" -> firePromptShown()
           "command_started" -> processCommandStartedEvent(it)
           "command_finished" -> processCommandFinishedEvent(it)
+          "prompt_state_updated" -> processPromptStateUpdatedEvent(it)
           "command_history" -> processCommandHistoryEvent(it)
           "generator_finished" -> processGeneratorFinishedEvent(it)
           "clear_invoked" -> fireClearInvoked()
@@ -37,30 +42,49 @@ class ShellCommandManager(session: BlockTerminalSession) {
     })
   }
 
-  private fun processInitialized(event: List<String>) {
-    val currentDirectory = Param.CURRENT_DIRECTORY.getDecodedValueOrNull(event.getOrNull(1))
-    fireInitialized(currentDirectory)
+  private fun processInitialized() {
+    if (session.commandBlockIntegration.commandEndMarker != null) {
+      debug { "Received initialized event, waiting for command end marker" }
+      ShellCommandEndMarkerListener(session) {
+        fireInitialized()
+      }
+    }
+    else {
+      fireInitialized()
+    }
   }
 
   private fun processCommandStartedEvent(event: List<String>) {
     val command = Param.COMMAND.getDecodedValue(event.getOrNull(1))
     val currentDirectory = Param.CURRENT_DIRECTORY.getDecodedValue(event.getOrNull(2))
-    val startedCommand = StartedCommand(System.nanoTime(), currentDirectory, command)
+    val startedCommand = StartedCommand(command, currentDirectory, TimeSource.Monotonic.markNow())
     this.startedCommand = startedCommand
     fireCommandStarted(startedCommand)
   }
 
   private fun processCommandFinishedEvent(event: List<String>) {
     val exitCode = Param.EXIT_CODE.getIntValue(event.getOrNull(1))
-    val newCurrentDirectory = Param.CURRENT_DIRECTORY.getDecodedValue(event.getOrNull(2))
     val startedCommand = this.startedCommand
-    if (startedCommand != null) {
-      if (startedCommand.currentDirectory != newCurrentDirectory) {
-        fireDirectoryChanged(newCurrentDirectory)
+    if (session.commandBlockIntegration.commandEndMarker != null) {
+      debug { "Received command_finished event, waiting for command end marker" }
+      ShellCommandEndMarkerListener(session) {
+        fireCommandFinished(startedCommand, exitCode)
+        this.startedCommand = null
       }
     }
-    fireCommandFinished(startedCommand, exitCode)
-    this.startedCommand = null
+    else {
+      fireCommandFinished(startedCommand, exitCode)
+      this.startedCommand = null
+    }
+  }
+
+  private fun processPromptStateUpdatedEvent(event: List<String>) {
+    val currentDirectory = Param.CURRENT_DIRECTORY.getDecodedValue(event.getOrNull(1))
+    val gitBranch = Param.GIT_BRANCH.getDecodedValueOrNull(event.getOrNull(2))?.takeIf { it.isNotEmpty() }
+    val virtualEnv = Param.VIRTUAL_ENV.getDecodedValueOrNull(event.getOrNull(3))?.takeIf { it.isNotEmpty() }
+    val condaEnv = Param.CONDA_ENV.getDecodedValueOrNull(event.getOrNull(4))?.takeIf { it.isNotEmpty() }
+    val state = TerminalPromptState(currentDirectory, gitBranch, virtualEnv, condaEnv)
+    firePromptStateUpdated(state)
   }
 
   private fun processCommandHistoryEvent(event: List<String>) {
@@ -71,77 +95,96 @@ class ShellCommandManager(session: BlockTerminalSession) {
   private fun processGeneratorFinishedEvent(event: List<String>) {
     val requestId = Param.REQUEST_ID.getIntValue(event.getOrNull(1))
     val result = Param.RESULT.getDecodedValue(event.getOrNull(2))
-    fireGeneratorFinished(requestId, result)
+    if (session.commandBlockIntegration.commandEndMarker != null) {
+      debug { "Received generator_finished event, waiting for command end marker" }
+      ShellCommandEndMarkerListener(session) {
+        fireGeneratorFinished(requestId, result)
+      }
+    }
+    else {
+      fireGeneratorFinished(requestId, result)
+    }
   }
 
-  private fun fireInitialized(currentDirectory: String?) {
-    if (LOG.isDebugEnabled) {
-      LOG.debug("Shell event: initialized")
+  /**
+   * Clear backing terminal text buffer on command/generator termination.
+   * This helps to ensure that IDE doesn't see previous command/generator output when a new command starts.
+   * A possible problem with this approach is that it might not work on ConPTY as it synchronizes buffers sometimes.
+   * In this case (the worst case), the problem is that the fix won't work as intended, but nothing else bad will happen.
+   *
+   * It might be solved differently - start scraping command output on command_started event, but it won't work
+   * reliably on ConPTY where command_started event is delivered asynchronously with command output.
+   *
+   * There is a plan to get rid of command_started event and replace this code with a new clear_all generator running
+   * on command termination.
+   */
+  private fun clearTerminal() {
+    session.terminalStarterFuture.getNow(null)?.let {
+      debug { "force clearing terminal" }
+      session.model.clearAllAndMoveCursorToTopLeftCorner(it.terminal)
     }
+  }
+
+  private fun fireInitialized() {
+    debug { "Shell event: initialized" }
     for (listener in listeners) {
-      listener.initialized(currentDirectory)
+      listener.initialized()
     }
+    clearTerminal()
   }
 
   private fun firePromptShown() {
-    if (LOG.isDebugEnabled) {
-      LOG.debug("Shell event: prompt_shown")
-    }
+    debug { "Shell event: prompt_shown" }
     for (listener in listeners) {
       listener.promptShown()
     }
   }
 
   private fun fireCommandStarted(startedCommand: StartedCommand) {
-    if (LOG.isDebugEnabled) {
-      LOG.debug("Shell event: command_started - $startedCommand")
-    }
+    debug { "Shell event: command_started - $startedCommand" }
     for (listener in listeners) {
       listener.commandStarted(startedCommand.command)
     }
   }
 
   private fun fireCommandFinished(startedCommand: StartedCommand?, exitCode: Int) {
-    if (LOG.isDebugEnabled) {
-      LOG.debug("Shell event: command_finished - $startedCommand, exit code: $exitCode")
+    if (startedCommand == null) {
+      LOG.info("Shell event: received command_finished without preceding command_started - skipping")
     }
-    for (listener in listeners) {
-      val duration = startedCommand?.commandStartedNano?.let { TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - it) }
-      listener.commandFinished(startedCommand?.command, exitCode, duration)
+    else {
+      val event = CommandFinishedEvent(startedCommand.command, exitCode, startedCommand.commandStarted.elapsedNow())
+      debug { "Shell event: command_finished - $event" }
+      for (listener in listeners) {
+        listener.commandFinished(event)
+      }
     }
+    clearTerminal()
   }
 
-  private fun fireDirectoryChanged(newDirectory: String) {
+  private fun firePromptStateUpdated(state: TerminalPromptState) {
     for (listener in listeners) {
-      listener.directoryChanged(newDirectory)
+      listener.promptStateUpdated(state)
     }
-    if (LOG.isDebugEnabled) {
-      LOG.debug("Current directory changed from '${startedCommand?.currentDirectory}' to '$newDirectory'")
-    }
+    debug { "Prompt state updated: $state" }
   }
 
   private fun fireCommandHistoryReceived(history: String) {
-    if (LOG.isDebugEnabled) {
-      LOG.debug("Shell event: command_history of ${history.length} size")
-    }
+    debug { "Shell event: command_history of ${history.length} size" }
     for (listener in listeners) {
       listener.commandHistoryReceived(history)
     }
   }
 
   private fun fireGeneratorFinished(requestId: Int, result: String) {
-    if (LOG.isDebugEnabled) {
-      LOG.debug("Shell event: generator_finished with requestId $requestId and result of ${result.length} size")
-    }
+    debug { "Shell event: generator_finished with requestId $requestId and result of ${result.length} size" }
     for (listener in listeners) {
       listener.generatorFinished(requestId, result)
     }
+    clearTerminal()
   }
 
   private fun fireClearInvoked() {
-    if (LOG.isDebugEnabled) {
-      LOG.debug("Shell event: clear_invoked")
-    }
+    debug { "Shell event: clear_invoked" }
     for (listener in listeners) {
       listener.clearInvoked()
     }
@@ -160,6 +203,10 @@ class ShellCommandManager(session: BlockTerminalSession) {
   companion object {
     internal val LOG = logger<ShellCommandManager>()
 
+    internal inline fun debug(e: Exception? = null, lazyMessage: () -> @NonNls String) {
+      LOG.debug(e, lazyMessage)
+    }
+
     @Throws(IllegalArgumentException::class)
     private fun decodeHex(hexStr: String): String {
       val bytes = HexFormat.of().parseHex(hexStr)
@@ -170,11 +217,14 @@ class ShellCommandManager(session: BlockTerminalSession) {
   private enum class Param {
 
     EXIT_CODE,
-    CURRENT_DIRECTORY,
     COMMAND,
     HISTORY_STRING,
     REQUEST_ID,
-    RESULT;
+    RESULT,
+    CURRENT_DIRECTORY,
+    GIT_BRANCH,
+    VIRTUAL_ENV,
+    CONDA_ENV;
 
     private val paramNameWithSeparator: String = "${paramName()}="
 
@@ -200,11 +250,7 @@ class ShellCommandManager(session: BlockTerminalSession) {
 }
 
 interface ShellCommandListener {
-  /**
-   * Fired before the first prompt is printed
-   * todo: make current directory notnull when all shell integrations adapt it
-   */
-  fun initialized(currentDirectory: String?) {}
+  fun initialized() {}
 
   /**
    * Fired each time when prompt is printed.
@@ -216,9 +262,9 @@ interface ShellCommandListener {
   fun commandStarted(command: String) {}
 
   /** Fired after command is executed and before prompt is printed */
-  fun commandFinished(command: String?, exitCode: Int, duration: Long?) {}
+  fun commandFinished(event: CommandFinishedEvent) {}
 
-  fun directoryChanged(newDirectory: String) {}
+  fun promptStateUpdated(newState: TerminalPromptState) {}
 
   fun commandHistoryReceived(history: String) {}
 
@@ -227,8 +273,6 @@ interface ShellCommandListener {
   fun clearInvoked() {}
 }
 
-private class StartedCommand(val commandStartedNano: Long, val currentDirectory: String, val command: String) {
-  override fun toString(): String {
-    return "command: $command, currentDirectory: $currentDirectory"
-  }
-}
+data class CommandFinishedEvent(val command: String, val exitCode: Int, val duration: Duration)
+
+private data class StartedCommand(val command: String, val currentDirectory: String, val commandStarted: TimeMark)

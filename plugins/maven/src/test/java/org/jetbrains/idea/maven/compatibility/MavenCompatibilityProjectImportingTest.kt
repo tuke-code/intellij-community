@@ -82,7 +82,7 @@ class MavenCompatibilityProjectImportingTest : MavenImportingTestCase() {
                          </extensions>
                        </build>
                        """.trimIndent())
-    doImportProjects(java.util.List.of(projectPom), false)
+    doImportProjectsAsync(listOf(projectPom), false)
 
     val projects = projectsTree.projects
     assertEquals(1, projects.size)
@@ -159,7 +159,7 @@ class MavenCompatibilityProjectImportingTest : MavenImportingTestCase() {
   }
 
 
-  private fun assertCorrectVersion() {
+  private suspend fun assertCorrectVersion() {
     assertEquals(myMavenVersion, MavenServerManager.getInstance().getConnector(project, projectRoot.path).mavenDistribution.version)
   }
 
@@ -380,7 +380,7 @@ class MavenCompatibilityProjectImportingTest : MavenImportingTestCase() {
     @get:Parameterized.Parameters(name = "with Maven-{0}")
     val mavenVersions: List<Array<String>>
       get() = listOf(
-        arrayOf("4.0.0-alpha-9"),
+        arrayOf("4.0.0-alpha-12"),
         arrayOf("3.9.6"),
         arrayOf("3.9.5"),
         arrayOf("3.9.4"),

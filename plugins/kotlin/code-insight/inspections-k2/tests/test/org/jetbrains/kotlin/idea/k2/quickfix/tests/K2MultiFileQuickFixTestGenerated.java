@@ -1,4 +1,4 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 
 package org.jetbrains.kotlin.idea.k2.quickfix.tests;
 
@@ -17,87 +17,43 @@ import org.junit.runner.RunWith;
 @TestRoot("code-insight/inspections-k2/tests")
 @TestDataPath("$CONTENT_ROOT")
 @RunWith(JUnit3RunnerWithInners.class)
+@TestMetadata("../../../idea/tests/testData/quickfix/optIn")
 public abstract class K2MultiFileQuickFixTestGenerated extends AbstractK2MultiFileQuickFixTest {
     @RunWith(JUnit3RunnerWithInners.class)
-    @TestMetadata("../../../idea/tests/testData/quickfix/optIn")
-    public abstract static class OptIn extends AbstractK2MultiFileQuickFixTest {
-        @RunWith(JUnit3RunnerWithInners.class)
-        @TestMetadata("../../../idea/tests/testData/quickfix/optIn/multifile")
-        public static class Multifile extends AbstractK2MultiFileQuickFixTest {
-            private void runTest(String testDataFilePath) throws Exception {
-                KotlinTestUtils.runTest(this::doTestWithExtraFile, this, testDataFilePath);
-            }
-
-            @TestMetadata("apiFromJava.test")
-            public void testApiFromJava() throws Exception {
-                runTest("../../../idea/tests/testData/quickfix/optIn/multifile/apiFromJava.test");
-            }
-
-            @TestMetadata("apiFromJava2.test")
-            public void testApiFromJava2() throws Exception {
-                runTest("../../../idea/tests/testData/quickfix/optIn/multifile/apiFromJava2.test");
-            }
-
-            @TestMetadata("apiFromJava3.test")
-            public void testApiFromJava3() throws Exception {
-                runTest("../../../idea/tests/testData/quickfix/optIn/multifile/apiFromJava3.test");
-            }
-
-            @TestMetadata("apiFromJava4.test")
-            public void testApiFromJava4() throws Exception {
-                runTest("../../../idea/tests/testData/quickfix/optIn/multifile/apiFromJava4.test");
-            }
-
-            @TestMetadata("reservedKeywordPackage.test")
-            public void testReservedKeywordPackage() throws Exception {
-                runTest("../../../idea/tests/testData/quickfix/optIn/multifile/reservedKeywordPackage.test");
-            }
-
-            @TestMetadata("reservedKeywordPackage2.test")
-            public void testReservedKeywordPackage2() throws Exception {
-                runTest("../../../idea/tests/testData/quickfix/optIn/multifile/reservedKeywordPackage2.test");
-            }
-        }
-    }
-
-    @RunWith(JUnit3RunnerWithInners.class)
-    @TestMetadata("../../../idea/tests/testData/quickfix/createFromUsage/createFunction/fromJava")
-    public static class FromJava extends AbstractK2MultiFileQuickFixTest {
+    @TestMetadata("../../../idea/tests/testData/quickfix/optIn/multifile")
+    public static class Multifile extends AbstractK2MultiFileQuickFixTest {
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTestWithExtraFile, this, testDataFilePath);
         }
 
-        @TestMetadata("classMember.before.Main.java")
-        public void testClassMember() throws Exception {
-            runTest("../../../idea/tests/testData/quickfix/createFromUsage/createFunction/fromJava/classMember.before.Main.java");
+        @TestMetadata("apiFromJava.test")
+        public void testApiFromJava() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/optIn/multifile/apiFromJava.test");
         }
 
-        @TestMetadata("companionMember.before.Main.java")
-        public void testCompanionMember() throws Exception {
-            runTest("../../../idea/tests/testData/quickfix/createFromUsage/createFunction/fromJava/companionMember.before.Main.java");
+        @TestMetadata("apiFromJava2.test")
+        public void testApiFromJava2() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/optIn/multifile/apiFromJava2.test");
         }
 
-        @TestMetadata("nullType.before.Main.java")
-        public void testNullType() throws Exception {
-            runTest("../../../idea/tests/testData/quickfix/createFromUsage/createFunction/fromJava/nullType.before.Main.java");
+        @TestMetadata("apiFromJava3.test")
+        public void testApiFromJava3() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/optIn/multifile/apiFromJava3.test");
         }
 
-        @TestMetadata("topLevel.before.Main.java")
-        public void testTopLevel() throws Exception {
-            runTest("../../../idea/tests/testData/quickfix/createFromUsage/createFunction/fromJava/topLevel.before.Main.java");
-        }
-    }
-
-    @RunWith(JUnit3RunnerWithInners.class)
-    @TestMetadata("../../../idea/tests/testData/quickfix/createFromUsage/createFunction/fromKotlinToJava")
-    public static class FromKotlinToJava extends AbstractK2MultiFileQuickFixTest {
-        private void runTest(String testDataFilePath) throws Exception {
-            KotlinTestUtils.runTest(this::doTestWithExtraFile, this, testDataFilePath);
+        @TestMetadata("apiFromJava4.test")
+        public void testApiFromJava4() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/optIn/multifile/apiFromJava4.test");
         }
 
-        @TestMetadata("classMember.before.Main.kt")
-        public void testClassMember() throws Exception {
-            runTest("../../../idea/tests/testData/quickfix/createFromUsage/createFunction/fromKotlinToJava/classMember.before.Main.kt");
+        @TestMetadata("reservedKeywordPackage.test")
+        public void testReservedKeywordPackage() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/optIn/multifile/reservedKeywordPackage.test");
+        }
+
+        @TestMetadata("reservedKeywordPackage2.test")
+        public void testReservedKeywordPackage2() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/optIn/multifile/reservedKeywordPackage2.test");
         }
     }
 }

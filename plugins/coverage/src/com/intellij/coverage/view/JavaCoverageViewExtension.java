@@ -61,7 +61,7 @@ public class JavaCoverageViewExtension extends CoverageViewExtension {
 
   @NotNull
   private static String getNodeId(AbstractTreeNode<?> node) {
-    return node instanceof CoverageListRootNode ? "" : ((JavaCoverageNode)node).getQualifiedName();
+    return node instanceof CoverageListRootNode ? CoverageClassStructure.ROOT_ID : ((JavaCoverageNode)node).getQualifiedName();
   }
 
   @Override
@@ -104,6 +104,13 @@ public class JavaCoverageViewExtension extends CoverageViewExtension {
   public AbstractTreeNode<?> createRootNode() {
     final PsiPackage aPackage = JavaPsiFacade.getInstance(myProject).findPackage("");
     return new JavaCoverageRootNode(myProject, Objects.requireNonNull(aPackage), mySuitesBundle, myStateBean);
+  }
+
+  @Override
+  public boolean hasChildren(AbstractTreeNode<?> node) {
+    CoverageClassStructure structure = myAnnotator.getStructure();
+    if (structure == null) return false;
+    return structure.hasChildren(getNodeId(node));
   }
 
   @Override

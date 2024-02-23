@@ -1,4 +1,4 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 @file:Suppress("LiftReturnOrAssignment")
 
 package com.intellij.openapi.project.impl
@@ -7,6 +7,7 @@ import com.intellij.codeInsight.daemon.DaemonCodeAnalyzer
 import com.intellij.configurationStore.saveSettings
 import com.intellij.conversion.CannotConvertException
 import com.intellij.diagnostic.StartUpMeasurer
+import com.intellij.diagnostic.StartUpPerformanceService
 import com.intellij.diagnostic.dumpCoroutines
 import com.intellij.featureStatistics.fusCollectors.FileEditorCollector.EmptyStateCause
 import com.intellij.featureStatistics.fusCollectors.LifecycleUsageTriggerCollector
@@ -49,6 +50,7 @@ import com.intellij.platform.diagnostic.telemetry.impl.rootTask
 import com.intellij.platform.diagnostic.telemetry.impl.span
 import com.intellij.platform.ide.CoreUiCoroutineScopeHolder
 import com.intellij.platform.ide.bootstrap.getAndUnsetSplashProjectFrame
+import com.intellij.platform.ide.diagnostic.startUpPerformanceReporter.FUSProjectHotStartUpMeasurer
 import com.intellij.problems.WolfTheProblemSolver
 import com.intellij.psi.PsiManager
 import com.intellij.toolWindow.computeToolWindowBeans
@@ -64,6 +66,7 @@ import java.nio.file.Path
 import java.time.Instant
 import java.util.concurrent.atomic.AtomicLong
 import javax.swing.JFrame
+import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.math.min
 import kotlin.time.Duration.Companion.seconds
 
@@ -194,21 +197,28 @@ internal class ProjectUiFrameAllocator(@JvmField val options: OpenProjectTask,
       val toolWindowInitJob = scheduleInitFrame(rawProjectDeferred = rawProjectDeferred,
                                                 reopeningEditorJob = reopeningEditorJob,
                                                 deferredProjectFrameHelper = deferredProjectFrameHelper)
+      val startUpContextElementToPass = FUSProjectHotStartUpMeasurer.getStartUpContextElementToPass() ?: EmptyCoroutineContext
 
-      serviceAsync<CoreUiCoroutineScopeHolder>().coroutineScope.launch {
-        val project = rawProjectDeferred.await()
+      serviceAsync<CoreUiCoroutineScopeHolder>().coroutineScope.launch(startUpContextElementToPass) {
+        try {
+          val project = rawProjectDeferred.await()
+          coroutineScope {
+            launch(rootTask()) {
+              val frameHelper = deferredProjectFrameHelper.await()
+              frameHelper.installDefaultProjectStatusBarWidgets(project)
+              frameHelper.updateTitle(serviceAsync<FrameTitleBuilder>().getProjectTitle(project), project)
+            }
 
-        launch(rootTask()) {
-          val frameHelper = deferredProjectFrameHelper.await()
-          frameHelper.installDefaultProjectStatusBarWidgets(project)
-          frameHelper.updateTitle(serviceAsync<FrameTitleBuilder>().getProjectTitle(project), project)
+            reopeningEditorJob.join()
+            postOpenEditors(deferredProjectFrameHelper = deferredProjectFrameHelper,
+                            fileEditorManager = project.serviceAsync<FileEditorManager>() as FileEditorManagerImpl,
+                            toolWindowInitJob = toolWindowInitJob,
+                            project = project)
+          }
         }
-
-        reopeningEditorJob.join()
-        postOpenEditors(deferredProjectFrameHelper = deferredProjectFrameHelper,
-                        fileEditorManager = project.serviceAsync<FileEditorManager>() as FileEditorManagerImpl,
-                        toolWindowInitJob = toolWindowInitJob,
-                        project = project)
+        finally {
+          FUSProjectHotStartUpMeasurer.reportNoMoreEditorsOnStartup(System.nanoTime())
+        }
       }
 
       task(scheduleSaveTemplate(options), projectInitObserver)
@@ -357,6 +367,7 @@ private suspend fun restoreEditors(project: Project, fileEditorManager: FileEdit
 
     val (editorComponent, editorState) = fileEditorManager.init()
     if (editorState == null) {
+      serviceAsync<StartUpPerformanceService>().editorRestoringTillHighlighted()
       return@coroutineScope
     }
 
@@ -407,15 +418,19 @@ private suspend fun postOpenEditors(deferredProjectFrameHelper: Deferred<Project
   }
 }
 
-private fun focusSelectedEditor(editorComponent: EditorsSplitters) {
+private suspend fun focusSelectedEditor(editorComponent: EditorsSplitters) {
   val composite = editorComponent.currentWindow?.selectedComposite ?: return
   val editor = (composite.selectedEditor as? TextEditor)?.editor
   if (editor == null) {
+    FUSProjectHotStartUpMeasurer.firstOpenedUnknownEditor(composite.file, System.nanoTime())
     composite.preferredFocusedComponent?.requestFocusInWindow()
   }
   else {
-    AsyncEditorLoader.performWhenLoaded(editor) {
-      composite.preferredFocusedComponent?.requestFocusInWindow()
+    blockingContext {
+      AsyncEditorLoader.performWhenLoaded(editor) {
+        FUSProjectHotStartUpMeasurer.firstOpenedEditor(composite.file)
+        composite.preferredFocusedComponent?.requestFocusInWindow()
+      }
     }
   }
 }
@@ -530,6 +545,7 @@ private suspend fun findAndOpenReadmeIfNeeded(project: Project) {
       (project.serviceAsync<FileEditorManager>() as FileEditorManagerEx).openFile(readme, FileEditorOpenOptions(requestFocus = true))
 
       readme.putUserData(README_OPENED_ON_START_TS, Instant.now())
+      FUSProjectHotStartUpMeasurer.openedReadme(readme, System.nanoTime())
     }
   }
 }

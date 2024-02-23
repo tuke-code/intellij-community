@@ -1,4 +1,4 @@
-// Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.kotlin.idea.fir.extensions
 
 import com.intellij.ide.impl.isTrusted
@@ -42,6 +42,7 @@ import org.jetbrains.kotlin.idea.base.projectStructure.ideaModule
 import org.jetbrains.kotlin.idea.base.projectStructure.moduleInfo
 import org.jetbrains.kotlin.idea.base.projectStructure.moduleInfo.ModuleTestSourceInfo
 import org.jetbrains.kotlin.idea.base.util.Frontend10ApiUsage
+import org.jetbrains.kotlin.idea.base.util.caching.getChanges
 import org.jetbrains.kotlin.idea.compiler.configuration.KotlinCommonCompilerArgumentsHolder
 import org.jetbrains.kotlin.idea.compiler.configuration.KotlinCompilerSettingsListener
 import org.jetbrains.kotlin.idea.facet.KotlinFacet
@@ -66,12 +67,14 @@ internal class KtCompilerPluginsProviderIdeImpl(private val project: Project, cs
 
     init {
         cs.launch {
-            WorkspaceModel.getInstance(project).changesEventFlow.collect { event ->
-                val hasChanges = event.getChanges(FacetEntity::class.java).any { change ->
-                    change.facetTypes.any { it == KotlinFacetType.ID }
-                }
-                if (hasChanges) {
-                    pluginsCacheCachedValue.drop()
+            WorkspaceModel.getInstance(project).subscribe { _, changes ->
+                changes.collect { event ->
+                    val hasChanges = event.getChanges<FacetEntity>().any { change ->
+                        change.facetTypes.any { it == KotlinFacetType.ID }
+                    }
+                    if (hasChanges) {
+                        pluginsCacheCachedValue.drop()
+                    }
                 }
             }
         }

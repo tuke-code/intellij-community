@@ -40,7 +40,7 @@ class SimpleTerminalController(
     Disposer.register(this, caretPainter)
 
     // create dummy logical block, that will cover all the output, needed only for caret model
-    outputModel.createBlock(command = null, directory = null)
+    outputModel.createBlock(command = null, prompt = null)
     terminalModel.isCommandRunning = true
 
     setupContentListener()
@@ -128,7 +128,7 @@ class SimpleTerminalController(
 
   private fun updateEditor(content: TerminalContent) {
     document.setText(content.text)
-    editor.highlighter = TerminalTextHighlighter(content.highlightings)
+    editor.highlighter = TerminalTextHighlighter(AllHighlightingsSnapshot(editor.document, content.highlightings))
 
     val line = terminalModel.historyLinesCount + terminalModel.cursorY - 1
     editor.caretModel.moveToLogicalPosition(LogicalPosition(line, terminalModel.cursorX))

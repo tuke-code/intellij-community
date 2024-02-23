@@ -1,27 +1,32 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.codeInspection.java19api;
 
 import com.intellij.codeInsight.daemon.impl.analysis.JavaModuleGraphUtil;
 import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.module.Module;
 import com.intellij.openapi.module.ModuleUtilCore;
-import com.intellij.openapi.roots.*;
+import com.intellij.openapi.roots.ContentEntry;
+import com.intellij.openapi.roots.ModuleRootManager;
+import com.intellij.openapi.roots.SourceFolder;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiDirectory;
 import com.intellij.psi.PsiJavaModule;
 import com.intellij.psi.PsiManager;
-import one.util.streamex.StreamEx;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.jps.model.java.JavaSourceRootProperties;
+import org.jetbrains.jps.model.module.JpsModuleSourceRoot;
 
 import java.util.*;
+
+import static org.jetbrains.jps.model.java.JavaSourceRootType.SOURCE;
 
 class ModuleNode implements Comparable<ModuleNode> {
   @Nullable private final Module myModule;
   @NotNull private final Set<String> myDeclaredPackages;
   @NotNull private final Set<String> myRequiredPackages;
-  @NotNull private final Map<ModuleNode, Boolean> myDependencies = new TreeMap<>();
+  @NotNull private final Map<ModuleNode, Set<DependencyType>> myDependencies = new TreeMap<>();
   @NotNull private final Set<String> myExports = new TreeSet<>();
   @Nullable private final PsiJavaModule myDescriptor;
   @NotNull private final String myName;
@@ -68,7 +73,7 @@ class ModuleNode implements Comparable<ModuleNode> {
   }
 
   @NotNull
-  Map<ModuleNode, Boolean> getDependencies() {
+  Map<ModuleNode, Set<DependencyType>> getDependencies() {
     return myDependencies;
   }
 
@@ -122,20 +127,38 @@ class ModuleNode implements Comparable<ModuleNode> {
     if (myModule == null) return null;
     return ReadAction.compute(() -> {
       ModuleRootManager moduleManager = ModuleRootManager.getInstance(myModule);
+      List<VirtualFile> folderCandidates = new ArrayList<>();
+      for (ContentEntry entry : moduleManager.getContentEntries()) {
+        for (SourceFolder folder : entry.getSourceFolders()) {
+          if (isSourceFolder(folder)) {
+            folderCandidates.add(folder.getFile());
+          }
+        }
+      }
+
       PsiManager psiManager = PsiManager.getInstance(myModule.getProject());
-      return findJavaDirectory(psiManager, moduleManager.getSourceRoots(false));
+      return folderCandidates.stream()
+        .filter(Objects::nonNull)
+        .sorted(Comparator.comparingInt((VirtualFile vFile) -> "java".equals(vFile.getName()) ? 0 : 1).thenComparing(VirtualFile::getName))
+        .map(psiManager::findDirectory)
+        .filter(Objects::nonNull).findFirst().orElse(null);
     });
   }
 
-  @Nullable
-  private static PsiDirectory findJavaDirectory(@NotNull PsiManager psiManager, VirtualFile @NotNull [] roots) {
-    return ReadAction.compute(() -> StreamEx.of(roots)
-      .sorted(Comparator.comparingInt((VirtualFile vFile) -> "java".equals(vFile.getName()) ? 0 : 1).thenComparing(VirtualFile::getName))
-      .map(psiManager::findDirectory).nonNull().findFirst().orElse(null));
+  private static boolean isSourceFolder(@NotNull SourceFolder folder) {
+    final JpsModuleSourceRoot sourceRoot = folder.getJpsElement();
+    if (sourceRoot.getRootType() != SOURCE) return false;
+    if (!(sourceRoot.getProperties() instanceof JavaSourceRootProperties javaProperties)) return false;
+    return !javaProperties.isForGeneratedSources();
   }
 
   @Nullable
   private static PsiJavaModule findDescriptor(@NotNull Module module, @Nullable VirtualFile root) {
     return JavaModuleGraphUtil.findDescriptorByFile(root, module.getProject());
+  }
+
+  enum DependencyType {
+    STATIC,
+    TRANSITIVE
   }
 }

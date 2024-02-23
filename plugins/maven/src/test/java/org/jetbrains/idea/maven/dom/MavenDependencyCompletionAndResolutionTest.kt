@@ -293,8 +293,8 @@ class MavenDependencyCompletionAndResolutionTest : MavenDomWithIndicesTestCase()
       </dependencies>
       """.trimIndent())
 
-    assertCompletionVariants(m1, LOOKUP_STRING, "test:project:1", "test:m1:1", "test:m2_new:1")
-    assertCompletionVariants(m1, RENDERING_TEXT, "project", "m1", "m2_new")
+    assertCompletionVariantsNoCache(m1, LOOKUP_STRING, "test:project:1", "test:m1:1", "test:m2_new:1")
+    assertCompletionVariantsNoCache(m1, RENDERING_TEXT, "project", "m1", "m2_new")
   }
 
   @Test
@@ -337,7 +337,7 @@ class MavenDependencyCompletionAndResolutionTest : MavenDomWithIndicesTestCase()
                           </dependencies>
                           """.trimIndent())
 
-    assertCompletionVariants(projectPom)
+    assertCompletionVariantsNoCache(projectPom, RENDERING_TEXT)
   }
 
   @Test
@@ -405,7 +405,7 @@ class MavenDependencyCompletionAndResolutionTest : MavenDomWithIndicesTestCase()
 
   @Test
   fun testResolutionParentPathOutsideTheProject() = runBlocking {
-    val filePath = myIndicesFixture!!.repositoryHelper.getTestDataPath("local1/org/example/1.0/example-1.0.pom")
+    val filePath = myIndicesFixture!!.repositoryHelper.getTestDataPath("local1/org/example/example/1.0/example-1.0.pom")
 
     val relativePathUnixSeparator =
       FileUtil.getRelativePath(File(projectRoot.getPath()), File(filePath))!!.replace("\\\\".toRegex(), "/")
@@ -1219,6 +1219,7 @@ $libPath<caret></systemPath>
                          <dependency>
                            <groupId>junit</groupId>
                            <artifactId>junit</artifactId>
+                           <version>3.8.1</version>
                            <exclusions>
                              <<error descr="'artifactId' child tag should be defined">exclusion</error>>
                                <groupId>jmock</groupId>

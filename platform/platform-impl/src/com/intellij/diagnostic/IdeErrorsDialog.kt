@@ -1,4 +1,4 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.diagnostic
 
 import com.intellij.CommonBundle
@@ -13,6 +13,7 @@ import com.intellij.ide.util.PropertiesComponent
 import com.intellij.idea.ActionsBundle
 import com.intellij.openapi.actionSystem.*
 import com.intellij.openapi.actionSystem.impl.ActionToolbarImpl
+import com.intellij.openapi.actionSystem.toolbarLayout.ToolbarLayoutStrategy
 import com.intellij.openapi.application.ApplicationInfo
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.ApplicationNamesInfo
@@ -169,8 +170,10 @@ open class IdeErrorsDialog @JvmOverloads internal constructor(
   }
 
   private fun setDevelopers(developers: DeveloperList) {
-    myAssigneeCombo.model = CollectionComboBoxModel(developers.developers)
-    myDevListTimestamp = developers.timestamp
+    UIUtil.invokeLaterIfNeeded {
+      myAssigneeCombo.model = CollectionComboBoxModel(developers.developers)
+      myDevListTimestamp = developers.timestamp
+    }
   }
 
   private fun selectMessage(defaultMessage: LogMessage?): Int {
@@ -212,7 +215,7 @@ open class IdeErrorsDialog @JvmOverloads internal constructor(
     myForeignPluginWarningLabel = SwingHelper.createHtmlViewer(false, null, null, null)
     val toolbar = ActionManager.getInstance().createActionToolbar(
       ActionPlaces.TOOLBAR_DECORATOR_TOOLBAR, DefaultActionGroup(BackAction(), ForwardAction()), true)
-    toolbar.layoutPolicy = ActionToolbar.NOWRAP_LAYOUT_POLICY
+    toolbar.layoutStrategy = ToolbarLayoutStrategy.NOWRAP_STRATEGY
     toolbar.component.border = JBUI.Borders.empty()
     (toolbar as ActionToolbarImpl).setForceMinimumSize(true)
     toolbar.setTargetComponent(myCountLabel)
@@ -969,7 +972,7 @@ open class IdeErrorsDialog @JvmOverloads internal constructor(
         }
         if (!PluginManagerCore.processAllNonOptionalDependencies((rootDescriptor as IdeaPluginDescriptorImpl), pluginIdMap) { descriptor ->
             when {
-              descriptor!!.isEnabled -> if (pluginIdsToDisable.contains(descriptor.pluginId)) FileVisitResult.TERMINATE
+              descriptor.isEnabled -> if (pluginIdsToDisable.contains(descriptor.pluginId)) FileVisitResult.TERMINATE
               else FileVisitResult.CONTINUE
               else -> FileVisitResult.SKIP_SUBTREE
             }

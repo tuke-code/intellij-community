@@ -1,14 +1,18 @@
 // Copyright 2000-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
 package com.intellij.coverage;
 
+import com.intellij.execution.configurations.ModuleBasedConfiguration;
 import com.intellij.execution.configurations.RunConfigurationBase;
 import com.intellij.openapi.application.PathManager;
 import com.intellij.openapi.diagnostic.Logger;
+import com.intellij.openapi.module.Module;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.InvalidDataException;
 import com.intellij.openapi.util.JDOMExternalizable;
 import com.intellij.openapi.util.WriteExternalException;
 import com.intellij.openapi.util.io.FileUtil;
+import com.intellij.psi.search.GlobalSearchScope;
+import com.intellij.psi.search.GlobalSearchScopesCore;
 import com.intellij.rt.coverage.data.ProjectData;
 import org.jdom.Element;
 import org.jetbrains.annotations.NonNls;
@@ -115,6 +119,12 @@ public abstract class BaseCoverageSuite implements CoverageSuite, JDOMExternaliz
     return myCoverageDataFileProvider;
   }
 
+  @NotNull
+  @Override
+  public String getCoverageDataFileName() {
+    return myCoverageDataFileProvider.getCoverageDataFilePath();
+  }
+
   @Override
   public long getLastCoverageTimeStamp() {
     return myTimestamp;
@@ -174,7 +184,8 @@ public abstract class BaseCoverageSuite implements CoverageSuite, JDOMExternaliz
 
   @Nullable
   protected ProjectData loadProjectInfo() {
-    String sessionDataFileName = getCoverageDataFileName();
+    String sessionDataFileName = myCoverageDataFileProvider.getCoverageDataFilePath();
+    if (sessionDataFileName == null) return null;
     File sessionDataFile = new File(sessionDataFileName);
     if (!sessionDataFile.exists()) {
       if (LOG.isDebugEnabled()) {
@@ -219,7 +230,7 @@ public abstract class BaseCoverageSuite implements CoverageSuite, JDOMExternaliz
 
   @Override
   public void writeExternal(final Element element) throws WriteExternalException {
-    String absolutePath = getCoverageDataFileName();
+    String absolutePath = myCoverageDataFileProvider.getCoverageDataFilePath();
     String pathInSystemDir = FileUtil.getRelativePath(new File(PathManager.getSystemPath()), new File(absolutePath));
     element.setAttribute(FILE_PATH, pathInSystemDir != null ? FileUtil.toSystemIndependentName(pathInSystemDir) : absolutePath);
     element.setAttribute(NAME_ATTRIBUTE, myName);
@@ -252,6 +263,19 @@ public abstract class BaseCoverageSuite implements CoverageSuite, JDOMExternaliz
   @Override
   public int hashCode() {
     return myCoverageDataFileProvider.getCoverageDataFilePath().hashCode();
+  }
+
+  public GlobalSearchScope getSearchScope(Project project) {
+    RunConfigurationBase<?> configuration = getConfiguration();
+    GlobalSearchScope scope = isTrackTestFolders() ? GlobalSearchScope.projectScope(project)
+                                                   : GlobalSearchScopesCore.projectProductionScope(project);
+    if (configuration instanceof ModuleBasedConfiguration<?, ?> moduleConfig) {
+      Module module = moduleConfig.getConfigurationModule().getModule();
+      if (module != null) {
+        return GlobalSearchScope.moduleWithDependenciesScope(module).intersectWith(scope);
+      }
+    }
+    return scope;
   }
 
   private static String generateName(String path) {

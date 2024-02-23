@@ -5,6 +5,7 @@ package com.intellij.platform.diagnostic.telemetry
 
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.util.concurrency.SynchronizedClearableLazy
+import io.opentelemetry.api.GlobalOpenTelemetry
 import io.opentelemetry.api.OpenTelemetry
 import io.opentelemetry.api.metrics.Meter
 import kotlinx.coroutines.CoroutineName
@@ -59,9 +60,16 @@ interface TelemetryManager {
     fun forceSetTelemetryManager(value: TelemetryManager = NoopTelemetryManager()) {
       instance.value = value
     }
+
+    @TestOnly
+    fun resetGlobalSdk() {
+      GlobalOpenTelemetry.resetForTest()
+    }
   }
 
   var verboseMode: Boolean
+
+  fun hasSpanExporters(): Boolean
 
   /**
    * Method creates a tracer with the scope name.
@@ -127,6 +135,8 @@ private val instance = SynchronizedClearableLazy {
 
 class NoopTelemetryManager : TelemetryManager {
   override var verboseMode: Boolean = false
+
+  override fun hasSpanExporters(): Boolean = false
 
   override fun getTracer(scope: Scope): IJTracer = IJNoopTracer
 

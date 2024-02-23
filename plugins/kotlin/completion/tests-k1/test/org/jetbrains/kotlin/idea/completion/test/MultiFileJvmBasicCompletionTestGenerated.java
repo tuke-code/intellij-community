@@ -1,4 +1,4 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 
 package org.jetbrains.kotlin.idea.completion.test;
 
@@ -186,11 +186,6 @@ public class MultiFileJvmBasicCompletionTestGenerated extends AbstractMultiFileJ
     @TestMetadata("InImportExtension")
     public void testInImportExtension() throws Exception {
         runTest("../testData/basic/multifile/InImportExtension/");
-    }
-
-    @TestMetadata("InImportExtensionNoAttributes")
-    public void testInImportExtensionNoAttributes() throws Exception {
-        runTest("../testData/basic/multifile/InImportExtensionNoAttributes/");
     }
 
     @TestMetadata("InImportHighOrderTopLevelFun")

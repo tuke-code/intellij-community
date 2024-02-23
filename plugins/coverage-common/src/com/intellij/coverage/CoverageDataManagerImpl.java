@@ -30,7 +30,6 @@ import com.intellij.openapi.util.Disposer;
 import com.intellij.util.ArrayUtil;
 import com.intellij.util.containers.ContainerUtil;
 import com.intellij.util.messages.MessageBusConnection;
-import com.intellij.util.ui.UIUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -124,8 +123,11 @@ public class CoverageDataManagerImpl extends CoverageDataManager implements Disp
 
   @Override
   public CoverageSuitesBundle getCurrentSuitesBundle() {
-    CoverageSuitesBundle openedSuite = CoverageViewManager.getInstance(myProject).getOpenedSuite();
-    if (openedSuite != null) return openedSuite;
+    CoverageViewManager manager = CoverageViewManager.getInstanceIfCreated(myProject);
+    if (manager != null) {
+      CoverageSuitesBundle openedSuite = manager.getOpenedSuite();
+      if (openedSuite != null) return openedSuite;
+    }
     return myActiveBundles.values().stream().findFirst().orElse(null);
   }
 
@@ -340,7 +342,7 @@ public class CoverageDataManagerImpl extends CoverageDataManager implements Disp
   @Override
   public void triggerPresentationUpdate() {
     CoverageDataAnnotationsManager.getInstance(myProject).update();
-    UIUtil.invokeLaterIfNeeded(() -> {
+    ApplicationManager.getApplication().invokeLater(() -> {
       if (myProject.isDisposed()) return;
       ProjectView.getInstance(myProject).refresh();
     });

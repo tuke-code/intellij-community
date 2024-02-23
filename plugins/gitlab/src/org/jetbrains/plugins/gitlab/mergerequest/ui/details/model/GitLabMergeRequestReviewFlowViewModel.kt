@@ -139,7 +139,7 @@ internal class GitLabMergeRequestReviewFlowViewModelImpl(
     }
   }.modelFlow(scope, LOG)
 
-  override val userCanApprove: SharedFlow<Boolean> = mergeRequest.details.map { it.userPermissions.canApprove == true }
+  override val userCanApprove: SharedFlow<Boolean> = mergeRequest.details.map { it.userPermissions.canApprove ?: true }
     .modelFlow(scope, LOG)
   override val userCanManage: SharedFlow<Boolean> = mergeRequest.details.map { it.userPermissions.updateMergeRequest }
     .modelFlow(scope, LOG)
@@ -172,11 +172,12 @@ internal class GitLabMergeRequestReviewFlowViewModelImpl(
 
   override fun submitReview() {
     scope.launch {
-      check(submittableReview.first() != null)
+      val review = submittableReview.first()
+      check(review != null)
       val handler = submitReviewInputHandler
       check(handler != null)
       val ctx = currentCoroutineContext()
-      val vm = GitLabMergeRequestSubmitReviewViewModelImpl(this, mergeRequest, currentUser) {
+      val vm = GitLabMergeRequestSubmitReviewViewModelImpl(this, mergeRequest, currentUser, review) {
         ctx.cancel()
       }
       handler.invoke(vm)

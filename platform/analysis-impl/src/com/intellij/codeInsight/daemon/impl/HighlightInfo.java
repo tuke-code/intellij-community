@@ -11,17 +11,13 @@ import com.intellij.codeInspection.*;
 import com.intellij.codeInspection.ex.GlobalInspectionToolWrapper;
 import com.intellij.codeInspection.ex.InspectionToolWrapper;
 import com.intellij.codeInspection.ex.LocalInspectionToolWrapper;
-import com.intellij.codeInspection.ex.QuickFixWrapper;
 import com.intellij.injected.editor.DocumentWindow;
 import com.intellij.lang.ASTNode;
-import com.intellij.lang.annotation.Annotation;
-import com.intellij.lang.annotation.ExternalAnnotator;
-import com.intellij.lang.annotation.HighlightSeverity;
-import com.intellij.lang.annotation.ProblemGroup;
+import com.intellij.lang.annotation.*;
 import com.intellij.lang.injection.InjectedLanguageManager;
 import com.intellij.modcommand.ModCommandAction;
-import com.intellij.modcommand.ModCommandService;
 import com.intellij.openapi.diagnostic.Logger;
+import com.intellij.openapi.diagnostic.ReportingClassSubstitutor;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.editor.HighlighterColors;
@@ -323,7 +319,13 @@ public class HighlightInfo implements Segment {
   }
 
   public @Nullable @NonNls String getInspectionToolId() {
-    return toolId instanceof String ? (String)toolId : null;
+    return toolId instanceof String inspectionToolShortName ? inspectionToolShortName : null;
+  }
+
+  @ApiStatus.Internal
+  public @Nullable @NonNls String getExternalSourceId() {
+    return myProblemGroup instanceof ExternalSourceProblemGroup ?
+           ((ExternalSourceProblemGroup)myProblemGroup).getExternalCheckName() : null;
   }
 
   private boolean isFlagSet(@FlagConstant byte mask) {
@@ -497,7 +499,7 @@ public class HighlightInfo implements Segment {
     s += "; severity=" + getSeverity();
     synchronized (this) {
       if (quickFixActionRanges != null) {
-        s += "; quickFixes: " + quickFixActionRanges;
+        s += "; quickFixes: " + StringUtil.join(quickFixActionRanges, q-> q.getFirst().myAction.getClass().getName(), ", ");
       }
     }
     if (gutterIconRenderer != null) {
@@ -863,17 +865,8 @@ public class HighlightInfo implements Segment {
 
     @Override
     public String toString() {
-      ModCommandAction modCommandAction = getAction().asModCommandAction();
-      LocalQuickFix fix = QuickFixWrapper.unwrap(getAction());
-      if (fix != null) {
-        modCommandAction = ModCommandService.getInstance().unwrap(fix);
-      }
-      Object action = modCommandAction != null ? modCommandAction :
-                      fix != null ? fix : 
-                      IntentionActionDelegate.unwrap(getAction());
-      String name =
-        action instanceof CommonIntentionAction intentionAction ? intentionAction.getFamilyName() : ((LocalQuickFix)action).getFamilyName();
-      return "IntentionActionDescriptor: " + name + " (" + action.getClass() + ")";
+      String name = getAction().getFamilyName();
+      return "IntentionActionDescriptor: " + name + " (" + ReportingClassSubstitutor.getClassToReport(getAction()) + ")";
     }
 
     public @Nullable Icon getIcon() {
@@ -926,8 +919,10 @@ public class HighlightInfo implements Segment {
     if (highlighter == null) {
       throw new RuntimeException("info not applied yet");
     }
+    TextRange range = highlighter.getTextRange();
     if (!highlighter.isValid()) return "";
-    return highlighter.getDocument().getText(highlighter.getTextRange());
+    String text = highlighter.getDocument().getText();
+    return text.substring(Math.min(range.getStartOffset(), text.length()), Math.min(range.getEndOffset(), text.length()));
   }
 
   /**
@@ -1081,5 +1076,8 @@ public class HighlightInfo implements Segment {
   }
   void setUnresolvedReferenceQuickFixesComputed() {
     setFlag(UNRESOLVED_REFERENCE_QUICK_FIXES_COMPUTED_MASK, true);
+  }
+  boolean isFromAnnotator() {
+    return toolId instanceof Class<?> c && Annotator.class.isAssignableFrom(c);
   }
 }

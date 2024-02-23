@@ -31,7 +31,7 @@ public final class JavaFormatterUtil {
   private static final TokenSet ASSIGNMENT_ELEMENT_TYPES = TokenSet
     .create(JavaElementType.ASSIGNMENT_EXPRESSION, JavaElementType.LOCAL_VARIABLE, JavaElementType.FIELD);
 
-  private static final int CALL_EXPRESSION_DEPTH = 2500;
+  private static final int CALL_EXPRESSION_DEPTH = 500;
 
   private JavaFormatterUtil() { }
 
@@ -308,6 +308,9 @@ public final class JavaFormatterUtil {
         if (prev instanceof PsiKeyword) {
           return null;
         }
+        else if (isAnnoInsideModifierListWithAtLeastOneKeyword(child, parent)) {
+          return Wrap.createWrap(WrapType.NONE, false);
+        }
 
         return Wrap.createWrap(getWrapType(getAnnotationWrapType(parent.getTreeParent(), child, settings, javaSettings)), true);
       }
@@ -504,8 +507,24 @@ public final class JavaFormatterUtil {
     return CommonCodeStyleSettings.DO_NOT_WRAP;
   }
 
+  private static boolean isAnnoInsideModifierListWithAtLeastOneKeyword(@NotNull ASTNode current, @NotNull ASTNode parent) {
+    if (current.getElementType() != JavaElementType.ANNOTATION || parent.getElementType() != JavaElementType.MODIFIER_LIST) return false;
+    while (true) {
+      current = FormatterUtil.getPreviousNonWhitespaceSibling(current);
+      if (current instanceof PsiKeyword) {
+        ASTNode grandParent = parent.getTreeParent();
+        return grandParent != null && grandParent.getElementType() == JavaElementType.METHOD;
+      }
+      else if (current == null || current.getElementType() != JavaElementType.ANNOTATION) break;
+    }
+    return false;
+  }
+
+
   /**
-   * Traverses the children of the node and collects nodes with type method calls or reference expressions to the list
+   * Traverses the children of the node and collects nodes with type method calls or reference expressions to the list.
+   * If the quantity of the call expressions is greater than {@link JavaFormatterUtil#CALL_EXPRESSION_DEPTH}, call expressions will not be
+   * collected, and you should not format them.
    * @param nodes List in which the method add nodes
    * @param node Node to traverse
    *
@@ -515,7 +534,8 @@ public final class JavaFormatterUtil {
     stack.addLast(node.getFirstChildNode());
     while (!stack.isEmpty()) {
       if (stack.size() >= CALL_EXPRESSION_DEPTH) {
-        throw new IllegalStateException("Too long call chain! " + node);
+        nodes.clear();
+        return;
       }
       ASTNode currentNode = stack.removeLast();
         if (!FormatterUtil.containsWhiteSpacesOnly(currentNode)) {

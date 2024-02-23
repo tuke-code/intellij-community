@@ -79,7 +79,7 @@ class InvalidProjectImportingTest : MavenMultiVersionImportingTestCase() {
       </dependencies>
       """.trimIndent())
 
-    importProjectAsync()
+    updateAllProjects()
     assertModules("project", "m1")
     assertModuleLibDeps("m1", "Maven: somegroup:artifact:2.0")
   }
@@ -844,21 +844,19 @@ class InvalidProjectImportingTest : MavenMultiVersionImportingTestCase() {
     return projectsTree.getModules(p)
   }
 
-  companion object {
-    private fun assertProblems(project: MavenProject, vararg expectedProblems: String) {
-      val actualProblems: MutableList<String?> = ArrayList()
-      for (each in project.getProblems()) {
-        actualProblems.add(each.description)
-      }
-      assertOrderedElementsAreEqual(actualProblems, *expectedProblems)
+  private fun assertProblems(project: MavenProject, vararg expectedProblems: String) {
+    val actualProblems: MutableList<String?> = ArrayList()
+    for (each in project.getProblems()) {
+      actualProblems.add(each.description)
     }
+    assertOrderedElementsAreEqual(actualProblems, *expectedProblems)
+  }
 
-    private fun assertContainsProblems(project: MavenProject, vararg expectedProblems: String) {
-      val actualProblems: MutableList<String?> = ArrayList()
-      for (each in project.getProblems()) {
-        actualProblems.add(each.description)
-      }
-      UsefulTestCase.assertContainsElements(actualProblems, *expectedProblems)
+  private fun assertContainsProblems(project: MavenProject, vararg expectedProblems: String) {
+    val actualProblems: MutableList<String?> = ArrayList()
+    for (each in project.getProblems()) {
+      actualProblems.add(each.description)
     }
+    UsefulTestCase.assertContainsElements(actualProblems, *expectedProblems)
   }
 }

@@ -253,20 +253,25 @@ public class XDebuggerUtilImpl extends XDebuggerUtil {
   }
 
   private static <T> @Nullable T getBestMatchingBreakpoint(int caretOffset, Iterator<@NotNull T> breakpoints, Function<T, @Nullable TextRange> rangeProvider) {
-    // Best matching = minimal by range of all breakpoints containing caret offset in their range.
+    // Best matching = closest to the insertion point and minimal by range of all breakpoints or breakpoint variants
     T bestBreakpoint = null;
+    int bestDistance = Integer.MAX_VALUE;
     int bestRangeLength = Integer.MAX_VALUE;
     while (breakpoints.hasNext()) {
       var b = breakpoints.next();
       TextRange range = rangeProvider.apply(b);
       int rangeLength = range != null ? range.getLength() : Integer.MAX_VALUE;
       // note that range = null means "whole line"
-      if (range == null || range.contains(caretOffset)) {
-        if (bestBreakpoint == null || rangeLength < bestRangeLength) {
+      int distance = range == null ?
+                       0 :
+                       range.containsOffset(caretOffset) ? //include end offset
+                         0 :
+                         Math.min(Math.abs(range.getStartOffset() - caretOffset), Math.abs(range.getEndOffset() - caretOffset));
+      if (bestBreakpoint == null || distance < bestDistance || (distance == bestDistance && rangeLength < bestRangeLength)) {
           bestBreakpoint = b;
+          bestDistance = distance;
           bestRangeLength = rangeLength;
         }
-      }
     }
     return bestBreakpoint;
   }
@@ -307,14 +312,13 @@ public class XDebuggerUtilImpl extends XDebuggerUtil {
           return null;
         }
 
-        assert !variants.isEmpty();
-        XLineBreakpointType.XLineBreakpointVariant variant;
-        if (variants.size() > 1) {
-          variant = breakpointOrVariant instanceof XLineBreakpointType.XLineBreakpointVariant v ? v : variants.get(0);
-        } else {
-          variant = variants.get(0);
+        if (breakpointOrVariant instanceof XLineBreakpointType.XLineBreakpointVariant variant) {
+          return addLineBreakpoint(breakpointManager, variant, file, line, temporary);
         }
-        return addLineBreakpoint(breakpointManager, variant, file, line, temporary);
+
+        assert !variants.isEmpty();
+        LOG.error("Unexpected breakpoint toggle state, any variant would be considered as the best one");
+        return null;
       });
       // FIXME[inline-bp]: review code below, I was able to loose something non-trivial there
     }

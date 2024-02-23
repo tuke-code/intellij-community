@@ -1,4 +1,4 @@
-// Copyright 2000-2021 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
+// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package git4idea.branch
 
 import com.intellij.dvcs.repo.Repository
@@ -17,6 +17,7 @@ import com.intellij.project.stateStore
 import com.intellij.testFramework.runInEdtAndWait
 import com.intellij.util.LineSeparator
 import git4idea.GitCommit
+import git4idea.GitLocalBranch
 import git4idea.GitNotificationIdsHolder
 import git4idea.branch.GitBranchUiHandler.DeleteRemoteBranchDecision
 import git4idea.branch.GitBranchUtil.getTrackInfoForBranch
@@ -61,7 +62,7 @@ class GitBranchWorkerTest : GitPlatformTest() {
     checkoutNewBranch("feature", TestUiHandler(project))
 
     assertCurrentBranch("feature")
-    assertSuccessfulNotification("Branch ${bcode("feature")} was created")
+    assertSuccessfulNotification("Branch ${code("feature")} was created")
   }
 
   fun `test create new branch without checkout not at HEAD`() {
@@ -76,7 +77,7 @@ class GitBranchWorkerTest : GitPlatformTest() {
       assertNotNull("Branch not created in $it", branch)
       assertEquals("Branch feature created at wrong point", hashMap[it], it.branches.getHash(branch!!)!!.asString())
     }
-    assertSuccessfulNotification("Branch ${bcode("feature")} was created")
+    assertSuccessfulNotification("Branch ${code("feature")} was created")
   }
 
   fun `test if create new branch fails with error in first repo, then notification should be shown`() {
@@ -84,7 +85,7 @@ class GitBranchWorkerTest : GitPlatformTest() {
 
     checkoutNewBranch("feature", TestUiHandler(project))
 
-    assertErrorNotification("Couldn't create new branch feature", "unknown error")
+    assertErrorNotification("Could not create new branch feature", "unknown error")
   }
 
   fun `test if create new branch fails with error in second repo, then we should propose to rollback`() {
@@ -134,7 +135,7 @@ class GitBranchWorkerTest : GitPlatformTest() {
     checkoutBranch("feature", TestUiHandler(project))
 
     assertCurrentBranch("feature")
-    assertEquals("Notification about successful branch checkout is incorrect", "Checked out " + bcode("feature"),
+    assertEquals("Notification about successful branch checkout is incorrect", "Checked out " + code("feature"),
                  vcsNotifier.lastNotification.content)
   }
 
@@ -197,7 +198,7 @@ class GitBranchWorkerTest : GitPlatformTest() {
     checkoutRevision("feature", TestUiHandler(project))
 
     assertDetachedState("feature")
-    assertSuccessfulNotification("Checked out ${bcode("feature")}")
+    assertSuccessfulNotification("Checked out ${code("feature")}")
   }
 
   fun `test checkout revision checkout ref with complete success`() {
@@ -206,7 +207,7 @@ class GitBranchWorkerTest : GitPlatformTest() {
     checkoutRevision("feature~1", TestUiHandler(project))
 
     assertDetachedState("master")
-    assertSuccessfulNotification("Checked out ${bcode("feature~1")}")
+    assertSuccessfulNotification("Checked out ${code("feature~1")}")
   }
 
   fun `test checkout revision checkout ref with complete failure`() {
@@ -216,7 +217,7 @@ class GitBranchWorkerTest : GitPlatformTest() {
 
     assertCurrentBranch("master")
     assertCurrentRevision("master")
-    assertErrorNotification("Couldn't checkout unknown_ref",
+    assertErrorNotification("Could not checkout unknown_ref",
                             "Revision not found in community, contrib and ${project.stateStore.projectBasePath.fileName}")
   }
 
@@ -229,8 +230,8 @@ class GitBranchWorkerTest : GitPlatformTest() {
     assertDetachedState(first, "feature")
     assertDetachedState(second, "feature")
 
-    assertSuccessfulNotification("Checked out ${bcode("feature")} in community and contrib<br/>" +
-                                 "Revision not found in ${project.stateStore.projectBasePath.fileName}<br><a href=\"rollback\">Rollback</a>")
+    assertSuccessfulNotification("Checked out ${code("feature")} in community and contrib<br/>" +
+                                 "Revision not found in ${project.stateStore.projectBasePath.fileName}", actions = listOf("Rollback"))
   }
 
   fun `test checkout with untracked files overwritten by checkout in first repo should show notification`() {
@@ -333,7 +334,8 @@ class GitBranchWorkerTest : GitPlatformTest() {
   }
 
   fun `test agree to smart checkout should smart checkout`() {
-    val localChanges = `agree to smart operation`("checkout", "Checked out <b><code>feature</code></b>")
+    val localChanges = `agree to smart operation`("checkout")
+    assertSuccessfulNotification("Checked out <code>feature</code>")
 
     assertCurrentBranch("feature")
     cd(last)
@@ -345,8 +347,8 @@ class GitBranchWorkerTest : GitPlatformTest() {
   }
 
   fun `test agree to smart merge should smart merge`() {
-    val localChanges = `agree to smart operation`("merge",
-                                                  "Merged <b><code>feature</code></b> to <b><code>master</code></b><br/><a href=\"delete\">Delete feature</a>")
+    val localChanges = `agree to smart operation`("merge")
+    assertSuccessfulNotification("Merged <code>feature</code> to <code>master</code>", actions = listOf("Delete feature"))
 
     cd(last)
     val actual = cat(localChanges.first())
@@ -356,10 +358,9 @@ class GitBranchWorkerTest : GitPlatformTest() {
     assertContentIgnoreLineSeparators(expectedContent, actual)
   }
 
-  private fun `agree to smart operation`(operation: String, expectedSuccessMessage: String): List<String> {
+  private fun `agree to smart operation`(operation: String): List<String> {
     val localChanges = prepareLocalChangesOverwrittenBy(last)
     checkoutOrMerge(operation, "feature", TestUiHandler(project))
-    assertSuccessfulNotification(expectedSuccessMessage)
     return localChanges
   }
 
@@ -486,7 +487,7 @@ class GitBranchWorkerTest : GitPlatformTest() {
     })
     brancher.checkoutNewBranchStartingFrom("new_branch", "feature", myRepositories)
 
-    assertSuccessfulNotification("Checked out new branch <b><code>new_branch</code></b> from <b><code>feature</code></b>")
+    assertSuccessfulNotification("Checked out new branch <code>new_branch</code> from <code>feature</code>")
     assertCurrentBranch("new_branch")
   }
 
@@ -655,8 +656,8 @@ class GitBranchWorkerTest : GitPlatformTest() {
 
     mergeBranch("master2", TestUiHandler(project))
 
-    assertSuccessfulNotification("Merged ${bcode("master2")} to ${bcode("master")}<br/>" +
-                                 "<a href=\"delete\">Delete master2</a>")
+    assertSuccessfulNotification("Merged ${code("master2")} to ${code("master")}", actions = listOf("Delete master2"))
+
     assertFile(last, "branch_file.txt", "branch content")
     assertFile(first, "branch_file.txt", "branch content")
     assertFile(second, "branch_file.txt", "branch content")
@@ -711,9 +712,7 @@ class GitBranchWorkerTest : GitPlatformTest() {
 
     mergeBranch("master2", TestUiHandler(project))
 
-    assertNotNull("Success message wasn't shown", vcsNotifier.lastNotification)
-    assertEquals("Success message is incorrect", "Already up to date<br/><a href=\"delete\">Delete master2</a>",
-                 vcsNotifier.lastNotification.content)
+    assertSuccessfulNotification("Already up to date", actions = listOf("Delete master2"))
   }
 
   fun `test merge one simple and other up to date`() {
@@ -724,10 +723,28 @@ class GitBranchWorkerTest : GitPlatformTest() {
     mergeBranch("master2", TestUiHandler(project))
 
     assertNotNull("Success message wasn't shown", vcsNotifier.lastNotification)
-    assertEquals("Success message is incorrect",
-                 "Merged " + bcode("master2") + " to " + bcode("master") + "<br/><a href=\"delete\">Delete master2</a>",
-                 vcsNotifier.lastNotification.content)
+
+    assertSuccessfulNotification("Merged " + code("master2") + " to " + code("master"), actions = listOf("Delete master2"))
     assertFile(first, "branch_file.txt", "branch content")
+  }
+
+  fun `test merge branch with the same name as tag`() {
+    prepareLocalAndRemoteBranch("master2", track = false)
+
+    first.git("tag master2")
+
+    checkoutBranch("master2", TestUiHandler(project))
+    cd(first)
+    touch("file.txt", "content")
+    first.add("file.txt")
+    first.commit("master2 commit")
+
+    checkoutBranch("master", TestUiHandler(project))
+
+    mergeBranch("master2", TestUiHandler(project))
+
+    assertNotNull("Success message wasn't shown", vcsNotifier.lastNotification)
+    assertSuccessfulNotification("Merged ${code("master2")} to ${code("master")}", actions = listOf("Delete master2"))
   }
 
   fun `test merge with unmerged files in first repo should show notification`() {
@@ -832,6 +849,19 @@ class GitBranchWorkerTest : GitPlatformTest() {
     myRepositories.forEach { assertBranchExists(it, "feature") }
   }
 
+  fun `test delete remote branch with the same name as remote tag`() {
+    prepareLocalAndRemoteBranch("feature", track = false)
+
+    git("tag feature")
+    git("push origin refs/tags/feature")
+
+    deleteRemoteBranch("origin/feature", DeleteRemoteBranchDecision.DELETE)
+
+    assertSuccessfulNotification("Deleted remote branch origin/feature")
+    myRepositories.forEach { `assert remote branch deleted`(it, "origin/feature") }
+    myRepositories.forEach { assertBranchExists(it, "feature") }
+  }
+
   fun `test delete remote branch should optionally delete the tracking branch as well`() {
     prepareLocalAndRemoteBranch("feature", track = true)
 
@@ -915,7 +945,7 @@ class GitBranchWorkerTest : GitPlatformTest() {
 
   private fun mergeBranch(name: String, uiHandler: GitBranchUiHandler) {
     val brancher = GitBranchWorker(project, git, uiHandler)
-    brancher.merge(name, GitBrancher.DeleteOnMergeOption.PROPOSE, myRepositories)
+    brancher.merge(GitLocalBranch(name), GitBrancher.DeleteOnMergeOption.PROPOSE, myRepositories)
   }
 
   private fun deleteBranch(name: String, uiHandler: GitBranchUiHandler) {
@@ -1025,8 +1055,8 @@ class GitBranchWorkerTest : GitPlatformTest() {
     }
   }
 
-  private fun bcode(s: String): String {
-    return "<b><code>$s</code></b>"
+  private fun code(s: String): String {
+    return "<code>$s</code>"
   }
 
   private fun newGitVersion(): Boolean {

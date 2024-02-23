@@ -13,9 +13,11 @@ import com.intellij.psi.PsiImplicitClass;
 import com.intellij.psi.PsiJavaFile;
 import com.intellij.psi.PsiNameHelper;
 import com.intellij.psi.util.JavaImplicitClassUtil;
+import com.intellij.refactoring.ui.NameSuggestionsField;
 import com.intellij.usageView.UsageViewUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.VisibleForTesting;
 
 import java.util.Objects;
 import java.util.Optional;
@@ -32,48 +34,56 @@ public class RenameJavaImplicitClassProcessor extends RenamePsiFileProcessor {
   @Override
   public RenameDialog createRenameDialog(@NotNull Project project,
                                          @NotNull final PsiElement element,
-                                         PsiElement nameSuggestionContext,
-                                         Editor editor) {
-    return new MyPsiFileRenameDialog(project, element, nameSuggestionContext, editor);
+                                         @Nullable PsiElement nameSuggestionContext,
+                                         @Nullable Editor editor) {
+    return new RenameJavaImplicitClassRenameDialog(project, element, nameSuggestionContext, editor);
   }
 
-  private static class MyPsiFileRenameDialog extends PsiFileRenameDialog {
-    @NotNull
-    private final PsiImplicitClass myImplicitClass;
+  public static class RenameJavaImplicitClassRenameDialog extends PsiFileRenameDialog {
     @Nullable
     private final String myExtension;
 
-    private MyPsiFileRenameDialog(@NotNull Project project, @NotNull PsiElement element, PsiElement nameSuggestionContext, Editor editor) {
+    private RenameJavaImplicitClassRenameDialog(@NotNull Project project, @NotNull PsiElement element, PsiElement nameSuggestionContext, Editor editor) {
       super(project, element, nameSuggestionContext, editor);
-      myImplicitClass = Objects.requireNonNull(JavaImplicitClassUtil.getImplicitClassFor(element));
       myExtension = Optional.ofNullable(((PsiJavaFile)element).getVirtualFile())
         .map(file -> file.getExtension())
         .orElse(null);
     }
 
+    public PsiImplicitClass getImplicitClass() {
+      return Objects.requireNonNull(JavaImplicitClassUtil.getImplicitClassFor(getPsiElement()));
+    }
+
     @Override
     protected void canRun() throws ConfigurationException {
       String name = super.getNewName();
-      if (Comparing.strEqual(name, myImplicitClass.getQualifiedName())) throw new ConfigurationException(null);
-      if (!PsiNameHelper.getInstance(myImplicitClass.getProject()).isIdentifier(name)) {
+      if (Comparing.strEqual(name, getImplicitClass().getQualifiedName())) throw new ConfigurationException(null);
+      if (!PsiNameHelper.getInstance(getProject()).isIdentifier(name)) {
         throw new ConfigurationException(LangBundle.message("dialog.message.valid.identifier", getNewName()));
       }
     }
 
     @Override
     protected String getFullName() {
-      String name = DescriptiveNameUtil.getDescriptiveName(myImplicitClass);
-      String type = UsageViewUtil.getType(myImplicitClass);
+      PsiImplicitClass implicitClass = getImplicitClass();
+      String name = DescriptiveNameUtil.getDescriptiveName(implicitClass);
+      String type = UsageViewUtil.getType(implicitClass);
       return StringUtil.isEmpty(name) ? type : type + " '" + name + "'";
     }
 
     @Override
     public String[] getSuggestedNames() {
-      String name = myImplicitClass.getQualifiedName();
+      String name = getImplicitClass().getQualifiedName();
       if (name != null) {
         return new String[]{name};
       }
       return super.getSuggestedNames();
+    }
+
+    @VisibleForTesting
+    @Override
+    public NameSuggestionsField getNameSuggestionsField() {
+      return super.getNameSuggestionsField();
     }
 
     @Override

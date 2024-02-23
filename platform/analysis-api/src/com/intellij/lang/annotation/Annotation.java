@@ -4,9 +4,10 @@ package com.intellij.lang.annotation;
 import com.intellij.codeInsight.daemon.HighlightDisplayKey;
 import com.intellij.codeInsight.intention.IntentionAction;
 import com.intellij.codeInspection.LocalQuickFix;
-import com.intellij.codeInspection.LocalQuickFixAsIntentionAdapter;
+import com.intellij.codeInspection.LocalQuickFixBackedByIntentionAction;
 import com.intellij.codeInspection.ProblemDescriptor;
 import com.intellij.codeInspection.ProblemHighlightType;
+import com.intellij.codeInspection.ex.QuickFixWrapper;
 import com.intellij.openapi.editor.HighlighterColors;
 import com.intellij.openapi.editor.colors.CodeInsightColors;
 import com.intellij.openapi.editor.colors.TextAttributesKey;
@@ -54,18 +55,28 @@ public final class Annotation implements Segment {
 
   public static final class QuickFixInfo {
     public final @NotNull IntentionAction quickFix;
+    private final @NotNull LocalQuickFix localQuickFix;
     public final @NotNull TextRange textRange;
     public final HighlightDisplayKey key;
 
     QuickFixInfo(@NotNull IntentionAction fix, @NotNull TextRange range, final @Nullable HighlightDisplayKey key) {
+      this(fix, fix instanceof LocalQuickFix lqf ? lqf : new LocalQuickFixBackedByIntentionAction(fix), range, key);
+    }
+
+    QuickFixInfo(@NotNull IntentionAction fix, @NotNull LocalQuickFix localQuickFix, @NotNull TextRange range, final @Nullable HighlightDisplayKey key) {
       this.key = key;
       quickFix = fix;
+      this.localQuickFix = localQuickFix;
       textRange = range;
     }
 
     @Override
     public String toString() {
       return quickFix.toString();
+    }
+
+    public @NotNull LocalQuickFix getLocalQuickFix() {
+      return localQuickFix;
     }
   }
 
@@ -137,7 +148,7 @@ public final class Annotation implements Segment {
     if (myQuickFixes == null) {
       myQuickFixes = new ArrayList<>();
     }
-    myQuickFixes.add(new QuickFixInfo(new LocalQuickFixAsIntentionAdapter(fix, problemDescriptor), range, key));
+    myQuickFixes.add(new QuickFixInfo(QuickFixWrapper.wrap(problemDescriptor, fix), fix, range, key));
   }
 
   /**
@@ -174,13 +185,18 @@ public final class Annotation implements Segment {
    */
   @Deprecated
   public <T extends IntentionAction & LocalQuickFix> void registerBatchFix(@NotNull T fix, @Nullable TextRange range, @Nullable HighlightDisplayKey key) {
+    registerBatchFix(fix, fix, range, key);
+  }
+
+  @Deprecated
+  public void registerBatchFix(@NotNull IntentionAction action, @NotNull LocalQuickFix fix, @Nullable TextRange range, @Nullable HighlightDisplayKey key) {
     range = notNullize(range);
 
     List<QuickFixInfo> fixes = myBatchFixes;
     if (fixes == null) {
       myBatchFixes = fixes = new ArrayList<>();
     }
-    fixes.add(new QuickFixInfo(fix, range, key));
+    fixes.add(new QuickFixInfo(action, fix, range, key));
   }
 
   /**

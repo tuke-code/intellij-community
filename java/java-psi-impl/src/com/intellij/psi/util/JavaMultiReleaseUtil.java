@@ -107,8 +107,8 @@ public final class JavaMultiReleaseUtil {
     if (relativePath == null) return file;
     VirtualFile versions = root.findFileByRelativePath("META-INF/versions");
     if (versions == null) return file;
-    int feature = level.toJavaVersion().feature;
-    int minFeature = MIN_MULTI_RELEASE_VERSION.toJavaVersion().feature;
+    int feature = level.feature();
+    int minFeature = MIN_MULTI_RELEASE_VERSION.feature();
     while (feature >= minFeature) {
       VirtualFile versionRoot = versions.findChild(String.valueOf(feature));
       if (versionRoot != null) {
@@ -129,7 +129,8 @@ public final class JavaMultiReleaseUtil {
    * null if the given file is not a version-specific file from a library, or a corresponding version is not supported by current IDE.
    */
   public static @Nullable LanguageLevel getVersion(@NotNull PsiFile file) {
-    return getVersion(file.getVirtualFile());
+    VirtualFile virtualFile = file.getVirtualFile();
+    return virtualFile == null ? null : getVersion(virtualFile);
   }
 
   /**

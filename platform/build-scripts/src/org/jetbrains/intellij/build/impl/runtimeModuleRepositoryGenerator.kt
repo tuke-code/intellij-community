@@ -4,11 +4,11 @@ package org.jetbrains.intellij.build.impl
 import com.intellij.devkit.runtimeModuleRepository.jps.build.RuntimeModuleRepositoryBuildConstants.GENERATOR_VERSION
 import com.intellij.devkit.runtimeModuleRepository.jps.build.RuntimeModuleRepositoryBuildConstants.JAR_REPOSITORY_FILE_NAME
 import com.intellij.devkit.runtimeModuleRepository.jps.build.RuntimeModuleRepositoryValidator
-import com.intellij.openapi.util.io.isAncestor
 import com.intellij.openapi.util.text.StringUtil
 import com.intellij.platform.runtime.repository.MalformedRepositoryException
 import com.intellij.platform.runtime.repository.RuntimeModuleId
 import com.intellij.platform.runtime.repository.serialization.RawRuntimeModuleDescriptor
+import com.intellij.platform.runtime.repository.serialization.RawRuntimeModuleRepositoryData
 import com.intellij.platform.runtime.repository.serialization.RuntimeModuleRepositorySerialization
 import com.intellij.util.containers.MultiMap
 import com.jetbrains.plugin.structure.base.utils.exists
@@ -31,13 +31,13 @@ import kotlin.io.path.pathString
  * resources should be included in the distribution, instead of taking this information from the project model.  
  */
 internal fun generateRuntimeModuleRepository(entries: List<DistributionFileEntry>, context: BuildContext) {
-  val (repositoryForCompiledModulesPath, compiledModulesDescriptors) = loadForCompiledModules(context)
+  val compiledModulesDescriptors = loadForCompiledModules(context)
 
   val repositoryEntries = ArrayList<RuntimeModuleRepositoryEntry>()
   val osSpecificDistPaths = listOf(null to context.paths.distAllDir) +
                             SUPPORTED_DISTRIBUTIONS.map { it to getOsAndArchSpecificDistDirectory(it.os, it.arch, context) }
   for (entry in entries) {
-    val (distribution, rootPath) = osSpecificDistPaths.find { it.second.isAncestor(entry.path, false) } 
+    val (distribution, rootPath) = osSpecificDistPaths.find { entry.path.startsWith(it.second) }
                                    ?: continue
 
     val pathInDist = rootPath.relativize(entry.path).pathString
@@ -46,14 +46,14 @@ internal fun generateRuntimeModuleRepository(entries: List<DistributionFileEntry
 
   if (repositoryEntries.all { it.distribution == null }) {
     generateRepositoryForDistribution(context.paths.distAllDir, repositoryEntries, compiledModulesDescriptors,
-                                      context, repositoryForCompiledModulesPath)
+                                      context)
   }
   else {
     SUPPORTED_DISTRIBUTIONS.forEach { distribution ->
       val targetDirectory = getOsAndArchSpecificDistDirectory(distribution.os, distribution.arch, context)
       val actualEntries = repositoryEntries.filter { it.distribution == null || it.distribution == distribution }
       generateRepositoryForDistribution(targetDirectory, actualEntries, compiledModulesDescriptors,
-                                        context, repositoryForCompiledModulesPath)
+                                        context)
     }
   }
 }
@@ -64,9 +64,9 @@ internal fun generateRuntimeModuleRepository(entries: List<DistributionFileEntry
  */
 @ApiStatus.Internal
 fun generateRuntimeModuleRepositoryForDevBuild(entries: Sequence<DistributionFileEntry>, targetDirectory: Path, context: BuildContext) {
-  val (repositoryForCompiledModulesPath, compiledModulesDescriptors) = loadForCompiledModules(context)
+  val compiledModulesDescriptors = loadForCompiledModules(context)
   val actualEntries = entries.mapNotNull { entry ->
-    if (targetDirectory.isAncestor(entry.path, false)) {
+    if (entry.path.startsWith(targetDirectory)) {
       RuntimeModuleRepositoryEntry(distribution = null,
                                    relativePath = targetDirectory.relativize(entry.path).pathString,
                                    origin = entry)
@@ -78,12 +78,12 @@ fun generateRuntimeModuleRepositoryForDevBuild(entries: Sequence<DistributionFil
   }
   generateRepositoryForDistribution(targetDirectory = targetDirectory,
                                     entries = actualEntries.toList(),
-                                    compiledModulesDescriptors = compiledModulesDescriptors,
-                                    context = context,
-                                    repositoryForCompiledModulesPath = repositoryForCompiledModulesPath)
+                                    compiledModulesDescriptorsData = compiledModulesDescriptors,
+                                    context = context
+  )
 }
 
-private fun loadForCompiledModules(context: BuildContext): Pair<Path, Map<RuntimeModuleId, RawRuntimeModuleDescriptor>> {
+private fun loadForCompiledModules(context: BuildContext): RawRuntimeModuleRepositoryData {
   // maybe it makes sense to produce the repository along with compiled classes and reuse it
   CompilationTasks.create(context).generateRuntimeModuleRepository()
 
@@ -91,14 +91,13 @@ private fun loadForCompiledModules(context: BuildContext): Pair<Path, Map<Runtim
   if (!repositoryForCompiledModulesPath.exists()) {
     context.messages.error("Runtime module repository wasn't generated during compilation: $repositoryForCompiledModulesPath doesn't exist")
   }
-  val compiledModulesDescriptors = try {
-    RuntimeModuleRepositorySerialization.loadFromJar(repositoryForCompiledModulesPath).mapKeys { RuntimeModuleId.raw(it.key) }
+  return try {
+    RuntimeModuleRepositorySerialization.loadFromJar(repositoryForCompiledModulesPath)
   }
   catch (e: MalformedRepositoryException) {
     context.messages.error("Failed to load runtime module repository: ${e.message}", e)
-    emptyMap<RuntimeModuleId, RawRuntimeModuleDescriptor>()
+    throw e
   }
-  return repositoryForCompiledModulesPath to compiledModulesDescriptors
 }
 
 private data class RuntimeModuleRepositoryEntry(val distribution: SupportedDistribution?, val relativePath: String, val origin: DistributionFileEntry)
@@ -106,9 +105,8 @@ private data class RuntimeModuleRepositoryEntry(val distribution: SupportedDistr
 private fun generateRepositoryForDistribution(
   targetDirectory: Path,
   entries: List<RuntimeModuleRepositoryEntry>,
-  compiledModulesDescriptors: Map<RuntimeModuleId, RawRuntimeModuleDescriptor>,
-  context: BuildContext,
-  repositoryForCompiledModulesPath: Path
+  compiledModulesDescriptorsData: RawRuntimeModuleRepositoryData,
+  context: BuildContext
 ) {
   val mainPathsForResources = computeMainPathsForResourcesCopiedToMultiplePlaces(entries, context)
   val resourcePathMapping = MultiMap.createOrderedSet<RuntimeModuleId, String>()
@@ -120,6 +118,9 @@ private fun generateRepositoryForDistribution(
     }
   }
 
+  val compiledModulesDescriptors = compiledModulesDescriptorsData.allIds.associateBy(
+    { RuntimeModuleId.raw(it) }, { compiledModulesDescriptorsData.findDescriptor(it)!! }
+  )
   addMappingsForDuplicatingLibraries(resourcePathMapping, compiledModulesDescriptors)
 
   val transitiveDependencies = LinkedHashSet<RuntimeModuleId>()
@@ -129,7 +130,7 @@ private fun generateRepositoryForDistribution(
   for ((moduleId, resourcePaths) in resourcePathMapping.entrySet()) {
     val descriptor = compiledModulesDescriptors[moduleId]
     if (descriptor == null) {
-      context.messages.warning("Descriptor for '$moduleId' isn't found in module repository $repositoryForCompiledModulesPath")
+      context.messages.warning("Descriptor for '$moduleId' isn't found in module repository ${compiledModulesDescriptorsData.basePath}")
       continue
     }
 

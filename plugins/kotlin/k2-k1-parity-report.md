@@ -1,22 +1,22 @@
 # K2/K1 feature parity report
 
 
-Generated on Thu Dec 14 11:16:00 CET 2023
+Generated on Mon Feb 12 11:28:02 CET 2024
 
 ## Shared cases
-shared 9882 files out of 701 cases
+shared 10098 files out of 712 cases
 
 | Status | Case name | Success rate, % | K2 files | K1 files | Total files |
 | -- | -- | --  | -- | -- | -- |
- | :white_check_mark: | [FirParameterInfoTestGenerated] | 93 | 117 | 126 | 126 | 
+ | :white_check_mark: | [FirParameterInfoTestGenerated] | 94 | 118 | 126 | 126 | 
  | :x: | FirParameterInfoTestGenerated$WithLib3 | 0 | 0 | 1 | 1 | 
  | :white_check_mark: | FirParameterInfoTestGenerated$ArrayAccess | 88 | 7 | 8 | 8 | 
- | :white_check_mark: | FirParameterInfoTestGenerated$FunctionCall | 92 | 82 | 89 | 89 | 
+ | :white_check_mark: | FirParameterInfoTestGenerated$FunctionCall | 93 | 83 | 89 | 89 | 
  | :white_check_mark: | FirParameterInfoTestGenerated$Annotations | 100 | 3 | 3 | 3 | 
  | :white_check_mark: | FirParameterInfoTestGenerated$TypeArguments | 100 | 23 | 23 | 23 | 
  | :white_check_mark: | FirParameterInfoTestGenerated$WithLib1 | 100 | 1 | 1 | 1 | 
  | :white_check_mark: | FirParameterInfoTestGenerated$WithLib2 | 100 | 1 | 1 | 1 | 
- | :x: | [HighLevelQuickFixTestGenerated] | 27 | 420 | 1566 | 1571 | 
+ | :x: | [HighLevelQuickFixTestGenerated] | 29 | 447 | 1567 | 1573 | 
  | :x: | HighLevelQuickFixTestGenerated$AddAnnotationTarget | 0 | 0 | 30 | 30 | 
  | :x: | HighLevelQuickFixTestGenerated$AddAnnotationUseSiteTarget | 0 | 0 | 2 | 2 | 
  | :x: | HighLevelQuickFixTestGenerated$AddConstructorParameter | 0 | 0 | 1 | 1 | 
@@ -55,7 +55,7 @@ shared 9882 files out of 701 cases
  | :x: | HighLevelQuickFixTestGenerated$CanBePrimaryConstructorProperty | 0 | 0 | 5 | 5 | 
  | :x: | HighLevelQuickFixTestGenerated$CastDueToProgressionResolveChange | 0 | 0 | 9 | 9 | 
  | :x: | HighLevelQuickFixTestGenerated$ChangeObjectToClass | 0 | 0 | 2 | 2 | 
- | :x: | HighLevelQuickFixTestGenerated$ChangeSignature | 0 | 0 | 63 | 63 | 
+ | :x: | HighLevelQuickFixTestGenerated$ChangeSignature | 0 | 0 | 64 | 64 | 
  | :x: | HighLevelQuickFixTestGenerated$ChangeSuperTypeListEntryTypeArgument | 0 | 0 | 4 | 4 | 
  | :x: | HighLevelQuickFixTestGenerated$ChangeToLabeledReturn | 0 | 0 | 11 | 11 | 
  | :x: | HighLevelQuickFixTestGenerated$ChangeToMutableCollection | 0 | 0 | 5 | 5 | 
@@ -129,7 +129,6 @@ shared 9882 files out of 701 cases
  | :x: | HighLevelQuickFixTestGenerated$RemoveSuspend | 0 | 0 | 6 | 6 | 
  | :x: | HighLevelQuickFixTestGenerated$RemoveToStringInStringTemplate | 0 | 0 | 6 | 6 | 
  | :x: | HighLevelQuickFixTestGenerated$RemoveTypeVariance | 0 | 0 | 2 | 2 | 
- | :x: | HighLevelQuickFixTestGenerated$RemoveUnused | 0 | 0 | 28 | 28 | 
  | :x: | HighLevelQuickFixTestGenerated$RemoveUnusedParameter | 0 | 0 | 24 | 24 | 
  | :x: | HighLevelQuickFixTestGenerated$RemoveUnusedReceiver | 0 | 0 | 2 | 2 | 
  | :x: | HighLevelQuickFixTestGenerated$RemoveUseSiteTarget | 0 | 0 | 4 | 4 | 
@@ -168,14 +167,15 @@ shared 9882 files out of 701 cases
  | :x: | HighLevelQuickFixTestGenerated$Override | 58 | 14 | 24 | 24 | 
  | :x: | HighLevelQuickFixTestGenerated$ReplaceWithDotCall | 67 | 6 | 9 | 9 | 
  | :x: | HighLevelQuickFixTestGenerated$Modifiers | 70 | 48 | 69 | 69 | 
- | :x: | HighLevelQuickFixTestGenerated$TypeAddition | 70 | 14 | 20 | 20 | 
- | :x: | HighLevelQuickFixTestGenerated$When | 70 | 26 | 37 | 37 | 
  | :x: | HighLevelQuickFixTestGenerated$AutoImports | 71 | 35 | 49 | 49 | 
+ | :x: | HighLevelQuickFixTestGenerated$When | 73 | 27 | 37 | 38 | 
  | :x: | HighLevelQuickFixTestGenerated$Abstract | 74 | 26 | 35 | 35 | 
+ | :x: | HighLevelQuickFixTestGenerated$TypeAddition | 75 | 15 | 20 | 20 | 
  | :x: | HighLevelQuickFixTestGenerated$ReplaceWithArrayCallInAnnotation | 80 | 4 | 5 | 5 | 
  | :x: | HighLevelQuickFixTestGenerated$AddExclExclCall | 84 | 31 | 37 | 37 | 
  | :white_check_mark: | HighLevelQuickFixTestGenerated$ReplaceInfixOrOperatorCall | 86 | 19 | 22 | 22 | 
  | :white_check_mark: | HighLevelQuickFixTestGenerated$ReplaceWithSafeCall | 86 | 25 | 29 | 29 | 
+ | :white_check_mark: | HighLevelQuickFixTestGenerated$RemoveUnused | 89 | 25 | 28 | 28 | 
  | :white_check_mark: | HighLevelQuickFixTestGenerated$Expressions | 90 | 36 | 40 | 40 | 
  | :white_check_mark: | HighLevelQuickFixTestGenerated$Nullables | 92 | 11 | 12 | 12 | 
  | :white_check_mark: | HighLevelQuickFixTestGenerated$WrapWithSafeLetCall | 94 | 32 | 34 | 34 | 
@@ -198,7 +198,7 @@ shared 9882 files out of 701 cases
  | :white_check_mark: | K2IndyLambdaKotlinSteppingTestGenerated$StepIntoOnly | 100 | 25 | 25 | 25 | 
  | :white_check_mark: | K2IndyLambdaKotlinSteppingTestGenerated$StepOut | 100 | 10 | 10 | 10 | 
  | :white_check_mark: | K2IndyLambdaKotlinSteppingTestGenerated$StepOver | 100 | 118 | 118 | 118 | 
- | :x: | [K2IntentionTestGenerated] | 32 | 657 | 2056 | 2069 | 
+ | :x: | [K2IntentionTestGenerated] | 35 | 728 | 2092 | 2105 | 
  | :x: | K2IntentionTestGenerated$AddAnnotationUseSiteTarget | 0 | 0 | 5 | 5 | 
  | :x: | K2IntentionTestGenerated$AddForLoopIndices | 0 | 0 | 14 | 14 | 
  | :x: | K2IntentionTestGenerated$AddJvmOverloads | 0 | 0 | 8 | 8 | 
@@ -254,7 +254,6 @@ shared 9882 files out of 701 cases
  | :x: | K2IntentionTestGenerated$ImplementAbstractMember | 0 | 0 | 13 | 13 | 
  | :x: | K2IntentionTestGenerated$ImplementAsConstructorParameter | 0 | 0 | 11 | 11 | 
  | :x: | K2IntentionTestGenerated$InfixCallToOrdinary | 0 | 0 | 6 | 6 | 
- | :x: | K2IntentionTestGenerated$InlayHints | 0 | 0 | 5 | 5 | 
  | :x: | K2IntentionTestGenerated$InsertCurlyBracesToTemplate | 0 | 0 | 8 | 8 | 
  | :x: | K2IntentionTestGenerated$IntroduceBackingProperty | 0 | 0 | 15 | 15 | 
  | :x: | K2IntentionTestGenerated$IntroduceImportAlias | 0 | 0 | 30 | 30 | 
@@ -262,7 +261,6 @@ shared 9882 files out of 701 cases
  | :x: | K2IntentionTestGenerated$IterateExpression | 0 | 0 | 13 | 13 | 
  | :x: | K2IntentionTestGenerated$IterationOverMap | 0 | 0 | 40 | 40 | 
  | :x: | K2IntentionTestGenerated$JoinDeclarationAndAssignment | 0 | 0 | 48 | 48 | 
- | :x: | K2IntentionTestGenerated$LambdaToAnonymousFunction | 0 | 0 | 30 | 30 | 
  | :x: | K2IntentionTestGenerated$MergeElseIf | 0 | 0 | 5 | 5 | 
  | :x: | K2IntentionTestGenerated$MoveDeclarationToSeparateFile | 0 | 0 | 2 | 2 | 
  | :x: | K2IntentionTestGenerated$MoveLambdaInsideParentheses | 0 | 0 | 19 | 19 | 
@@ -300,7 +298,7 @@ shared 9882 files out of 701 cases
  | :x: | K2IntentionTestGenerated$ValToObject | 0 | 0 | 8 | 8 | 
  | :white_check_mark: | K2IntentionTestGenerated$ImportMember | 95 | 21 | 22 | 22 | 
  | :white_check_mark: | K2IntentionTestGenerated$ConvertToBlockBody | 98 | 40 | 41 | 41 | 
- | :white_check_mark: | K2IntentionTestGenerated$SpecifyTypeExplicitly | 98 | 44 | 45 | 45 | 
+ | :white_check_mark: | K2IntentionTestGenerated$SpecifyTypeExplicitly | 98 | 47 | 48 | 48 | 
  | :white_check_mark: | K2IntentionTestGenerated$AddFullQualifier | 100 | 7 | 7 | 7 | 
  | :white_check_mark: | K2IntentionTestGenerated$AddMissingClassKeyword | 100 | 8 | 8 | 8 | 
  | :white_check_mark: | K2IntentionTestGenerated$AddNameToArgument | 100 | 30 | 30 | 30 | 
@@ -322,9 +320,11 @@ shared 9882 files out of 701 cases
  | :white_check_mark: | K2IntentionTestGenerated$InvertIfCondition | 100 | 58 | 58 | 58 | 
  | :white_check_mark: | K2IntentionTestGenerated$JoinArgumentList | 100 | 14 | 14 | 14 | 
  | :white_check_mark: | K2IntentionTestGenerated$JoinParameterList | 100 | 9 | 9 | 9 | 
+ | :white_check_mark: | K2IntentionTestGenerated$LambdaToAnonymousFunction | 100 | 31 | 31 | 31 | 
  | :white_check_mark: | K2IntentionTestGenerated$MergeIfs | 100 | 11 | 11 | 11 | 
  | :white_check_mark: | K2IntentionTestGenerated$MovePropertyToConstructor | 100 | 18 | 18 | 18 | 
  | :white_check_mark: | K2IntentionTestGenerated$RemoveAllArgumentNames | 100 | 16 | 16 | 16 | 
+ | :white_check_mark: | K2IntentionTestGenerated$RemoveExplicitTypeArguments | 100 | 37 | 37 | 37 | 
  | :white_check_mark: | K2IntentionTestGenerated$RemoveSingleArgumentName | 100 | 17 | 17 | 17 | 
  | :white_check_mark: | K2IntentionTestGenerated$ReplaceUnderscoreWithTypeArgument | 100 | 27 | 27 | 27 | 
  | :white_check_mark: | K2IntentionTestGenerated$ToRawStringLiteral | 100 | 16 | 16 | 16 | 
@@ -332,56 +332,61 @@ shared 9882 files out of 701 cases
  | :white_check_mark: | K2IntentionTestGenerated$InsertExplicitTypeArguments | 103 | 31 | 30 | 31 | 
  | :white_check_mark: | K2IntentionTestGenerated$RemoveExplicitType | 115 | 62 | 54 | 66 | 
  | :x: | FindUsagesWithDisableComponentSearchFirTestGenerated | 5 | 1 | 20 | 20 | 
- | :x: | K2SmartStepIntoTestGenerated | 5 | 2 | 42 | 42 | 
- | :x: | [HighLevelWeigherTestGenerated] | 69 | 72 | 105 | 106 | 
+ | :x: | K2SmartStepIntoTestGenerated | 5 | 2 | 43 | 43 | 
+ | :x: | [HighLevelWeigherTestGenerated] | 70 | 74 | 106 | 107 | 
  | :x: | HighLevelWeigherTestGenerated$ExpectedInfo | 13 | 2 | 15 | 15 | 
  | :x: | HighLevelWeigherTestGenerated$ContextualReturn | 65 | 11 | 17 | 17 | 
- | :x: | HighLevelWeigherTestGenerated$Uncategorized | 78 | 45 | 58 | 59 | 
- | :white_check_mark: | HighLevelWeigherTestGenerated$ExpectedType | 86 | 6 | 7 | 7 | 
+ | :x: | HighLevelWeigherTestGenerated$Uncategorized | 79 | 46 | 58 | 59 | 
+ | :white_check_mark: | HighLevelWeigherTestGenerated$ExpectedType | 88 | 7 | 8 | 8 | 
  | :white_check_mark: | HighLevelWeigherTestGenerated$ParameterNameAndType | 100 | 8 | 8 | 8 | 
- | :x: | [K2IntroduceVariableTestGenerated] | 63 | 84 | 134 | 135 | 
- | :x: | K2IntroduceVariableTestGenerated$StringTemplates | 18 | 3 | 17 | 17 | 
- | :x: | K2IntroduceVariableTestGenerated$Script | 33 | 1 | 3 | 3 | 
- | :x: | K2IntroduceVariableTestGenerated$ExtractToScope | 64 | 7 | 11 | 11 | 
- | :x: | K2IntroduceVariableTestGenerated$Uncategorized | 68 | 60 | 88 | 89 | 
- | :x: | K2IntroduceVariableTestGenerated$MultiDeclarations | 78 | 7 | 9 | 9 | 
- | :white_check_mark: | K2IntroduceVariableTestGenerated$ExplicateTypeArguments | 100 | 6 | 6 | 6 | 
  | :x: | [FirJvmOptimizeImportsTestGenerated] | 71 | 84 | 119 | 119 | 
  | :x: | FirJvmOptimizeImportsTestGenerated$Jvm | 43 | 20 | 47 | 47 | 
  | :white_check_mark: | FirJvmOptimizeImportsTestGenerated$Common | 89 | 64 | 72 | 72 | 
  | :x: | K2AddImportActionTestGenerated | 57 | 20 | 35 | 35 | 
- | :x: | K2MoveTestGenerated | 58 | 95 | 163 | 163 | 
+ | :x: | K2MoveTestGenerated | 58 | 96 | 166 | 167 | 
  | :x: | K2AutoImportTestGenerated | 64 | 18 | 28 | 28 | 
  | :x: | HighLevelQuickFixMultiFileTestGenerated$Uncategorized | 65 | 87 | 134 | 135 | 
  | :x: | SharedK2MultiFileQuickFixTestGenerated | 67 | 2 | 3 | 3 | 
- | :x: | HighLevelMultiFileJvmBasicCompletionTestGenerated | 70 | 64 | 91 | 95 | 
- | :white_check_mark: | [K2JvmBasicCompletionTestGenerated] | 88 | 600 | 684 | 718 | 
- | :x: | K2JvmBasicCompletionTestGenerated$Java | 74 | 37 | 50 | 54 | 
- | :white_check_mark: | K2JvmBasicCompletionTestGenerated$Common | 89 | 563 | 634 | 664 | 
+ | :x: | [K2IntroduceVariableTestGenerated] | 69 | 98 | 143 | 145 | 
+ | :x: | K2IntroduceVariableTestGenerated$StringTemplates | 22 | 4 | 18 | 18 | 
+ | :x: | K2IntroduceVariableTestGenerated$Script | 67 | 2 | 3 | 3 | 
+ | :x: | K2IntroduceVariableTestGenerated$Uncategorized | 72 | 67 | 93 | 95 | 
+ | :x: | K2IntroduceVariableTestGenerated$MultiDeclarations | 78 | 7 | 9 | 9 | 
+ | :white_check_mark: | K2IntroduceVariableTestGenerated$ExtractToScope | 86 | 12 | 14 | 14 | 
+ | :white_check_mark: | K2IntroduceVariableTestGenerated$ExplicateTypeArguments | 100 | 6 | 6 | 6 | 
  | :x: | HighLevelBasicCompletionHandlerTestGenerated$Basic | 76 | 214 | 283 | 289 | 
- | :x: | K2CompletionCharFilterTestGenerated | 80 | 28 | 35 | 35 | 
+ | :white_check_mark: | [K2JvmBasicCompletionTestGenerated] | 89 | 612 | 684 | 718 | 
+ | :x: | K2JvmBasicCompletionTestGenerated$Java | 78 | 39 | 50 | 54 | 
+ | :white_check_mark: | K2JvmBasicCompletionTestGenerated$Common | 90 | 573 | 634 | 664 | 
  | :white_check_mark: | [K2MultiFileLocalInspectionTestGenerated] | 92 | 11 | 12 | 12 | 
  | :x: | K2MultiFileLocalInspectionTestGenerated$RedundantQualifierName | 80 | 4 | 5 | 5 | 
  | :white_check_mark: | K2MultiFileLocalInspectionTestGenerated$UnusedSymbol | 100 | 7 | 7 | 7 | 
+ | :x: | FirMultiModuleSafeDeleteTestGenerated | 80 | 20 | 25 | 25 | 
+ | :white_check_mark: | FirMultiModuleRenameTestGenerated | 85 | 22 | 26 | 26 | 
  | :white_check_mark: | FirWithLibBasicCompletionTestGenerated | 88 | 15 | 17 | 17 | 
  | :white_check_mark: | FirShortenRefsTestGenerated$This | 88 | 7 | 8 | 8 | 
+ | :white_check_mark: | K2CompletionCharFilterTestGenerated | 89 | 31 | 35 | 35 | 
+ | :white_check_mark: | HighLevelMultiFileJvmBasicCompletionTestGenerated | 90 | 80 | 89 | 94 | 
  | :white_check_mark: | FirKeywordCompletionTestGenerated$Keywords | 91 | 127 | 139 | 139 | 
- | :white_check_mark: | [K2IdeK2CodeKotlinEvaluateExpressionTestGenerated] | 92 | 313 | 341 | 341 | 
+ | :white_check_mark: | [K2IdeK2CodeKotlinEvaluateExpressionTestGenerated] | 91 | 322 | 352 | 352 | 
+ | :white_check_mark: | K2IdeK2CodeKotlinEvaluateExpressionTestGenerated$SingleBreakpoint | 91 | 289 | 316 | 316 | 
  | :white_check_mark: | K2IdeK2CodeKotlinEvaluateExpressionTestGenerated$MultipleBreakpoints | 92 | 33 | 36 | 36 | 
- | :white_check_mark: | K2IdeK2CodeKotlinEvaluateExpressionTestGenerated$SingleBreakpoint | 92 | 280 | 305 | 305 | 
  | :white_check_mark: | K2KDocCompletionTestGenerated | 93 | 28 | 30 | 30 | 
  | :white_check_mark: | [K2SelectExpressionForDebuggerTestGenerated] | 99 | 68 | 69 | 69 | 
  | :white_check_mark: | K2SelectExpressionForDebuggerTestGenerated$DisallowMethodCalls | 95 | 20 | 21 | 21 | 
  | :white_check_mark: | K2SelectExpressionForDebuggerTestGenerated$Uncategorized | 100 | 48 | 48 | 48 | 
- | :white_check_mark: | FirUastDeclarationTestGenerated | 97 | 28 | 29 | 29 | 
  | :white_check_mark: | KotlinFirInlineTestGenerated$InlineVariableOrProperty | 97 | 32 | 33 | 33 | 
  | :white_check_mark: | FirRenameTestGenerated | 98 | 273 | 278 | 278 | 
  | :white_check_mark: | [FirLegacyUastValuesTestGenerated] | 100 | 79 | 79 | 79 | 
+ | :white_check_mark: | [FirUastDeclarationTestGenerated] | 100 | 30 | 30 | 30 | 
  | :white_check_mark: | [FirUastTypesTestGenerated] | 100 | 14 | 14 | 14 | 
  | :white_check_mark: | [FirUastValuesTestGenerated] | 100 | 2 | 2 | 2 | 
  | :white_check_mark: | [K2BytecodeToolWindowTestGenerated] | 100 | 19 | 19 | 19 | 
  | :white_check_mark: | [FirKeywordCompletionHandlerTestGenerated] | 100 | 49 | 49 | 49 | 
  | :white_check_mark: | [HighLevelJavaCompletionHandlerTestGenerated] | 100 | 1 | 1 | 1 | 
+ | :white_check_mark: | [K2CompletionIncrementalResolveTestGenerated] | 100 | 5 | 5 | 5 | 
+ | :white_check_mark: | [FirLiteralKotlinToKotlinCopyPasteTestGenerated] | 100 | 6 | 6 | 6 | 
+ | :white_check_mark: | [FirLiteralTextToKotlinCopyPasteTestGenerated] | 100 | 18 | 18 | 18 | 
  | :white_check_mark: | [K2ExternalAnnotationTestGenerated] | 100 | 4 | 4 | 4 | 
  | :white_check_mark: | [FindUsagesFirTestGenerated] | 93 | 264 | 284 | 284 | 
  | :white_check_mark: | [KotlinFindUsagesWithLibraryFirTestGenerated] | 100 | 22 | 22 | 22 | 
@@ -389,25 +394,29 @@ shared 9882 files out of 701 cases
  | :white_check_mark: | [KotlinGroupUsagesBySimilarityFeaturesFirTestGenerated] | 100 | 2 | 2 | 2 | 
  | :white_check_mark: | [KotlinGroupUsagesBySimilarityFirTestGenerated] | 100 | 12 | 12 | 12 | 
  | :white_check_mark: | [KotlinScriptFindUsagesFirTestGenerated] | 100 | 5 | 5 | 5 | 
+ | :white_check_mark: | [FirFoldingTestGenerated] | 100 | 25 | 25 | 25 | 
+ | :white_check_mark: | [K2FilteringAutoImportTestGenerated] | 100 | 1 | 1 | 1 | 
  | :white_check_mark: | [FirGotoDeclarationTestGenerated] | 100 | 13 | 13 | 13 | 
- | :white_check_mark: | [FirGotoTypeDeclarationTestGenerated] | 100 | 15 | 15 | 15 | 
+ | :white_check_mark: | [FirGotoTestGenerated] | 97 | 28 | 29 | 29 | 
+ | :white_check_mark: | [FirGotoTypeDeclarationTestGenerated] | 100 | 18 | 18 | 18 | 
+ | :white_check_mark: | [K2ProjectViewTestGenerated] | 100 | 31 | 31 | 31 | 
  | :white_check_mark: | [FirReferenceResolveInJavaTestGenerated] | 100 | 6 | 6 | 6 | 
  | :white_check_mark: | [FirReferenceResolveTestGenerated] | 101 | 154 | 152 | 154 | 
  | :white_check_mark: | [FirReferenceToCompiledKotlinResolveInJavaTestGenerated] | 100 | 16 | 16 | 16 | 
  | :white_check_mark: | [ReferenceResolveInLibrarySourcesFirTestGenerated] | 100 | 4 | 4 | 4 | 
- | :white_check_mark: | [K2FilteringAutoImportTestGenerated] | 100 | 1 | 1 | 1 | 
  | :white_check_mark: | [KotlinFirBreadcrumbsTestGenerated] | 100 | 15 | 15 | 15 | 
  | :white_check_mark: | [K2SharedQuickFixTestGenerated] | 100 | 2 | 2 | 2 | 
  | :white_check_mark: | [SharedK2InspectionTestGenerated] | 100 | 8 | 8 | 8 | 
- | :white_check_mark: | [SharedK2LocalInspectionTestGenerated] | 100 | 255 | 255 | 255 | 
+ | :white_check_mark: | [SharedK2LocalInspectionTestGenerated] | 100 | 260 | 260 | 260 | 
  | :white_check_mark: | [SharedK2KDocHighlightingTestGenerated] | 100 | 2 | 2 | 2 | 
  | :white_check_mark: | [SharedK2IntentionTestGenerated] | 100 | 346 | 346 | 346 | 
  | :white_check_mark: | [LineMarkersK2TestGenerated] | 100 | 46 | 46 | 46 | 
+ | :white_check_mark: | [K2PostfixTemplateTestGenerated] | 100 | 4 | 4 | 4 | 
  | :white_check_mark: | [FirUpdateKotlinCopyrightTestGenerated] | 100 | 8 | 8 | 8 | 
  | :white_check_mark: | [K2BreakpointApplicabilityTestGenerated] | 100 | 8 | 8 | 8 | 
  | :white_check_mark: | [K2ClassNameCalculatorTestGenerated] | 100 | 8 | 8 | 8 | 
  | :white_check_mark: | [K2IdeK2CodeAsyncStackTraceTestGenerated] | 100 | 3 | 3 | 3 | 
- | :white_check_mark: | [K2IdeK2CodeContinuationStackTraceTestGenerated] | 100 | 3 | 3 | 3 | 
+ | :white_check_mark: | [K2IdeK2CodeContinuationStackTraceTestGenerated] | 100 | 5 | 5 | 5 | 
  | :white_check_mark: | [K2IdeK2CodeCoroutineDumpTestGenerated] | 100 | 3 | 3 | 3 | 
  | :white_check_mark: | [K2IdeK2CodeFileRankingTestGenerated] | 100 | 12 | 12 | 12 | 
  | :white_check_mark: | [K2IdeK2CodeKotlinVariablePrintingTestGenerated] | 100 | 9 | 9 | 9 | 
@@ -416,33 +425,37 @@ shared 9882 files out of 701 cases
  | :white_check_mark: | [K2PositionManagerTestGenerated] | 100 | 20 | 20 | 20 | 
  | :white_check_mark: | [Fe10BindingIntentionTestGenerated] | 101 | 132 | 131 | 132 | 
  | :white_check_mark: | [Fe10BindingLocalInspectionTestGenerated] | 100 | 214 | 214 | 214 | 
- | :white_check_mark: | [K2HighlightExitPointsTestGenerated] | 100 | 51 | 51 | 51 | 
+ | :white_check_mark: | [K2HighlightExitPointsTestGenerated] | 100 | 52 | 52 | 52 | 
  | :white_check_mark: | [K2HighlightUsagesTestGenerated] | 100 | 1 | 1 | 1 | 
- | :white_check_mark: | [K2HighlightingMetaInfoTestGenerated] | 104 | 51 | 49 | 51 | 
  | :white_check_mark: | [K2InspectionTestGenerated] | 88 | 14 | 16 | 16 | 
  | :white_check_mark: | [K2GotoTestOrCodeActionTestGenerated] | 100 | 9 | 9 | 9 | 
  | :white_check_mark: | [FirMoveLeftRightTestGenerated] | 100 | 16 | 16 | 16 | 
  | :white_check_mark: | [KotlinFirMoveStatementTestGenerated] | 99 | 277 | 279 | 279 | 
- | :white_check_mark: | [FirRenderingKDocTestGenerated] | 100 | 4 | 4 | 4 | 
  | :white_check_mark: | [K2MultiFileQuickFixTestGenerated] | 100 | 6 | 6 | 6 | 
  | :white_check_mark: | [K2SafeDeleteTestGenerated] | 100 | 198 | 198 | 198 | 
  | :white_check_mark: | [FirAnnotatedMembersSearchTestGenerated] | 100 | 12 | 12 | 12 | 
  | :white_check_mark: | [KotlinFirFileStructureTestGenerated] | 100 | 19 | 19 | 19 | 
  | :white_check_mark: | [KotlinFirSurroundWithTestGenerated] | 100 | 74 | 74 | 74 | 
  | :white_check_mark: | [KotlinFirUnwrapRemoveTestGenerated] | 100 | 63 | 63 | 63 | 
- | :white_check_mark: | [K2ProjectViewTestGenerated] | 100 | 31 | 31 | 31 | 
  | :white_check_mark: | [ParcelizeK2QuickFixTestGenerated] | 100 | 18 | 18 | 18 | 
- | :white_check_mark: | K2UnusedSymbolHighlightingTestGenerated$Uncategorized | 106 | 123 | 116 | 126 | 
+ | :white_check_mark: | K2UnusedSymbolHighlightingTestGenerated$Uncategorized | 109 | 126 | 116 | 127 | 
  | :white_check_mark: | K2InplaceRenameTestGenerated | 121 | 121 | 100 | 126 | 
+ | :white_check_mark: | [K2HighlightingMetaInfoTestGenerated] | 106 | 56 | 53 | 56 | 
+ | :white_check_mark: | K2HighlightingMetaInfoTestGenerated$Diagnostics | 100 | 3 | 3 | 3 | 
+ | :white_check_mark: | K2HighlightingMetaInfoTestGenerated$Dsl | 100 | 6 | 6 | 6 | 
+ | :white_check_mark: | K2HighlightingMetaInfoTestGenerated$SmartCasts | 100 | 8 | 8 | 8 | 
+ | :white_check_mark: | K2HighlightingMetaInfoTestGenerated$Unresolved | 100 | 3 | 3 | 3 | 
+ | :white_check_mark: | K2HighlightingMetaInfoTestGenerated$Uncategorized | 106 | 33 | 31 | 33 | 
+ | :white_check_mark: | K2HighlightingMetaInfoTestGenerated$FocusMode | 150 | 3 | 2 | 3 | 
 
 ### Extensions
 
-kt, test, before.Main.kt, kts, main.java, main.kt, option1.kt, kt.kt, java, 0.kt, 0.java, 0.properties, 0.kts, gradle.kts
+kt, test, before.Main.kt, kts, main.java, main.kt, option1.kt, kt.kt, java, 0.kt, 0.java, 0.properties, txt, 0.kts, gradle.kts
 
 ---
 ## Total 
- * K1: 9776 rate: 99 % of 9882 files
- * K2: 6591 rate: 67 % of 9882 files
+ * K1: 9986 rate: 99 % of 10098 files
+ * K2: 6892 rate: 68 % of 10098 files
 ---
 
 ## Build cases for K1
@@ -794,6 +807,7 @@ org.jetbrains.kotlin.idea.caches.resolve.MultiplatformAnalysisTestGenerated has 
  * idea/tests/testData/multiplatform/kt44898
  * idea/tests/testData/multiplatform/kt48291
  * idea/tests/testData/multiplatform/ktij22295
+ * idea/tests/testData/multiplatform/ktij27523
  * idea/tests/testData/multiplatform/lambdas
  * idea/tests/testData/multiplatform/languageConstructions
  * idea/tests/testData/multiplatform/multilevelParents
@@ -1211,7 +1225,6 @@ org.jetbrains.kotlin.idea.script.ScriptConfigurationHighlightingTestGenerated$Hi
  * idea/tests/testData/script/definition/highlighting/customExtension
  * idea/tests/testData/script/definition/highlighting/customJavaHome
  * idea/tests/testData/script/definition/highlighting/customLibrary
- * idea/tests/testData/script/definition/highlighting/customLibraryInModuleDeps
  * idea/tests/testData/script/definition/highlighting/doNotSpeakAboutJava
  * idea/tests/testData/script/definition/highlighting/doNotSpeakAboutJavaLegacy
  * idea/tests/testData/script/definition/highlighting/emptyAsyncResolver
@@ -1329,98 +1342,6 @@ org.jetbrains.kotlin.idea.completion.test.MultiPlatformCompletionTestGenerated h
  * completion/testData/multiPlatform/functionInCommon
  * completion/testData/multiPlatform/functionInPlatform
 
-org.jetbrains.kotlin.tools.projectWizard.cli.YamlBuildFileGenerationTestGenerated has directories
- * project-wizard/tests/testData/buildFileGeneration/android
- * project-wizard/tests/testData/buildFileGeneration/jsNodeAndBrowserTargets
- * project-wizard/tests/testData/buildFileGeneration/jvmTarget
- * project-wizard/tests/testData/buildFileGeneration/jvmTargetWithJava
- * project-wizard/tests/testData/buildFileGeneration/jvmToJvmDependency
- * project-wizard/tests/testData/buildFileGeneration/jvmToJvmDependencyWithSingleRoot
- * project-wizard/tests/testData/buildFileGeneration/kotlinJvm
- * project-wizard/tests/testData/buildFileGeneration/nativeForCurrentSystem
- * project-wizard/tests/testData/buildFileGeneration/simpleMultiplatform
- * project-wizard/tests/testData/buildFileGeneration/simpleNativeTarget
- * project-wizard/tests/testData/buildFileGeneration/singlePlatformJsBrowser
- * project-wizard/tests/testData/buildFileGeneration/singlePlatformJsNode
- * project-wizard/tests/testData/buildFileGeneration/wasmTarget
-
-org.jetbrains.kotlin.tools.projectWizard.cli.ProjectTemplateBuildFileGenerationTestGenerated has directories
- * project-wizard/tests/testData/projectTemplatesBuildFileGeneration/consoleApplication
- * project-wizard/tests/testData/projectTemplatesBuildFileGeneration/frontendApplication
- * project-wizard/tests/testData/projectTemplatesBuildFileGeneration/fullStackWebApplication
- * project-wizard/tests/testData/projectTemplatesBuildFileGeneration/multiplatformLibrary
- * project-wizard/tests/testData/projectTemplatesBuildFileGeneration/nativeApplication
- * project-wizard/tests/testData/projectTemplatesBuildFileGeneration/simpleWasmApplication
-
-org.jetbrains.kotlin.tools.projectWizard.wizard.YamlNewWizardProjectImportTestGenerated$GradleKts has directories
- * project-wizard/tests/testData/buildFileGeneration/android
- * project-wizard/tests/testData/buildFileGeneration/jsNodeAndBrowserTargets
- * project-wizard/tests/testData/buildFileGeneration/jvmTarget
- * project-wizard/tests/testData/buildFileGeneration/jvmTargetWithJava
- * project-wizard/tests/testData/buildFileGeneration/jvmToJvmDependency
- * project-wizard/tests/testData/buildFileGeneration/jvmToJvmDependencyWithSingleRoot
- * project-wizard/tests/testData/buildFileGeneration/kotlinJvm
- * project-wizard/tests/testData/buildFileGeneration/nativeForCurrentSystem
- * project-wizard/tests/testData/buildFileGeneration/simpleMultiplatform
- * project-wizard/tests/testData/buildFileGeneration/simpleNativeTarget
- * project-wizard/tests/testData/buildFileGeneration/singlePlatformJsBrowser
- * project-wizard/tests/testData/buildFileGeneration/singlePlatformJsNode
- * project-wizard/tests/testData/buildFileGeneration/wasmTarget
-
-org.jetbrains.kotlin.tools.projectWizard.wizard.YamlNewWizardProjectImportTestGenerated$GradleGroovy has directories
- * project-wizard/tests/testData/buildFileGeneration/android
- * project-wizard/tests/testData/buildFileGeneration/jsNodeAndBrowserTargets
- * project-wizard/tests/testData/buildFileGeneration/jvmTarget
- * project-wizard/tests/testData/buildFileGeneration/jvmTargetWithJava
- * project-wizard/tests/testData/buildFileGeneration/jvmToJvmDependency
- * project-wizard/tests/testData/buildFileGeneration/jvmToJvmDependencyWithSingleRoot
- * project-wizard/tests/testData/buildFileGeneration/kotlinJvm
- * project-wizard/tests/testData/buildFileGeneration/nativeForCurrentSystem
- * project-wizard/tests/testData/buildFileGeneration/simpleMultiplatform
- * project-wizard/tests/testData/buildFileGeneration/simpleNativeTarget
- * project-wizard/tests/testData/buildFileGeneration/singlePlatformJsBrowser
- * project-wizard/tests/testData/buildFileGeneration/singlePlatformJsNode
- * project-wizard/tests/testData/buildFileGeneration/wasmTarget
-
-org.jetbrains.kotlin.tools.projectWizard.wizard.YamlNewWizardProjectImportTestGenerated$Maven has directories
- * project-wizard/tests/testData/buildFileGeneration/android
- * project-wizard/tests/testData/buildFileGeneration/jsNodeAndBrowserTargets
- * project-wizard/tests/testData/buildFileGeneration/jvmTarget
- * project-wizard/tests/testData/buildFileGeneration/jvmTargetWithJava
- * project-wizard/tests/testData/buildFileGeneration/jvmToJvmDependency
- * project-wizard/tests/testData/buildFileGeneration/jvmToJvmDependencyWithSingleRoot
- * project-wizard/tests/testData/buildFileGeneration/kotlinJvm
- * project-wizard/tests/testData/buildFileGeneration/nativeForCurrentSystem
- * project-wizard/tests/testData/buildFileGeneration/simpleMultiplatform
- * project-wizard/tests/testData/buildFileGeneration/simpleNativeTarget
- * project-wizard/tests/testData/buildFileGeneration/singlePlatformJsBrowser
- * project-wizard/tests/testData/buildFileGeneration/singlePlatformJsNode
- * project-wizard/tests/testData/buildFileGeneration/wasmTarget
-
-org.jetbrains.kotlin.tools.projectWizard.wizard.ProjectTemplateNewWizardProjectImportTestGenerated$GradleKts has directories
- * project-wizard/tests/testData/projectTemplatesBuildFileGeneration/consoleApplication
- * project-wizard/tests/testData/projectTemplatesBuildFileGeneration/frontendApplication
- * project-wizard/tests/testData/projectTemplatesBuildFileGeneration/fullStackWebApplication
- * project-wizard/tests/testData/projectTemplatesBuildFileGeneration/multiplatformLibrary
- * project-wizard/tests/testData/projectTemplatesBuildFileGeneration/nativeApplication
- * project-wizard/tests/testData/projectTemplatesBuildFileGeneration/simpleWasmApplication
-
-org.jetbrains.kotlin.tools.projectWizard.wizard.ProjectTemplateNewWizardProjectImportTestGenerated$GradleGroovy has directories
- * project-wizard/tests/testData/projectTemplatesBuildFileGeneration/consoleApplication
- * project-wizard/tests/testData/projectTemplatesBuildFileGeneration/frontendApplication
- * project-wizard/tests/testData/projectTemplatesBuildFileGeneration/fullStackWebApplication
- * project-wizard/tests/testData/projectTemplatesBuildFileGeneration/multiplatformLibrary
- * project-wizard/tests/testData/projectTemplatesBuildFileGeneration/nativeApplication
- * project-wizard/tests/testData/projectTemplatesBuildFileGeneration/simpleWasmApplication
-
-org.jetbrains.kotlin.tools.projectWizard.wizard.ProjectTemplateNewWizardProjectImportTestGenerated$Maven has directories
- * project-wizard/tests/testData/projectTemplatesBuildFileGeneration/consoleApplication
- * project-wizard/tests/testData/projectTemplatesBuildFileGeneration/frontendApplication
- * project-wizard/tests/testData/projectTemplatesBuildFileGeneration/fullStackWebApplication
- * project-wizard/tests/testData/projectTemplatesBuildFileGeneration/multiplatformLibrary
- * project-wizard/tests/testData/projectTemplatesBuildFileGeneration/nativeApplication
- * project-wizard/tests/testData/projectTemplatesBuildFileGeneration/simpleWasmApplication
-
 org.jetbrains.kotlin.idea.search.refIndex.KotlinCompilerReferenceTestGenerated$ClassOrObject has directories
  * compiler-reference-index/tests/testData/compilerIndex/classOrObject/object
 
@@ -1453,7 +1374,7 @@ org.jetbrains.kotlin.idea.fir.search.refIndex.KotlinCompilerReferenceFirTestGene
 org.jetbrains.kotlin.idea.fir.search.refIndex.KotlinCompilerReferenceFirTestGenerated$Properties has directories
  * compiler-reference-index/tests/testData/compilerIndex/properties/topLevel/variableWithJvmNameOnProperty
 
-org.jetbrains.kotlin.idea.search.refIndex.KotlinCompilerReferenceByReferenceFirTestGenerated$Library has directories
+org.jetbrains.kotlin.idea.fir.search.refIndex.KotlinCompilerReferenceByReferenceFirTestGenerated$Library has directories
  * compiler-reference-index/tests/testData/compilerIndexByReference/library/object/hashCode
 
 org.jetbrains.kotlin.idea.fir.analysis.providers.sessions.LocalSessionInvalidationTestGenerated has directories
@@ -1489,6 +1410,29 @@ org.jetbrains.kotlin.idea.fir.analysis.providers.dependents.ModuleDependentsTest
  * base/fir/analysis-api-providers/testData/moduleDependents/linear
  * base/fir/analysis-api-providers/testData/moduleDependents/rhombus
  * base/fir/analysis-api-providers/testData/moduleDependents/singleRoot
+
+org.jetbrains.kotlin.idea.fir.analysis.providers.sealedInheritors.SealedInheritorsProviderTestGenerated has directories
+ * base/fir/analysis-api-providers/testData/sealedInheritors/ambiguousLibrarySealedClass
+ * base/fir/analysis-api-providers/testData/sealedInheritors/ambiguousLibrarySealedInterface
+ * base/fir/analysis-api-providers/testData/sealedInheritors/ambiguousSealedClass
+ * base/fir/analysis-api-providers/testData/sealedInheritors/ambiguousSealedInterface
+ * base/fir/analysis-api-providers/testData/sealedInheritors/illegalDistributedSealedClass
+ * base/fir/analysis-api-providers/testData/sealedInheritors/illegalExtendedLibrarySealedClass
+ * base/fir/analysis-api-providers/testData/sealedInheritors/indirectInheritorsLibrarySealedClass
+ * base/fir/analysis-api-providers/testData/sealedInheritors/indirectInheritorsLibrarySealedInterface
+ * base/fir/analysis-api-providers/testData/sealedInheritors/indirectInheritorsSealedClass
+ * base/fir/analysis-api-providers/testData/sealedInheritors/indirectInheritorsSealedInterface
+ * base/fir/analysis-api-providers/testData/sealedInheritors/librarySealedClass
+ * base/fir/analysis-api-providers/testData/sealedInheritors/librarySealedInterface
+ * base/fir/analysis-api-providers/testData/sealedInheritors/nestedLibrarySealedClass
+ * base/fir/analysis-api-providers/testData/sealedInheritors/nestedLibrarySealedInterface
+ * base/fir/analysis-api-providers/testData/sealedInheritors/nestedSealedClass
+ * base/fir/analysis-api-providers/testData/sealedInheritors/nestedSealedInterface
+ * base/fir/analysis-api-providers/testData/sealedInheritors/otherModuleSealedClass
+ * base/fir/analysis-api-providers/testData/sealedInheritors/otherModuleSealedInterface
+ * base/fir/analysis-api-providers/testData/sealedInheritors/sameModuleSealedClass
+ * base/fir/analysis-api-providers/testData/sealedInheritors/sameModuleSealedClassWithIrregularPackage
+ * base/fir/analysis-api-providers/testData/sealedInheritors/sameModuleSealedInterface
 
 org.jetbrains.kotlin.idea.fir.resolve.FirReferenceResolveWithLibTestGenerated has directories
  * idea/tests/testData/resolve/referenceWithLib/dataClassSyntheticMethods
@@ -1546,6 +1490,20 @@ org.jetbrains.kotlin.idea.fir.resolve.FirReferenceResolveWithCrossLibTestGenerat
  * idea/tests/testData/resolve/referenceWithLib/referenceToRootJavaClassFromLib
  * idea/tests/testData/resolve/referenceWithLib/sameNameInLib
  * idea/tests/testData/resolve/referenceWithLib/setWithTypeParameters
+
+org.jetbrains.kotlin.idea.fir.navigation.FirGotoRelatedSymbolMultiModuleTestGenerated has directories
+ * idea/tests/testData/navigation/relatedSymbols/multiModule/fromActualMemberFunToExpect
+ * idea/tests/testData/navigation/relatedSymbols/multiModule/fromActualMemberValToExpect
+ * idea/tests/testData/navigation/relatedSymbols/multiModule/fromExpectMemberFunToActuals
+ * idea/tests/testData/navigation/relatedSymbols/multiModule/fromExpectMemberValToActuals
+ * idea/tests/testData/navigation/relatedSymbols/multiModule/fromNestedActualClassToExpect
+ * idea/tests/testData/navigation/relatedSymbols/multiModule/fromNestedExpectClassToActuals
+ * idea/tests/testData/navigation/relatedSymbols/multiModule/fromTopLevelActualClassToExpect
+ * idea/tests/testData/navigation/relatedSymbols/multiModule/fromTopLevelActualFunToExpect
+ * idea/tests/testData/navigation/relatedSymbols/multiModule/fromTopLevelActualValToExpect
+ * idea/tests/testData/navigation/relatedSymbols/multiModule/fromTopLevelExpectClassToActuals
+ * idea/tests/testData/navigation/relatedSymbols/multiModule/fromTopLevelExpectFunToActuals
+ * idea/tests/testData/navigation/relatedSymbols/multiModule/fromTopLevelExpectValToActuals
 
 org.jetbrains.kotlin.idea.fir.quickfix.HighLevelQuickFixMultiModuleTestGenerated$AccessibilityChecker has directories
  * idea/tests/testData/multiModuleQuickFix/accessibilityChecker/annotationOnClass
@@ -1881,14 +1839,13 @@ org.jetbrains.kotlin.idea.fir.codeInsight.K2MultiModuleLineMarkerTestGenerated h
  * code-insight/testData/linemarkers/multiplatform
 
 org.jetbrains.kotlin.idea.fir.resolve.K2MultiModuleHighlightingTestGenerated has directories
- * fir/testData/resolve/anchors/anchorInDependentModule
- * fir/testData/resolve/anchors/anchorInSameModule
- * fir/testData/resolve/anchors/anchorInSameModuleJavaDependency
+ * fir/tests/testData/resolve/anchors/anchorInDependentModule
+ * fir/tests/testData/resolve/anchors/anchorInSameModule
+ * fir/tests/testData/resolve/anchors/anchorInSameModuleJavaDependency
 ## K1 only cases
 
-564 K1 only cases (7707 files):
+554 K1 only cases (7542 files):
 
- * KotlinReceiverUsageHighlightingTestGenerated
  * org.jetbrains.kotlin.DataFlowValueRenderingTestGenerated
  * org.jetbrains.kotlin.addImport.AddImportTestGenerated
  * org.jetbrains.kotlin.addImportAlias.AddImportAliasTest53Generated
@@ -1896,7 +1853,6 @@ org.jetbrains.kotlin.idea.fir.resolve.K2MultiModuleHighlightingTestGenerated has
  * org.jetbrains.kotlin.asJava.classes.IdeCompiledLightClassesByFqNameTestGenerated$Facades
  * org.jetbrains.kotlin.asJava.classes.IdeCompiledLightClassesByFqNameTestGenerated$NullabilityAnnotations
  * org.jetbrains.kotlin.asJava.classes.IdeCompiledLightClassesByFqNameTestGenerated$Uncategorized
- * org.jetbrains.kotlin.asJava.classes.IdeCompiledLightClassesByFqNameTestGenerated$WithTestCompilerPluginEnabled
  * org.jetbrains.kotlin.asJava.classes.IdeLightClassesByFqNameTestGenerated$CompilationErrors
  * org.jetbrains.kotlin.asJava.classes.IdeLightClassesByFqNameTestGenerated$IdeRegression
  * org.jetbrains.kotlin.asJava.classes.IdeLightClassesByFqNameTestGenerated$Script
@@ -1962,6 +1918,8 @@ org.jetbrains.kotlin.idea.fir.resolve.K2MultiModuleHighlightingTestGenerated has
  * org.jetbrains.kotlin.idea.codeInsight.MoveOnCutPasteTestGenerated
  * org.jetbrains.kotlin.idea.codeInsight.MultiFileInspectionTestGenerated
  * org.jetbrains.kotlin.idea.codeInsight.OutOfBlockModificationTestGenerated
+ * org.jetbrains.kotlin.idea.codeInsight.PairMatcherTestGenerated
+ * org.jetbrains.kotlin.idea.codeInsight.RenderingKDocTestGenerated
  * org.jetbrains.kotlin.idea.codeInsight.codevision.KotlinCodeVisionProviderTestGenerated
  * org.jetbrains.kotlin.idea.codeInsight.generate.CodeInsightActionTestGenerated
  * org.jetbrains.kotlin.idea.codeInsight.generate.GenerateHashCodeAndEqualsActionTestGenerated
@@ -1976,11 +1934,9 @@ org.jetbrains.kotlin.idea.fir.resolve.K2MultiModuleHighlightingTestGenerated has
  * org.jetbrains.kotlin.idea.codeInsight.hints.KotlinLambdasHintsProviderGenerated
  * org.jetbrains.kotlin.idea.codeInsight.hints.KotlinRangesHintsProviderTestGenerated
  * org.jetbrains.kotlin.idea.codeInsight.hints.KotlinReferenceTypeHintsProviderTestGenerated
- * org.jetbrains.kotlin.idea.codeInsight.postfix.PostfixTemplateProviderTestGenerated$Uncategorized
- * org.jetbrains.kotlin.idea.codeInsight.postfix.PostfixTemplateProviderTestGenerated$WrapWithCall
+ * org.jetbrains.kotlin.idea.codeInsight.postfix.K1PostfixTemplateTestGenerated$Uncategorized
  * org.jetbrains.kotlin.idea.compilerPlugin.kotlinxSerialization.SerializationPluginIdeDiagnosticTestGenerated
  * org.jetbrains.kotlin.idea.compilerPlugin.kotlinxSerialization.SerializationQuickFixTestGenerated
- * org.jetbrains.kotlin.idea.completion.test.CompletionIncrementalResolveTest31Generated
  * org.jetbrains.kotlin.idea.completion.test.Java8BasicCompletionTestGenerated
  * org.jetbrains.kotlin.idea.completion.test.JvmSmartCompletionTestGenerated$AfterAs
  * org.jetbrains.kotlin.idea.completion.test.JvmSmartCompletionTestGenerated$AnonymousObject
@@ -2002,6 +1958,7 @@ org.jetbrains.kotlin.idea.fir.resolve.K2MultiModuleHighlightingTestGenerated has
  * org.jetbrains.kotlin.idea.completion.test.JvmSmartCompletionTestGenerated$Uncategorized
  * org.jetbrains.kotlin.idea.completion.test.JvmSmartCompletionTestGenerated$Vararg
  * org.jetbrains.kotlin.idea.completion.test.JvmSmartCompletionTestGenerated$WhenEntry
+ * org.jetbrains.kotlin.idea.completion.test.K1CompletionIncrementalResolveTestGenerated$Smart
  * org.jetbrains.kotlin.idea.completion.test.K1JSBasicCompletionTestGenerated$Js
  * org.jetbrains.kotlin.idea.completion.test.KotlinSourceInJavaCompletionTestGenerated
  * org.jetbrains.kotlin.idea.completion.test.KotlinStdLibInJavaCompletionTestGenerated
@@ -2011,8 +1968,6 @@ org.jetbrains.kotlin.idea.fir.resolve.K2MultiModuleHighlightingTestGenerated has
  * org.jetbrains.kotlin.idea.completion.test.handlers.SmartCompletionHandlerTestGenerated$SuspendLambdaSignature
  * org.jetbrains.kotlin.idea.completion.test.handlers.SmartCompletionHandlerTestGenerated$Uncategorized
  * org.jetbrains.kotlin.idea.completion.test.weighers.SmartCompletionWeigherTestGenerated
- * org.jetbrains.kotlin.idea.conversion.copy.LiteralKotlinToKotlinCopyPasteTestGenerated
- * org.jetbrains.kotlin.idea.conversion.copy.LiteralTextToKotlinCopyPasteTestGenerated
  * org.jetbrains.kotlin.idea.coverage.KotlinCoverageOutputFilesTestGenerated
  * org.jetbrains.kotlin.idea.debugger.evaluate.CodeFragmentAutoImportTestGenerated
  * org.jetbrains.kotlin.idea.debugger.evaluate.CodeFragmentCompletionHandlerTestGenerated
@@ -2060,11 +2015,10 @@ org.jetbrains.kotlin.idea.fir.resolve.K2MultiModuleHighlightingTestGenerated has
  * org.jetbrains.kotlin.idea.editor.backspaceHandler.BackspaceHandlerTestGenerated$Uncategorized
  * org.jetbrains.kotlin.idea.editor.commenter.KotlinCommenterTestGenerated
  * org.jetbrains.kotlin.idea.editor.quickDoc.QuickDocProviderTestGenerated
- * org.jetbrains.kotlin.idea.folding.KotlinFoldingTestGenerated$CheckCollapse
- * org.jetbrains.kotlin.idea.folding.KotlinFoldingTestGenerated$NoCollapse
  * org.jetbrains.kotlin.idea.highlighter.DiagnosticMessageJsTestGenerated
  * org.jetbrains.kotlin.idea.highlighter.DiagnosticMessageTestGenerated
  * org.jetbrains.kotlin.idea.highlighter.DslHighlighterTestGenerated
+ * org.jetbrains.kotlin.idea.highlighter.KotlinReceiverUsageHighlightingTestGenerated
  * org.jetbrains.kotlin.idea.highlighter.UsageHighlightingTestGenerated
  * org.jetbrains.kotlin.idea.imports.JsOptimizeImportsTestGenerated$Js
  * org.jetbrains.kotlin.idea.imports.JvmOptimizeImportsTestGenerated$Jvm$Uncategorized
@@ -2078,7 +2032,6 @@ org.jetbrains.kotlin.idea.fir.resolve.K2MultiModuleHighlightingTestGenerated has
  * org.jetbrains.kotlin.idea.inspections.LocalInspectionTestGenerated$Collections
  * org.jetbrains.kotlin.idea.inspections.LocalInspectionTestGenerated$ComplexRedundantLet
  * org.jetbrains.kotlin.idea.inspections.LocalInspectionTestGenerated$ConstantConditionIf
- * org.jetbrains.kotlin.idea.inspections.LocalInspectionTestGenerated$ControlFlowWithEmptyBody
  * org.jetbrains.kotlin.idea.inspections.LocalInspectionTestGenerated$ConventionNameCalls
  * org.jetbrains.kotlin.idea.inspections.LocalInspectionTestGenerated$ConvertObjectToDataObject
  * org.jetbrains.kotlin.idea.inspections.LocalInspectionTestGenerated$ConvertTwoComparisonsToRangeCheck
@@ -2221,7 +2174,6 @@ org.jetbrains.kotlin.idea.fir.resolve.K2MultiModuleHighlightingTestGenerated has
  * org.jetbrains.kotlin.idea.intentions.K1IntentionTest2Generated$TakeWhile
  * org.jetbrains.kotlin.idea.intentions.K1IntentionTest2Generated$ToCollection
  * org.jetbrains.kotlin.idea.intentions.K1IntentionTest2Generated$Uncategorized
- * org.jetbrains.kotlin.idea.intentions.K1IntentionTestGenerated$RemoveExplicitTypeArguments
  * org.jetbrains.kotlin.idea.intentions.K1IntentionTestGenerated$RemoveExplicitTypeWithApiMode
  * org.jetbrains.kotlin.idea.intentions.K1IntentionTestGenerated$SpecifyTypeExplicitlyInDestructuringAssignment
  * org.jetbrains.kotlin.idea.intentions.MultiFileIntentionTestGenerated
@@ -2257,8 +2209,6 @@ org.jetbrains.kotlin.idea.fir.resolve.K2MultiModuleHighlightingTestGenerated has
  * org.jetbrains.kotlin.idea.maven.KotlinMavenInspectionTestGenerated$_19
  * org.jetbrains.kotlin.idea.navigation.GotoSuperTestGenerated
  * org.jetbrains.kotlin.idea.navigation.KotlinGotoImplementationTestGenerated
- * org.jetbrains.kotlin.idea.navigation.KotlinGotoTestGenerated$GotoClass
- * org.jetbrains.kotlin.idea.navigation.KotlinGotoTestGenerated$GotoSymbol
  * org.jetbrains.kotlin.idea.navigationToolbar.KotlinNavBarTestGenerated
  * org.jetbrains.kotlin.idea.quickfix.K1QuickFixTestGenerated$ReplaceWithSafeCallForScopeFunction
  * org.jetbrains.kotlin.idea.quickfix.QuickFixMultiFileTestGenerated$AddAnnotationTarget
@@ -2334,8 +2284,6 @@ org.jetbrains.kotlin.idea.fir.resolve.K2MultiModuleHighlightingTestGenerated has
  * org.jetbrains.kotlin.idea.refactoring.pushDown.PushDownTestGenerated$J2K
  * org.jetbrains.kotlin.idea.refactoring.pushDown.PushDownTestGenerated$K2J
  * org.jetbrains.kotlin.idea.refactoring.pushDown.PushDownTestGenerated$K2K
- * org.jetbrains.kotlin.idea.refactoring.rename.MultiModuleRenameTestGenerated
- * org.jetbrains.kotlin.idea.refactoring.safeDelete.MultiModuleSafeDeleteTestGenerated
  * org.jetbrains.kotlin.idea.refactoring.safeDelete.SafeDeleteTestGenerated$KotlinClassWithJava
  * org.jetbrains.kotlin.idea.refactoring.safeDelete.SafeDeleteTestGenerated$KotlinFunctionWithJava
  * org.jetbrains.kotlin.idea.refactoring.safeDelete.SafeDeleteTestGenerated$KotlinPropertyWithJava
@@ -2443,7 +2391,7 @@ org.jetbrains.kotlin.idea.fir.resolve.K2MultiModuleHighlightingTestGenerated has
  * org.jetbrains.kotlin.nj2k.PartialConverterTestGenerated$Field
  * org.jetbrains.kotlin.nj2k.PartialConverterTestGenerated$Function
  * org.jetbrains.kotlin.parcelize.ide.test.ParcelizeK1CheckerTestGenerated
- * org.jetbrains.kotlin.psi.patternMatching.PsiUnifierTestGenerated$Equivalence
+ * org.jetbrains.kotlin.psi.patternMatching.KotlinPsiUnifierTestGenerated$Equivalence
  * org.jetbrains.kotlin.search.InheritorsSearchTestGenerated
  * org.jetbrains.kotlin.shortenRefs.ShortenRefsTestGenerated$Constructor
  * org.jetbrains.kotlin.shortenRefs.ShortenRefsTestGenerated$Imports

@@ -1,11 +1,13 @@
 // Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.ide.startup.importSettings.chooser.ui
 
+import com.intellij.ide.startup.importSettings.data.WizardProvider
 import com.intellij.openapi.util.NlsContexts
+import com.intellij.platform.ide.bootstrap.StartupWizardStage
 
 class OnboardingController private constructor(){
   companion object {
-    val controller = OnboardingController()
+    private val controller = OnboardingController()
     fun getInstance(): OnboardingController = controller
   }
 
@@ -17,10 +19,10 @@ class OnboardingController private constructor(){
     CLOSED
   }
 
-  private var dialog = createDialog()
+  private var dialog: OnboardingDialog? = null
 
-  private fun createDialog(): OnboardingDialog {
-    return OnboardingDialog { doCancelAction() }.apply {
+  private fun createDialog(titleGetter: (StartupWizardStage?) -> @NlsContexts.DialogTitle String?): OnboardingDialog {
+    return OnboardingDialog(titleGetter) { doCancelAction() }.apply {
       this.isResizable = false
     }
   }
@@ -33,43 +35,72 @@ class OnboardingController private constructor(){
   private var cancelImportCallback: (() -> Unit)? = null
 
   fun startImport(cancelCallback: (() -> Unit)? = null,
-                  @NlsContexts.DialogTitle title: String? = null, isModal: Boolean = true) {
+                  titleGetter: (StartupWizardStage?) -> @NlsContexts.DialogTitle String? = { null },
+                  isModal: Boolean = true,
+                  skipImportAction: (() -> Unit)? = null) {
 
-    if(!dialog.isShowing || !dialog.isVisible) {
-      dialog = createDialog()
+    val dl = getDialog(titleGetter)
+
+    val skipAction: () -> Unit = skipImportAction ?:
+      WizardProvider.getInstance().getWizardService()?.let {
+      { startWizard(cancelCallback, titleGetter, isModal) }
+    } ?: run {
+      { dialogClose() }
     }
 
-    val controller = ImportSettingsController.createController(dialog)
+    val controller = ImportSettingsController.createController(dl, skipAction)
 
     cancelImportCallback = cancelCallback
     controller.goToProductChooserPage()
-    dialog.isModal = isModal
+    dl.isModal = isModal
 
-    if(!dialog.isShowing) {
-      dialog.initialize()
-      dialog.show()
+    if(!dl.isShowing) {
+      dl.initialize()
+      dl.show()
     }
 
-    dialog.title = title
     state = State.IMPORT
   }
 
-  fun startWizard(cancelCallback: (() -> Unit)? = null,
-                  @NlsContexts.DialogTitle title: String? = null) {
+  fun dialogClose() {
+    dialog?.dialogClose()
+  }
 
-    if(!dialog.isShowing || !dialog.isVisible) {
-      dialog = createDialog()
+  private fun getDialog(titleGetter: (StartupWizardStage?) -> @NlsContexts.DialogTitle String?): OnboardingDialog {
+    val dl = dialog?.let {
+       if(!it.isShowing || !it.isVisible) {
+          createDialog(titleGetter)
+       } else {
+         it.titleGetter = titleGetter
+         it
+       }
+    } ?: run {
+      createDialog(titleGetter)
     }
+    dialog = dl
+    return dl
+  }
 
+  fun startWizard(cancelCallback: (() -> Unit)? = null,
+                  titleGetter: (StartupWizardStage?) -> @NlsContexts.DialogTitle String? = { null },
+                  isModal: Boolean = true,
+                  goBackAction: (() -> Unit)? = {startImport (cancelCallback, titleGetter, isModal)}) {
+
+    val dl = getDialog(titleGetter)
+
+    val service = WizardProvider.getInstance().getWizardService() ?: return
+
+    val wizardController = WizardController.createController(dl, service, goBackAction)
     cancelImportCallback = cancelCallback
 
-    if(!dialog.isShowing) {
-      dialog.initialize()
-      dialog.show()
+    wizardController.goToThemePage()
+
+    if(!dl.isShowing) {
+      dl.initialize()
+      dl.show()
     }
 
-    dialog.title = title
-    state = State.IMPORT
+    state = State.WIZARD
   }
 
 }

@@ -123,6 +123,14 @@ class FE1UastResolveApiFixtureTest : KotlinLightCodeInsightFixtureTestCase(), Ua
         checkArgumentMappingOOBE(myFixture)
     }
 
+    fun testArgumentMappingSAM() {
+        checkArgumentMappingSAM(myFixture)
+    }
+
+    fun testArgumentMappingSAM_methodReference() {
+        checkArgumentMappingSAM_methodReference(myFixture)
+    }
+
     fun testSyntheticEnumMethods() {
         checkSyntheticEnumMethods(myFixture)
     }
@@ -217,5 +225,21 @@ class FE1UastResolveApiFixtureTest : KotlinLightCodeInsightFixtureTestCase(), Ua
 
     fun testResolvePropertiesInInnerClassFromBinaryDependency() {
         checkResolvePropertiesInInnerClassFromBinaryDependency(myFixture)
+    }
+
+    fun testResolveTopLevelInlineReifiedFromLibrary() {
+        checkResolveTopLevelInlineReifiedFromLibrary(myFixture, withJvmName = false)
+    }
+
+    fun testResolveTopLevelInlineReifiedFromLibraryWithJvmName() {
+        checkResolveTopLevelInlineReifiedFromLibrary(myFixture, withJvmName = true)
+    }
+
+    fun testResolveTopLevelInlineInFacadeFromLibrary() {
+        checkResolveTopLevelInlineInFacadeFromLibrary(myFixture, isK2 = false)
+    }
+
+    fun testResolveInnerInlineFromLibrary() {
+        checkResolveInnerInlineFromLibrary(myFixture)
     }
 }

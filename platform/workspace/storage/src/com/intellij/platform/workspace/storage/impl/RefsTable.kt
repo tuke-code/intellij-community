@@ -1,4 +1,4 @@
-// Copyright 2000-2020 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
+// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.platform.workspace.storage.impl
 
 import com.google.common.collect.BiMap
@@ -9,7 +9,7 @@ import com.intellij.platform.workspace.storage.impl.ConnectionId.ConnectionType
 import com.intellij.platform.workspace.storage.impl.containers.*
 import com.intellij.platform.workspace.storage.impl.references.*
 import com.intellij.platform.workspace.storage.instrumentation.Modification
-import com.intellij.util.containers.HashSetInterner
+import com.intellij.util.containers.Interner
 import it.unimi.dsi.fastutil.ints.IntArrayList
 import org.jetbrains.annotations.ApiStatus
 import java.util.function.BiConsumer
@@ -97,7 +97,7 @@ public class ConnectionId private constructor(
       return interner.intern(connectionId)
     }
 
-    private val interner = HashSetInterner<ConnectionId>()
+    private val interner = Interner.createInterner<ConnectionId>()
   }
 }
 
@@ -155,7 +155,7 @@ internal class MutableRefsTable(
     else {
       val copy = LinkedBidirectionalMap<ChildEntityId, ParentEntityId>()
       val original = oneToAbstractManyContainer[connectionId]!!
-      original.forEach { (k, v) -> copy[k] = v }
+      original.forEach { (k, v) -> copy.add(k, v) }
       oneToAbstractManyContainer[connectionId] = copy
       oneToAbstractManyCopiedToModify.add(connectionId)
       copy
@@ -258,13 +258,13 @@ internal class MutableRefsTable(
     return listOf(Modification.Remove(parentId.id, childId.id))
   }
 
-  internal fun replaceChildrenOfParent(connectionId: ConnectionId, parentId: ParentEntityId, newChildrenIds: Collection<ChildEntityId>): List<Modification> {
-    if (newChildrenIds !is Set<ChildEntityId> && newChildrenIds.size != newChildrenIds.toSet().size) {
+  internal fun replaceChildrenOfParent(connectionId: ConnectionId, parentId: ParentEntityId, newChildrenIds: List<ChildEntityId>): List<Modification> {
+    if (newChildrenIds.size != newChildrenIds.toSet().size) {
       error("Children have duplicates: $newChildrenIds")
     }
     return when (connectionId.connectionType) {
       ConnectionType.ONE_TO_MANY -> {
-        replaceOneToManyChildrenOfParent(connectionId, parentId.id, newChildrenIds.toList())
+        replaceOneToManyChildrenOfParent(connectionId, parentId.id, newChildrenIds)
       }
       ConnectionType.ONE_TO_ONE -> {
         val copiedMap = getOneToOneMutableMap(connectionId)
@@ -312,7 +312,7 @@ internal class MutableRefsTable(
         add(Modification.Remove(parentId, createEntityId(it, connectionId.childClass)))
       })
       val children = newChildrenEntityIds.mapToIntArray { it.id.arrayId }
-      val previousParents = copiedMap.putAll(children, parentId.arrayId)
+      val previousParents = copiedMap.addAll(children, parentId.arrayId)
       previousParents.forEach(BiConsumer { child, parent ->
         add(Modification.Remove(createEntityId(parent, connectionId.parentClass), createEntityId(child, connectionId.childClass)))
       })
@@ -330,7 +330,7 @@ internal class MutableRefsTable(
       val removedChildren = copiedMap.removeValue(parentId)
       removedChildren.forEach { add(Modification.Remove(parentId.id, it.id)) }
       newChildrenEntityIds.forEach {
-        val previousParentOfChild = copiedMap.put(it, parentId)
+        val previousParentOfChild = copiedMap.add(it, parentId)
         if (previousParentOfChild != null) add(Modification.Remove(previousParentOfChild.id, it.id))
         add(Modification.Add(parentId.id, it.id))
       }
@@ -428,7 +428,7 @@ internal class MutableRefsTable(
       if (existingParent != NonNegativeIntIntBiMap.DEFAULT_RETURN_VALUE && existingParent == parentId.id.arrayId) return emptyList()
 
       val removedParent = copiedMap.removeKey(childId.arrayId)
-      val removedChildren = copiedMap.putAll(intArrayOf(childId.arrayId), parentId.id.arrayId)
+      val removedChildren = copiedMap.addAll(intArrayOf(childId.arrayId), parentId.id.arrayId)
       if (removedParent != null) add(Modification.Remove(createEntityId(removedParent, connectionId.parentClass), childId))
       removedChildren.forEach { (child, parent) ->
         add(Modification.Remove(createEntityId(parent, connectionId.parentClass), createEntityId(child, connectionId.childClass)))
@@ -448,7 +448,7 @@ internal class MutableRefsTable(
     if (copiedMap[childId] == parentId) return emptyList()
 
     val removedParent = copiedMap.remove(childId)
-    copiedMap.put(childId, parentId)
+    copiedMap.add(childId, parentId)
     return buildList {
       if (removedParent != null) add(Modification.Remove(removedParent.id, childId.id))
       add(Modification.Add(parentId.id, childId.id))
@@ -468,15 +468,6 @@ internal class MutableRefsTable(
       other.oneToOneContainer.toMutableContainer(),
       other.oneToAbstractManyContainer.toMutableContainer(),
       other.abstractOneToOneContainer.toMutableContainer())
-  }
-
-  private fun <T> Sequence<T>.mapToIntArray(action: (T) -> Int): IntArray {
-    val intArrayList = IntArrayList()
-    this.forEach { item ->
-      intArrayList.add(action(item))
-    }
-
-    return intArrayList.toIntArray()
   }
 
   private fun <T> List<T>.mapToIntArray(action: (T) -> Int): IntArray {
@@ -539,33 +530,6 @@ internal sealed class AbstractRefsTable {
       if (!bimap.containsKey(childId)) continue
       val value = bimap[childId] ?: continue
       val existingValue = res.putIfAbsent(connectionId, value)
-      if (existingValue != null) thisLogger().error("This parent already exists")
-    }
-
-    val filteredAbstractOneToOne = abstractOneToOneContainer
-      .filterKeys { it.childClass.findWorkspaceEntity().isAssignableFrom(childClass) }
-    for ((connectionId, bimap) in filteredAbstractOneToOne) {
-      if (!bimap.containsKey(childId)) continue
-      val value = bimap[childId] ?: continue
-      val existingValue = res.putIfAbsent(connectionId, value)
-      if (existingValue != null) thisLogger().error("This parent already exists")
-    }
-
-    return res
-  }
-
-  fun getParentOneToOneRefsOfChild(childId: ChildEntityId): Map<ConnectionId, ParentEntityId> {
-    val childArrayId = childId.id.arrayId
-    val childClassId = childId.id.clazz
-    val childClass = childId.id.clazz.findWorkspaceEntity()
-
-    val res = HashMap<ConnectionId, ParentEntityId>()
-
-    val filteredOneToOne = oneToOneContainer.filterKeys { it.childClass == childClassId }
-    for ((connectionId, bimap) in filteredOneToOne) {
-      if (!bimap.containsKey(childArrayId)) continue
-      val value = bimap.get(childArrayId)
-      val existingValue = res.putIfAbsent(connectionId, createEntityId(value, connectionId.parentClass).asParent())
       if (existingValue != null) thisLogger().error("This parent already exists")
     }
 
@@ -647,33 +611,6 @@ internal sealed class AbstractRefsTable {
       val key = bimap.inverse()[parentId]
       if (key == null) continue
       val existingValue = res.putIfAbsent(connectionId, listOf(key))
-      if (existingValue != null) thisLogger().error("These children already exist")
-    }
-
-    return res
-  }
-
-  fun getChildrenOneToOneRefsOfParentBy(parentId: ParentEntityId): Map<ConnectionId, ChildEntityId> {
-    val parentArrayId = parentId.id.arrayId
-    val parentClassId = parentId.id.clazz
-    val parentClass = parentId.id.clazz.findWorkspaceEntity()
-
-    val res = HashMap<ConnectionId, ChildEntityId>()
-
-    val filteredOneToOne = oneToOneContainer.filterKeys { it.parentClass == parentClassId }
-    for ((connectionId, bimap) in filteredOneToOne) {
-      if (!bimap.containsValue(parentArrayId)) continue
-      val key = bimap.getKey(parentArrayId)
-      val existingValue = res.putIfAbsent(connectionId, createEntityId(key, connectionId.childClass).asChild())
-      if (existingValue != null) thisLogger().error("These children already exist")
-    }
-
-    val filteredAbstractOneToOne = abstractOneToOneContainer
-      .filterKeys { it.parentClass.findWorkspaceEntity().isAssignableFrom(parentClass) }
-    for ((connectionId, bimap) in filteredAbstractOneToOne) {
-      val key = bimap.inverse()[parentId]
-      if (key == null) continue
-      val existingValue = res.putIfAbsent(connectionId, key)
       if (existingValue != null) thisLogger().error("These children already exist")
     }
 

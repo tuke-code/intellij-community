@@ -17,11 +17,14 @@ import com.intellij.ide.dnd.DnDManagerImpl
 import com.intellij.ide.ui.UISettings
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.application.ThreadingSupport
 import com.intellij.openapi.application.TransactionGuard
 import com.intellij.openapi.application.TransactionGuardImpl
 import com.intellij.openapi.application.ex.ApplicationManagerEx
+import com.intellij.openapi.application.impl.AnyThreadWriteThreadingSupport
 import com.intellij.openapi.application.impl.InvocationUtil
 import com.intellij.openapi.application.impl.RwLockHolder
+import com.intellij.openapi.application.isNewLockEnabled
 import com.intellij.openapi.components.serviceIfCreated
 import com.intellij.openapi.diagnostic.ControlFlowException
 import com.intellij.openapi.diagnostic.Logger
@@ -80,7 +83,7 @@ class IdeEventQueue private constructor() : EventQueue() {
   private val activityListeners = ContainerUtil.createLockFreeCopyOnWriteList<Runnable>()
 
   @Internal
-  val rwLockHolder: RwLockHolder = RwLockHolder
+  val threadingSupport: ThreadingSupport = if (isNewLockEnabled) AnyThreadWriteThreadingSupport else RwLockHolder
   val keyEventDispatcher: IdeKeyEventDispatcher = IdeKeyEventDispatcher(this)
   val mouseEventDispatcher: IdeMouseEventDispatcher = IdeMouseEventDispatcher()
   val popupManager: IdePopupManager = IdePopupManager()
@@ -143,7 +146,7 @@ class IdeEventQueue private constructor() : EventQueue() {
     val systemEventQueue = Toolkit.getDefaultToolkit().systemEventQueue
     assert(systemEventQueue !is IdeEventQueue) { systemEventQueue }
     systemEventQueue.push(this)
-    rwLockHolder.postInit(Thread.currentThread())
+    threadingSupport.postInit(Thread.currentThread())
     EDT.updateEdt()
     replaceDefaultKeyboardFocusManager()
     addDispatcher(WindowsAltSuppressor(), null)
@@ -400,12 +403,7 @@ class IdeEventQueue private constructor() : EventQueue() {
     }
     finally {
       Thread.interrupted()
-      if (event is WindowEvent || event is FocusEvent || event is InputEvent) {
-        // Increment the activity counter right before notifying listeners
-        // so that the listeners would get data providers with fresh data
-        incrementActivityCountIfNeeded(e)
-        processIdleActivityListeners(event)
-      }
+      processIdleActivityListeners(e)
       performanceWatcher?.edtEventFinished()
       eventWatcher?.edtEventFinished(event, System.currentTimeMillis())
     }
@@ -562,7 +560,9 @@ class IdeEventQueue private constructor() : EventQueue() {
 
     // increment the activity counter before performing the action
     // so that they are called with data providers with fresh data
-    incrementActivityCountIfNeeded(e)
+    if (isUserActivityEvent(e)) {
+      ActivityTracker.getInstance().inc()
+    }
     if (popupManager.isPopupActive && popupManager.dispatch(e)) {
       if (keyEventDispatcher.isWaitingForSecondKeyStroke) {
         keyEventDispatcher.state = KeyState.STATE_INIT
@@ -581,8 +581,8 @@ class IdeEventQueue private constructor() : EventQueue() {
     }
 
     when {
-      e is MouseEvent -> rwLockHolder.runWithImplicitRead { dispatchMouseEvent(e) }
-      e is KeyEvent -> rwLockHolder.runWithImplicitRead { dispatchKeyEvent(e) }
+      e is MouseEvent -> threadingSupport.runWithImplicitRead { dispatchMouseEvent(e) }
+      e is KeyEvent -> threadingSupport.runWithImplicitRead { dispatchKeyEvent(e) }
       appIsLoaded() -> {
         val app = ApplicationManagerEx.getApplicationEx()
         if (e is ComponentEvent) {
@@ -590,28 +590,26 @@ class IdeEventQueue private constructor() : EventQueue() {
             (app.serviceIfCreated<WindowManager>() as? WindowManagerEx)?.dispatchComponentEvent(e)
           }
         }
-        rwLockHolder.runWithoutImplicitRead { defaultDispatchEvent(e) }
+        threadingSupport.runWithoutImplicitRead { defaultDispatchEvent(e) }
       }
-      else -> rwLockHolder.runWithoutImplicitRead { defaultDispatchEvent(e) }
+      else -> threadingSupport.runWithoutImplicitRead { defaultDispatchEvent(e) }
     }
   }
 
-  private fun isActivityInputEvent(e: AWTEvent): Boolean =
+  private fun isUserActivityEvent(e: AWTEvent): Boolean =
     KeyEvent.KEY_PRESSED == e.id ||
     KeyEvent.KEY_TYPED == e.id ||
     MouseEvent.MOUSE_PRESSED == e.id ||
     MouseEvent.MOUSE_RELEASED == e.id ||
-    MouseEvent.MOUSE_CLICKED == e.id
-
-  private fun incrementActivityCountIfNeeded(e: AWTEvent) {
-    if (isActivityInputEvent(e) || e is WindowEvent || e is FocusEvent) {
-      ActivityTracker.getInstance().inc()
-    }
-  }
+    MouseEvent.MOUSE_CLICKED == e.id ||
+    e is WindowEvent || e is FocusEvent
 
   private fun processIdleActivityListeners(e: AWTEvent) {
+    if (!isUserActivityEvent(e)) return
+    // Increment the activity counter right before notifying listeners
+    // so that the listeners would get data providers with fresh data
+    ActivityTracker.getInstance().inc()
     idleTracker()
-    if (!isActivityInputEvent(e)) return
     synchronized(lock) {
       lastActiveTime = System.nanoTime()
       for (activityListener in activityListeners) {
@@ -686,7 +684,8 @@ class IdeEventQueue private constructor() : EventQueue() {
       val me = if (e is MouseEvent) e else null
       val ke = if (e is KeyEvent) e else null
       val consumed = ke == null || ke.isConsumed
-      if (me != null && (me.isPopupTrigger || e.id == MouseEvent.MOUSE_PRESSED) || ke != null && ke.keyCode == KeyEvent.VK_CONTEXT_MENU) {
+      if (me != null && (me.isPopupTrigger || e.id == MouseEvent.MOUSE_PRESSED) ||
+          ke != null /*&& ke.keyCode == KeyEvent.VK_CONTEXT_MENU*/) {
         popupTriggerTime = System.nanoTime()
       }
       val source = e.source

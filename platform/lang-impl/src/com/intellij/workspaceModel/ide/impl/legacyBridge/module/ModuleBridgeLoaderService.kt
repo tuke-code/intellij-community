@@ -1,4 +1,4 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.workspaceModel.ide.impl.legacyBridge.module
 
 import com.intellij.openapi.application.writeAction
@@ -11,10 +11,14 @@ import com.intellij.openapi.project.impl.ProjectServiceContainerInitializedListe
 import com.intellij.openapi.projectRoots.ProjectJdkTable
 import com.intellij.openapi.roots.ProjectRootManager
 import com.intellij.openapi.roots.libraries.LibraryTablesRegistrar
+import com.intellij.openapi.util.component1
+import com.intellij.openapi.util.component2
 import com.intellij.platform.PlatformProjectOpenProcessor.Companion.PROJECT_LOADED_FROM_CACHE_BUT_HAS_NO_MODULES
 import com.intellij.platform.backend.workspace.WorkspaceModel
 import com.intellij.platform.backend.workspace.WorkspaceModelTopics
-import com.intellij.platform.diagnostic.telemetry.helpers.addElapsedTimeMillis
+import com.intellij.platform.backend.workspace.impl.internal
+import com.intellij.platform.diagnostic.telemetry.helpers.Milliseconds
+import com.intellij.platform.diagnostic.telemetry.helpers.MillisecondsMeasurer
 import com.intellij.platform.diagnostic.telemetry.impl.span
 import com.intellij.platform.workspace.jps.entities.ModuleEntity
 import com.intellij.platform.workspace.storage.MutableEntityStorage
@@ -22,6 +26,7 @@ import com.intellij.workspaceModel.core.fileIndex.WorkspaceFileIndex
 import com.intellij.workspaceModel.core.fileIndex.impl.WorkspaceFileIndexEx
 import com.intellij.workspaceModel.ide.JpsProjectLoadedListener
 import com.intellij.workspaceModel.ide.impl.GlobalWorkspaceModel
+import com.intellij.workspaceModel.ide.impl.WorkspaceModelCacheImpl
 import com.intellij.workspaceModel.ide.impl.WorkspaceModelImpl
 import com.intellij.workspaceModel.ide.impl.jps.serialization.JpsProjectModelSynchronizer
 import com.intellij.workspaceModel.ide.impl.jpsMetrics
@@ -30,19 +35,18 @@ import com.intellij.workspaceModel.ide.impl.legacyBridge.project.ProjectRootMana
 import io.opentelemetry.api.metrics.Meter
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
-import java.util.concurrent.atomic.AtomicLong
 
 private val LOG: Logger
   get() = logger<ModuleBridgeLoaderService>()
 
-private val moduleLoadingTimeMs = AtomicLong().also { setupOpenTelemetryReporting(jpsMetrics.meter) }
+private val moduleLoadingTimeMs = MillisecondsMeasurer().also { setupOpenTelemetryReporting(jpsMetrics.meter) }
 
 private fun setupOpenTelemetryReporting(meter: Meter) {
   val modulesLoadingTimeCounter = meter.counterBuilder("workspaceModel.moduleBridgeLoader.loading.modules.ms").buildObserver()
 
   meter.batchCallback(
     {
-      modulesLoadingTimeCounter.record(moduleLoadingTimeMs.get())
+      modulesLoadingTimeCounter.record(moduleLoadingTimeMs.asMilliseconds())
     },
     modulesLoadingTimeCounter
   )
@@ -56,7 +60,7 @@ private class ModuleBridgeLoaderService : ProjectServiceContainerInitializedList
 
       launch { project.serviceAsync<ProjectRootManager>() }
 
-      val start = System.currentTimeMillis()
+      val start = Milliseconds.now()
 
       if (workspaceModel.loadedFromCache) {
         span("modules loading with cache") {
@@ -104,10 +108,17 @@ private class ModuleBridgeLoaderService : ProjectServiceContainerInitializedList
         }
       }
       span("workspace file index initialization") {
-        (project.serviceAsync<WorkspaceFileIndex>() as WorkspaceFileIndexEx).initialize()
+        try {
+          (project.serviceAsync<WorkspaceFileIndex>() as WorkspaceFileIndexEx).initialize()
+        }
+        catch (e: RuntimeException) {
+          // IDEA-345082 There is a chance that the index was not initialized due to the broken cache.
+          WorkspaceModelCacheImpl.invalidateCaches()
+          throw RuntimeException(e)
+        }
       }
 
-      moduleLoadingTimeMs.addElapsedTimeMillis(start)
+      moduleLoadingTimeMs.addElapsedTime(start)
     }
     WorkspaceModelTopics.getInstance(project).notifyModulesAreLoaded()
   }
@@ -120,10 +131,11 @@ private suspend fun loadModules(project: Project,
   span("modules instantiation") {
     val moduleManager = project.serviceAsync<ModuleManager>() as ModuleManagerComponentBridge
     if (targetBuilder != null && targetUnloadedEntitiesBuilder != null) {
-      moduleManager.unloadNewlyAddedModulesIfPossible(targetBuilder, targetUnloadedEntitiesBuilder)
+      val (modulesToLoad, modulesToUnload) = moduleManager.calculateUnloadModules(targetBuilder, targetUnloadedEntitiesBuilder)
+      moduleManager.updateUnloadedStorage(modulesToLoad, modulesToUnload)
     }
     val entities = (targetBuilder ?: moduleManager.entityStore.current).entities(ModuleEntity::class.java).toList()
-    val unloadedEntities = (targetUnloadedEntitiesBuilder ?: WorkspaceModel.getInstance(project).currentSnapshotOfUnloadedEntities)
+    val unloadedEntities = (targetUnloadedEntitiesBuilder ?: WorkspaceModel.getInstance(project).internal.currentSnapshotOfUnloadedEntities)
       .entities(ModuleEntity::class.java)
       .toList()
     moduleManager.loadModules(loadedEntities = entities,

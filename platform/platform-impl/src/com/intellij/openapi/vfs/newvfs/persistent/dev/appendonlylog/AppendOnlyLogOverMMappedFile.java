@@ -1,8 +1,9 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.openapi.vfs.newvfs.persistent.dev.appendonlylog;
 
 import com.intellij.openapi.util.IntRef;
 import com.intellij.util.io.Unmappable;
+import com.intellij.util.io.dev.AlignmentUtils;
 import com.intellij.util.io.dev.mmapped.MMappedFileStorage;
 import com.intellij.util.io.dev.mmapped.MMappedFileStorage.Page;
 import com.intellij.util.io.IOUtil;
@@ -20,6 +21,7 @@ import java.nio.file.Path;
 import java.util.Objects;
 
 import static com.intellij.util.SystemProperties.getBooleanProperty;
+import static com.intellij.util.SystemProperties.getIntProperty;
 import static com.intellij.util.io.IOUtil.magicWordToASCII;
 import static java.lang.invoke.MethodHandles.byteBufferViewVarHandle;
 import static java.nio.ByteOrder.nativeOrder;
@@ -35,11 +37,20 @@ import static java.nio.ByteOrder.nativeOrder;
  */
 @ApiStatus.Internal
 public final class AppendOnlyLogOverMMappedFile implements AppendOnlyLog, Unmappable {
+
   //@formatter:off
+  /**
+   * On error, provide more verbose diagnostic info about AOLog state (i.e. was there a recovery?) and content
+   * around record in question
+   */
   private static final boolean MORE_DIAGNOSTIC_INFORMATION = getBooleanProperty("AppendOnlyLogOverMMappedFile.MORE_DIAGNOSTIC_INFORMATION", true);
-  private static final boolean ADD_LOG_CONTENT = getBooleanProperty("AppendOnlyLogOverMMappedFile.ADD_LOG_CONTENT", true);
-  /** How wide region around questionable record to dump for debug diagnostics (see {@link #dumpContentAroundId(long, int)}) */
+
+  /** Append to the exceptions/errors a dump (hex) of log's content around questionable region */
+  private static final boolean APPEND_LOG_DUMP_ON_ERROR = getBooleanProperty("AppendOnlyLogOverMMappedFile.APPEND_LOG_DUMP_ON_ERROR", true);
+  /** How wide region around questionable record to dump for debug diagnostics (see {@link #dumpContentAroundId(long, int, int)}) */
   private static final int DEBUG_DUMP_REGION_WIDTH = 256;
+  /** If record content is larger -- don't print remaining part in the dump */
+  private static final int MAX_RECORD_SIZE_TO_DUMP = getIntProperty("AppendOnlyLogOverMMappedFile.MAX_RECORD_SIZE_TO_DUMP", 256);
   //@formatter:on
 
   private static final VarHandle INT32_OVER_BYTE_BUFFER = byteBufferViewVarHandle(int[].class, nativeOrder()).withInvokeExactBehavior();
@@ -250,6 +261,17 @@ public final class AppendOnlyLogOverMMappedFile implements AppendOnlyLog, Unmapp
       putPaddingRecord(buffer, offsetInBuffer, remainsToPad);
     }
 
+    /** generates data record header given length of payload and commited status */
+    private static int dataRecordHeader(int payloadLength,
+                                        boolean commited) {
+      int totalRecordSize = payloadLength + RECORD_HEADER_SIZE;
+      if ((totalRecordSize & (~RECORD_LENGTH_MASK)) != 0) {
+        throw new IllegalArgumentException("totalRecordSize(=" + totalRecordSize + ") must have 2 highest bits 0");
+      }
+
+      return totalRecordSize | (commited ? COMMITED_STATUS_OK : COMMITED_STATUS_NOT_YET);
+    }
+
     private static void putPaddingRecord(@NotNull ByteBuffer buffer,
                                          int offsetInBuffer,
                                          int remainsToPad) {
@@ -258,26 +280,12 @@ public final class AppendOnlyLogOverMMappedFile implements AppendOnlyLog, Unmapp
           "Can't create PaddingRecord for " + remainsToPad + "b leftover, must be >" + RECORD_HEADER_SIZE + " b left:" +
           "buffer.capacity(=" + buffer.capacity() + "), offsetInBuffer(=" + offsetInBuffer + ")");
       }
-      int header = paddingRecordHeader(remainsToPad, /*commited: */true);
+      int header = paddingRecordHeader(remainsToPad);
       INT32_OVER_BYTE_BUFFER.setVolatile(buffer, offsetInBuffer + HEADER_OFFSET, header);
     }
 
-
-    /** generates data record header given length of payload and commited status */
-    private static int dataRecordHeader(int payloadLength,
-                                        boolean commited) {
-      int totalRecordSize = payloadLength + RECORD_HEADER_SIZE;
-      if ((totalRecordSize & COMMITED_STATUS_MASK) != 0
-          || (totalRecordSize & RECORD_TYPE_MASK) != 0) {
-        throw new IllegalArgumentException("totalRecordSize(=" + totalRecordSize + ") must have 2 highest bits 0");
-      }
-
-      return totalRecordSize | (commited ? COMMITED_STATUS_OK : COMMITED_STATUS_NOT_YET);
-    }
-
     /** generates padding record header given total length of padding, and commited status */
-    private static int paddingRecordHeader(int lengthToPad,
-                                           boolean commited) {
+    private static int paddingRecordHeader(int lengthToPad) {
       if (lengthToPad == 0) {
         throw new IllegalArgumentException("lengthToPad(=" + lengthToPad + ") must be >0");
       }
@@ -286,7 +294,8 @@ public final class AppendOnlyLogOverMMappedFile implements AppendOnlyLog, Unmapp
         throw new IllegalArgumentException("lengthToPad(=" + lengthToPad + ") must have 2 highest bits 0");
       }
 
-      return totalRecordSize | RECORD_TYPE_MASK | (commited ? 0 : COMMITED_STATUS_MASK);
+      //padding record has no content => immediately committed:
+      return totalRecordSize | RECORD_TYPE_MASK | COMMITED_STATUS_OK;
     }
 
     /** @return total record length (including header) */
@@ -298,7 +307,7 @@ public final class AppendOnlyLogOverMMappedFile implements AppendOnlyLog, Unmapp
 
     /** @return total record length (including header) */
     private static int extractRecordLength(int header) {
-      return roundUpToInt32(header & RECORD_LENGTH_MASK);
+      return AlignmentUtils.roundUpToInt32(header & RECORD_LENGTH_MASK);
     }
 
     /** @return record payload length (excluding header) */
@@ -324,7 +333,7 @@ public final class AppendOnlyLogOverMMappedFile implements AppendOnlyLog, Unmapp
     }
 
     public static int calculateRecordLength(int payloadSize) {
-      return roundUpToInt32(payloadSize + RECORD_HEADER_SIZE);
+      return AlignmentUtils.roundUpToInt32(payloadSize + RECORD_HEADER_SIZE);
     }
 
     /**
@@ -352,7 +361,7 @@ public final class AppendOnlyLogOverMMappedFile implements AppendOnlyLog, Unmapp
     boolean fileIsEmpty = (storage.actualFileSize() == 0);
 
     int pageSize = storage.pageSize();
-    if (!is32bAligned(pageSize)) {
+    if (!AlignmentUtils.is32bAligned(pageSize)) {
       throw new IllegalArgumentException("storage.pageSize(=" + pageSize + ") must be 32b-aligned");
     }
 
@@ -416,6 +425,7 @@ public final class AppendOnlyLogOverMMappedFile implements AppendOnlyLog, Unmapp
       //          count is actually lagging behind.
       IntRef recordsCount = new IntRef(0);
       forEachRecord((recordId, buffer) -> {
+        recordsCount.inc();
         return true;
       }, successfullyRecoveredUntil);
       setIntHeaderField(HeaderLayout.RECORDS_COUNT_OFFSET, recordsCount.get());
@@ -492,7 +502,7 @@ public final class AppendOnlyLogOverMMappedFile implements AppendOnlyLog, Unmapp
 
     int totalRecordLength = RecordLayout.calculateRecordLength(payloadSize);
     long recordOffsetInFile = allocateSpaceForRecord(totalRecordLength);
-    assert32bAligned(recordOffsetInFile, "recordOffsetInFile");
+    AlignmentUtils.assert32bAligned(recordOffsetInFile, "recordOffsetInFile");
 
     Page page = storage.pageByOffset(recordOffsetInFile);
     int offsetInPage = storage.toOffsetInPage(recordOffsetInFile);
@@ -569,7 +579,7 @@ public final class AppendOnlyLogOverMMappedFile implements AppendOnlyLog, Unmapp
       throw new IOException("record[" + recordId + "][@" + recordOffsetInFile + "] is not commited: " +
                             "(header=" + Integer.toHexString(recordHeader) + ") either not yet written or corrupted. " +
                             moreDiagnosticInfo(recordOffsetInFile) +
-                            (ADD_LOG_CONTENT ? "\n" + dumpContentAroundId(recordId, DEBUG_DUMP_REGION_WIDTH) : "")
+                            (APPEND_LOG_DUMP_ON_ERROR ? "\n" + dumpContentAroundId(recordId, DEBUG_DUMP_REGION_WIDTH, MAX_RECORD_SIZE_TO_DUMP) : "")
       );
     }
     int payloadLength = RecordLayout.extractPayloadLength(recordHeader);
@@ -578,7 +588,7 @@ public final class AppendOnlyLogOverMMappedFile implements AppendOnlyLog, Unmapp
                             "is incorrect: page[0.." + pageBuffer.limit() + "], " +
                             "committedUpTo: " + firstUnCommittedOffset() + ", allocatedUpTo: " + firstUnAllocatedOffset() + ". " +
                             moreDiagnosticInfo(recordOffsetInFile) +
-                            (ADD_LOG_CONTENT ? "\n" + dumpContentAroundId(recordId, DEBUG_DUMP_REGION_WIDTH) : "")
+                            (APPEND_LOG_DUMP_ON_ERROR ? "\n" + dumpContentAroundId(recordId, DEBUG_DUMP_REGION_WIDTH, MAX_RECORD_SIZE_TO_DUMP) : "")
       );
     }
     ByteBuffer recordDataSlice = pageBuffer.slice(recordOffsetInPage + RecordLayout.DATA_OFFSET, payloadLength)
@@ -593,7 +603,7 @@ public final class AppendOnlyLogOverMMappedFile implements AppendOnlyLog, Unmapp
       return false;
     }
     long recordOffset = recordIdToOffsetUnchecked(recordId);
-    if (!is32bAligned(recordOffset)) {
+    if (!AlignmentUtils.is32bAligned(recordOffset)) {
       return false;
     }
     return recordOffset < firstUnAllocatedOffset();
@@ -800,8 +810,8 @@ public final class AppendOnlyLogOverMMappedFile implements AppendOnlyLog, Unmapp
    */
   private long nextRecordOffset(long recordOffsetInFile,
                                 int totalRecordLength) {
-    assert32bAligned(recordOffsetInFile, "recordOffsetInFile");
-    long nextRecordOffset = roundUpToInt32(recordOffsetInFile + totalRecordLength);
+    AlignmentUtils.assert32bAligned(recordOffsetInFile, "recordOffsetInFile");
+    long nextRecordOffset = AlignmentUtils.roundUpToInt32(recordOffsetInFile + totalRecordLength);
 
     int pageSize = storage.pageSize();
     int offsetInPage = storage.toOffsetInPage(nextRecordOffset);
@@ -900,6 +910,12 @@ public final class AppendOnlyLogOverMMappedFile implements AppendOnlyLog, Unmapp
         }//else: record not yet commited, we can't _read_ it -- but maybe _next_ record(s) are committed?
       }
       else if (RecordLayout.isPaddingHeader(recordHeader)) {
+        //TODO RC: enable the check below after VFS version bump (currently it causes all the aologs to become
+        //         corrupted, since all them previously missed 'committed' bit in padding records
+        //if (!RecordLayout.isRecordCommitted(recordHeader)) {
+        //  throw new IOException("padding.header("+recordHeader+") is not committed -- bug?")
+        //}
+
         //just skip it
       }
       else {
@@ -945,7 +961,13 @@ public final class AppendOnlyLogOverMMappedFile implements AppendOnlyLog, Unmapp
         }//else: record OK -> move to the next one
       }
       else if (RecordLayout.isPaddingHeader(recordHeader)) {
-        //padding is always committed -> move to the next one
+        //TODO RC: enable the check below after VFS version bump (currently it causes all the aologs to become
+        //         corrupted, since all them previously missed 'committed' bit in padding records
+        //if (!RecordLayout.isRecordCommitted(recordHeader)) {
+        //  throw new IOException("padding.header("+recordHeader+") is not committed -- bug?")
+        //}
+
+        //padding must be always committed -> move to the next one
       }
       else {
         //Unrecognizable garbage: we could just stop recovering here, and erase everything from
@@ -977,27 +999,37 @@ public final class AppendOnlyLogOverMMappedFile implements AppendOnlyLog, Unmapp
 
   /**
    * @return log records in a region [aroundRecordId-regionWidth..aroundRecordId+regionWidth],
-   * one record per line. Record content formatted as hex-string
+   * one record per line.
+   * Record content formatted as hex-string.
+   * If fecord is larger than maxRecordSizeToDump -- first maxRecordSizeToDump bytes dumped, with '...' at the end
+   *
    */
   private String dumpContentAroundId(long aroundRecordId,
-                                     int regionWidth) throws IOException {
+                                     int regionWidth,
+                                     int maxRecordSizeToDump) throws IOException {
     StringBuilder sb = new StringBuilder("Log content around id: " + aroundRecordId + " +/- " + regionWidth +
                                          " (first uncommitted offset: " + firstUnCommittedOffset() +
                                          ", first unallocated: " + firstUnAllocatedOffset() + ")\n");
     forEachRecord((recordId, buffer) -> {
-      long nextRecordId = recordOffsetToId(
-        nextRecordOffset(recordIdToOffset(recordId), buffer.remaining())
-      );
+      long recordOffset = recordIdToOffset(recordId);
+      int recordSize = buffer.remaining();
+
+      long nextRecordId = recordOffsetToId(nextRecordOffset(recordOffset, recordSize));
+
       //MAYBE RC: only use insideQuestionableRecord? Seems like records around are of little use
       boolean insideQuestionableRecord = (recordId <= aroundRecordId && aroundRecordId <= nextRecordId);
       boolean insideNeighbourRegion = (aroundRecordId - regionWidth <= recordId
                                        && recordId <= aroundRecordId + regionWidth);
 
       if (insideQuestionableRecord || insideNeighbourRegion) {
-        String bufferAsHex = IOUtil.toHexString(buffer);
+        String bufferAsHex = recordSize > maxRecordSizeToDump ?
+                             IOUtil.toHexString(buffer.limit(buffer.position()+maxRecordSizeToDump)) + " ... " :
+                             IOUtil.toHexString(buffer);
         sb.append(insideQuestionableRecord ? "*" : "")
-          .append("[id: ").append(recordId).append("][offset: ").append(recordIdToOffset(recordId)).append("][hex: ")
-          .append(bufferAsHex).append("]\n");
+          .append("[id: ").append(recordId).append(']')
+          .append("[offset: ").append(recordOffset).append(']')
+          .append("[len: ").append(recordSize).append(']')
+          .append("[hex: ").append(bufferAsHex).append("]\n");
       }
       return recordId <= aroundRecordId + regionWidth;
     });
@@ -1010,7 +1042,7 @@ public final class AppendOnlyLogOverMMappedFile implements AppendOnlyLog, Unmapp
 
   @VisibleForTesting
   static long recordOffsetToId(long recordOffset) {
-    assert32bAligned(recordOffset, "recordOffsetInFile");
+    AlignmentUtils.assert32bAligned(recordOffset, "recordOffsetInFile");
     //0 is considered invalid id (NULL_ID) everywhere in our code, so '+1' for first id to be 1
     return recordOffset - HeaderLayout.HEADER_SIZE + 1;
   }
@@ -1018,7 +1050,7 @@ public final class AppendOnlyLogOverMMappedFile implements AppendOnlyLog, Unmapp
   @VisibleForTesting
   static long recordIdToOffset(long recordId) {
     long offset = recordIdToOffsetUnchecked(recordId);
-    if (!is32bAligned(offset)) {
+    if (!AlignmentUtils.is32bAligned(offset)) {
       throw new IllegalArgumentException("recordId(=" + recordId + ") is invalid: recordOffsetInFile(=" + offset + ") is not 32b-aligned");
     }
     return offset;
@@ -1054,40 +1086,4 @@ public final class AppendOnlyLogOverMMappedFile implements AppendOnlyLog, Unmapp
   //================== alignment: ========================================================================
   // Record headers must be 32b-aligned so they could be accessed with volatile semantics -- because not
   // all CPU arch support unaligned access with memory sync semantics
-
-  private static int roundUpToInt32(int value) {
-    if (is32bAligned(value)) {
-      return value;
-    }
-    return ((value >> 2) + 1) << 2;
-  }
-
-  private static long roundUpToInt32(long value) {
-    if (is32bAligned(value)) {
-      return value;
-    }
-    return ((value >> 2) + 1) << 2;
-  }
-
-  private static boolean is32bAligned(int value) {
-    return (value & 0b11) == 0;
-  }
-
-  private static boolean is32bAligned(long value) {
-    return (value & 0b11L) == 0;
-  }
-
-  private static void assert32bAligned(long value,
-                                       @NotNull String name) {
-    if (!is32bAligned(value)) {
-      throw new AssertionError("Bug: " + name + "(=" + value + ") is not 32b-aligned");
-    }
-  }
-
-  private static void assert32bAligned(int value,
-                                       @NotNull String name) {
-    if (!is32bAligned(value)) {
-      throw new AssertionError("Bug: " + name + "(=" + value + ") is not 32b-aligned");
-    }
-  }
 }

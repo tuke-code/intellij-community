@@ -8,29 +8,32 @@ import com.intellij.openapi.externalSystem.model.ProjectKeys
 import com.intellij.openapi.externalSystem.model.project.ContentRootData
 import com.intellij.openapi.externalSystem.model.project.ModuleData
 import com.intellij.openapi.externalSystem.model.project.ProjectData
+import com.intellij.openapi.externalSystem.model.task.ExternalSystemTaskId
 import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.plugins.gradle.settings.GradleExecutionSettings
 import org.jetbrains.plugins.gradle.util.GradleConstants
 import org.jetbrains.plugins.gradle.util.gradleIdentityPath
 import java.io.File
 
-@ApiStatus.Internal
-abstract class GradlePreviewCustomizer {
+@ApiStatus.OverrideOnly
+@ApiStatus.Experimental
+interface GradlePreviewCustomizer {
   companion object {
     var EP_NAME: ExtensionPointName<GradlePreviewCustomizer> = create("org.jetbrains.plugins.gradle.previewCustomizer")
 
-    fun getCustomizer(projectPath: String): GradlePreviewCustomizer? = EP_NAME.extensionList.firstOrNull { it.accept(projectPath) }
+    fun getCustomizer(projectPath: String, taskId: ExternalSystemTaskId): GradlePreviewCustomizer =
+      EP_NAME.extensionList.firstOrNull { it.isApplicable(projectPath, taskId) } ?: DefaultGradlePreviewCustomizer
   }
 
-  abstract fun accept(projectPath: String): Boolean
+  fun isApplicable(projectPath: String, taskId: ExternalSystemTaskId): Boolean
 
-  abstract fun perform(projectPath: String, settings: GradleExecutionSettings?): DataNode<ProjectData>?
+  fun resolvePreviewProjectInfo(projectPath: String, taskId: ExternalSystemTaskId, settings: GradleExecutionSettings?): DataNode<ProjectData>
 }
 
-object DefaultGradlePreviewCustomizer : GradlePreviewCustomizer() {
-  override fun accept(projectPath: String): Boolean = true
+object DefaultGradlePreviewCustomizer : GradlePreviewCustomizer {
+  override fun isApplicable(projectPath: String, taskId: ExternalSystemTaskId): Boolean = true
 
-  override fun perform(projectPath: String, settings: GradleExecutionSettings?): DataNode<ProjectData> {
+  override fun resolvePreviewProjectInfo(projectPath: String, taskId: ExternalSystemTaskId, settings: GradleExecutionSettings?): DataNode<ProjectData> {
     val projectName: String = File(projectPath).name
 
     val ideProjectPath = settings?.ideProjectPath

@@ -16,12 +16,8 @@
 package org.jetbrains.idea.maven.dom
 
 import com.intellij.codeInspection.LocalInspectionTool
-import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.EDT
 import com.intellij.openapi.vfs.LocalFileSystem
-import com.intellij.openapi.vfs.VirtualFileManager
-import com.intellij.openapi.vfs.newvfs.BulkFileListener
-import com.intellij.openapi.vfs.newvfs.events.VFileEvent
 import com.intellij.psi.ElementManipulators
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
@@ -29,7 +25,6 @@ import kotlinx.coroutines.withContext
 import org.jetbrains.idea.maven.dom.inspections.MavenParentMissedVersionInspection
 import org.jetbrains.idea.maven.dom.inspections.MavenPropertyInParentInspection
 import org.jetbrains.idea.maven.dom.inspections.MavenRedundantGroupIdInspection
-import org.jetbrains.idea.maven.utils.MavenLog
 import org.junit.Test
 
 class MavenParentCompletionAndResolutionTest : MavenDomWithIndicesTestCase() {
@@ -177,6 +172,13 @@ class MavenParentCompletionAndResolutionTest : MavenDomWithIndicesTestCase() {
                     <version>1</version>
                     """.trimIndent())
 
+    val parent = createModulePom("parent",
+                                 """
+                                           <groupId>test</groupId>
+                                           <artifactId>parent</artifactId>
+                                           <version>1</version>
+                                           """.trimIndent())
+
     createProjectPom("""
                        <groupId>test</groupId>
                        <artifactId>project</artifactId>
@@ -185,21 +187,17 @@ class MavenParentCompletionAndResolutionTest : MavenDomWithIndicesTestCase() {
                          <parentPath>parent/pom.xml</parentPath>
                        </properties>
                        <parent>
-                         <groupId><caret>test</groupId>
+                         <groupId>test</groupId>
                          <artifactId>parent</artifactId>
                          <version>1</version>
                          <relativePath>${'$'}{parentPath}</relativePath>
                        </parent>
                        """.trimIndent())
 
-    val parent = createModulePom("parent",
-                                 """
-                                           <groupId>test</groupId>
-                                           <artifactId>parent</artifactId>
-                                           <version>1</version>
-                                           """.trimIndent())
-
     withContext(Dispatchers.EDT) {
+      moveCaretTo(projectPom, """
+        <parent>
+          <groupId><caret>test</groupId>""".trimIndent())
       assertResolved(projectPom, findPsiFile(parent))
     }
   }
@@ -481,28 +479,21 @@ class MavenParentCompletionAndResolutionTest : MavenDomWithIndicesTestCase() {
 
   @Test
   fun testHighlightingAbsentGroupId() = runBlocking {
-    ApplicationManager.getApplication().messageBus.connect(testRootDisposable)
-      .subscribe(VirtualFileManager.VFS_CHANGES, object : BulkFileListener {
-        override fun before(events: MutableList<out VFileEvent>) {
-          MavenLog.LOG.warn("before $events")
-        }
-
-        override fun after(events: MutableList<out VFileEvent>) {
-          MavenLog.LOG.warn("after $events")
-        }
-      })
-
     createProjectPom("""
                        <groupId>test</groupId>
                        <artifactId>project</artifactId>
                        <version>1</version>
-                       <<error descr="'groupId' child tag should be defined">parent</error>>
-                         <artifactId><error>junit</error></artifactId>
-                         <version><error>4.0</error></version>
+                       <parent>
+                         <artifactId>junit</artifactId>
+                         <version>4.0</version>
                        </parent>
                        """.trimIndent())
     importProjectAsync()
-    checkHighlighting()
+    checkHighlighting(projectPom,
+                      Highlight(text="parent", description = "'groupId' child tag should be defined"),
+                      Highlight(text="junit"),
+                      Highlight(text="4.0"),
+    )
   }
 
   @Test

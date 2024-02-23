@@ -7,6 +7,7 @@ import com.intellij.ide.ui.UISettingsListener
 import com.intellij.ide.ui.customization.CustomActionsSchema
 import com.intellij.openapi.actionSystem.*
 import com.intellij.openapi.actionSystem.ex.ActionManagerEx
+import com.intellij.openapi.actionSystem.ex.ActionRuntimeRegistrar
 import com.intellij.openapi.actionSystem.impl.*
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.EDT
@@ -24,6 +25,7 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.collectLatest
+import org.jetbrains.annotations.ApiStatus
 import java.awt.Dialog
 import java.awt.Dimension
 import java.awt.KeyboardFocusManager
@@ -183,13 +185,26 @@ private suspend fun expandMainActionGroup(mainActionGroup: ActionGroup,
   }.filterIsInstance<ActionGroup>()
 }
 
-internal suspend fun getAndWrapMainMenuActionGroup(): ActionGroup? {
+@Suppress("FunctionName")
+@ApiStatus.Internal
+suspend fun IdeMainMenuActionGroup(): ActionGroup? {
   val group = CustomActionsSchema.getInstanceAsync().getCorrectedActionAsync(IdeActions.GROUP_MAIN_MENU) ?: return null
+  return object : ActionGroupWrapper(group) {
+    override fun postProcessVisibleChildren(visibleChildren: List<AnAction>,
+                                            updateSession: UpdateSession): List<AnAction?> {
+      return super.postProcessVisibleChildren(visibleChildren, updateSession)
+        .filterIsInstance<ActionGroup>()
+    }
+  }
+}
+
+class IdeMainMenuActionCustomizer : ActionConfigurationCustomizer, ActionConfigurationCustomizer.LightCustomizeStrategy {
   // enforce the "always-visible" flag for all main menu items
   // without forcing everyone to employ custom groups in their plugin.xml files.
-  return object : ActionGroupWrapper(group) {
-    override fun getChildren(e: AnActionEvent?): Array<out AnAction> {
-      return super.getChildren(e).onEach { it.templatePresentation.putClientProperty(ActionMenu.ALWAYS_VISIBLE, true) }
+  override suspend fun customize(actionRegistrar: ActionRuntimeRegistrar) {
+    val group = actionRegistrar.getActionOrStub(IdeActions.GROUP_MAIN_MENU) as? DefaultActionGroup
+    group?.childActionsOrStubs?.forEach {
+      it.templatePresentation.putClientProperty(ActionMenu.ALWAYS_VISIBLE, true)
     }
   }
 }

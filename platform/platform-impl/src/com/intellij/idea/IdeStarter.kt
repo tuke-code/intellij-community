@@ -1,4 +1,4 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 @file:Suppress("ReplaceNegatedIsEmptyWithIsNotEmpty")
 
 package com.intellij.idea
@@ -15,8 +15,10 @@ import com.intellij.internal.inspector.UiInspectorAction
 import com.intellij.notification.NotificationAction
 import com.intellij.notification.NotificationGroupManager
 import com.intellij.notification.NotificationType
+import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.application.*
+import com.intellij.openapi.application.ex.ApplicationEx
 import com.intellij.openapi.application.ex.ApplicationManagerEx
 import com.intellij.openapi.components.serviceAsync
 import com.intellij.openapi.diagnostic.Logger
@@ -33,6 +35,7 @@ import com.intellij.openapi.wm.impl.welcomeScreen.WelcomeFrame
 import com.intellij.platform.diagnostic.telemetry.impl.span
 import com.intellij.platform.ide.CoreUiCoroutineScopeHolder
 import com.intellij.platform.ide.bootstrap.LAUNCHER_INITIAL_DIRECTORY_ENV_VAR
+import com.intellij.platform.ide.diagnostic.startUpPerformanceReporter.FUSProjectHotStartUpMeasurer
 import com.intellij.ui.mac.touchbar.TouchbarSupport
 import com.intellij.ui.updateAppWindowIcon
 import com.intellij.util.io.URLUtil.SCHEME_SEPARATOR
@@ -46,12 +49,10 @@ open class IdeStarter : ModernApplicationStarter() {
     private var filesToLoad: List<Path> = Collections.emptyList()
     private var uriToOpen: String? = null
 
-    @JvmStatic
     fun openFilesOnLoading(value: List<Path>) {
       filesToLoad = value
     }
 
-    @JvmStatic
     fun openUriOnLoading(value: String) {
       uriToOpen = value
     }
@@ -69,7 +70,21 @@ open class IdeStarter : ModernApplicationStarter() {
     coroutineScope {
       val app = ApplicationManager.getApplication()
       val lifecyclePublisher = app.messageBus.syncPublisher(AppLifecycleListener.TOPIC)
-      openProjectIfNeeded(args = args, app = app, asyncCoroutineScope = this, lifecyclePublisher = lifecyclePublisher)
+
+      val openProjectBlock: suspend CoroutineScope.() -> Unit = {
+        openProjectIfNeeded(args = args, app = app, asyncCoroutineScope = this, lifecyclePublisher = lifecyclePublisher)
+      }
+
+      val starter = FUSProjectHotStartUpMeasurer.getStartUpContextElementIntoIdeStarter(this@IdeStarter)
+      if (starter != null) {
+        if ((app as ApplicationEx).isLightEditMode) {
+          FUSProjectHotStartUpMeasurer.lightEditProjectFound()
+        }
+        withContext(starter, openProjectBlock)
+      }
+      else {
+        openProjectBlock()
+      }
 
       app.serviceAsync<PerformanceWatcher>()
       // cache it as IdeEventQueue should use loaded PerformanceWatcher service as soon as it is ready (getInstanceIfCreated is used)
@@ -88,7 +103,6 @@ open class IdeStarter : ModernApplicationStarter() {
     }
   }
 
-  @OptIn(IntellijInternalApi::class)
   protected open suspend fun openProjectIfNeeded(args: List<String>,
                                                  app: Application,
                                                  asyncCoroutineScope: CoroutineScope,
@@ -112,13 +126,8 @@ open class IdeStarter : ModernApplicationStarter() {
         LifecycleUsageTriggerCollector.onIdeStart()
       }
 
-      if (app.isInternal) {
-        asyncCoroutineScope.launch(Dispatchers.EDT + ModalityState.any().asContextElement()) {
-          UiInspectorAction.initStacktracesSaving()
-        }
-      }
-
       if (uriToOpen != null || args.isNotEmpty() && args.first().contains(SCHEME_SEPARATOR)) {
+        FUSProjectHotStartUpMeasurer.reportUriOpening()
         processUriParameter(uri = uriToOpen ?: args.first(), lifecyclePublisher = lifecyclePublisher)
         return@span false
       }
@@ -134,12 +143,22 @@ open class IdeStarter : ModernApplicationStarter() {
     }
 
     val project = when {
-      filesToLoad.isNotEmpty() -> ProjectUtil.openOrImportFilesAsync(filesToLoad, "IdeStarter")
-      args.isNotEmpty() -> loadProjectFromExternalCommandLine(args)
+      filesToLoad.isNotEmpty() -> {
+        FUSProjectHotStartUpMeasurer.reportProjectType(FUSProjectHotStartUpMeasurer.ProjectsType.FromFilesToLoad)
+        ProjectUtil.openOrImportFilesAsync(filesToLoad, "IdeStarter")
+      }
+      args.isNotEmpty() -> {
+        FUSProjectHotStartUpMeasurer.reportProjectType(FUSProjectHotStartUpMeasurer.ProjectsType.FromArgs)
+        loadProjectFromExternalCommandLine(args)
+      }
       else -> null
     }
 
     if (project != null) {
+      // the IDE is started with an argument to open a specific project => forget which projects were opened in the last session,
+      // otherwise irrelevant projects may be opened after a restart.
+      // `project` will remain with "opened" status because it is open at this point
+      recentProjectManager.updateLastProjectPath()
       return
     }
 
@@ -163,11 +182,18 @@ open class IdeStarter : ModernApplicationStarter() {
 
   private suspend fun showWelcomeFrame(lifecyclePublisher: AppLifecycleListener): Boolean {
     val showWelcomeFrameTask = WelcomeFrame.prepareToShow() ?: return true
-    serviceAsync<CoreUiCoroutineScopeHolder>().coroutineScope.launch(Dispatchers.EDT) {
-      showWelcomeFrameTask()
-      runCatching {
-        lifecyclePublisher.welcomeScreenDisplayed()
-      }.getOrLogException(thisLogger())
+    serviceAsync<CoreUiCoroutineScopeHolder>().coroutineScope.launch {
+      // https://youtrack.jetbrains.com/issue/IJPL-522
+      launch {
+        serviceAsync<ActionManager>()
+      }
+
+      withContext(Dispatchers.EDT) {
+        showWelcomeFrameTask()
+        runCatching {
+          lifecyclePublisher.welcomeScreenDisplayed()
+        }.getOrLogException(thisLogger())
+      }
     }
     return false
   }
@@ -224,7 +250,14 @@ private suspend fun loadProjectFromExternalCommandLine(commandLineArgs: List<Str
   return result.project
 }
 
+@OptIn(IntellijInternalApi::class)
 private fun CoroutineScope.postOpenUiTasks() {
+  if (ApplicationManager.getApplication().isInternal) {
+    launch(Dispatchers.EDT + ModalityState.any().asContextElement()) {
+      UiInspectorAction.initStacktracesSaving()
+    }
+  }
+
   if (PluginManagerCore.isRunningFromSources()) {
     updateAppWindowIcon(JOptionPane.getRootFrame())
   }
@@ -242,6 +275,10 @@ private fun CoroutineScope.postOpenUiTasks() {
 
   launch {
     startSystemHealthMonitor()
+  }
+
+  launch {
+    FUSProjectHotStartUpMeasurer.startWritingStatistics()
   }
 }
 

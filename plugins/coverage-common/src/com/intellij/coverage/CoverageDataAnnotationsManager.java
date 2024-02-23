@@ -17,12 +17,14 @@ import com.intellij.psi.PsiDocumentManager;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiManager;
 import com.intellij.util.concurrency.AppExecutorUtil;
+import com.intellij.util.concurrency.annotations.RequiresBackgroundThread;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.TestOnly;
 
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
@@ -37,6 +39,7 @@ public final class CoverageDataAnnotationsManager implements Disposable {
   private final ExecutorService myExecutor;
   private final Map<Editor, CoverageEditorAnnotator> myAnnotators = new HashMap<>();
   private final Map<Editor, Future<?>> myRequests = new ConcurrentHashMap<>();
+  private volatile CompletableFuture<?> myUpdateRequest = null;
 
   public CoverageDataAnnotationsManager(Project project) {
     myProject = project;
@@ -67,7 +70,13 @@ public final class CoverageDataAnnotationsManager implements Disposable {
     });
   }
 
-  public synchronized void update() {
+  public void update() {
+    myUpdateRequest = CompletableFuture.runAsync(this::updateInternal, myExecutor);
+  }
+
+  @RequiresBackgroundThread
+  public void updateInternal() {
+    if (CoverageDataManager.getInstance(myProject).activeSuites().isEmpty()) return;
     FileEditorManager fileEditorManager = FileEditorManager.getInstance(myProject);
     List<VirtualFile> openFiles = fileEditorManager.getOpenFilesWithRemotes();
     for (VirtualFile openFile : openFiles) {
@@ -115,6 +124,7 @@ public final class CoverageDataAnnotationsManager implements Disposable {
       CoverageEngine engine = bundle.getCoverageEngine();
       if (!engine.coverageEditorHighlightingApplicableTo(psiFile)) return;
       if (!engine.acceptedByFilters(psiFile, bundle)) return;
+      if (engine.isInLibraryClasses(editor.getProject(), psiFile.getVirtualFile())) return;
 
       CoverageEditorAnnotator annotator = getOrCreateAnnotator(editor, psiFile, engine);
       annotator.showCoverage(bundle);
@@ -127,8 +137,8 @@ public final class CoverageDataAnnotationsManager implements Disposable {
   @TestOnly
   @NotNull
   public Future<?> getAllRequestsCompletion() {
-    return myExecutor.submit(() -> {
-    });
+    if (myUpdateRequest == null) return CompletableFuture.runAsync(() -> { }, myExecutor);
+    return myUpdateRequest.thenRunAsync(() -> {}, myExecutor);
   }
 
 

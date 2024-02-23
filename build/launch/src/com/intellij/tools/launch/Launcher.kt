@@ -4,10 +4,11 @@ import com.intellij.tools.launch.impl.ClassPathBuilder
 import com.intellij.util.JavaModuleOptions
 import com.intellij.util.system.OS
 import org.jetbrains.intellij.build.dependencies.TeamCityHelper
+import org.jetbrains.jps.model.java.JpsJavaClasspathKind
 import java.io.File
 import java.net.InetAddress
 import java.net.ServerSocket
-import java.util.Locale
+import java.util.*
 import java.util.logging.Logger
 
 object Launcher {
@@ -16,10 +17,10 @@ object Launcher {
   private const val STRACE_PROPERTY_KEY = "com.intellij.tools.launch.Launcher.run.under.strace"
 
   fun launch(paths: PathsProvider,
-             modules: ModulesProvider,
+             modulesToScopes: Map<String, JpsJavaClasspathKind>,
              options: LauncherOptions,
              logClasspath: Boolean): Pair<Process, String?> {
-    val classPathBuilder = ClassPathBuilder(paths, modules)
+    val classPathBuilder = ClassPathBuilder(paths, modulesToScopes)
     logger.info("Building classpath")
     val classPathArgFile = classPathBuilder.build(logClasspath)
     logger.info("Done building classpath")
@@ -57,6 +58,7 @@ object Launcher {
       "-Dsun.awt.disablegrab=true",
       "-Dsun.io.useCanonCaches=false",
       "-Dteamcity.build.tempDir=${paths.tempFolder.canonicalPath}",
+      "-Djava.io.tmpdir=${paths.tempFolder.canonicalPath}",
       "-Xmx${options.xmx}m",
       "-XX:+UseG1GC",
       "-XX:-OmitStackTraceInFastThrow",
@@ -89,6 +91,9 @@ object Launcher {
     if (options.platformPrefix != null) {
       cmd.add("-Didea.platform.prefix=${options.platformPrefix}")
     }
+    options.productMode?.let {
+      cmd.add("-Dintellij.platform.product.mode=${it.id}")
+    }
 
     if (!TeamCityHelper.isUnderTeamCity && options.debugPort != null) {
       val suspendOnStart = if (options.debugSuspendOnStart) "y" else "n"
@@ -104,7 +109,10 @@ object Launcher {
     }
 
     cmd.add("@${classPathArgFile.canonicalPath}")
-    cmd.add("com.intellij.idea.Main")
+    cmd.add(
+      if (options.productMode != null) "com.intellij.platform.runtime.loader.IntellijLoader"
+      else "com.intellij.idea.Main"
+    )
 
     for (arg in options.ideaArguments) {
       cmd.add(arg.trim('"'))
@@ -143,7 +151,7 @@ object Launcher {
     }
   }
 
-  fun findFreeDebugPort(): Int {
+  fun findFreePort(): Int {
     synchronized(this) {
       val socket = ServerSocket(0, 0, InetAddress.getByName("127.0.0.1"))
       val result = socket.localPort

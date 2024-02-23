@@ -20,10 +20,10 @@ import org.jetbrains.kotlin.idea.KotlinLanguage
 import org.jetbrains.kotlin.name.StandardClassIds
 import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.psi.psiUtil.containingClass
-import org.jetbrains.kotlin.type.MapPsiToAsmDesc
 import org.jetbrains.uast.*
 import org.jetbrains.uast.kotlin.*
-import org.jetbrains.uast.kotlin.psi.UastFakeDeserializedLightMethod
+import org.jetbrains.uast.kotlin.psi.UastFakeDeserializedSourceLightMethod
+import org.jetbrains.uast.kotlin.psi.UastFakeDeserializedSymbolLightMethod
 import org.jetbrains.uast.kotlin.psi.UastFakeSourceLightMethod
 import org.jetbrains.uast.kotlin.psi.UastFakeSourceLightPrimaryConstructor
 
@@ -78,6 +78,25 @@ internal fun toPsiMethod(
     functionSymbol: KtFunctionLikeSymbol,
     context: KtElement,
 ): PsiMethod? {
+    // `inline` w/ `reified` type param from binary dependency,
+    // which we can't find source PSI, so fake it
+    if (functionSymbol.origin == KtSymbolOrigin.LIBRARY &&
+        (functionSymbol as? KtFunctionSymbol)?.isInline == true &&
+        functionSymbol.typeParameters.any { it.isReified }
+    ) {
+        functionSymbol.getContainingJvmClassName()?.let { fqName ->
+            JavaPsiFacade.getInstance(context.project)
+                .findClass(fqName, context.resolveScope)
+                ?.let { containingClass ->
+                    return UastFakeDeserializedSymbolLightMethod(
+                        functionSymbol.createPointer(),
+                        functionSymbol.name.identifier,
+                        containingClass,
+                        context
+                    )
+                }
+        }
+    }
     return when (val psi = psiForUast(functionSymbol, context.project)) {
         null -> null
         is PsiMethod -> psi
@@ -125,6 +144,41 @@ private fun toPsiMethodForDeserialized(
     psi: KtFunction,
 ): PsiMethod? {
 
+    fun equalSignatures(psiMethod: PsiMethod): Boolean {
+        val methodParameters: Array<PsiParameter> = psiMethod.parameterList.parameters
+        val symbolParameters: List<KtValueParameterSymbol> = functionSymbol.valueParameters
+        if (methodParameters.size != symbolParameters.size) {
+            return false
+        }
+
+        for (i in methodParameters.indices) {
+            val symbolParameter = symbolParameters[i]
+            val symbolParameterType = toPsiType(
+                symbolParameter.returnType,
+                psiMethod,
+                context,
+                PsiTypeConversionConfiguration(
+                    TypeOwnerKind.DECLARATION,
+                    typeMappingMode = KtTypeMappingMode.VALUE_PARAMETER,
+                )
+            )
+
+            if (methodParameters[i].type != symbolParameterType) return false
+        }
+        val psiMethodReturnType = psiMethod.returnType ?: PsiTypes.voidType()
+        val symbolReturnType = toPsiType(
+            functionSymbol.returnType,
+            psiMethod,
+            context,
+            PsiTypeConversionConfiguration(
+                TypeOwnerKind.DECLARATION,
+                typeMappingMode = KtTypeMappingMode.RETURN_TYPE,
+            )
+        )
+
+        return psiMethodReturnType == symbolReturnType
+    }
+
     // NB: no fake generation for member functions, as deserialized source PSI for built-ins can trigger FIR build/resolution
     fun PsiClass.lookup(fake: Boolean): PsiMethod? {
         val candidates =
@@ -133,10 +187,10 @@ private fun toPsiMethodForDeserialized(
             else
                 methods.filter { it.name == psi.name }
         return when (candidates.size) {
-            0 -> if (fake) UastFakeDeserializedLightMethod(psi, this) else null
+            0 -> if (fake) UastFakeDeserializedSourceLightMethod(psi, this) else null
             1 -> candidates.single()
             else -> {
-                candidates.firstOrNull { it.desc == desc(functionSymbol, it, context) } ?: candidates.first()
+                candidates.firstOrNull { equalSignatures(it) } ?: candidates.first()
             }
         }
     }
@@ -153,40 +207,6 @@ private fun toPsiMethodForDeserialized(
     } ?:
     // Deserialized top-level function
     psi.containingKtFile.findFacadeClass()?.lookup(fake = true)
-}
-
-context(KtAnalysisSession)
-private fun desc(
-    functionSymbol: KtFunctionLikeSymbol,
-    containingLightDeclaration: PsiModifierListOwner,
-    context: KtElement
-): String  = buildString {
-    functionSymbol.valueParameters.joinTo(this, separator = "", prefix = "(", postfix = ")") {
-        MapPsiToAsmDesc.typeDesc(
-            toPsiType(
-                it.returnType,
-                containingLightDeclaration,
-                context,
-                PsiTypeConversionConfiguration(
-                    TypeOwnerKind.DECLARATION,
-                    typeMappingMode = KtTypeMappingMode.VALUE_PARAMETER,
-                )
-            )
-        )
-    }
-    append(
-        MapPsiToAsmDesc.typeDesc(
-            toPsiType(
-                functionSymbol.returnType,
-                containingLightDeclaration,
-                context,
-                PsiTypeConversionConfiguration(
-                    TypeOwnerKind.DECLARATION,
-                    typeMappingMode = KtTypeMappingMode.RETURN_TYPE,
-                )
-            )
-        )
-    )
 }
 
 context(KtAnalysisSession)
@@ -258,6 +278,13 @@ internal fun receiverType(
 }
 
 context(KtAnalysisSession)
+internal val KtType.typeForValueClass: Boolean
+    get() {
+        val symbol = expandedClassSymbol as? KtNamedClassOrObjectSymbol ?: return false
+        return symbol.isInline
+    }
+
+context(KtAnalysisSession)
 internal fun isInheritedGenericType(ktType: KtType?): Boolean {
     if (ktType == null) return false
     return ktType is KtTypeParameterType &&
@@ -291,10 +318,7 @@ internal tailrec fun psiForUast(symbol: KtSymbol, project: Project): PsiElement?
         // UAST/Lint CLI: use [DecompiledPsiDeclarationProvider] / [KotlinStaticPsiDeclarationFromBinaryModuleProvider]
         return findPsi(symbol, project)
             // UAST/Lint IDE: decompiled PSI
-            ?: symbol.psi?.let {
-                // Attempt to convert (decompiled) library source to LC element
-                (it as? KtElement)?.toPsiElementAsLightElement() ?: it
-            }
+            ?: symbol.psi
     }
 
     if (symbol is KtCallableSymbol) {

@@ -1,5 +1,6 @@
 package com.intellij.tools.launch
 
+import com.intellij.platform.runtime.product.ProductMode
 import java.net.InetAddress
 
 interface LauncherOptions {
@@ -12,6 +13,12 @@ interface LauncherOptions {
   val environment: Map<String, String> get() = mapOf()
   val beforeProcessStart: () -> Unit get() = { }
   val redirectOutputIntoParentProcess: Boolean get() = false
+
+  /**
+   * Return non-null value to run the product using the module-based loading scheme in the specified mode. If `null` is returned, the old
+   * path-based scheme is used.
+   */
+  val productMode: ProductMode? get() = null
 }
 
 data class DockerNetworkEntry(
@@ -24,7 +31,7 @@ data class DockerNetworkEntry(
 }
 
 interface DockerLauncherOptions : LauncherOptions {
-  val exposedPorts: List<Int> get() = debugPort?.let { listOf(it) }.orEmpty()
+  val exposedPorts: List<Int>
   val runBashBeforeJava: List<String>?
   val runBashBackgroundBeforeJava: List<String>?
   val address: InetAddress get() = InetAddress.getLoopbackAddress()

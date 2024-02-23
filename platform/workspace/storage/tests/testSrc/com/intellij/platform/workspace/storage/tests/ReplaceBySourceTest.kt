@@ -1,4 +1,4 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.platform.workspace.storage.tests
 
 import com.intellij.platform.workspace.storage.EntityChange
@@ -13,6 +13,7 @@ import com.intellij.testFramework.UsefulTestCase.assertOneElement
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.RepeatedTest
 import org.junit.jupiter.api.RepetitionInfo
+import org.junit.jupiter.api.assertAll
 import java.util.*
 import kotlin.test.*
 
@@ -142,7 +143,7 @@ class ReplaceBySourceTest {
   fun `entity modification`() {
     val entity = builder add NamedEntity("hello2", MySource)
     replacement = createBuilderFrom(builder)
-    val replacementEntity = entity.createReference<NamedEntity>().resolve(replacement)!!
+    val replacementEntity = entity.createPointer<NamedEntity>().resolve(replacement)!!
     val modified = replacement.modifyEntity(replacementEntity) {
       myName = "Hello Alex"
     }
@@ -1030,9 +1031,9 @@ class ReplaceBySourceTest {
   @RepeatedTest(10)
   fun `non persistent id root`() {
     val targetEntity = builder addEntity SampleEntity(false, "data", ArrayList(), HashMap(),
-                                                      VirtualFileUrlManagerImpl().fromUrl("file:///tmp"), MySource)
+                                                      VirtualFileUrlManagerImpl().getOrCreateFromUri("file:///tmp"), MySource)
     val replaceWithEntity = replacement addEntity SampleEntity(false, "data", ArrayList(), HashMap(),
-                                                               VirtualFileUrlManagerImpl().fromUrl("file:///tmp"), MySource)
+                                                               VirtualFileUrlManagerImpl().getOrCreateFromUri("file:///tmp"), MySource)
 
     rbsMySources()
 
@@ -1488,7 +1489,7 @@ class ReplaceBySourceTest {
   }
 
   @RepeatedTest(10)
-  fun `replace same entities should produce no events`() {
+  fun `replace same entities should produce no events except ordering`() {
     builder add NamedEntity("name", MySource) {
       children = listOf(
         NamedChildEntity("info1", MySource),
@@ -1868,5 +1869,21 @@ class ReplaceBySourceTest {
   private infix fun <T : WorkspaceEntity> MutableEntityStorage.add(entity: T): T {
     this.addEntity(entity)
     return entity
+  }
+
+  private fun ChangeEntry?.assertReplaceEntity(
+    removedChildren: Int = 0,
+    newChildren: Int = 0,
+    newParents: Int = 0,
+    removedParents: Int = 0,
+  ): ChangeEntry.ReplaceEntity {
+    assertTrue(this is ChangeEntry.ReplaceEntity)
+    assertAll(
+      { assertEquals(removedChildren, references!!.removedChildren.size) },
+      { assertEquals(newChildren, references!!.newChildren.size) },
+      { assertEquals(newParents, references!!.newParents.size) },
+      { assertEquals(removedParents, references!!.removedParents.size) },
+    )
+    return this
   }
 }

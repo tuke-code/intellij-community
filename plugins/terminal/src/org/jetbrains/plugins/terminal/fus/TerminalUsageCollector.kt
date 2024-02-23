@@ -16,10 +16,11 @@ import java.util.*
 object TerminalUsageTriggerCollector : CounterUsagesCollector() {
   override fun getGroup(): EventLogGroup = GROUP
 
-  private val GROUP = EventLogGroup(GROUP_ID, 16)
+  private val GROUP = EventLogGroup(GROUP_ID, 18)
 
   private val TERMINAL_COMMAND_HANDLER_FIELD = EventFields.Class("terminalCommandHandler")
   private val RUN_ANYTHING_PROVIDER_FIELD = EventFields.Class("runAnythingProvider")
+  private val BLOCK_TERMINAL_FIELD = EventFields.Boolean("new_terminal")
 
   private val sshExecEvent = GROUP.registerEvent("ssh.exec")
   private val terminalSmartCommandExecutedEvent = GROUP.registerVarargEvent("terminal.smart.command.executed",
@@ -30,18 +31,27 @@ object TerminalUsageTriggerCollector : CounterUsagesCollector() {
                                                                                RUN_ANYTHING_PROVIDER_FIELD)
   private val localExecEvent = GROUP.registerEvent("local.exec",
                                                    EventFields.StringValidatedByRegexpReference("os-version", "version"),
-                                                   EventFields.String("shell", KNOWN_SHELLS.toList()))
+                                                   EventFields.String("shell", KNOWN_SHELLS.toList()),
+                                                   BLOCK_TERMINAL_FIELD)
 
   private val commandExecutedEvent = GROUP.registerEvent("terminal.command.executed",
                                                          TerminalCommandUsageStatistics.commandExecutableField,
-                                                         TerminalCommandUsageStatistics.subCommandField)
+                                                         TerminalCommandUsageStatistics.subCommandField,
+                                                         BLOCK_TERMINAL_FIELD)
+
+  private val promotionShownEvent = GROUP.registerEvent("promotion.shown")
+  private val promotionGotItClickedEvent = GROUP.registerEvent("promotion.got.it.clicked")
+
+  private val blockTerminalSwitchedEvent = GROUP.registerEvent("new.terminal.switched",
+                                                               EventFields.Boolean("enabled"),
+                                                               EventFields.Enum<BlockTerminalSwitchPlace>("switch_place"))
 
   @JvmStatic
   fun triggerSshShellStarted(project: Project) = sshExecEvent.log(project)
 
   @JvmStatic
-  fun triggerCommandExecuted(project: Project, userCommandLine: String) {
-    TerminalCommandUsageStatistics.triggerCommandExecuted(commandExecutedEvent, project, userCommandLine)
+  fun triggerCommandExecuted(project: Project, userCommandLine: String, isBlockTerminal: Boolean) {
+    TerminalCommandUsageStatistics.triggerCommandExecuted(commandExecutedEvent, project, userCommandLine, isBlockTerminal)
   }
 
   @JvmStatic
@@ -66,10 +76,24 @@ object TerminalUsageTriggerCollector : CounterUsagesCollector() {
   }
 
   @JvmStatic
-  fun triggerLocalShellStarted(project: Project, shellCommand: Array<String>) =
+  fun triggerLocalShellStarted(project: Project, shellCommand: Array<String>, isBlockTerminal: Boolean) =
     localExecEvent.log(project,
                        Version.parseVersion(SystemInfo.OS_VERSION)?.toCompactString() ?: "unknown",
-                       getShellNameForStat(shellCommand.firstOrNull()))
+                       getShellNameForStat(shellCommand.firstOrNull()),
+                       isBlockTerminal)
+
+  internal fun triggerPromotionShown(project: Project) {
+    promotionShownEvent.log(project)
+  }
+
+  internal fun triggerPromotionGotItClicked(project: Project) {
+    promotionGotItClickedEvent.log(project)
+  }
+
+  @JvmStatic
+  internal fun triggerBlockTerminalSwitched(project: Project, enabled: Boolean, place: BlockTerminalSwitchPlace) {
+    blockTerminalSwitchedEvent.log(project, enabled, place)
+  }
 
   @JvmStatic
   private fun getShellNameForStat(shellName: String?): String {
@@ -89,6 +113,10 @@ object TerminalUsageTriggerCollector : CounterUsagesCollector() {
     val ext = PathUtil.getFileExtension(name)
     return if (ext != null && KNOWN_EXTENSIONS.contains(ext)) name.substring(0, name.length - ext.length - 1) else name
   }
+}
+
+internal enum class BlockTerminalSwitchPlace {
+  SETTINGS, TOOLWINDOW_OPTIONS
 }
 
 private const val GROUP_ID = "terminalShell"

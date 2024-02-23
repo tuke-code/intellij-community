@@ -5,8 +5,7 @@ import com.intellij.openapi.diagnostic.debug
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.util.JDOMUtil
-import com.intellij.platform.diagnostic.telemetry.helpers.addElapsedTimeMillis
-import com.intellij.platform.diagnostic.telemetry.helpers.addMeasuredTimeMillis
+import com.intellij.platform.diagnostic.telemetry.helpers.MillisecondsMeasurer
 import com.intellij.platform.workspace.jps.*
 import com.intellij.platform.workspace.jps.entities.*
 import com.intellij.platform.workspace.storage.EntitySource
@@ -23,7 +22,6 @@ import org.jetbrains.jps.model.serialization.SerializationConstants
 import org.jetbrains.jps.model.serialization.java.JpsJavaModelSerializerExtension
 import org.jetbrains.jps.model.serialization.library.JpsLibraryTableSerializer.*
 import org.jetbrains.jps.model.serialization.module.JpsModuleRootModelSerializer
-import java.util.concurrent.atomic.AtomicLong
 
 internal class JpsLibrariesDirectorySerializerFactory(override val directoryUrl: String) : JpsDirectoryEntitiesSerializerFactory<LibraryEntity> {
   override val componentName: String
@@ -42,7 +40,7 @@ internal class JpsLibrariesDirectorySerializerFactory(override val directoryUrl:
   override fun createSerializer(fileUrl: String,
                                 entitySource: JpsProjectFileEntitySource.FileInDirectory,
                                 virtualFileManager: VirtualFileUrlManager): JpsFileEntitiesSerializer<LibraryEntity> {
-    return JpsLibraryEntitiesSerializer(virtualFileManager.fromUrl(fileUrl), entitySource, LibraryTableId.ProjectLibraryTableId)
+    return JpsLibraryEntitiesSerializer(virtualFileManager.getOrCreateFromUri(fileUrl), entitySource, LibraryTableId.ProjectLibraryTableId)
   }
 
   override fun changeEntitySourcesToDirectoryBasedFormat(builder: MutableEntityStorage, configLocation: JpsProjectConfigLocation) {
@@ -137,12 +135,12 @@ open class JpsLibraryEntitiesSerializer(override val fileUrl: VirtualFileUrl,
     reader: JpsFileContentReader,
     errorReporter: ErrorReporter,
     virtualFileManager: VirtualFileUrlManager
-  ): LoadingResult<Map<Class<out WorkspaceEntity>, Collection<WorkspaceEntity>>> = loadEntitiesTimeMs.addMeasuredTimeMillis {
+  ): LoadingResult<Map<Class<out WorkspaceEntity>, Collection<WorkspaceEntity>>> = loadEntitiesTimeMs.addMeasuredTime {
     val libraryTableTag = runCatchingXmlIssues { reader.loadComponent(fileUrl.url, LIBRARY_TABLE_COMPONENT_NAME) }
-                            .onFailure { return@addMeasuredTimeMillis LoadingResult(emptyMap(), null) }
-                            .getOrThrow() ?: return@addMeasuredTimeMillis LoadingResult(emptyMap(), null)
+                            .onFailure { return@addMeasuredTime LoadingResult(emptyMap(), null) }
+                            .getOrThrow() ?: return@addMeasuredTime LoadingResult(emptyMap(), null)
     val libs = runCatchingXmlIssues { libraryTableTag.getChildren(LIBRARY_TAG) }
-      .onFailure { return@addMeasuredTimeMillis LoadingResult(emptyMap(), null) }
+      .onFailure { return@addMeasuredTime LoadingResult(emptyMap(), null) }
       .getOrThrow()
       .mapNotNull { libraryTag ->
         runCatchingXmlIssues {
@@ -152,7 +150,7 @@ open class JpsLibraryEntitiesSerializer(override val fileUrl: VirtualFileUrl,
         }
       }
 
-    return@addMeasuredTimeMillis LoadingResult(
+    return@addMeasuredTime LoadingResult(
       mapOf(LibraryEntity::class.java to libs.mapNotNull { it.getOrNull() }),
       libs.firstOrNull { it.isFailure }?.exceptionOrNull(),
     )
@@ -186,8 +184,8 @@ open class JpsLibraryEntitiesSerializer(override val fileUrl: VirtualFileUrl,
   override fun saveEntities(mainEntities: Collection<LibraryEntity>,
                             entities: Map<Class<out WorkspaceEntity>, List<WorkspaceEntity>>,
                             storage: EntityStorage,
-                            writer: JpsFileContentWriter) = saveEntitiesTimeMs.addMeasuredTimeMillis {
-    if (mainEntities.isEmpty()) return@addMeasuredTimeMillis
+                            writer: JpsFileContentWriter) = saveEntitiesTimeMs.addMeasuredTime {
+    if (mainEntities.isEmpty()) return@addMeasuredTime
 
     val componentTag = JDomSerializationUtil.createComponentElement(LIBRARY_TABLE_COMPONENT_NAME)
     mainEntities.sortedBy { it.name }.forEach {
@@ -280,7 +278,7 @@ open class JpsLibraryEntitiesSerializer(override val fileUrl: VirtualFileUrl,
           "excluded" -> excludedRoots.addAll(
             childElement.getChildren(JpsJavaModelSerializerExtension.ROOT_TAG)
               .map { it.getAttributeValueStrict(JpsModuleRootModelSerializer.URL_ATTRIBUTE) }
-              .map { virtualFileManager.fromUrl(it) }
+              .map { virtualFileManager.getOrCreateFromUri(it) }
           )
           PROPERTIES_TAG -> {
             properties = JDOMUtil.write(childElement)
@@ -292,7 +290,7 @@ open class JpsLibraryEntitiesSerializer(override val fileUrl: VirtualFileUrl,
             for (rootTag in childElement.getChildren(JpsJavaModelSerializerExtension.ROOT_TAG)) {
               val url = rootTag.getAttributeValueStrict(JpsModuleRootModelSerializer.URL_ATTRIBUTE)
               val inclusionOptions = jarDirectories[Pair(rootType, url)] ?: LibraryRoot.InclusionOptions.ROOT_ITSELF
-              roots.add(LibraryRoot(virtualFileManager.fromUrl(url), libraryRootTypes[rootType]!!, inclusionOptions))
+              roots.add(LibraryRoot(virtualFileManager.getOrCreateFromUri(url), libraryRootTypes[rootType]!!, inclusionOptions))
             }
           }
         }
@@ -311,8 +309,8 @@ open class JpsLibraryEntitiesSerializer(override val fileUrl: VirtualFileUrl,
       return libraryEntity
     }
 
-    private val loadEntitiesTimeMs: AtomicLong = AtomicLong()
-    private val saveEntitiesTimeMs: AtomicLong = AtomicLong()
+    private val loadEntitiesTimeMs = MillisecondsMeasurer()
+    private val saveEntitiesTimeMs = MillisecondsMeasurer()
 
     private fun setupOpenTelemetryReporting(meter: Meter) {
       val loadEntitiesTimeCounter = meter.counterBuilder("jps.library.entities.serializer.load.entities.ms").buildObserver()
@@ -320,8 +318,8 @@ open class JpsLibraryEntitiesSerializer(override val fileUrl: VirtualFileUrl,
 
       meter.batchCallback(
         {
-          loadEntitiesTimeCounter.record(loadEntitiesTimeMs.get())
-          saveEntitiesTimeCounter.record(saveEntitiesTimeMs.get())
+          loadEntitiesTimeCounter.record(loadEntitiesTimeMs.asMilliseconds())
+          saveEntitiesTimeCounter.record(saveEntitiesTimeMs.asMilliseconds())
         },
         loadEntitiesTimeCounter, saveEntitiesTimeCounter
       )

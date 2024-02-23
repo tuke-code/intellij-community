@@ -1,6 +1,5 @@
 package com.intellij.tools.launch
 
-import com.intellij.util.SystemProperties
 import org.jetbrains.intellij.build.dependencies.BuildDependenciesCommunityRoot
 import org.jetbrains.intellij.build.dependencies.JdkDownloader
 import org.jetbrains.intellij.build.dependencies.TeamCityHelper
@@ -35,6 +34,9 @@ interface PathsProvider {
 
   val communityBinFolder: File
     get() = communityRootFolder.resolve("bin")
+
+  val ultimateRootMarker: File
+    get() = sourcesRootFolder.resolve(".ultimate.root.marker")
 
   val javaExecutable: File
     get() = JdkDownloader.getJavaExecutable(javaHomeFolder.toPath()).normalize().toFile()

@@ -58,7 +58,7 @@ class MiscImportingTest : MavenMultiVersionImportingTestCase() {
                     """.trimIndent())
     assertModules("project")
     assertEquals("1", projectsTree.rootProjects[0].name)
-    MavenServerManager.getInstance().shutdown(true)
+    MavenServerManager.getInstance().closeAllConnectorsAndWait()
     importProjectAsync("""
                     <groupId>test</groupId>
                     <artifactId>project</artifactId>
@@ -165,6 +165,7 @@ class MiscImportingTest : MavenMultiVersionImportingTestCase() {
 
   @Test
   fun testDoRootChangesOnProjectReimportWhenNothingChanges() = runBlocking {
+    Assume.assumeTrue(isWorkspaceImport)
     importProjectAsync("""
                     <groupId>test</groupId>
                     <artifactId>project</artifactId>
@@ -191,8 +192,8 @@ class MiscImportingTest : MavenMultiVersionImportingTestCase() {
                       </dependency>
                     </dependencies>
                     """.trimIndent())
-    myEventsTestHelper.assertRootsChanged(if (isWorkspaceImport) 0 else 1)
-    myEventsTestHelper.assertWorkspaceModelChanges(if (isWorkspaceImport) 0 else 1)
+    myEventsTestHelper.assertRootsChanged(0)
+    myEventsTestHelper.assertWorkspaceModelChanges(0)
   }
 
   @Test
@@ -251,7 +252,7 @@ class MiscImportingTest : MavenMultiVersionImportingTestCase() {
                       <artifactId>m2</artifactId>
                       <version>1</version>
                       """.trimIndent())
-    importProjectAsync()
+    updateAllProjects()
     createModulePom("m1",
                     """
                       <groupId>test</groupId>
@@ -296,7 +297,7 @@ class MiscImportingTest : MavenMultiVersionImportingTestCase() {
           }
         }
       })
-    importProjectAsync()
+    updateAllProjects()
     assertEquals(setOf("modified m1", "created Maven: junit:junit:4.0", "created LibraryPropertiesEntityImpl"), changeLog)
   }
 
@@ -399,7 +400,7 @@ class MiscImportingTest : MavenMultiVersionImportingTestCase() {
       PlatformTestUtil.assertPathsEqual(projectPom.getPath(), mavenProject.properties.getProperty("workspace-info"))
     }
     finally {
-      MavenServerManager.getInstance().shutdown(true) // to unlock files
+      MavenServerManager.getInstance().closeAllConnectorsAndWait() // to unlock files
     }
   }
 

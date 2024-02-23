@@ -29,6 +29,7 @@ private val LOG = logger<GitLabMergeRequest>()
 
 interface GitLabMergeRequest : GitLabMergeRequestDiscussionsContainer {
   val glProject: GitLabProjectCoordinates
+  val gitRepository: GitRepository
 
   val iid: String
   val gid: String
@@ -98,11 +99,13 @@ internal class LoadedGitLabMergeRequest(
   private val api: GitLabApi,
   private val glMetadata: GitLabServerMetadata?,
   private val projectMapping: GitLabProjectMapping,
+  private val currentUser: GitLabUserDTO,
   mergeRequest: GitLabMergeRequestDTO
 ) : GitLabMergeRequest {
   private val cs = parentCs.childScope(Dispatchers.Default + CoroutineExceptionHandler { _, e -> LOG.warn(e) })
 
   override val glProject: GitLabProjectCoordinates = projectMapping.repository
+  override val gitRepository: GitRepository = projectMapping.gitRepository
 
   override val iid: String = mergeRequest.iid
   override val gid: String = mergeRequest.id
@@ -157,7 +160,7 @@ internal class LoadedGitLabMergeRequest(
   override val draftReviewText: MutableStateFlow<String> = MutableStateFlow("")
 
   private val discussionsContainer =
-    GitLabMergeRequestDiscussionsContainerImpl(parentCs, project, api, glMetadata, projectMapping.repository, this)
+    GitLabMergeRequestDiscussionsContainerImpl(parentCs, project, api, glMetadata, projectMapping.repository, currentUser, this)
 
   init {
     cs.launch {
@@ -345,6 +348,8 @@ internal class LoadedGitLabMergeRequest(
   override val discussions: Flow<Result<Collection<GitLabMergeRequestDiscussion>>> = discussionsContainer.discussions
   override val systemNotes: Flow<Result<Collection<GitLabNote>>> = discussionsContainer.systemNotes
   override val draftNotes: Flow<Result<Collection<GitLabMergeRequestDraftNote>>> = discussionsContainer.draftNotes
+  override val nonEmptyDiscussionsData: SharedFlow<Result<List<GitLabDiscussionDTO>>> = discussionsContainer.nonEmptyDiscussionsData
+  override val draftNotesData: SharedFlow<Result<List<GitLabMergeRequestDraftNoteRestDTO>>> = discussionsContainer.draftNotesData
 
   override val canAddNotes: Boolean = discussionsContainer.canAddNotes
   override val canAddDraftNotes: Boolean = discussionsContainer.canAddDraftNotes

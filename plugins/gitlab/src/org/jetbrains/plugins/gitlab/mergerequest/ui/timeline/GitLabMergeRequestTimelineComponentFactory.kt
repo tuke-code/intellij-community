@@ -6,6 +6,7 @@ import com.intellij.collaboration.ui.*
 import com.intellij.collaboration.ui.codereview.CodeReviewChatItemUIUtil
 import com.intellij.collaboration.ui.codereview.CodeReviewChatItemUIUtil.ComponentType
 import com.intellij.collaboration.ui.codereview.CodeReviewTimelineUIUtil
+import com.intellij.collaboration.ui.codereview.comment.CodeReviewCommentTextFieldFactory
 import com.intellij.collaboration.ui.codereview.comment.CommentInputActionsComponentFactory
 import com.intellij.collaboration.ui.codereview.list.error.ErrorStatusPanelFactory
 import com.intellij.collaboration.ui.codereview.timeline.StatusMessageComponentFactory
@@ -38,7 +39,6 @@ import org.jetbrains.annotations.Nls
 import org.jetbrains.plugins.gitlab.api.dto.*
 import org.jetbrains.plugins.gitlab.mergerequest.ui.details.GitLabMergeRequestViewModel
 import org.jetbrains.plugins.gitlab.mergerequest.ui.error.GitLabMergeRequestTimelineErrorStatusPresenter
-import org.jetbrains.plugins.gitlab.mergerequest.ui.timeline.GitLabMergeRequestTimelineUIUtil.createTitleTextPane
 import org.jetbrains.plugins.gitlab.ui.GitLabUIUtil
 import org.jetbrains.plugins.gitlab.ui.comment.*
 import org.jetbrains.plugins.gitlab.util.GitLabBundle
@@ -125,7 +125,7 @@ internal object GitLabMergeRequestTimelineComponentFactory {
     val itemType = ComponentType.FULL
     val icon = CommentTextFieldFactory.IconConfig.of(itemType, iconsProvider, editVm.currentUser)
 
-    return GitLabNoteEditorComponentFactory.create(project, noteCs, editVm, actions, icon).apply {
+    return CodeReviewCommentTextFieldFactory.createIn(noteCs, editVm, actions, icon).apply {
       border = Borders.empty(itemType.inputPaddingInsets)
     }
   }
@@ -143,13 +143,12 @@ internal object GitLabMergeRequestTimelineComponentFactory {
 
     val timelineItems = MutableSharedFlow<List<GitLabMergeRequestTimelineItemViewModel>>()
     val timelineItemContent = ComponentListPanelFactory.createVertical(cs, timelineItems,
-                                                                       { it.id },
                                                                        panelInitializer = {
                                                                          add(LoadingLabel().apply {
                                                                            border = Borders.empty(ComponentType.FULL.paddingInsets)
                                                                          }, ListLayout.Alignment.CENTER)
-                                                                       }) { itemCs, item ->
-      createItemComponent(project, itemCs, avatarIconsProvider, item)
+                                                                       }) { item ->
+      createItemComponent(project, avatarIconsProvider, item)
     }
     timelineOrErrorPanel.setContent(timelineItemContent)
 
@@ -175,10 +174,9 @@ internal object GitLabMergeRequestTimelineComponentFactory {
     return timelineOrErrorPanel
   }
 
-  private fun createItemComponent(project: Project,
-                                  cs: CoroutineScope,
-                                  avatarIconsProvider: IconsProvider<GitLabUserDTO>,
-                                  item: GitLabMergeRequestTimelineItemViewModel): JComponent =
+  private fun CoroutineScope.createItemComponent(project: Project,
+                                                 avatarIconsProvider: IconsProvider<GitLabUserDTO>,
+                                                 item: GitLabMergeRequestTimelineItemViewModel): JComponent =
     when (item) {
       is GitLabMergeRequestTimelineItemViewModel.Immutable -> {
         val immutableItem = item.item
@@ -187,11 +185,14 @@ internal object GitLabMergeRequestTimelineComponentFactory {
         CodeReviewChatItemUIUtil.build(ComponentType.FULL,
                                        { avatarIconsProvider.getIcon(immutableItem.actor, it) },
                                        content) {
-          withHeader(createTitleTextPane(immutableItem.actor, immutableItem.date))
+          withHeader(CodeReviewTimelineUIUtil.createTitleTextPane(immutableItem.actor.name, immutableItem.actor.webUrl, immutableItem.date))
         }
       }
-      is GitLabMergeRequestTimelineDiscussionViewModel -> {
-        GitLabMergeRequestTimelineDiscussionComponentFactory.create(project, cs, avatarIconsProvider, item)
+      is GitLabMergeRequestTimelineItemViewModel.Discussion -> {
+        GitLabMergeRequestTimelineDiscussionComponentFactory.createIn(project, this, item, avatarIconsProvider)
+      }
+      is GitLabMergeRequestTimelineItemViewModel.DraftNote -> {
+        GitLabMergeRequestTimelineDiscussionComponentFactory.createIn(project, this, item, avatarIconsProvider)
       }
     }
 

@@ -1,4 +1,4 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 @file:Suppress("JAVA_MODULE_DOES_NOT_EXPORT_PACKAGE", "RAW_RUN_BLOCKING")
 
 package com.intellij.testFramework.common
@@ -12,6 +12,7 @@ import com.intellij.diagnostic.COROUTINE_DUMP_HEADER
 import com.intellij.diagnostic.LoadingState
 import com.intellij.diagnostic.dumpCoroutines
 import com.intellij.diagnostic.enableCoroutineDump
+import com.intellij.diagnostic.logs.LogLevelConfigurationManager
 import com.intellij.ide.plugins.PluginManagerCore
 import com.intellij.idea.AppMode
 import com.intellij.openapi.application.Application
@@ -24,6 +25,7 @@ import com.intellij.openapi.command.impl.DocumentReferenceManagerImpl
 import com.intellij.openapi.command.impl.UndoManagerImpl
 import com.intellij.openapi.command.undo.DocumentReferenceManager
 import com.intellij.openapi.command.undo.UndoManager
+import com.intellij.openapi.components.serviceAsync
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.editor.EditorFactory
 import com.intellij.openapi.editor.impl.EditorFactoryImpl
@@ -73,6 +75,7 @@ import org.jetbrains.annotations.TestOnly
 import sun.awt.AWTAutoShutdown
 import java.time.Duration
 import java.util.concurrent.TimeUnit
+import kotlin.coroutines.jvm.internal.CoroutineDumpState
 
 private var appInitResult: Result<Unit>? = null
 const val LEAKED_PROJECTS: String = "leakedProjects"
@@ -113,7 +116,9 @@ fun loadApp(setupEventQueue: Runnable) {
   System.setProperty("idea.diagnostic.opentelemetry.file",
                      PathManager.getLogDir().resolve("opentelemetry.json").toAbsolutePath().toString())
 
+  // if BB in classpath
   enableCoroutineDump()
+  CoroutineDumpState.install()
   JBR.getJstack()?.includeInfoFrom {
     """
     $COROUTINE_DUMP_HEADER
@@ -192,15 +197,20 @@ private fun loadAppInUnitTestMode(isHeadless: Boolean) {
 private suspend fun preloadServicesAndCallAppInitializedListeners(app: ApplicationImpl) {
   coroutineScope {
     withTimeout(Duration.ofSeconds(40).toMillis()) {
-      preloadCriticalServices(app = app,
-                              asyncScope = app.coroutineScope,
-                              appRegistered = CompletableDeferred(value = null),
-                              initLafJob = CompletableDeferred(value = null),
-                              initAwtToolkitAndEventQueueJob = null)
+      val pathMacroJob = preloadCriticalServices(
+        app = app,
+        asyncScope = app.getCoroutineScope(),
+        appRegistered = CompletableDeferred(value = null),
+        initAwtToolkitAndEventQueueJob = null,
+      )
+      launch {
+        pathMacroJob.join()
+        app.serviceAsync<LogLevelConfigurationManager>()
+      }
     }
 
     @Suppress("TestOnlyProblems")
-    callAppInitialized(getAppInitializedListeners(app), app.coroutineScope)
+    callAppInitialized(getAppInitializedListeners(app), app.getCoroutineScope())
 
     LoadingState.setCurrentState(LoadingState.COMPONENTS_LOADED)
   }

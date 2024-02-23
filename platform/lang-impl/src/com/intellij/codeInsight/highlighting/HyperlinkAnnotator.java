@@ -13,6 +13,7 @@ import com.intellij.openapi.editor.colors.CodeInsightColors;
 import com.intellij.openapi.keymap.KeymapManager;
 import com.intellij.openapi.keymap.KeymapUtil;
 import com.intellij.openapi.paths.WebReference;
+import com.intellij.openapi.project.DumbAware;
 import com.intellij.openapi.util.Key;
 import com.intellij.openapi.util.TextRange;
 import com.intellij.psi.PsiElement;
@@ -21,6 +22,8 @@ import com.intellij.psi.PsiReferenceService;
 import com.intellij.psi.PsiReferenceService.Hints;
 import com.intellij.psi.util.CachedValueProvider.Result;
 import com.intellij.psi.util.CachedValuesManager;
+import com.intellij.psi.util.ParameterizedCachedValue;
+import com.intellij.psi.util.ParameterizedCachedValueProvider;
 import com.intellij.psi.util.PsiModificationTracker;
 import com.intellij.util.containers.ContainerUtil;
 import org.jetbrains.annotations.ApiStatus;
@@ -33,7 +36,7 @@ import static com.intellij.util.containers.ContainerUtil.emptyList;
 import static java.util.Objects.requireNonNull;
 
 @ApiStatus.NonExtendable
-public class HyperlinkAnnotator implements Annotator {
+public class HyperlinkAnnotator implements Annotator, DumbAware {
 
   private static final Key<@Nls String> messageKey = Key.create("hyperlink.message");
 
@@ -70,12 +73,16 @@ public class HyperlinkAnnotator implements Annotator {
     }
   }
 
+  private static final Key<ParameterizedCachedValue<List<PsiReference>, PsiElement>> REFS_KEY = Key.create("HyperlinkAnnotator");
+  private static final ParameterizedCachedValueProvider<List<PsiReference>, PsiElement> REFS_PROVIDER = element -> {
+    List<PsiReference> references = PsiReferenceService.getService().getReferences(element, Hints.HIGHLIGHTED_REFERENCES);
+    if (references.isEmpty()) references = emptyList();
+    return Result.create(references, PsiModificationTracker.MODIFICATION_COUNT);
+  };
+
   private static @NotNull List<PsiReference> getReferences(@NotNull PsiElement element) {
-    return CachedValuesManager.getCachedValue(element, () -> {
-      List<PsiReference> references = PsiReferenceService.getService().getReferences(element, Hints.HIGHLIGHTED_REFERENCES);
-      if (references.isEmpty()) references = emptyList();
-      return Result.create(references, PsiModificationTracker.MODIFICATION_COUNT);
-    });
+    return CachedValuesManager.getManager(element.getProject())
+      .getParameterizedCachedValue(element, REFS_KEY, REFS_PROVIDER, false, element);
   }
 
   private static boolean annotateHyperlinks(@NotNull PsiElement element,

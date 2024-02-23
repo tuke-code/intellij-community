@@ -30,6 +30,7 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.future.await
 import org.jetbrains.plugins.gitlab.GitLabProjectsManager
 import org.jetbrains.plugins.gitlab.api.dto.GitLabUserDTO
+import org.jetbrains.plugins.gitlab.mergerequest.data.GitLabMergeRequestState
 import org.jetbrains.plugins.gitlab.mergerequest.data.GitLabProject
 import org.jetbrains.plugins.gitlab.mergerequest.util.GitLabMergeRequestReviewersUtil
 import org.jetbrains.plugins.gitlab.util.GitLabBundle
@@ -104,7 +105,7 @@ internal class GitLabMergeRequestCreateViewModelImpl(
     val targetProject = state.baseRepo
     val targetBranch = state.baseBranch.nameForRemoteOperations
 
-    projectData.mergeRequests.findByBranches(sourceBranch, targetBranch).find {
+    projectData.mergeRequests.findByBranches(GitLabMergeRequestState.ALL, sourceBranch, targetBranch).find {
       it.targetProject.fullPath == targetProject.repository.projectPath.fullPath() &&
       it.sourceProject?.fullPath == sourceProject.repository.projectPath.fullPath()
     }?.iid
@@ -160,7 +161,7 @@ internal class GitLabMergeRequestCreateViewModelImpl(
     cs.launch {
       val baseRepo = projectData.projectMapping
       val baseGitRepo = baseRepo.gitRepository
-      val defaultBranch = projectData.defaultBranch.await()
+      val defaultBranch = projectData.defaultBranch.await() ?: return@launch
       val baseBranch = baseGitRepo.getBranchTrackInfo(defaultBranch)?.remoteBranch ?: return@launch
       val currentBranch = baseGitRepo.currentBranch ?: return@launch
 

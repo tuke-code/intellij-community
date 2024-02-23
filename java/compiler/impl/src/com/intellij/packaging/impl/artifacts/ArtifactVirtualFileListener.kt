@@ -1,4 +1,4 @@
-// Copyright 2000-2021 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
+// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.packaging.impl.artifacts
 
 import com.intellij.java.workspace.entities.ArtifactEntity
@@ -18,18 +18,18 @@ import com.intellij.packaging.impl.artifacts.workspacemodel.ArtifactBridge
 import com.intellij.packaging.impl.artifacts.workspacemodel.ArtifactManagerBridge.Companion.artifactsMap
 import com.intellij.packaging.impl.elements.FileOrDirectoryCopyPackagingElement
 import com.intellij.platform.backend.workspace.WorkspaceModel.Companion.getInstance
+import com.intellij.platform.backend.workspace.impl.internal
 import com.intellij.platform.backend.workspace.useQueryCacheWorkspaceModelApi
 import com.intellij.platform.backend.workspace.workspaceModel
 import com.intellij.platform.diagnostic.telemetry.Compiler
 import com.intellij.platform.diagnostic.telemetry.TelemetryManager
-import com.intellij.platform.diagnostic.telemetry.helpers.addMeasuredTimeMillis
+import com.intellij.platform.diagnostic.telemetry.helpers.MillisecondsMeasurer
 import com.intellij.platform.workspace.storage.*
 import com.intellij.platform.workspace.storage.query.entities
 import com.intellij.platform.workspace.storage.query.flatMap
 import com.intellij.platform.workspace.storage.query.groupBy
 import com.intellij.util.PathUtil
 import io.opentelemetry.api.metrics.Meter
-import java.util.concurrent.atomic.AtomicLong
 
 internal class ArtifactVirtualFileListener(private val project: Project) : BulkFileListener {
   private val parentPathsToArtifacts: CachedValue<Map<String, List<ArtifactEntity>>> = CachedValue { storage: EntityStorage ->
@@ -47,14 +47,14 @@ internal class ArtifactVirtualFileListener(private val project: Project) : BulkF
     }
   }
 
-  private fun filePathChanged(oldPath: String, newPath: String) = filePathChangedMs.addMeasuredTimeMillis {
+  private fun filePathChanged(oldPath: String, newPath: String) = filePathChangedMs.addMeasuredTime {
     val artifactEntities = if (useQueryCacheWorkspaceModelApi()) {
-      val refs = parentPathToArtifactReferences[oldPath]?.asSequence() ?: return@addMeasuredTimeMillis
-      val storage = project.workspaceModel.entityStorage.current
+      val refs = parentPathToArtifactReferences[oldPath]?.asSequence() ?: return@addMeasuredTime
+      val storage = project.workspaceModel.currentSnapshot
       refs.map { it.resolve(storage)!! }
     }
     else {
-      parentPathToArtifacts[oldPath]?.asSequence() ?: return@addMeasuredTimeMillis
+      parentPathToArtifacts[oldPath]?.asSequence() ?: return@addMeasuredTime
     }
     val artifactManager = ArtifactManager.getInstance(project)
 
@@ -79,16 +79,16 @@ internal class ArtifactVirtualFileListener(private val project: Project) : BulkF
     model.commit()
   }
 
-  private val parentPathToArtifactReferences: Map<String, List<EntityReference<ArtifactEntity>>>
+  private val parentPathToArtifactReferences: Map<String, List<EntityPointer<ArtifactEntity>>>
     get() {
-      val storage = project.workspaceModel.entityStorage.current
-      return (storage as EntityStorageSnapshot).cached(query)
+      val storage = project.workspaceModel.currentSnapshot
+      return (storage as ImmutableEntityStorage).cached(query)
     }
 
   private val parentPathToArtifacts: Map<String, List<ArtifactEntity>>
-    get() = getInstance(project).entityStorage.cachedValue(parentPathsToArtifacts)
+    get() = getInstance(project).internal.entityStorage.cachedValue(parentPathsToArtifacts)
 
-  private fun propertyChanged(event: VFilePropertyChangeEvent) = propertyChangedMs.addMeasuredTimeMillis {
+  private fun propertyChanged(event: VFilePropertyChangeEvent) = propertyChangedMs.addMeasuredTime {
     if (VirtualFile.PROP_NAME == event.propertyName) {
       val parent = event.file.parent
       if (parent != null) {
@@ -107,7 +107,7 @@ internal class ArtifactVirtualFileListener(private val project: Project) : BulkF
           processFileOrDirectoryCopyElements(artifactEntity) { entity ->
             var path = VfsUtilCore.urlToPath(entity.filePath.url)
             while (path.isNotEmpty()) {
-              add(artifactEntity.createReference<ArtifactEntity>() to path)
+              add(artifactEntity.createPointer<ArtifactEntity>() to path)
               path = PathUtil.getParentPath(path)
             }
             true
@@ -131,8 +131,8 @@ internal class ArtifactVirtualFileListener(private val project: Project) : BulkF
       return result
     }
 
-    private val filePathChangedMs: AtomicLong = AtomicLong()
-    private val propertyChangedMs: AtomicLong = AtomicLong()
+    private val filePathChangedMs = MillisecondsMeasurer()
+    private val propertyChangedMs = MillisecondsMeasurer()
 
     private fun setupOpenTelemetryReporting(meter: Meter): Unit {
       val filePathChangedGauge = meter.gaugeBuilder("compiler.ArtifactVirtualFileListener.filePathChanged.ms")
@@ -142,8 +142,8 @@ internal class ArtifactVirtualFileListener(private val project: Project) : BulkF
 
       meter.batchCallback(
         {
-          filePathChangedGauge.record(filePathChangedMs.get())
-          propertyChangedGauge.record(propertyChangedMs.get())
+          filePathChangedGauge.record(filePathChangedMs.asMilliseconds())
+          propertyChangedGauge.record(propertyChangedMs.asMilliseconds())
         },
         filePathChangedGauge, propertyChangedGauge,
       )

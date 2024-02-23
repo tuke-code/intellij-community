@@ -311,7 +311,7 @@ public class DarculaSpinnerUI extends BasicSpinnerUI {
       public Dimension getPreferredSize() {
         Insets i = spinner.getInsets();
         int minHeight = isCompact(spinner) ? JBUIScale.scale(10) : JBUIScale.scale(12);
-        return new Dimension(ARROW_BUTTON_WIDTH.get() + i.left,
+        return new Dimension(JBUI.CurrentTheme.Component.ARROW_AREA_WIDTH.get() + i.right,
                              minHeight + (direction == SwingConstants.NORTH ? i.top : i.bottom));
       }
     };

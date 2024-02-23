@@ -5,13 +5,13 @@ import com.intellij.CommonBundle;
 import com.intellij.diff.requests.ContentDiffRequest;
 import com.intellij.diff.util.DiffUtil;
 import com.intellij.history.core.LocalHistoryFacade;
+import com.intellij.history.core.changes.ChangeSet;
 import com.intellij.history.integration.IdeaGateway;
 import com.intellij.history.integration.LocalHistoryImpl;
 import com.intellij.history.integration.revertion.Reverter;
 import com.intellij.history.integration.ui.models.FileDifferenceModel;
 import com.intellij.history.integration.ui.models.HistoryDialogModel;
 import com.intellij.history.integration.ui.models.RevisionItem;
-import com.intellij.history.integration.ui.models.RevisionProcessingProgress;
 import com.intellij.history.utils.LocalHistoryLog;
 import com.intellij.icons.AllIcons;
 import com.intellij.ide.actions.ContextHelpAction;
@@ -19,7 +19,6 @@ import com.intellij.ide.actions.RevealFileAction;
 import com.intellij.ide.ui.SplitterProportionsDataImpl;
 import com.intellij.openapi.actionSystem.*;
 import com.intellij.openapi.application.ApplicationManager;
-import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.diff.impl.patch.FilePatch;
 import com.intellij.openapi.diff.impl.patch.IdeaTextPatchBuilder;
 import com.intellij.openapi.progress.ProgressIndicator;
@@ -38,6 +37,7 @@ import com.intellij.openapi.vcs.changes.patch.CreatePatchConfigurationPanel;
 import com.intellij.openapi.vcs.changes.patch.PatchWriter;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.wm.ex.IdeFocusTraversalPolicy;
+import com.intellij.platform.lvcs.impl.statistics.LocalHistoryCounter;
 import com.intellij.project.ProjectKt;
 import com.intellij.ui.*;
 import com.intellij.ui.awt.RelativePoint;
@@ -113,7 +113,7 @@ public abstract class HistoryDialog<T extends HistoryDialogModel> extends FrameW
 
     facade.addListener(new LocalHistoryFacade.Listener() {
       @Override
-      public void changeSetFinished() {
+      public void changeSetFinished(@NotNull ChangeSet changeSet) {
         scheduleRevisionsUpdate(null);
       }
     }, this);
@@ -126,7 +126,9 @@ public abstract class HistoryDialog<T extends HistoryDialogModel> extends FrameW
       synchronized (myModel) {
         if (configRunnable != null) configRunnable.consume(myModel);
         myModel.clearRevisions();
-        myModel.getRevisions();// force load
+        LocalHistoryCounter.INSTANCE.logLoadItems(myProject, myModel.getKind(), () -> {
+          return myModel.getRevisions();// force load
+        });
       }
       return () -> myRevisionsList.updateData(myModel);
     });
@@ -237,7 +239,12 @@ public abstract class HistoryDialog<T extends HistoryDialogModel> extends FrameW
         boolean changed = toSelect == null ? myModel.resetSelection() : myModel.selectRevisions(toSelect.first, toSelect.second);
         changed |= myForceUpdateDiff;
         myForceUpdateDiff = false;
-        return changed ? doUpdateDiffs(myModel) : EmptyRunnable.getInstance();
+        if (changed) {
+          return LocalHistoryCounter.INSTANCE.logLoadDiff(myProject, myModel.getKind(), () -> {
+            return doUpdateDiffs(myModel);
+          });
+        }
+        return EmptyRunnable.getInstance();
       }
     });
   }
@@ -464,6 +471,7 @@ public abstract class HistoryDialog<T extends HistoryDialogModel> extends FrameW
 
     @Override
     protected void doPerform(T model) {
+      LocalHistoryCounter.INSTANCE.logActionInvoked(LocalHistoryCounter.ActionKind.RevertRevisions, myModel.getKind());
       revert();
     }
 
@@ -480,6 +488,7 @@ public abstract class HistoryDialog<T extends HistoryDialogModel> extends FrameW
 
     @Override
     protected void doPerform(T model) {
+      LocalHistoryCounter.INSTANCE.logActionInvoked(LocalHistoryCounter.ActionKind.CreatePatch, myModel.getKind());
       createPatch();
     }
 

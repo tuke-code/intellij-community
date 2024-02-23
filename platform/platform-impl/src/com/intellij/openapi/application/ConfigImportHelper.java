@@ -1,4 +1,4 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.openapi.application;
 
 import com.intellij.configurationStore.StoreUtilKt;
@@ -13,9 +13,7 @@ import com.intellij.ide.plugins.marketplace.MarketplacePluginDownloadService;
 import com.intellij.ide.startup.StartupActionScriptManager;
 import com.intellij.ide.startup.StartupActionScriptManager.ActionCommand;
 import com.intellij.ide.ui.laf.LookAndFeelThemeAdapterKt;
-import com.intellij.openapi.application.migrations.BigDataTools232;
-import com.intellij.openapi.application.migrations.HttpClientPostmanConverter233;
-import com.intellij.openapi.application.migrations.PresentationAssistant233;
+import com.intellij.openapi.application.migrations.AIAssistant241;
 import com.intellij.openapi.application.migrations.RustUltimate241;
 import com.intellij.openapi.components.StoragePathMacros;
 import com.intellij.openapi.diagnostic.Logger;
@@ -129,6 +127,7 @@ public final class ConfigImportHelper {
     ConfigDirsSearchResult guessedOldConfigDirs = findConfigDirectories(newConfigDir, settings, otherProductPrefixes);
     Path tempBackup = null;
     boolean vmOptionFileChanged = false;
+    @Nullable List<String> vmOptionsLines = null;
     ImportOldConfigsState.InitialImportScenario importScenarioStatistics = null;
 
     try {
@@ -138,8 +137,15 @@ public final class ConfigImportHelper {
         vmOptionFileChanged = doesVmOptionsFileExist(newConfigDir);
         try {
           if (customMigrationOption instanceof CustomConfigMigrationOption.MigrateFromCustomPlace mcp) {
-            tempBackup = backupCurrentConfigToTempAndDelete(newConfigDir, log, false, settings);
             oldConfigDirAndOldIdePath = findConfigDirectoryByPath(mcp.getLocation());
+            if (oldConfigDirAndOldIdePath != null && oldConfigDirAndOldIdePath.first != null) {
+              if (doesVmOptionsFileExist(newConfigDir) && !vmOptionsRequiresMerge(oldConfigDirAndOldIdePath.first, newConfigDir, log)) {
+                //save old lines for the new file
+                vmOptionsLines = Files.readAllLines(newConfigDir.resolve(VMOptions.getFileName()), VMOptions.getFileCharset());
+                vmOptionFileChanged = false;
+              }
+            }
+            tempBackup = backupCurrentConfigToTempAndDelete(newConfigDir, log, false, settings);
             importScenarioStatistics = IMPORT_SETTINGS_ACTION;
           }
           else {
@@ -200,9 +206,9 @@ public final class ConfigImportHelper {
           }
         }
       }
-
+      Path oldConfigDir;
       if (oldConfigDirAndOldIdePath != null) {
-        Path oldConfigDir = oldConfigDirAndOldIdePath.first;
+        oldConfigDir = oldConfigDirAndOldIdePath.first;
         Path oldIdeHome = oldConfigDirAndOldIdePath.second;
 
         var configImportOptions = new ConfigImportOptions(log);
@@ -224,6 +230,7 @@ public final class ConfigImportHelper {
         setConfigImportedInThisSession();
       }
       else {
+        oldConfigDir = null;
         log.info("No configs imported, starting with clean configs at " + newConfigDir);
         if (importScenarioStatistics == null) {
           importScenarioStatistics = CLEAN_CONFIGS;
@@ -235,7 +242,18 @@ public final class ConfigImportHelper {
       }
 
       ImportOldConfigsState.Companion.getInstance().reportImportScenario(importScenarioStatistics);
-      vmOptionFileChanged |= doesVmOptionsFileExist(newConfigDir);
+      if (importScenarioStatistics == IMPORT_SETTINGS_ACTION && vmOptionsLines != null) {
+        Path vmOptionsFile = newConfigDir.resolve(VMOptions.getFileName());
+        try {
+          Files.write(vmOptionsFile, vmOptionsLines, VMOptions.getFileCharset());
+          vmOptionFileChanged = false;
+        }
+        catch (IOException e) {
+          throw new RuntimeException(e);
+        }
+      } else {
+        vmOptionFileChanged |= doesVmOptionsFileExist(newConfigDir);
+      }
     }
     finally {
       if (tempBackup != null) {
@@ -260,7 +278,7 @@ public final class ConfigImportHelper {
       }
 
       if (settings == null || settings.shouldRestartAfterVmOptionsChange()) {
-        new CustomConfigMigrationOption.SetProperties(properties).writeConfigMarkerFile();
+        new CustomConfigMigrationOption.SetProperties(properties).writeConfigMarkerFile(newConfigDir);
         restart(args);
       }
     }
@@ -605,7 +623,7 @@ public final class ConfigImportHelper {
     return null;
   }
 
-  private static @Nullable Pair<Path, Path> findConfigDirectoryByPath(Path selectedDir) {
+  public static @Nullable Pair<Path, Path> findConfigDirectoryByPath(Path selectedDir) {
     // tries to map a user selection into a valid config directory
     // returns a pair of a config directory and an IDE home (when a user pointed to it; null otherwise)
 
@@ -965,10 +983,8 @@ public final class ConfigImportHelper {
   private static void migrateGlobalPlugins(Path newConfigDir, Path oldConfigDir, List<IdeaPluginDescriptor> toMigrate, List<IdeaPluginDescriptor> toDownload) {
     var currentProductVersion = PluginManagerCore.getBuildNumber().asStringWithoutProductCode();
     var options = new PluginMigrationOptions(currentProductVersion, newConfigDir, oldConfigDir, toMigrate, toDownload);
-    new BigDataTools232().migratePlugins(options);
-    new PresentationAssistant233().migratePlugin(options);
     new RustUltimate241().migratePlugins(options);
-    new HttpClientPostmanConverter233().migratePlugins(options);
+    new AIAssistant241().migratePlugins(options);
   }
 
   private static void partitionNonBundled(Collection<? extends IdeaPluginDescriptor> descriptors,
@@ -1158,40 +1174,12 @@ public final class ConfigImportHelper {
    * When both files set the same property, the value from an external tool is supposed to be more actual.
    * When both files set `-Xmx`, a higher value is preferred.
    */
-  private static void mergeVmOptions(Path importFile, Path currentFile, Logger log) {
+  public static void mergeVmOptions(Path importFile, Path currentFile, Logger log) {
     try {
       var cs = VMOptions.getFileCharset();
       var importLines = Files.readAllLines(importFile, cs);
       var currentLines = Files.readAllLines(currentFile, cs);
-      var result = new ArrayList<String>(importLines.size() + currentLines.size());
-      var preferCurrentXmx = false;
-
-      nextLine:
-      for (var line : importLines) {
-        if (line.startsWith("-D")) {
-          var p = line.indexOf('=');
-          if (p > 0) {
-            var prefix = line.substring(0, p + 1);
-            for (var l : currentLines) {
-              if (l.startsWith(prefix)) {
-                continue nextLine;
-              }
-            }
-          }
-        }
-        else if (line.startsWith("-Xmx") && isLowerValue("-Xmx", line.substring(4), currentLines)) {
-          preferCurrentXmx = true;
-          continue nextLine;
-        }
-        result.add(line);
-      }
-
-      for (var line : currentLines) {
-        if (preferCurrentXmx || !line.startsWith("-Xmx")) {
-          result.add(line);
-        }
-      }
-
+      ArrayList<String> result = mergeVmOptionsLines(importLines, currentLines, log);
       Files.write(currentFile, result, cs);
     }
     catch (IOException e) {
@@ -1199,33 +1187,76 @@ public final class ConfigImportHelper {
     }
   }
 
+  private static boolean vmOptionsRequiresMerge(@Nullable Path oldConfigDir, Path newConfigDir, Logger log){
+    if (oldConfigDir == null) {
+      return false;
+    }
+    if (newConfigDir == null) {
+      return true;
+    }
+    Path importFile = oldConfigDir.resolve(VMOptions.getFileName());
+    Path currentFile = newConfigDir.resolve(VMOptions.getFileName());
+    try {
+      if (!Files.isRegularFile(importFile))
+        return false;
+      if (!Files.isRegularFile(currentFile))
+        return true;
+
+      var cs = VMOptions.getFileCharset();
+      var importLines = Files.readAllLines(importFile, cs);
+      var currentLines = Files.readAllLines(currentFile, cs);
+      currentLines.sort(String::compareTo);
+      ArrayList<String> result = mergeVmOptionsLines(importLines, currentLines, log);
+      updateVMOptionsLines(newConfigDir, result, log);
+      result.sort(String::compareTo);
+      return !currentLines.equals(result);
+    }
+    catch (IOException e) {
+      log.warn("Failed to merge VM option files " + importFile + " and " + currentFile, e);
+      return true;
+    }
+  }
+
+  private static ArrayList<String> mergeVmOptionsLines(List<String> importLines, List<String> currentLines, Logger log) {
+    var result = new ArrayList<String>(importLines.size() + currentLines.size());
+    var preferCurrentXmx = false;
+
+    nextLine:
+    for (var line : importLines) {
+      if (line.startsWith("-D")) {
+        var p = line.indexOf('=');
+        if (p > 0) {
+          var prefix = line.substring(0, p + 1);
+          for (var l : currentLines) {
+            if (l.startsWith(prefix)) {
+              continue nextLine;
+            }
+          }
+        }
+      }
+      else if (line.startsWith("-Xmx") && isLowerValue("-Xmx", line.substring(4), currentLines)) {
+        preferCurrentXmx = true;
+        continue nextLine;
+      }
+      result.add(line);
+    }
+
+    for (var line : currentLines) {
+      if (preferCurrentXmx || !line.startsWith("-Xmx")) {
+        result.add(line);
+      }
+    }
+    return result;
+  }
+
   /* Fix VM options in the custom *.vmoptions file that won't work with the current IDE version or duplicate/undercut platform ones. */
   @SuppressWarnings("SpellCheckingInspection")
-  private static void updateVMOptions(Path newConfigDir, Logger log) {
+  public static void updateVMOptions(Path newConfigDir, Logger log) {
     Path vmOptionsFile = newConfigDir.resolve(VMOptions.getFileName());
     if (Files.exists(vmOptionsFile)) {
       try {
         List<String> lines = Files.readAllLines(vmOptionsFile, VMOptions.getFileCharset());
-        Path platformVmOptionsFile = newConfigDir.getFileSystem().getPath(VMOptions.getPlatformOptionsFile().toString());
-        Collection<String> platformLines = new LinkedHashSet<>(readPlatformOptions(platformVmOptionsFile, log));
-        boolean updated = false;
-
-        for (ListIterator<String> i = lines.listIterator(); i.hasNext(); ) {
-          String line = i.next().trim();
-          if (line.equals("-XX:MaxJavaStackTraceDepth=-1")) {
-            i.set("-XX:MaxJavaStackTraceDepth=10000"); updated = true;
-          }
-          else if ("-XX:+UseConcMarkSweepGC".equals(line) ||
-                   "-Xverify:none".equals(line) || "-noverify".equals(line) ||
-                   "-XX:+UseCompressedOops".equals(line) ||
-                   line.startsWith("-agentlib:yjpagent") ||
-                   line.startsWith("-agentpath:") && line.contains("yjpagent") ||
-                   "-Dsun.io.useCanonPrefixCache=false".equals(line) ||
-                   "-Dfile.encoding=UTF-8".equals(line) && SystemInfoRt.isMac ||
-                   isDuplicateOrLowerValue(line, platformLines)) {
-            i.remove(); updated = true;
-          }
-        }
+        boolean updated = updateVMOptionsLines(newConfigDir, lines, log);
 
         if (updated) {
           Files.write(vmOptionsFile, lines, VMOptions.getFileCharset());
@@ -1237,7 +1268,32 @@ public final class ConfigImportHelper {
     }
   }
 
-  private static List<String> readPlatformOptions(Path platformVmOptionsFile, Logger log) {
+  private static boolean updateVMOptionsLines(Path newConfigDir, List<String> lines, Logger log) {
+    Path platformVmOptionsFile = newConfigDir.getFileSystem().getPath(VMOptions.getPlatformOptionsFile().toString());
+    Collection<String> platformLines = new LinkedHashSet<>(readPlatformOptions(platformVmOptionsFile, log));
+    boolean updated = false;
+
+    for (ListIterator<String> i = lines.listIterator(); i.hasNext(); ) {
+      String line = i.next().trim();
+      if (line.equals("-XX:MaxJavaStackTraceDepth=-1")) {
+        i.set("-XX:MaxJavaStackTraceDepth=10000"); updated = true;
+      }
+      else if ("-XX:+UseConcMarkSweepGC".equals(line) ||
+               "-Xverify:none".equals(line) || "-noverify".equals(line) ||
+               "-XX:+UseCompressedOops".equals(line) ||
+               line.startsWith("-agentlib:yjpagent") ||
+               line.startsWith("-agentpath:") && line.contains("yjpagent") ||
+               "-Dsun.io.useCanonPrefixCache=false".equals(line) ||
+               "-Dfile.encoding=UTF-8".equals(line) && SystemInfoRt.isMac ||
+               isDuplicateOrLowerValue(line, platformLines)) {
+        i.remove(); updated = true;
+      }
+    }
+    return updated;
+  }
+
+  @VisibleForTesting
+  static List<String> readPlatformOptions(Path platformVmOptionsFile, Logger log) {
     try {
       return Files.readAllLines(platformVmOptionsFile, VMOptions.getFileCharset());
     }

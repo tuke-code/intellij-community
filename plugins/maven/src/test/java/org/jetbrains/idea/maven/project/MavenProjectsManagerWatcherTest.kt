@@ -17,6 +17,7 @@ import org.junit.Test
 import java.io.IOException
 
 class MavenProjectsManagerWatcherTest : MavenMultiVersionImportingTestCase() {
+
   private var myProjectsTreeTracker: MavenProjectTreeTracker? = null
 
   override fun setUp() = runBlocking {
@@ -147,18 +148,15 @@ class MavenProjectsManagerWatcherTest : MavenMultiVersionImportingTestCase() {
                                  </dependencies>
                              </profile>
                          </profiles>
-                       
                        """.trimIndent())
     scheduleProjectImportAndWait()
     assertRootProjects("project")
     assertModules("project")
-    projectsManager.explicitProfiles = MavenExplicitProfiles(listOf("junit4"),
-                                                                 listOf("junit5"))
+    projectsManager.explicitProfiles = MavenExplicitProfiles(listOf("junit4"), listOf("junit5"))
     assertHasPendingProjectForReload()
     scheduleProjectImportAndWait()
     assertMavenProjectDependencies("test:project:1", "junit:junit:4.12")
-    projectsManager.explicitProfiles = MavenExplicitProfiles(listOf("junit5"),
-                                                                 listOf("junit4"))
+    projectsManager.explicitProfiles = MavenExplicitProfiles(listOf("junit5"), listOf("junit4"))
     assertHasPendingProjectForReload()
     scheduleProjectImportAndWait()
     assertMavenProjectDependencies("test:project:1", "org.junit.jupiter:junit-jupiter-engine:5.9.1")

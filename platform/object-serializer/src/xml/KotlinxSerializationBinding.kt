@@ -1,6 +1,8 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.serialization.xml
 
+import com.intellij.openapi.diagnostic.debug
+import com.intellij.serialization.LOG
 import com.intellij.util.xml.dom.XmlElement
 import com.intellij.util.xmlb.NotNullDeserializeBinding
 import com.intellij.util.xmlb.SerializationFilter
@@ -25,8 +27,9 @@ private val lookup = MethodHandles.lookup()
 private val kotlinMethodType = MethodType.methodType(KSerializer::class.java)
 
 @Internal
-class KotlinxSerializationBinding(aClass: Class<*>) : NotNullDeserializeBinding() {
-  private val serializer: KSerializer<Any>
+class KotlinxSerializationBinding(aClass: Class<*>) : NotNullDeserializeBinding {
+  @JvmField
+  val serializer: KSerializer<Any>
 
   init {
     val findStaticGetter = lookup.findStaticGetter(aClass, "Companion", aClass.classLoader.loadClass(aClass.name + "\$Companion"))
@@ -35,18 +38,18 @@ class KotlinxSerializationBinding(aClass: Class<*>) : NotNullDeserializeBinding(
     serializer = lookup.findVirtual(companion.javaClass, "serializer", kotlinMethodType).invoke(companion) as KSerializer<Any>
   }
 
-  override fun serialize(o: Any, context: Any?, filter: SerializationFilter?): Any {
+  override fun serialize(bean: Any, context: Any?, filter: SerializationFilter?): Element {
     val element = Element("state")
-    val json = encodeToJson(o)
+    val json = encodeToJson(bean)
     if (!json.isEmpty() && json != "{\n}") {
       element.addContent(CDATA(json))
     }
     return element
   }
 
-  fun encodeToJson(o: Any): String = json.encodeToString(serializer, o)
+  private fun encodeToJson(o: Any): String = json.encodeToString(serializer, o)
 
-  fun decodeFromJson(data: String): Any = json.decodeFromString(serializer, data)
+  private fun decodeFromJson(data: String): Any = json.decodeFromString(serializer, data)
 
   override fun isBoundTo(element: Element): Boolean {
     throw UnsupportedOperationException("Only root object is supported")
@@ -59,7 +62,7 @@ class KotlinxSerializationBinding(aClass: Class<*>) : NotNullDeserializeBinding(
   override fun deserialize(context: Any?, element: Element): Any {
     val cdata = element.content.firstOrNull() as? Text
     if (cdata == null) {
-      LOG.debug("incorrect data (old format?) for $serializer")
+      LOG.debug { "incorrect data (old format?) for $serializer" }
       return json.decodeFromString(serializer, "{}")
     }
     return decodeFromJson(cdata.text)

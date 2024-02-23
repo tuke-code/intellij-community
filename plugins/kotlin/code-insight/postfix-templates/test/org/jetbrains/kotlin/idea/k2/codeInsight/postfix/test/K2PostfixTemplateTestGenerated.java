@@ -1,4 +1,4 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 
 package org.jetbrains.kotlin.idea.k2.codeInsight.postfix.test;
 
@@ -94,6 +94,11 @@ public abstract class K2PostfixTemplateTestGenerated extends AbstractK2PostfixTe
             performTest();
         }
 
+        @TestMetadata("array.kt")
+        public void testArray() throws Exception {
+            performTest();
+        }
+
         @TestMetadata("forOnMap.kt")
         public void testForOnMap() throws Exception {
             performTest();
@@ -141,6 +146,11 @@ public abstract class K2PostfixTemplateTestGenerated extends AbstractK2PostfixTe
 
         @TestMetadata("string.kt")
         public void testString() throws Exception {
+            performTest();
+        }
+
+        @TestMetadata("vararg.kt")
+        public void testVararg() throws Exception {
             performTest();
         }
     }

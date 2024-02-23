@@ -3,6 +3,7 @@ package org.jetbrains.plugins.gitlab.mergerequest.ui.diff
 
 import com.intellij.collaboration.messages.CollaborationToolsBundle
 import com.intellij.collaboration.ui.codereview.CodeReviewChatItemUIUtil
+import com.intellij.collaboration.ui.codereview.comment.CodeReviewCommentTextFieldFactory
 import com.intellij.collaboration.ui.codereview.comment.CodeReviewCommentUIUtil
 import com.intellij.collaboration.ui.codereview.comment.CommentInputActionsComponentFactory
 import com.intellij.collaboration.ui.codereview.timeline.comment.CommentTextFieldFactory
@@ -26,6 +27,17 @@ internal object GitLabMergeRequestDiffInlayComponentsFactory {
                        vm: GitLabMergeRequestDiscussionViewModel,
                        place: GitLabStatistics.MergeRequestNoteActionPlace): JComponent =
     GitLabDiscussionComponentFactory.create(project, cs, avatarIconsProvider, vm, place).apply {
+      border = JBUI.Borders.empty(CodeReviewCommentUIUtil.getInlayPadding(CodeReviewChatItemUIUtil.ComponentType.COMPACT))
+    }.let {
+      CodeReviewCommentUIUtil.createEditorInlayPanel(it)
+    }
+
+  fun createDraftNote(project: Project,
+                      cs: CoroutineScope,
+                      avatarIconsProvider: IconsProvider<GitLabUserDTO>,
+                      vm: GitLabNoteViewModel,
+                      place: GitLabStatistics.MergeRequestNoteActionPlace): JComponent =
+    GitLabNoteComponentFactory.create(CodeReviewChatItemUIUtil.ComponentType.COMPACT, project, cs, avatarIconsProvider, vm, place).apply {
       border = JBUI.Borders.empty(CodeReviewCommentUIUtil.getInlayPadding(CodeReviewChatItemUIUtil.ComponentType.COMPACT))
     }.let {
       CodeReviewCommentUIUtil.createEditorInlayPanel(it)
@@ -65,7 +77,7 @@ internal object GitLabMergeRequestDiffInlayComponentsFactory {
     val itemType = CodeReviewChatItemUIUtil.ComponentType.COMPACT
     val icon = CommentTextFieldFactory.IconConfig.of(itemType, avatarIconsProvider, vm.currentUser)
 
-    val editor = GitLabNoteEditorComponentFactory.create(project, cs, vm, actions, icon).apply {
+    val editor = CodeReviewCommentTextFieldFactory.createIn(cs, vm, actions, icon).apply {
       border = JBUI.Borders.empty(itemType.inputPaddingInsets)
     }
 

@@ -1,15 +1,13 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.workspaceModel.ide.impl
 
 import com.intellij.ide.plugins.PluginManagerCore
 import com.intellij.ide.plugins.cl.PluginAwareClassLoader
+import com.intellij.openapi.application.ApplicationInfo
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.logger
-import com.intellij.openapi.extensions.ExtensionPointName
 import com.intellij.openapi.extensions.PluginId
-import com.intellij.platform.backend.workspace.WorkspaceModelCacheVersion
-import com.intellij.platform.diagnostic.telemetry.helpers.addElapsedTimeMillis
-import com.intellij.platform.diagnostic.telemetry.helpers.addMeasuredTimeMillis
+import com.intellij.platform.diagnostic.telemetry.helpers.MillisecondsMeasurer
 import com.intellij.platform.workspace.jps.entities.ModuleEntity
 import com.intellij.platform.workspace.storage.*
 import com.intellij.platform.workspace.storage.impl.serialization.EntityStorageSerializerImpl
@@ -24,7 +22,6 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 import java.util.concurrent.atomic.AtomicBoolean
-import java.util.concurrent.atomic.AtomicLong
 import kotlin.io.path.exists
 import kotlin.io.path.getLastModifiedTime
 
@@ -33,21 +30,22 @@ class WorkspaceModelCacheSerializer(vfuManager: VirtualFileUrlManager, urlRelati
     EntityStorageSerializerImpl(
       PluginAwareEntityTypesResolver,
       vfuManager,
-      urlRelativizer
+      urlRelativizer,
+      ApplicationInfo.getInstance().build.toString(),
     )
 
   internal fun loadCacheFromFile(file: Path,
                                  invalidateGlobalCachesMarkerFile: Path,
-                                 invalidateCachesMarkerFile: Path): MutableEntityStorage? = loadCacheFromFileTimeMs.addMeasuredTimeMillis {
+                                 invalidateCachesMarkerFile: Path): MutableEntityStorage? = loadCacheFromFileTimeMs.addMeasuredTime {
     val start = System.currentTimeMillis()
-    val cacheFileAttributes = file.basicAttributesIfExists() ?: return@addMeasuredTimeMillis null
+    val cacheFileAttributes = file.basicAttributesIfExists() ?: return@addMeasuredTime null
 
     val invalidateCachesMarkerFileAttributes = invalidateGlobalCachesMarkerFile.basicAttributesIfExists()
     if ((invalidateCachesMarkerFileAttributes != null && cacheFileAttributes.lastModifiedTime() < invalidateCachesMarkerFileAttributes.lastModifiedTime()) ||
         invalidateCachesMarkerFile.exists() && cacheFileAttributes.lastModifiedTime() < invalidateCachesMarkerFile.getLastModifiedTime()) {
       LOG.info("Skipping cache loading since '${invalidateGlobalCachesMarkerFile}' is present and newer than cache file '$file'")
       runCatching { Files.deleteIfExists(file) }
-      return@addMeasuredTimeMillis null
+      return@addMeasuredTime null
     }
 
     LOG.debug("Loading cache from $file")
@@ -63,13 +61,13 @@ class WorkspaceModelCacheSerializer(vfuManager: VirtualFileUrlManager, urlRelati
       }
       .getOrNull()
 
-    return@addMeasuredTimeMillis cache
+    return@addMeasuredTime cache
   }
 
   // Serialize and atomically replace cacheFile. Delete temporary file in any cache to avoid junk in cache folder
-  internal fun saveCacheToFile(storage: EntityStorageSnapshot,
+  internal fun saveCacheToFile(storage: ImmutableEntityStorage,
                                file: Path,
-                               userPreProcessor: Boolean = false): SaveInfo = saveCacheToFileTimeMs.addMeasuredTimeMillis {
+                               userPreProcessor: Boolean = false): SaveInfo = saveCacheToFileTimeMs.addMeasuredTime {
     val start = System.currentTimeMillis()
 
     LOG.debug("Saving Workspace model cache to $file")
@@ -96,7 +94,7 @@ class WorkspaceModelCacheSerializer(vfuManager: VirtualFileUrlManager, urlRelati
       Files.deleteIfExists(tmpFile)
     }
 
-    return@addMeasuredTimeMillis SaveInfo(System.currentTimeMillis() - start, cacheSize)
+    return@addMeasuredTime SaveInfo(System.currentTimeMillis() - start, cacheSize)
   }
 
   // Looks like https://opentelemetry.io/docs/specs/otel/metrics/api/#histogram
@@ -105,7 +103,7 @@ class WorkspaceModelCacheSerializer(vfuManager: VirtualFileUrlManager, urlRelati
     val loadedSize: Long?,
   )
 
-  private fun cachePreProcess(storage: EntityStorageSnapshot): EntityStorageSnapshot {
+  private fun cachePreProcess(storage: ImmutableEntityStorage): ImmutableEntityStorage {
     val builder = MutableEntityStorage.from(storage)
     val nonPersistentModules = builder.entities(ModuleEntity::class.java)
       .filter { it.entitySource == NonPersistentEntitySource }
@@ -142,14 +140,8 @@ class WorkspaceModelCacheSerializer(vfuManager: VirtualFileUrlManager, urlRelati
   }
 
   companion object {
-    private val WORKSPACE_MODEL_CACHE_VERSION_EP = ExtensionPointName<WorkspaceModelCacheVersion>("com.intellij.workspaceModel.cache.version")
-
-    fun collectExternalCacheVersions(): Map<String, String> {
-      return WORKSPACE_MODEL_CACHE_VERSION_EP.extensionList.associate { it.getId() to it.getVersion() }
-    }
-
-    private val loadCacheFromFileTimeMs: AtomicLong = AtomicLong()
-    private val saveCacheToFileTimeMs: AtomicLong = AtomicLong()
+    private val loadCacheFromFileTimeMs = MillisecondsMeasurer()
+    private val saveCacheToFileTimeMs = MillisecondsMeasurer()
 
     private fun setupOpenTelemetryReporting(meter: Meter) {
       val loadCacheFromFileTimeCounter = meter.counterBuilder("workspaceModel.load.cache.from.file.ms").buildObserver()
@@ -157,8 +149,8 @@ class WorkspaceModelCacheSerializer(vfuManager: VirtualFileUrlManager, urlRelati
 
       meter.batchCallback(
         {
-          loadCacheFromFileTimeCounter.record(loadCacheFromFileTimeMs.get())
-          saveCacheToFileTimeCounter.record(saveCacheToFileTimeMs.get())
+          loadCacheFromFileTimeCounter.record(loadCacheFromFileTimeMs.asMilliseconds())
+          saveCacheToFileTimeCounter.record(saveCacheToFileTimeMs.asMilliseconds())
         },
         loadCacheFromFileTimeCounter, saveCacheToFileTimeCounter
       )

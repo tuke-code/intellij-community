@@ -20,7 +20,7 @@
   <xi:include href="kotlin-core.xml" xpointer="xpointer(/idea-plugin/*)"/>
   <xi:include href="searching-base.xml" xpointer="xpointer(/idea-plugin/*)"/>
   <xi:include href="statistics.xml" xpointer="xpointer(/idea-plugin/*)"/>
-  <xi:include href="kotlin.highlighting-shared.xml" xpointer="xpointer(/idea-plugin/*)"/>
+  <xi:include href="kotlin.highlighting.shared.xml" xpointer="xpointer(/idea-plugin/*)"/>
   <xi:include href="codeInsights.xml" xpointer="xpointer(/idea-plugin/*)"/>
   <xi:include href="lowLevelApiFir.xml" xpointer="xpointer(/idea-plugin/*)"/>
   <xi:include href="light-classes.xml" xpointer="xpointer(/idea-plugin/*)"/>
@@ -48,6 +48,10 @@
     <idePlatformKindTooling implementation="org.jetbrains.kotlin.idea.base.fir.codeInsight.tooling.FirNativeIdePlatformKindTooling"/>
     <idePlatformKindTooling implementation="org.jetbrains.kotlin.idea.base.fir.codeInsight.tooling.FirCommonIdePlatformKindTooling"/>
 
+    <supportAvailability implementation="org.jetbrains.kotlin.idea.base.fir.codeInsight.MultiplatformSupportAvailability"/>
+    <supportAvailability implementation="org.jetbrains.kotlin.idea.highlighter.ScriptingSupportAvailability"/>
+
+    <scriptAdditionalIdeaDependenciesProvider implementation="org.jetbrains.kotlin.idea.core.script.ModuleScriptAdditionalIdeaDependenciesProvider"/>
   </extensions>
 
   <extensions defaultExtensionNs="org.jetbrains.uast">
@@ -55,13 +59,18 @@
     <generate.uastCodeGenerationPlugin implementation="org.jetbrains.uast.kotlin.FirKotlinUastCodeGenerationPlugin"/>
   </extensions>
 
+  <applicationListeners>
+    <listener class="org.jetbrains.kotlin.idea.fir.FirStatusBarWidgetListener"
+              topic="com.intellij.openapi.util.registry.RegistryValueListener"/>
+  </applicationListeners>
+
   <extensions defaultExtensionNs="com.intellij">
     <projectService serviceImplementation="org.jetbrains.kotlin.idea.fir.extensions.KtCompilerPluginsProviderIdeImpl"
                     serviceInterface="org.jetbrains.kotlin.analysis.project.structure.KtCompilerPluginsProvider"/>
     <compilableFileTypesProvider implementation="org.jetbrains.kotlin.idea.compiler.KotlinCompilableFileTypesProvider" />
     <!-- fir-specific -->
-    <applicationService serviceInterface="org.jetbrains.kotlin.idea.base.plugin.KotlinPluginKindProvider"
-                        serviceImplementation="org.jetbrains.kotlin.idea.fir.plugin.FirKotlinPluginKindProvider"/>
+    <applicationService serviceInterface="org.jetbrains.kotlin.idea.base.plugin.KotlinPluginModeProvider"
+                        serviceImplementation="org.jetbrains.kotlin.idea.fir.plugin.K2KotlinPluginModeProvider"/>
     <applicationService serviceInterface="org.jetbrains.kotlin.idea.codeInsight.overrideImplement.OverrideImplementFacility"
                         serviceImplementation="org.jetbrains.kotlin.idea.core.overrideImplement.OverrideImplementFacilityImpl"/>
     <projectService serviceInterface="org.jetbrains.kotlin.analysis.api.session.KtAnalysisSessionProvider"
@@ -89,10 +98,26 @@
                  defaultValue="false"
                  restartRequired="true"/>
 
+    <registryKey key="kotlin.k2.kmp.enabled"
+                 description="Enable KMP support in the Kotlin K2 plugin for all platforms"
+                 defaultValue="false"
+                 restartRequired="true"/>
+
     <registryKey key="kotlin.k2.only.bundled.compiler.plugins.enabled"
                  description="Allow only bundled K2 compiler plugins to be used"
                  defaultValue="true"
                  restartRequired="false"/>
+
+    <registryKey key="kotlin.k2.show.fir.statusbar.icon"
+                 description="Show K2 FIR tree icon in the status bar"
+                 defaultValue="false"
+                 restartRequired="false"/>
+
+    <registryKey
+            key="kotlin.k2.j2k.enabled"
+            description="Enable K2 Java to Kotlin converter"
+            defaultValue="false"
+            restartRequired="false"/>
 
     <!-- shared completion -->
     <lookup.charFilter implementation="org.jetbrains.kotlin.idea.completion.KotlinCompletionCharFilter"/>
@@ -123,8 +148,73 @@
                                implementationClass="org.jetbrains.kotlin.idea.parameterInfo.KotlinHighLevelClassTypeArgumentInfoHandler"/>
     <codeInsight.parameterInfo language="kotlin"
                                implementationClass="org.jetbrains.kotlin.idea.parameterInfo.KotlinHighLevelFunctionTypeArgumentInfoHandler"/>
-  </extensions>
 
+    <!-- inlay hints -->
+    <codeInsight.inlayActionHandler implementationClass="org.jetbrains.kotlin.idea.codeInsight.hints.KotlinFqnDeclarativeInlayActionHandler"
+                                    handlerId="kotlin.fqn.class"/>
+
+    <codeInsight.declarativeInlayProvider
+            language="kotlin"
+            implementationClass="org.jetbrains.kotlin.idea.codeInsight.hints.KtReferencesTypeHintsProvider"
+            isEnabledByDefault="false"
+            group="TYPES_GROUP"
+            providerId="kotlin.references.types.hints"
+            bundle="messages.KotlinBundle"
+            nameKey="hints.settings.types"
+            descriptionKey="inlay.kotlin.references.types.hints">
+      <option bundle="messages.KotlinBundle"
+              optionId="hints.type.property"
+              enabledByDefault="false"
+              nameKey="hints.settings.types.property"
+              descriptionKey="inlay.kotlin.references.types.hints.hints.type.property"/>
+      <option bundle="messages.KotlinBundle"
+              optionId="hints.type.variable"
+              enabledByDefault="false"
+              nameKey="hints.settings.types.variable"
+              descriptionKey="inlay.kotlin.references.types.hints.hints.type.variable"/>
+      <option bundle="messages.KotlinBundle"
+              optionId="hints.type.function.return"
+              enabledByDefault="false"
+              nameKey="hints.settings.types.return"
+              descriptionKey="inlay.kotlin.references.types.hints.hints.type.function.return"/>
+      <option bundle="messages.KotlinBundle"
+              optionId="hints.type.function.parameter"
+              enabledByDefault="false"
+              nameKey="hints.settings.types.parameter"
+              descriptionKey="inlay.kotlin.references.types.hints.hints.type.function.parameter"/>
+    </codeInsight.declarativeInlayProvider>
+
+    <codeInsight.declarativeInlayProvider
+            language="kotlin"
+            implementationClass="org.jetbrains.kotlin.idea.codeInsight.hints.KtLambdasHintsProvider"
+            isEnabledByDefault="false"
+            group="LAMBDAS_GROUP"
+            providerId="kotlin.lambdas.hints"
+            bundle="messages.KotlinBundle"
+            nameKey="hints.settings.lambdas"
+            descriptionKey="inlay.kotlin.lambdas.hints">
+      <option bundle="messages.KotlinBundle"
+              optionId="hints.lambda.return"
+              enabledByDefault="true"
+              nameKey="hints.settings.lambda.return"
+              descriptionKey="inlay.kotlin.lambdas.hints.hints.lambda.return"/>
+      <option bundle="messages.KotlinBundle"
+              optionId="hints.lambda.receivers.parameters"
+              enabledByDefault="true"
+              nameKey="hints.settings.lambda.receivers.parameters"
+              descriptionKey="inlay.kotlin.lambdas.hints.hints.lambda.receivers.parameters"/>
+    </codeInsight.declarativeInlayProvider>
+
+    <codeInsight.declarativeInlayProvider
+            language="kotlin"
+            implementationClass="org.jetbrains.kotlin.idea.codeInsight.hints.KtValuesHintsProvider"
+            isEnabledByDefault="true"
+            group="VALUES_GROUP"
+            providerId="kotlin.values.hints"
+            bundle="messages.KotlinBundle"
+            nameKey="hints.settings.values.ranges"
+            descriptionKey="inlay.kotlin.values.hints"/>
+  </extensions>
 
   <extensionPoints>
     <extensionPoint qualifiedName="org.jetbrains.kotlin.resolveScopeEnlarger"
@@ -134,6 +224,7 @@
 
   <extensions defaultExtensionNs="com.intellij">
     <library.type implementation="org.jetbrains.kotlin.idea.base.platforms.library.JSLibraryType"/>
+    <library.type implementation="org.jetbrains.kotlin.idea.base.platforms.library.WasmLibraryType"/>
 
     <projectService serviceInterface="org.jetbrains.kotlin.resolve.jvm.modules.JavaModuleResolver"
                     serviceImplementation="org.jetbrains.kotlin.idea.modules.IdeJavaModuleResolver"/>
@@ -167,9 +258,6 @@
     <targetElementEvaluator language="kotlin"
                             implementationClass="org.jetbrains.kotlin.idea.search.ideaExtensions.FirKotlinTargetElementEvaluator"/>
     <targetElementUtilExtender implementation="org.jetbrains.kotlin.idea.search.ideaExtensions.FirKotlinTargetElementEvaluator"/>
-
-    <lang.elementManipulator forClass="org.jetbrains.kotlin.psi.KtStringTemplateExpression"
-                             implementationClass="org.jetbrains.kotlin.psi.psiUtil.KtStringTemplateExpressionManipulator"/>
 
     <projectService serviceInterface="org.jetbrains.kotlin.idea.references.ReadWriteAccessChecker"
                     serviceImplementation="org.jetbrains.kotlin.idea.references.ReadWriteAccessCheckerDescriptorsFirImpl"/>
@@ -236,15 +324,17 @@
     <module name="kotlin.project-wizard.maven"/>
     <module name="kotlin.project-wizard.compose"/>
 
-    <module name="kotlin.code-insight.intentions-shared"/>
-    <module name="kotlin.code-insight.inspections-shared"/>
-    <module name="kotlin.code-insight.live-templates-shared"/>
-    <module name="kotlin.code-insight.intentions-k2"/>
-    <module name="kotlin.code-insight.inspections-k2"/>
+    <module name="kotlin.jvm-decompiler"/>
+
+    <module name="kotlin.code-insight.intentions.shared"/>
+    <module name="kotlin.code-insight.inspections.shared"/>
+    <module name="kotlin.code-insight.live-templates.shared"/>
+    <module name="kotlin.code-insight.intentions.k2"/>
+    <module name="kotlin.code-insight.inspections.k2"/>
     <module name="kotlin.code-insight.k2"/>
-    <module name="kotlin.code-insight.live-templates-k2"/>
-    <module name="kotlin.code-insight.postfix-templates-k2"/>
-    <module name="kotlin.code-insight.structural-search-k2"/>
+    <module name="kotlin.code-insight.live-templates.k2"/>
+    <module name="kotlin.code-insight.postfix-templates.k2"/>
+    <module name="kotlin.code-insight.structural-search.k2"/>
 
     <module name="kotlin.searching.k2"/>
     <module name="kotlin.refactorings.k2"/>
@@ -253,13 +343,13 @@
     <module name="kotlin.refactorings.introduce.k2"/>
 
     <module name="kotlin.navigation"/>
-    <module name="kotlin.code-insight.line-markers-k2"/>
+    <module name="kotlin.code-insight.line-markers.k2"/>
 
     <module name="kotlin.highlighting.k2"/>
 
     <module name="kotlin.compiler-reference-index"/>
 
-    <module name="kotlin.compiler-plugins.assignment.common-k2"/>
+    <module name="kotlin.compiler-plugins.assignment.common.k2"/>
     <module name="kotlin.compiler-plugins.scripting"/>
     <module name="kotlin.compiler-plugins.compiler-plugin-support.maven"/>
     <module name="kotlin.compiler-plugins.allopen.maven"/>
@@ -269,7 +359,7 @@
     <module name="kotlin.compiler-plugins.lombok.maven"/>
     <module name="kotlin.compiler-plugins.assignment.maven"/>
 
-    <module name="kotlin.injection-k2"/>
+    <module name="kotlin.injection.k2"/>
     <module name="kotlin.base.injection"/>
   </content>
 </idea-plugin>

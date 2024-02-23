@@ -1,4 +1,4 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 
 package org.jetbrains.kotlin.idea.refactoring.move;
 
@@ -331,6 +331,11 @@ public class MoveTestGenerated extends AbstractMoveTest {
     @TestMetadata("kotlin/moveFile/typeRefWithArguments/typeRefWithArguments.test")
     public void testKotlin_moveFile_typeRefWithArguments_TypeRefWithArguments() throws Exception {
         runTest("testData/refactoring/move/kotlin/moveFile/typeRefWithArguments/typeRefWithArguments.test");
+    }
+
+    @TestMetadata("kotlin/moveFile/withoutUsages/withoutUsages.test")
+    public void testKotlin_moveFile_withoutUsages_WithoutUsages() throws Exception {
+        runTest("testData/refactoring/move/kotlin/moveFile/withoutUsages/withoutUsages.test");
     }
 
     @TestMetadata("kotlin/moveMethod/moveToClass/companionHasReference/companionHasReference.test")
@@ -831,6 +836,11 @@ public class MoveTestGenerated extends AbstractMoveTest {
     @TestMetadata("kotlin/moveTopLevelDeclarations/objectAlreadyInaccessible/objectAlreadyInaccessible.test")
     public void testKotlin_moveTopLevelDeclarations_objectAlreadyInaccessible_ObjectAlreadyInaccessible() throws Exception {
         runTest("testData/refactoring/move/kotlin/moveTopLevelDeclarations/objectAlreadyInaccessible/objectAlreadyInaccessible.test");
+    }
+
+    @TestMetadata("kotlin/moveTopLevelDeclarations/operationReference/operationReference.test")
+    public void testKotlin_moveTopLevelDeclarations_operationReference_OperationReference() throws Exception {
+        runTest("testData/refactoring/move/kotlin/moveTopLevelDeclarations/operationReference/operationReference.test");
     }
 
     @TestMetadata("kotlin/moveTopLevelDeclarations/propertyAlreadyInaccessible/propertyAlreadyInaccessible.test")

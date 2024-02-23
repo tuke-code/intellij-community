@@ -13,6 +13,7 @@ import com.intellij.testFramework.UsefulTestCase
 import com.intellij.testFramework.assertEqualsToFile
 import org.jetbrains.kotlin.diagnostics.Severity
 import org.jetbrains.kotlin.diagnostics.rendering.DefaultErrorMessages
+import org.jetbrains.kotlin.idea.base.test.InTextDirectivesUtils
 import org.jetbrains.kotlin.idea.caches.resolve.analyzeWithContent
 import org.jetbrains.kotlin.idea.codeinsight.api.classic.inspections.AbstractKotlinInspection
 import org.jetbrains.kotlin.psi.KtFile
@@ -22,10 +23,17 @@ import kotlin.test.assertTrue
 
 
 object DirectiveBasedActionUtils {
-    const val DISABLE_ERRORS_DIRECTIVE = "// DISABLE-ERRORS"
-    const val DISABLE_WARNINGS_DIRECTIVE = "// DISABLE-WARNINGS"
-    const val ENABLE_WARNINGS_DIRECTIVE = "// ENABLE-WARNINGS"
-    const val ACTION_DIRECTIVE = "// ACTION:"
+    const val DISABLE_ERRORS_DIRECTIVE: String = "// DISABLE-ERRORS"
+    const val DISABLE_WARNINGS_DIRECTIVE: String = "// DISABLE-WARNINGS"
+    const val ENABLE_WARNINGS_DIRECTIVE: String = "// ENABLE-WARNINGS"
+
+    /**
+     * If present in the test data file, checks that
+     * - the corresponding quickfix is available at the <caret>,         t
+     * - all other quickfixes with names not mentioned in "//ACTION" are not available.
+     * When no "// ACTION" directives are present in the file, quickfixes are not checked.
+     */
+    const val ACTION_DIRECTIVE: String = "// ACTION:"
 
     fun checkForUnexpectedErrors(file: KtFile, diagnosticsProvider: (KtFile) -> Diagnostics = { it.analyzeWithContent().diagnostics }) {
         if (InTextDirectivesUtils.findLinesWithPrefixesRemoved(file.text, DISABLE_ERRORS_DIRECTIVE).isNotEmpty()) {
@@ -175,6 +183,7 @@ object DirectiveBasedActionUtils {
         assertion: (expectedDirectives: List<String>, actualActionsDirectives: List<String>) -> Unit,
     ) {
         val expectedActions = InTextDirectivesUtils.findLinesWithPrefixesRemoved(fileText, ACTION_DIRECTIVE).sorted()
+        if (expectedActions.isEmpty()) return // do not check for available fixes if there are no //ACTION
 
         UsefulTestCase.assertEmpty(
             "Irrelevant actions should not be specified in $ACTION_DIRECTIVE directive for they are not checked anyway",

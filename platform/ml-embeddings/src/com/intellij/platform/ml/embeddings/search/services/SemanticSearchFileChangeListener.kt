@@ -6,11 +6,9 @@ import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.intellij.openapi.components.serviceAsync
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.project.waitForSmartMode
 import com.intellij.openapi.vfs.AsyncFileListener
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.newvfs.events.VFileEvent
-import com.intellij.platform.ml.embeddings.search.settings.SemanticSearchSettings
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.channels.BufferOverflow
@@ -30,7 +28,6 @@ class SemanticSearchFileChangeListener(private val project: Project, cs: Corouti
 
   init {
     cs.launch {
-      project.waitForSmartMode()
       reindexRequest.debounce(1000.milliseconds).collectLatest {
         processFiles(reindexQueue.getAndSet(ConcurrentCollectionFactory.createConcurrentSet()))
       }
@@ -41,7 +38,7 @@ class SemanticSearchFileChangeListener(private val project: Project, cs: Corouti
   fun clearEvents() = reindexQueue.get().clear()
 
   override fun prepareChange(events: MutableList<out VFileEvent>): AsyncFileListener.ChangeApplier? {
-    if (!SemanticSearchSettings.getInstance().isEnabledFileRelated()) return null
+    if (!EmbeddingIndexSettingsImpl.getInstance(project).shouldIndexAnything) return null
     events.forEach { it.file?.let { file -> reindexQueue.get().add(file) } }
     return object : AsyncFileListener.ChangeApplier {
       override fun afterVfsChange() {
@@ -51,16 +48,7 @@ class SemanticSearchFileChangeListener(private val project: Project, cs: Corouti
   }
 
   private suspend fun processFiles(queue: Set<VirtualFile>) {
-    val semanticSearchSettings = SemanticSearchSettings.getInstance()
-    if (semanticSearchSettings.enabledInClassesTab) {
-      project.serviceAsync<ClassEmbeddingsStorage>().generateEmbeddingsIfNecessary(queue)
-    }
-    if (semanticSearchSettings.enabledInFilesTab) {
-      project.serviceAsync<FileEmbeddingsStorage>().generateEmbeddingsIfNecessary(queue)
-    }
-    if (semanticSearchSettings.enabledInSymbolsTab) {
-      project.serviceAsync<SymbolEmbeddingStorage>().generateEmbeddingsIfNecessary(queue)
-    }
+    project.serviceAsync<FileBasedEmbeddingStoragesManager>().indexFiles(queue.toList())
   }
 
   companion object {

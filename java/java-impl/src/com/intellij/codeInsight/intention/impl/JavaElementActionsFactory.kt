@@ -1,8 +1,7 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.codeInsight.intention.impl
 
 import com.intellij.codeInsight.daemon.QuickFixBundle
-import com.intellij.codeInsight.daemon.impl.analysis.HighlightingFeature
 import com.intellij.codeInsight.daemon.impl.quickfix.ModifierFix
 import com.intellij.codeInsight.intention.AddAnnotationPsiFix
 import com.intellij.codeInsight.intention.FileModifier
@@ -18,9 +17,11 @@ import com.intellij.modcommand.ModPsiUpdater
 import com.intellij.modcommand.Presentation
 import com.intellij.modcommand.PsiUpdateModCommandAction
 import com.intellij.openapi.util.text.StringUtilRt
+import com.intellij.pom.java.JavaFeature
 import com.intellij.psi.*
 import com.intellij.psi.codeStyle.JavaCodeStyleManager
 import com.intellij.psi.impl.light.LightRecordMember
+import com.intellij.psi.util.PsiUtil
 import com.intellij.util.ThreeState
 import com.intellij.util.asSafely
 import org.jetbrains.uast.UDeclaration
@@ -113,8 +114,8 @@ class JavaElementActionsFactory : JvmElementActionsFactory() {
   override fun createAddFieldActions(targetClass: JvmClass, request: CreateFieldRequest): List<IntentionAction> {
     val javaClass = targetClass.toJavaClassOrNull() ?: return emptyList()
 
-    val constantRequested = request.isConstant || javaClass.isInterface || request.modifiers.containsAll(constantModifiers)
-    if (javaClass.isRecord) request.modifiers += JvmModifier.STATIC
+    val constantRequested = request.isConstant || javaClass.isInterface || javaClass.isRecord ||
+                            request.modifiers.containsAll(constantModifiers)
     val result = ArrayList<IntentionAction>()
     if (canCreateEnumConstant(javaClass)) {
       result += CreateEnumConstantAction(javaClass, request)
@@ -136,11 +137,11 @@ class JavaElementActionsFactory : JvmElementActionsFactory() {
 
     if (staticMethodRequested) {
       // static methods in interfaces are allowed starting with Java 8
-      if (javaClass.isInterface && !HighlightingFeature.STATIC_INTERFACE_CALLS.isAvailable(javaClass)) return emptyList()
+      if (javaClass.isInterface && !PsiUtil.isAvailable(JavaFeature.STATIC_INTERFACE_CALLS, javaClass)) return emptyList()
       // static methods in inner classes are disallowed before Java 16: see JLS 8.1.3
       if (javaClass.containingClass != null &&
           !javaClass.hasModifierProperty(PsiModifier.STATIC) &&
-          !HighlightingFeature.INNER_STATICS.isAvailable(javaClass)) return emptyList()
+          !PsiUtil.isAvailable(JavaFeature.INNER_STATICS, javaClass)) return emptyList()
     }
 
     val result = ArrayList<IntentionAction>()

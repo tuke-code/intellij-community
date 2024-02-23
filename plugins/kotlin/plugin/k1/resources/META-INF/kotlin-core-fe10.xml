@@ -2,10 +2,6 @@
 
   <extensionPoints>
     <extensionPoint
-            qualifiedName="org.jetbrains.kotlin.j2kConverterExtension"
-            interface="org.jetbrains.kotlin.j2k.J2kConverterExtension"
-            dynamic="true"/>
-    <extensionPoint
             qualifiedName="org.jetbrains.kotlin.kotlinIndicesHelperExtension"
             interface="org.jetbrains.kotlin.idea.core.extension.KotlinIndicesHelperExtension"
             area="IDEA_PROJECT"
@@ -13,6 +9,14 @@
     <extensionPoint
             qualifiedName="org.jetbrains.kotlin.quickFixContributor"
             interface="org.jetbrains.kotlin.idea.quickfix.QuickFixContributor"
+            dynamic="true"/>
+    <extensionPoint
+            qualifiedName="org.jetbrains.kotlin.idea.caches.resolve.resolveOptimizingOptionsProvider"
+            interface="org.jetbrains.kotlin.idea.caches.resolve.ResolveOptimizingOptionsProvider"
+            dynamic="true"/>
+    <extensionPoint
+            qualifiedName="org.jetbrains.kotlin.classImportFilter"
+            interface="org.jetbrains.kotlin.idea.util.ClassImportFilter"
             dynamic="true"/>
   </extensionPoints>
 
@@ -158,7 +162,7 @@
 <!--    <codeInsight.inlayProvider language="kotlin"-->
 <!--                               implementationClass="org.jetbrains.kotlin.idea.codeInsight.codevision.KotlinCodeVisionProvider"/>-->
 
-    <codeInsight.inlayActionHandler implementationClass="org.jetbrains.kotlin.idea.codeInsight.hints.declarative.KotlinFqnDeclarativeInlayActionHandler"
+    <codeInsight.inlayActionHandler implementationClass="org.jetbrains.kotlin.idea.codeInsight.hints.KotlinFqnDeclarativeInlayActionHandler"
                                     handlerId="kotlin.fqn.class"/>
 
     <codeInsight.declarativeInlayProvider
@@ -242,8 +246,6 @@
   <!-- Go to declaration -->
   <extensions defaultExtensionNs="com.intellij">
 
-    <gotoRelatedProvider implementation="org.jetbrains.kotlin.idea.goto.KotlinExpectOrActualGotoRelatedProvider"/>
-
     <codeInsight.gotoSuper language="kotlin" implementationClass="org.jetbrains.kotlin.idea.codeInsight.GotoSuperActionHandler"/>
 
     <gotoTargetRendererProvider
@@ -257,18 +259,17 @@
     <copyPastePostProcessor implementation="org.jetbrains.kotlin.idea.conversion.copy.ConvertJavaCopyPasteProcessor"/>
     <copyPastePostProcessor implementation="org.jetbrains.kotlin.idea.conversion.copy.ConvertTextJavaCopyPasteProcessor"/>
     <copyPastePostProcessor implementation="org.jetbrains.kotlin.idea.codeInsight.KotlinCopyPasteReferenceProcessor"/>
-    <copyPastePreProcessor implementation="org.jetbrains.kotlin.idea.editor.KotlinLiteralCopyPasteProcessor"/>
     <copyPastePostProcessor implementation="org.jetbrains.kotlin.idea.refactoring.cutPaste.MoveDeclarationsCopyPasteProcessor"/>
 
     <filePasteProvider implementation="org.jetbrains.kotlin.idea.conversion.copy.KotlinFilePasteProvider" order="first"/>
-    
+
     <elementDescriptionProvider order="first" implementation="org.jetbrains.kotlin.idea.findUsages.KotlinElementDescriptionProvider"/>
   </extensions>
 
   <extensions defaultExtensionNs="org.jetbrains.kotlin">
     <quickFixContributor implementation="org.jetbrains.kotlin.idea.quickfix.QuickFixRegistrar"/>
 
-    <j2kConverterExtension implementation="org.jetbrains.kotlin.idea.j2k.OldJ2kConverterExtension"/>
+    <j2kConverterExtension implementation="org.jetbrains.kotlin.j2k.OldJ2kConverterExtension"/>
   </extensions>
 
   <!-- Navigation -->
@@ -294,6 +295,9 @@
     <projectService serviceInterface="org.jetbrains.kotlin.idea.search.KotlinSearchUsagesSupport"
                     serviceImplementation="org.jetbrains.kotlin.idea.search.KotlinSearchUsagesSupportImpl"/>
 
+    <projectService serviceInterface="org.jetbrains.kotlin.idea.search.ExpectActualSupport"
+                    serviceImplementation="org.jetbrains.kotlin.idea.search.KotlinExpectActualSupportImpl"/>
+
     <projectService serviceInterface="org.jetbrains.kotlin.idea.references.ReadWriteAccessChecker"
                     serviceImplementation="org.jetbrains.kotlin.idea.references.ReadWriteAccessCheckerDescriptorsImpl"/>
 
@@ -311,6 +315,18 @@
     <applicationService
             serviceInterface="org.jetbrains.kotlin.analysis.decompiled.light.classes.origin.KotlinDeclarationInCompiledFileSearcher"
             serviceImplementation="org.jetbrains.kotlin.analysis.decompiled.light.classes.fe10.KotlinDeclarationInCompiledFileSearcherFE10Impl"/>
+  </extensions>
+
+  <!-- dataflow -->
+  <extensions defaultExtensionNs="com.intellij">
+    <dataflowIRProvider language="kotlin" implementationClass="org.jetbrains.kotlin.idea.inspections.dfa.KotlinDataFlowIRProvider"/>
+  </extensions>
+
+  <!-- slicer -->
+  <extensions defaultExtensionNs="com.intellij">
+    <lang.sliceProvider language="kotlin" implementationClass="org.jetbrains.kotlin.idea.slicer.KotlinSliceProvider"/>
+    <usageContextPanelProvider implementation="org.jetbrains.kotlin.idea.slicer.KotlinUsageContextDataInflowPanel$Provider"/>
+    <usageContextPanelProvider implementation="org.jetbrains.kotlin.idea.slicer.KotlinUsageContextDataOutflowPanel$Provider"/>
   </extensions>
 
 </idea-plugin>

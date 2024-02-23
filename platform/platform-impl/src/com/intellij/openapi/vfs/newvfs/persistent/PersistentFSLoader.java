@@ -1,13 +1,15 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.openapi.vfs.newvfs.persistent;
 
 import com.intellij.ide.actions.cache.RecoverVfsFromLogService;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.util.NotNullLazyValue;
 import com.intellij.openapi.util.io.FileUtil;
-import com.intellij.openapi.vfs.newvfs.persistent.dev.ContentHashEnumeratorOverDurableEnumerator;
-import com.intellij.openapi.vfs.newvfs.persistent.dev.ContentStorageAdapter;
-import com.intellij.openapi.vfs.newvfs.persistent.dev.VFSContentStorageOverMMappedFile;
+import com.intellij.openapi.util.io.FileUtilRt;
+import com.intellij.openapi.vfs.newvfs.persistent.dev.content.CompressingAlgo;
+import com.intellij.openapi.vfs.newvfs.persistent.dev.content.ContentHashEnumeratorOverDurableEnumerator;
+import com.intellij.openapi.vfs.newvfs.persistent.dev.content.ContentStorageAdapter;
+import com.intellij.openapi.vfs.newvfs.persistent.dev.content.VFSContentStorageOverMMappedFile;
 import com.intellij.openapi.vfs.newvfs.persistent.dev.blobstorage.StreamlinedBlobStorageHelper;
 import com.intellij.openapi.vfs.newvfs.persistent.dev.blobstorage.StreamlinedBlobStorageOverLockFreePagedStorage;
 import com.intellij.openapi.vfs.newvfs.persistent.dev.blobstorage.StreamlinedBlobStorageOverMMappedFile;
@@ -425,7 +427,7 @@ public final class PersistentFSLoader {
     }
 
     if (attributesEnumerator.isEmpty() && !attributesStorage.isEmpty()) {
-      addProblem(UNRECOGNIZED, "Attributes enumerator is empty, while attributesStorage is !empty");
+      addProblem(ATTRIBUTES_STORAGE_CORRUPTED, "Attributes enumerator is empty, while attributesStorage is !empty");
     }
 
     int maxAllocatedID = recordsStorage.maxAllocatedID();
@@ -700,8 +702,23 @@ public final class PersistentFSLoader {
   private static @NotNull VFSContentStorage createContentStorage_makeStorage(@NotNull Path contentsHashesFile,
                                                                              @NotNull Path contentsFile) throws IOException {
     if (FSRecordsImpl.USE_CONTENT_STORAGE_OVER_MMAPPED_FILE) {
-      LOG.info("VFS uses content storage over memory-mapped file (compress if > " + FSRecordsImpl.COMPRESS_CONTENT_IF_LARGER_THAN + "b)");
-      return new VFSContentStorageOverMMappedFile(contentsFile, FSRecordsImpl.COMPRESS_CONTENT_IF_LARGER_THAN);
+      //Use larger pages: content storage is usually quite big.
+      int pageSize = 64 * IOUtil.MiB;
+
+      if (pageSize <= FileUtilRt.LARGE_FOR_CONTENT_LOADING) {
+        //pageSize is an upper limit on record size for AppendOnlyLogOverMMappedFile:
+        LOG.warn("ContentStorage.pageSize(=" + pageSize + ") " +
+                 "must be > FileUtilRt.LARGE_FOR_CONTENT_LOADING(=" + FileUtilRt.LARGE_FOR_CONTENT_LOADING + "b), " +
+                 "otherwise large content can't fit");
+      }
+      CompressingAlgo compressionAlgo = switch (FSRecordsImpl.COMPRESSION_ALGO) {
+        case "zip" -> new CompressingAlgo.ZipAlgo(FSRecordsImpl.COMPRESS_CONTENT_IF_LARGER_THAN);
+        case "lz4" -> new CompressingAlgo.Lz4Algo(FSRecordsImpl.COMPRESS_CONTENT_IF_LARGER_THAN);
+        //"none"
+        default -> new CompressingAlgo.NoCompressionAlgo();
+      };
+      LOG.info("VFS uses content storage over memory-mapped file, with compression algo: " + compressionAlgo);
+      return new VFSContentStorageOverMMappedFile(contentsFile, pageSize, compressionAlgo);
     }
 
     RefCountingContentStorage contentStorage;
@@ -882,10 +899,21 @@ public final class PersistentFSLoader {
   public void problemsWereRecovered(@NotNull List<VFSInitException> recovered) {
     problemsDuringLoad.removeAll(recovered);
     problemsRecovered.addAll(recovered);
+
+    String recoveredProblemsList = recovered.stream()
+      .map(VFSInitException::category)
+      .map(Object::toString)
+      .collect(joining());
+    String remainingProblemsList = problemsDuringLoad.isEmpty() ?
+                                   "no problems" :
+                                   problemsDuringLoad.stream()
+                                     .map(VFSInitException::category)
+                                     .map(Object::toString)
+                                     .collect(joining());
+
     LOG.warn("[VFS load problem]: " +
-             recovered.stream().map(VFSInitException::category).map(Object::toString).collect(joining()) + " recovered, " +
-             problemsDuringLoad.stream() + " remain"
-    );
+             recoveredProblemsList + " recovered, " +
+             remainingProblemsList + " remain");
   }
 
   public void problemsRecoveryFailed(@NotNull List<VFSInitException> triedToRecover,

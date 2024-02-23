@@ -1,14 +1,13 @@
-// Copyright 2000-2020 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
+// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.platform.workspace.storage
 
-import com.intellij.platform.workspace.storage.impl.EntityStorageSnapshotImpl
+import com.intellij.platform.workspace.storage.impl.ImmutableEntityStorageImpl
 import com.intellij.platform.workspace.storage.query.StorageQuery
 import com.intellij.platform.workspace.storage.url.VirtualFileUrlIndex
 import org.jetbrains.annotations.ApiStatus
-import org.jetbrains.annotations.NonNls
 
 /**
- * A base interface for immutable [EntityStorageSnapshot] and [MutableEntityStorage].
+ * A base interface for immutable [ImmutableEntityStorage] and [MutableEntityStorage].
  */
 public interface EntityStorage {
   /**
@@ -38,7 +37,7 @@ public interface EntityStorage {
   /**
    * Returns a mapping with the given [identifier] which associates entities from this storage with values of type [T]. 
    */
-  public fun <T> getExternalMapping(identifier: @NonNls String): ExternalEntityMapping<T>
+  public fun <T> getExternalMapping(identifier: ExternalMappingKey<T>): ExternalEntityMapping<T>
 
   /**
    * Returns an index which allows to quickly find entities which refer to a particular [VirtualFileUrl][com.intellij.platform.workspace.storage.url.VirtualFileUrl]
@@ -47,10 +46,17 @@ public interface EntityStorage {
   public fun getVirtualFileUrlIndex(): VirtualFileUrlIndex
 
   /**
-   * Returns a map containing all entities from this storage which [entitySource][WorkspaceEntity.entitySource] property satisfies the
+   * Returns a sequence containing all entities from this storage which [entitySource][WorkspaceEntity.entitySource] property satisfies the
    * given [sourceFilter]. 
    */
-  public fun entitiesBySource(sourceFilter: (EntitySource) -> Boolean): Map<EntitySource, Map<Class<out WorkspaceEntity>, List<WorkspaceEntity>>>
+  public fun entitiesBySource(sourceFilter: (EntitySource) -> Boolean): Sequence<WorkspaceEntity>
+}
+
+/**
+ * Kotlin shortcut for `EntityStorage.entities(E::class.java)`.
+ */
+public inline fun <reified E: WorkspaceEntity> EntityStorage.entities(): Sequence<E> {
+  return this.entities(E::class.java)
 }
 
 /**
@@ -59,7 +65,7 @@ public interface EntityStorage {
  * 
  * Use [com.intellij.platform.backend.workspace.WorkspaceModel.currentSnapshot] to get an instance representing entities inside the IDE process. 
  */
-public interface EntityStorageSnapshot : EntityStorage {
+public interface ImmutableEntityStorage : EntityStorage {
   /**
    * This function is under development, please don't use it.
    */
@@ -67,14 +73,14 @@ public interface EntityStorageSnapshot : EntityStorage {
   public fun <T> cached(query: StorageQuery<T>): T
 
   public companion object {
-    public fun empty(): EntityStorageSnapshot = EntityStorageSnapshotImpl.EMPTY
+    public fun empty(): ImmutableEntityStorage = ImmutableEntityStorageImpl.EMPTY
   }
 }
 
 /**
  * Creates a mutable copy of `this` storage.
  */
-public fun EntityStorageSnapshot.toBuilder(): MutableEntityStorage {
+public fun ImmutableEntityStorage.toBuilder(): MutableEntityStorage {
   return MutableEntityStorage.from(this)
 }
 
@@ -84,9 +90,9 @@ public fun EntityStorageSnapshot.toBuilder(): MutableEntityStorage {
  * This function is obsolete, use [MutableEntityStorage.toSnapshot].
  */
 @ApiStatus.Obsolete
-public fun EntityStorage.toSnapshot(): EntityStorageSnapshot {
+public fun EntityStorage.toSnapshot(): ImmutableEntityStorage {
   return when (this) {
-    is EntityStorageSnapshot -> this
+    is ImmutableEntityStorage -> this
     is MutableEntityStorage -> this.toSnapshot()
     else -> error("Unexpected storage: $this")
   }

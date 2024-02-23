@@ -612,9 +612,7 @@ class MavenProjectsTreeReadingTest : MavenProjectsTreeTestCase() {
       resolve(project,
               mavenProject,
               mavenGeneralSettings,
-              embeddersManager,
-              mavenProgressIndicator
-      )
+              embeddersManager)
     }
     finally {
       embeddersManager.releaseInTests()
@@ -1500,7 +1498,7 @@ class MavenProjectsTreeReadingTest : MavenProjectsTreeTestCase() {
     tree.updateAll(false, mavenGeneralSettings, rawProgressReporter)
     assertEquals(log().add("updated", "parent", "m1", "m2").add("deleted"), l.log)
     l.log.clear()
-    tree.removeManagedFiles(Arrays.asList(projectPom))
+    tree.removeManagedFiles(listOf(projectPom))
     tree.updateAll(false, mavenGeneralSettings, rawProgressReporter)
     assertEquals(log().add("updated").add("deleted", "m1", "m2", "parent"), l.log)
   }
@@ -1816,8 +1814,7 @@ class MavenProjectsTreeReadingTest : MavenProjectsTreeTestCase() {
       resolve(project,
               parentProject!!,
               mavenGeneralSettings,
-              embeddersManager,
-              mavenProgressIndicator)
+              embeddersManager)
     }
     finally {
       embeddersManager.releaseInTests()
@@ -1895,9 +1892,7 @@ class MavenProjectsTreeReadingTest : MavenProjectsTreeTestCase() {
       resolve(project,
               tree.rootProjects[0],
               mavenGeneralSettings,
-              embeddersManager,
-              mavenProgressIndicator
-      )
+              embeddersManager)
     }
     finally {
       embeddersManager.releaseInTests()
@@ -2001,9 +1996,7 @@ class MavenProjectsTreeReadingTest : MavenProjectsTreeTestCase() {
       resolve(project,
               mavenProject,
               mavenGeneralSettings,
-              embeddersManager,
-              mavenProgressIndicator
-      )
+              embeddersManager)
     }
     finally {
       embeddersManager.releaseInTests()
@@ -2191,8 +2184,7 @@ class MavenProjectsTreeReadingTest : MavenProjectsTreeTestCase() {
       resolve(project,
               mavenProject,
               mavenGeneralSettings,
-              embeddersManager,
-              mavenProgressIndicator)
+              embeddersManager)
     }
     finally {
       embeddersManager.releaseInTests()

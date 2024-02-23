@@ -16,7 +16,7 @@ import com.intellij.openapi.roots.libraries.Library;
 import com.intellij.openapi.vfs.VfsUtil;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.platform.backend.workspace.WorkspaceModel;
-import com.intellij.platform.workspace.storage.EntityStorageSnapshot;
+import com.intellij.platform.workspace.storage.ImmutableEntityStorage;
 import com.intellij.platform.workspace.storage.WorkspaceEntity;
 import com.intellij.psi.PsiDirectory;
 import com.intellij.psi.PsiManager;
@@ -33,6 +33,11 @@ public class ExternalLibrariesNode extends ProjectViewNode<String> {
 
   public ExternalLibrariesNode(@NotNull Project project, ViewSettings viewSettings) {
     super(project, "External Libraries", viewSettings);
+  }
+
+  @Override
+  public boolean isIncludedInExpandAll() {
+    return false;
   }
 
   @Override
@@ -101,7 +106,7 @@ public class ExternalLibrariesNode extends ProjectViewNode<String> {
     List<ExternalLibrariesWorkspaceModelNodesProvider<?>> extensionList =
       ExternalLibrariesWorkspaceModelNodesProvider.EP.getExtensionList();
     if (!extensionList.isEmpty()) {
-      EntityStorageSnapshot current = WorkspaceModel.getInstance(project).getCurrentSnapshot();
+      ImmutableEntityStorage current = WorkspaceModel.getInstance(project).getCurrentSnapshot();
       for (ExternalLibrariesWorkspaceModelNodesProvider<?> provider : extensionList) {
         handleProvider(provider, project, current, children);
       }
@@ -111,7 +116,7 @@ public class ExternalLibrariesNode extends ProjectViewNode<String> {
 
   private <T extends WorkspaceEntity> void handleProvider(ExternalLibrariesWorkspaceModelNodesProvider<T> provider,
                                                           @NotNull Project project,
-                                                          EntityStorageSnapshot storage,
+                                                          ImmutableEntityStorage storage,
                                                           List<? super AbstractTreeNode<?>> children) {
     Sequence<T> sequence = storage.entities(provider.getWorkspaceClass());
     for (T entity : SequencesKt.asIterable(sequence)) {

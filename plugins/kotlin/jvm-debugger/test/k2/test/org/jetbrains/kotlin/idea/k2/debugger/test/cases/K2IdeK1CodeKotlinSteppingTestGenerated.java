@@ -1,4 +1,4 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 
 package org.jetbrains.kotlin.idea.k2.debugger.test.cases;
 
@@ -1280,6 +1280,11 @@ public abstract class K2IdeK1CodeKotlinSteppingTestGenerated extends AbstractK2I
             runTest("../testData/stepping/custom/filterProperties.kt");
         }
 
+        @TestMetadata("filterPropertyAccessCallsFromInlineClass.kt")
+        public void testFilterPropertyAccessCallsFromInlineClass() throws Exception {
+            runTest("../testData/stepping/custom/filterPropertyAccessCallsFromInlineClass.kt");
+        }
+
         @TestMetadata("finallyBlock.kt")
         public void testFinallyBlock() throws Exception {
             runTest("../testData/stepping/custom/finallyBlock.kt");
@@ -1613,6 +1618,11 @@ public abstract class K2IdeK1CodeKotlinSteppingTestGenerated extends AbstractK2I
         @TestMetadata("smartStepIntoMethodReference.kt")
         public void testSmartStepIntoMethodReference() throws Exception {
             runTest("../testData/stepping/custom/smartStepIntoMethodReference.kt");
+        }
+
+        @TestMetadata("smartStepIntoMethodWithJvmNameAnnotation.kt")
+        public void testSmartStepIntoMethodWithJvmNameAnnotation() throws Exception {
+            runTest("../testData/stepping/custom/smartStepIntoMethodWithJvmNameAnnotation.kt");
         }
 
         @TestMetadata("smartStepIntoMultiplyInlinedLambdas.kt")

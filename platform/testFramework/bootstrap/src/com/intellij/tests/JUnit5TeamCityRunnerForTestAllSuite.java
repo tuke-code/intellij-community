@@ -1,4 +1,4 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.tests;
 
 import jetbrains.buildServer.messages.serviceMessages.MapSerializerUtil;
@@ -53,6 +53,7 @@ public final class JUnit5TeamCityRunnerForTestAllSuite {
       }
     }
     catch (Throwable x) {
+      //noinspection CallToPrintStackTrace
       x.printStackTrace();
     }
     finally {
@@ -106,6 +107,8 @@ public final class JUnit5TeamCityRunnerForTestAllSuite {
     private TestPlan myTestPlan;
     private long myCurrentTestStart = 0;
     private int myFinishCount = 0;
+    private static final int MAX_STACKTRACE_MESSAGE_LENGTH =
+      Integer.getInteger("intellij.build.test.stacktrace.max.length", 100 * 1024);
 
     public TCExecutionListener() {
       myPrintStream = System.out;
@@ -272,10 +275,10 @@ public final class JUnit5TeamCityRunnerForTestAllSuite {
           attrs.put("duration", Long.toString(duration));
         }
         if (reason != null) {
-          attrs.put("message", reason);
+          attrs.put("message", limit(reason));
         }
         if (ex != null) {
-          attrs.put("details", getTrace(ex));
+          attrs.put("details", getTrace(ex, MAX_STACKTRACE_MESSAGE_LENGTH));
         }
         if (ex != null) {
           if (ex instanceof MultipleFailuresError && ((MultipleFailuresError)ex).hasFailures()) {
@@ -286,8 +289,8 @@ public final class JUnit5TeamCityRunnerForTestAllSuite {
           else if (ex instanceof AssertionFailedError &&
                    ((AssertionFailedError)ex).isActualDefined() &&
                    ((AssertionFailedError)ex).isExpectedDefined()) {
-            attrs.put("expected", ((AssertionFailedError)ex).getExpected().getStringRepresentation());
-            attrs.put("actual", ((AssertionFailedError)ex).getActual().getStringRepresentation());
+            attrs.put("expected", limit(((AssertionFailedError)ex).getExpected().getStringRepresentation()));
+            attrs.put("actual", limit(((AssertionFailedError)ex).getActual().getStringRepresentation()));
             attrs.put("type", "comparisonFailure");
           }
           else {
@@ -297,8 +300,8 @@ public final class JUnit5TeamCityRunnerForTestAllSuite {
                 String expected = (String)aClass.getMethod("getExpected").invoke(ex);
                 String actual = (String)aClass.getMethod("getActual").invoke(ex);
 
-                attrs.put("expected", expected);
-                attrs.put("actual", actual);
+                attrs.put("expected", limit(expected));
+                attrs.put("actual", limit(actual));
                 attrs.put("type", "comparisonFailure");
               }
               catch (Throwable e) {
@@ -323,10 +326,19 @@ public final class JUnit5TeamCityRunnerForTestAllSuite {
       return isComparisonFailure(aClass.getSuperclass());
     }
 
-    protected String getTrace(Throwable ex) {
+    private static String limit(String string) {
+      if (string == null) return null;
+      if (string.length() > MAX_STACKTRACE_MESSAGE_LENGTH) {
+        return string.substring(0, MAX_STACKTRACE_MESSAGE_LENGTH);
+      }
+      return string;
+    }
+
+    protected static String getTrace(Throwable ex, int limit) {
       final StringWriter stringWriter = new StringWriter();
-      final PrintWriter writer = new PrintWriter(stringWriter);
+      final LimitedStackTracePrintWriter writer = new LimitedStackTracePrintWriter(stringWriter, limit);
       ex.printStackTrace(writer);
+      writer.close();
       return stringWriter.toString();
     }
 
@@ -354,6 +366,87 @@ public final class JUnit5TeamCityRunnerForTestAllSuite {
 
     private static String escapeName(String str) {
       return MapSerializerUtil.escapeStr(str, MapSerializerUtil.STD_ESCAPER2);
+    }
+
+    static class LimitedStackTracePrintWriter extends PrintWriter {
+      public static final String CAUSED_BY = "Caused by: ";
+      private final int headLimit;
+      private final int tailLimit;
+      private final List<String> tailLines = new ArrayList<>(0);
+      private boolean newLine = false;
+      private boolean inCausedBy = false;
+      private int headLength = 0;
+      private int tailLength = 0;
+
+      LimitedStackTracePrintWriter(StringWriter out, int limit) {
+        super(out);
+        // Leave 10% for final 'caused by'
+        tailLimit = limit / 10;
+        headLimit = limit - tailLimit;
+      }
+
+      @Override
+      public void print(String x) {
+        if (x == null) return;
+        int headLeft = headLimit - headLength;
+        if (headLeft > 0) {
+          // write while within head limit
+          if (x.length() >= headLeft) {
+            x = x.substring(0, headLeft - 1);
+          }
+          super.print(x);
+          headLength += x.length();
+          newLine = true;
+          return;
+        }
+        if (x.contains(CAUSED_BY)) {
+          tailLines.clear();
+          tailLength = 0;
+          inCausedBy = true;
+        }
+        if (inCausedBy) {
+          // add to last lines if they are within their tail limit
+          int tailLeft = tailLimit - tailLength;
+          if (tailLeft > 0) {
+            if (x.length() >= tailLeft) {
+              x = x.substring(0, tailLeft + 1);
+            }
+            tailLines.add(x);
+            tailLength += x.length() + 1;
+          }
+        }
+        else {
+          // just skip, it's not 'caused by' section (yet?)
+        }
+      }
+
+      @Override
+      public void println() {
+        if (newLine) {
+          newLine = false;
+          super.println();
+          headLength++;
+        }
+      }
+
+      private void finish() {
+        if (!tailLines.isEmpty()) {
+          super.print("...");
+          super.println();
+          for (String line : tailLines) {
+            super.print(line);
+            super.println();
+          }
+          tailLines.clear();
+        }
+        super.flush();
+      }
+
+      @Override
+      public void close() {
+        finish();
+        super.close();
+      }
     }
   }
 }

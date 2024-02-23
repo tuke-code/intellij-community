@@ -2,9 +2,11 @@
 package org.jetbrains.kotlin.idea.k2.codeinsight.quickFixes.createFromUsage
 
 import com.intellij.codeInsight.intention.IntentionAction
+import com.intellij.codeInsight.intention.impl.BaseIntentionAction
 import com.intellij.lang.jvm.JvmClass
 import com.intellij.lang.jvm.actions.CreateMethodRequest
 import com.intellij.lang.jvm.actions.JvmElementActionsFactory
+import com.intellij.psi.PsiElement
 import org.jetbrains.kotlin.asJava.classes.KtLightClassForFacade
 import org.jetbrains.kotlin.asJava.elements.KtLightElement
 import org.jetbrains.kotlin.idea.base.resources.KotlinBundle
@@ -29,7 +31,9 @@ class KotlinElementActionsFactory : JvmElementActionsFactory() {
     }
 
     override fun createAddMethodActions(targetClass: JvmClass, request: CreateMethodRequest): List<IntentionAction> {
+        if (targetClass is PsiElement && !BaseIntentionAction.canModify(targetClass)) return emptyList()
         var container = targetClass.toKtClassOrFile() ?: return emptyList()
+
         return when (request) {
             is CreateMethodFromKotlinUsageRequest -> {
                 val isExtension = request.isExtension

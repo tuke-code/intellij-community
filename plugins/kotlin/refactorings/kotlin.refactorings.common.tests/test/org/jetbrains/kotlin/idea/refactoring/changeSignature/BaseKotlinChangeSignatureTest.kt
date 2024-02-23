@@ -28,6 +28,7 @@ import org.jetbrains.kotlin.descriptors.Visibilities.Internal
 import org.jetbrains.kotlin.descriptors.Visibilities.Private
 import org.jetbrains.kotlin.descriptors.Visibilities.Protected
 import org.jetbrains.kotlin.descriptors.Visibilities.Public
+import org.jetbrains.kotlin.idea.base.test.InTextDirectivesUtils
 import org.jetbrains.kotlin.idea.base.util.allScope
 import org.jetbrains.kotlin.idea.stubindex.KotlinTopLevelFunctionFqnNameIndex
 import org.jetbrains.kotlin.idea.test.*
@@ -995,6 +996,12 @@ abstract class BaseKotlinChangeSignatureTest<C: KotlinModifiableChangeInfo<P>, P
         newParameters[1].name = "_x2"
 
         swapParameters(0, 2)
+    }
+
+    fun testSwapArgumentsToHaveNamed() = doTest {
+        val newParameters = newParameters
+        setNewParameter(1, newParameters[2])
+        setNewParameter(2, newParameters[1])
     }
 
     fun testNoDefaultValuesInOverrides() = doTest { swapParameters(0, 1) }

@@ -6,8 +6,9 @@ import com.google.common.collect.Lists;
 import com.intellij.application.options.CodeStyle;
 import com.intellij.codeHighlighting.HighlightDisplayLevel;
 import com.intellij.codeInsight.daemon.HighlightDisplayKey;
+import com.intellij.codeInsight.intention.CommonIntentionAction;
 import com.intellij.codeInsight.intention.IntentionAction;
-import com.intellij.codeInspection.InspectionProfile;
+import com.intellij.codeInspection.*;
 import com.intellij.codeInspection.ex.CustomEditInspectionToolsSettingsAction;
 import com.intellij.codeInspection.ex.InspectionProfileModifiableModelKt;
 import com.intellij.execution.configurations.GeneralCommandLine;
@@ -35,7 +36,7 @@ import com.intellij.util.IncorrectOperationException;
 import com.intellij.util.containers.ContainerUtil;
 import com.jetbrains.python.*;
 import com.jetbrains.python.codeInsight.imports.OptimizeImportsQuickFix;
-import com.jetbrains.python.documentation.docstrings.DocStringUtil;
+import com.jetbrains.python.documentation.docstrings.DocStringParser;
 import com.jetbrains.python.formatter.PyCodeStyleSettings;
 import com.jetbrains.python.inspections.PyPep8Inspection;
 import com.jetbrains.python.inspections.flake8.Flake8InspectionSuppressor;
@@ -153,7 +154,7 @@ public final class Pep8ExternalAnnotator extends ExternalAnnotator<Pep8ExternalA
     if (vFile == null || !FileTypeRegistry.getInstance().isFileOfType(vFile, PythonFileType.INSTANCE)) {
       return null;
     }
-    Sdk sdk = PythonSdkType.findLocalCPython(DocStringUtil.getModuleForElement(file));
+    Sdk sdk = PythonSdkType.findLocalCPython(DocStringParser.getModuleForElement(file));
     if (sdk == null) {
       if (!myReportedMissingInterpreter) {
         myReportedMissingInterpreter = true;
@@ -192,7 +193,9 @@ public final class Pep8ExternalAnnotator extends ExternalAnnotator<Pep8ExternalA
     }
 
     return new State(homePath,
-                     LanguageLevel.forElement(file),
+                     // The local SDK used to launch the pycodestyle.py script is not necessarily of the same version as the project SDK, 
+                     // so LanguageLevel.forElement(file) might lead to launching the script incompatible with the "runner" interpreter.
+                     PySdkUtil.getLanguageLevelForSdk(sdk),
                      file.getText(),
                      profile.getErrorLevel(key, file),
                      ignoredErrors,
@@ -322,7 +325,7 @@ public final class Pep8ExternalAnnotator extends ExternalAnnotator<Pep8ExternalA
         else {
           severity = HighlightSeverity.WEAK_WARNING;
         }
-        IntentionAction fix;
+        CommonIntentionAction fix;
         boolean universal;
         if (problem.myCode.equals("E401")) {
           fix = new OptimizeImportsQuickFix();

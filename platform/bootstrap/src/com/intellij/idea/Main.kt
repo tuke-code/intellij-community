@@ -8,11 +8,13 @@ import com.intellij.concurrency.IdeaForkJoinWorkerThreadFactory
 import com.intellij.diagnostic.CoroutineTracerShim
 import com.intellij.diagnostic.StartUpMeasurer
 import com.intellij.ide.BootstrapBundle
+import com.intellij.ide.SystemLanguage
 import com.intellij.ide.startup.StartupActionScriptManager
 import com.intellij.openapi.application.ApplicationNamesInfo
 import com.intellij.openapi.application.ConfigImportHelper
 import com.intellij.openapi.application.PathManager
 import com.intellij.openapi.application.impl.ApplicationInfoImpl
+import com.intellij.openapi.util.SystemInfo
 import com.intellij.platform.bootstrap.initMarketplace
 import com.intellij.platform.diagnostic.telemetry.impl.rootTask
 import com.intellij.platform.diagnostic.telemetry.impl.span
@@ -22,6 +24,7 @@ import com.intellij.platform.ide.bootstrap.startApplication
 import com.intellij.platform.impl.toolkit.IdeFontManager
 import com.intellij.platform.impl.toolkit.IdeGraphicsEnvironment
 import com.intellij.platform.impl.toolkit.IdeToolkit
+import com.intellij.util.ui.JBHtmlEditorKit
 import com.jetbrains.JBR
 import kotlinx.coroutines.*
 import sun.font.FontManagerFactory
@@ -57,6 +60,7 @@ internal fun mainImpl(rawArgs: Array<String>,
     PathManager.loadProperties()
     addBootstrapTiming("properties loading", startupTimings)
     PathManager.customizePaths()
+    SystemLanguage.getInstance().loadState()
     addBootstrapTiming("customizePaths", startupTimings)
 
     @Suppress("RAW_RUN_BLOCKING")
@@ -187,6 +191,10 @@ private fun initRemoteDev(args: List<String>) {
   if (args.firstOrNull() == AppMode.SPLIT_MODE_COMMAND) {
     System.setProperty("idea.initially.ask.config", "never")
   }
+  if (SystemInfo.isMac) { // avoid icon jumping in dock for the backend process
+    System.setProperty("apple.awt.BackgroundOnly", "true") // this makes sure that the following call doesn't create an icon in Dock
+    Toolkit.getDefaultToolkit() // this will tell the operating system, that app initialization is finished
+  }
   initRemoteDevGraphicsEnvironment()
   initLux()
 }
@@ -210,6 +218,9 @@ private fun initLux() {
   System.setProperty("keymap.current.os.only", false.toString())
   System.setProperty("awt.nativeDoubleBuffering", false.toString())
   System.setProperty("swing.bufferPerWindow", true.toString())
+  // disables AntiFlickeringPanel that slows down Lux rendering,
+  // see RDCT-1076 Debugger tree is rendered slowly under Lux
+  System.setProperty("debugger.anti.flickering.delay", 0.toString())
 
   setStaticField(Toolkit::class.java, "toolkit", IdeToolkit())
   System.setProperty("awt.toolkit", IdeToolkit::class.java.canonicalName)
@@ -217,6 +228,8 @@ private fun initLux() {
   setStaticField(FontManagerFactory::class.java, "instance", IdeFontManager())
   @Suppress("SpellCheckingInspection")
   System.setProperty("sun.font.fontmanager", IdeFontManager::class.java.canonicalName)
+
+  JBHtmlEditorKit.DISABLE_TEXT_LAYOUT = true
 }
 
 private fun addBootstrapTiming(name: String, startupTimings: MutableList<Any>) {

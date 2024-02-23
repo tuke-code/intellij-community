@@ -138,7 +138,7 @@ import org.jetbrains.kotlin.nj2k.inference.mutability.AbstractMutabilityInferenc
 import org.jetbrains.kotlin.nj2k.inference.nullability.AbstractNullabilityInferenceTest
 import org.jetbrains.kotlin.parcelize.ide.test.AbstractParcelizeK1CheckerTest
 import org.jetbrains.kotlin.parcelize.ide.test.AbstractParcelizeK1QuickFixTest
-import org.jetbrains.kotlin.psi.patternMatching.AbstractPsiUnifierTest
+import org.jetbrains.kotlin.psi.patternMatching.AbstractK1PsiUnifierTest
 import org.jetbrains.kotlin.search.AbstractAnnotatedMembersSearchTest
 import org.jetbrains.kotlin.search.AbstractInheritorsSearchTest
 import org.jetbrains.kotlin.shortenRefs.AbstractShortenRefsTest
@@ -156,10 +156,6 @@ import org.jetbrains.kotlin.testGenerator.model.Patterns.KT_WITHOUT_DOT_AND_FIR_
 import org.jetbrains.kotlin.testGenerator.model.Patterns.KT_WITHOUT_FIR_PREFIX
 import org.jetbrains.kotlin.testGenerator.model.Patterns.TEST
 import org.jetbrains.kotlin.testGenerator.model.Patterns.WS_KTS
-import org.jetbrains.kotlin.tools.projectWizard.cli.AbstractProjectTemplateBuildFileGenerationTest
-import org.jetbrains.kotlin.tools.projectWizard.cli.AbstractYamlBuildFileGenerationTest
-import org.jetbrains.kotlin.tools.projectWizard.wizard.AbstractProjectTemplateNewWizardProjectImportTest
-import org.jetbrains.kotlin.tools.projectWizard.wizard.AbstractYamlNewWizardProjectImportTest
 import org.jetbrains.uast.test.kotlin.comparison.*
 
 fun main(@Suppress("UNUSED_PARAMETER") args: Array<String>) {
@@ -364,7 +360,7 @@ private fun assembleWorkspace(): TWorkspace = workspace {
             model("kotlinAndJavaChecker/javaAgainstKotlin")
         }
 
-        testClass<AbstractPsiUnifierTest> {
+        testClass<AbstractK1PsiUnifierTest> {
             model("unifier")
         }
 
@@ -505,6 +501,10 @@ private fun assembleWorkspace(): TWorkspace = workspace {
 
         testClass<AbstractBreadcrumbsTest> {
             model("codeInsight/breadcrumbs", pattern = KT_OR_KTS)
+        }
+
+        testClass<AbstractPairMatcherTest> {
+            model("codeInsight/pairMatcher", pattern = KT_OR_KTS)
         }
 
         testClass<AbstractK1IntentionTest> {
@@ -786,15 +786,15 @@ private fun assembleWorkspace(): TWorkspace = workspace {
             model("copyPaste/moveDeclarations", pattern = KT_WITHOUT_DOTS, testMethodName = "doTest")
         }
 
-        testClass<AbstractCustomHighlightUsageHandlerTest>("HighlightExitPointsTestGenerated") {
+        testClass<AbstractCustomHighlightUsageHandlerTest>("org.jetbrains.kotlin.idea.highlighter.HighlightExitPointsTestGenerated") {
             model("exitPoints")
         }
 
-        testClass<AbstractCustomHighlightUsageHandlerTest>("KotlinHighlightUsagesTestGenerated") {
+        testClass<AbstractCustomHighlightUsageHandlerTest>("org.jetbrains.kotlin.idea.highlighter.KotlinHighlightUsagesTestGenerated") {
             model("highlightUsages")
         }
 
-        testClass<AbstractKotlinReceiverUsageHighlightingTest>("KotlinReceiverUsageHighlightingTestGenerated") {
+        testClass<AbstractKotlinReceiverUsageHighlightingTest>("org.jetbrains.kotlin.idea.highlighter.KotlinReceiverUsageHighlightingTestGenerated") {
             model("receiverUsageHighlighting")
         }
 
@@ -1101,7 +1101,13 @@ private fun assembleWorkspace(): TWorkspace = workspace {
         }
 
         testClass<AbstractIdeLightClassesByFqNameTest> {
-            model("asJava/lightClasses/lightClassByFqName", pattern = KT_OR_KTS_WITHOUT_DOTS)
+            model(
+                "asJava/lightClasses/lightClassByFqName",
+                excludedDirectories = listOf(
+                    "withTestCompilerPluginEnabled", // relevant only for K2
+                ),
+                pattern = KT_OR_KTS_WITHOUT_DOTS,
+            )
         }
 
         testClass<AbstractIdeLightClassesByPsiTest> {
@@ -1111,7 +1117,13 @@ private fun assembleWorkspace(): TWorkspace = workspace {
         testClass<AbstractIdeCompiledLightClassesByFqNameTest> {
             model(
                 "asJava/lightClasses/lightClassByFqName",
-                excludedDirectories = listOf("local", "compilationErrors", "ideRegression", "script"),
+                excludedDirectories = listOf(
+                    "local",
+                    "compilationErrors",
+                    "ideRegression",
+                    "script",
+                    "withTestCompilerPluginEnabled", // relevant only for K2
+                ),
                 pattern = KT_OR_KTS_WITHOUT_DOTS,
             )
         }
@@ -1211,42 +1223,12 @@ private fun assembleWorkspace(): TWorkspace = workspace {
             model("basic/java8")
         }
 
-        testClass<AbstractCompletionIncrementalResolveTest31> {
+        testClass<AbstractK1CompletionIncrementalResolveTest> {
             model("incrementalResolve")
         }
 
         testClass<AbstractMultiPlatformCompletionTest> {
             model("multiPlatform", isRecursive = false, pattern = DIRECTORY)
-        }
-    }
-
-    testGroup("project-wizard/tests") {
-        fun MutableTSuite.allBuildSystemTests(relativeRootPath: String) {
-            for (testClass in listOf("GradleKts", "GradleGroovy", "Maven")) {
-                model(
-                    relativeRootPath,
-                    isRecursive = false,
-                    pattern = DIRECTORY,
-                    testMethodName = "doTest${testClass}",
-                    testClassName = testClass,
-                )
-            }
-        }
-
-        testClass<AbstractYamlBuildFileGenerationTest> {
-            model("buildFileGeneration", isRecursive = false, pattern = DIRECTORY)
-        }
-
-        testClass<AbstractProjectTemplateBuildFileGenerationTest> {
-            model("projectTemplatesBuildFileGeneration", isRecursive = false, pattern = DIRECTORY)
-        }
-
-        testClass<AbstractYamlNewWizardProjectImportTest> {
-            allBuildSystemTests("buildFileGeneration")
-        }
-
-        testClass<AbstractProjectTemplateNewWizardProjectImportTest> {
-            allBuildSystemTests("projectTemplatesBuildFileGeneration")
         }
     }
 
@@ -1260,25 +1242,13 @@ private fun assembleWorkspace(): TWorkspace = workspace {
         }
     }
 
-    testGroup("j2k/new/tests") {
+    testGroup("j2k/k1.new/tests", testDataPath = "../../shared/tests/testData") {
         testClass<AbstractNewJavaToKotlinConverterSingleFileTest> {
             model("newJ2k", pattern = Patterns.forRegex("""^([^.]+)\.java$"""))
         }
 
         testClass<AbstractPartialConverterTest> {
             model("partialConverter", pattern = Patterns.forRegex("""^([^.]+)\.java$"""))
-        }
-
-        testClass<AbstractCommonConstraintCollectorTest>(commonSuite = false) {
-            model("inference/common")
-        }
-
-        testClass<AbstractNullabilityInferenceTest>(commonSuite = false) {
-            model("inference/nullability")
-        }
-
-        testClass<AbstractMutabilityInferenceTest>(commonSuite = false) {
-            model("inference/mutability")
         }
 
         testClass<AbstractNewJavaToKotlinCopyPasteConversionTest>(commonSuite = false) {
@@ -1291,6 +1261,20 @@ private fun assembleWorkspace(): TWorkspace = workspace {
 
         testClass<AbstractNewJavaToKotlinConverterMultiFileTest>(commonSuite = false) {
             model("multiFile", pattern = DIRECTORY, isRecursive = false)
+        }
+    }
+
+    testGroup("j2k/k1.new/tests") {
+        testClass<AbstractCommonConstraintCollectorTest>(commonSuite = false) {
+            model("inference/common")
+        }
+
+        testClass<AbstractNullabilityInferenceTest>(commonSuite = false) {
+            model("inference/nullability")
+        }
+
+        testClass<AbstractMutabilityInferenceTest>(commonSuite = false) {
+            model("inference/mutability")
         }
     }
 

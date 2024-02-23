@@ -27,6 +27,8 @@ import com.intellij.util.ui.update.MergingUpdateQueue
 import com.intellij.util.ui.update.Update
 import com.intellij.xdebugger.XDebuggerManager
 import com.intellij.xdebugger.XDebuggerUtil
+import com.intellij.xdebugger.breakpoints.XBreakpoint
+import com.intellij.xdebugger.breakpoints.XBreakpointListener
 import com.intellij.xdebugger.breakpoints.XBreakpointProperties
 import com.intellij.xdebugger.breakpoints.XLineBreakpoint
 import com.intellij.xdebugger.breakpoints.XLineBreakpointType
@@ -34,6 +36,7 @@ import com.intellij.xdebugger.impl.XDebuggerUtilImpl
 import com.intellij.xdebugger.impl.XSourcePositionImpl
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import java.util.concurrent.atomic.AtomicLong
 import kotlin.math.max
 
 @Service(Service.Level.PROJECT)
@@ -50,20 +53,39 @@ internal class InlineBreakpointInlayManager(private val project: Project, privat
 
   private fun shouldAlwaysShowAllInlays() = Registry.`is`(SHOW_EVEN_TRIVIAL_KEY)
 
-  init {
-    EditorFactory.getInstance().addEditorFactoryListener(object : EditorFactoryListener {
-      override fun editorCreated(event: EditorFactoryEvent) {
-        initializeInNewEditor(event.editor)
-      }
-    }, project)
+  // Breakpoints are modified without borrowing the write lock,
+  // so we have to manually track their modifications to prevent races
+  // (e.g., between breakpoint removal and inlay drawing, IDEA-341620).
+  private val breakpointModificationStamp = AtomicLong(0)
 
-    for (key in listOf(XDebuggerUtil.INLINE_BREAKPOINTS_KEY, SHOW_EVEN_TRIVIAL_KEY)) {
-      Registry.get(key).addListener(object : RegistryValueListener {
-        override fun afterValueChanged(value: RegistryValue) {
-          reinitializeAll()
+  init {
+    val busConnection = project.messageBus.connect()
+    if (!project.isDefault) {
+      EditorFactory.getInstance().addEditorFactoryListener(object : EditorFactoryListener {
+        override fun editorCreated(event: EditorFactoryEvent) {
+          initializeInNewEditor(event.editor)
         }
       }, project)
+
+      for (key in listOf(XDebuggerUtil.INLINE_BREAKPOINTS_KEY, SHOW_EVEN_TRIVIAL_KEY)) {
+        Registry.get(key).addListener(object : RegistryValueListener {
+          override fun afterValueChanged(value: RegistryValue) {
+            reinitializeAll()
+          }
+        }, project)
+      }
+
+      busConnection.subscribe(XBreakpointListener.TOPIC, object : XBreakpointListener<XBreakpoint<*>> {
+        override fun breakpointAdded(breakpoint: XBreakpoint<*>) = changed()
+        override fun breakpointRemoved(breakpoint: XBreakpoint<*>) = changed()
+        override fun breakpointChanged(breakpoint: XBreakpoint<*>) = changed()
+
+        fun changed() {
+          breakpointModificationStamp.incrementAndGet()
+        }
+      })
     }
+
   }
 
   /**
@@ -149,22 +171,24 @@ internal class InlineBreakpointInlayManager(private val project: Project, privat
   }
 
   private suspend fun redraw(document: Document, onlyLine: Int?, onlyEditor: Editor?) {
-    val startStamp = document.modificationStamp
+    val documenetStamp = document.modificationStamp
+    val breakpointsStamp = breakpointModificationStamp.get()
 
     fun postponeOnChanged(): Boolean {
       val documentAndPsiAreOutOfSync = !PsiDocumentManager.getInstance(project).isCommitted(document)
-      val documentIsOutdated = document.modificationStamp != startStamp
-      return if (documentAndPsiAreOutOfSync || documentIsOutdated) {
+      val documentIsOutdated = document.modificationStamp != documenetStamp
+      val breakpointsAreOutdated = breakpointModificationStamp.get() != breakpointsStamp
+      val isOutdated = documentAndPsiAreOutOfSync || documentIsOutdated || breakpointsAreOutdated
+
+      if (isOutdated) {
         redrawQueue.queue(Update.create(Pair(document, onlyLine)) {
           scope.launch {
             redraw(document, onlyLine, onlyEditor)
           }
         })
-        true
       }
-      else {
-        false
-      }
+
+      return isOutdated
     }
 
     if (postponeOnChanged()) return
@@ -206,6 +230,8 @@ internal class InlineBreakpointInlayManager(private val project: Project, privat
         if (postponeOnChanged()) return@writeAction
 
         insertInlays(document, onlyEditor, onlyLine, inlays)
+
+        if (postponeOnChanged()) return@writeAction
       }
     }
   }
@@ -280,8 +306,8 @@ internal class InlineBreakpointInlayManager(private val project: Project, privat
               // If breakpoint was not matched earlier, just draw this inlay as a breakpoint.
               val offset = getBreakpointRangeStartOffset(breakpoint, codeStartOffset)
 
-              // However, if this breakpoint is the only breakpoint, and it covers a whole line, don't draw it.
-              val singleLineBreakpoint = breakpoints.size == 1 && getBreakpointHighlightRange(breakpoint) == null
+              // However, if this breakpoint is the only breakpoint, and all variant highlighters are inside its range, don't draw it.
+              val singleLineBreakpoint = breakpoints.size == 1 && breakpointHasTheBiggestRange(breakpoint, variants)
 
               if (!singleLineBreakpoint || shouldAlwaysShowAllInlays()) {
                 add(SingleInlayDatum(breakpoint, variant, offset))
@@ -303,6 +329,18 @@ internal class InlineBreakpointInlayManager(private val project: Project, privat
         val offset = getBreakpointRangeStartOffset(breakpoint, codeStartOffset)
         add(SingleInlayDatum(breakpoint, null, offset))
       }
+    }
+  }
+
+  private fun breakpointHasTheBiggestRange(breakpoint: XLineBreakpointImpl<*>, variants: List<XLineBreakpointType<XBreakpointProperties<*>>.XLineBreakpointVariant>) : Boolean {
+    val range = getBreakpointHighlightRange(breakpoint)
+    if (range == null) {
+      return true
+    }
+
+    return variants.all {
+      val variantRange = it.highlightRange ?: return@all false
+      return@all range.contains(variantRange)
     }
   }
 

@@ -27,7 +27,6 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import org.jetbrains.idea.maven.execution.MavenRunner
 import org.jetbrains.idea.maven.project.MavenImportListener
-import org.jetbrains.idea.maven.project.MavenProject
 import org.jetbrains.idea.maven.project.MavenWorkspaceSettingsComponent
 import org.jetbrains.jps.model.java.JavaSourceRootType
 import org.jetbrains.kotlin.caches.resolve.KotlinCacheService
@@ -97,9 +96,6 @@ abstract class AbstractKotlinMavenImporterTest(private val createStdProjectFolde
 
                 override fun artifactDownloadingFinished() {
                     artifactDownloadingFinished.incrementAndGet()
-                }
-
-                override fun importFinished(importedProjects: MutableCollection<MavenProject>, newModules: MutableList<Module>) {
                 }
             })
     }
@@ -2073,7 +2069,7 @@ abstract class AbstractKotlinMavenImporterTest(private val createStdProjectFolde
                             <apiVersion>1.0</apiVersion>
                             <args>
                                 <arg>-java-parameters</arg>
-                                <arg>-Xdump-declarations-to=dumpDir</arg>
+                                <arg>-Xjava-source-roots=javaDir</arg>
                                 <arg>-kotlin-home</arg>
                                 <arg>temp</arg>
                             </args>
@@ -2127,7 +2123,7 @@ abstract class AbstractKotlinMavenImporterTest(private val createStdProjectFolde
                             <configuration>
                                 <jvmTarget>1.8</jvmTarget>
                                 <args>
-                                    <arg>-Xdump-declarations-to=dumpDir2</arg>
+                                    <arg>-Xjava-source-roots=javaDir2</arg>
                                 </args>
                             </configuration>
                         </plugin>
@@ -2253,7 +2249,7 @@ abstract class AbstractKotlinMavenImporterTest(private val createStdProjectFolde
                 Assert.assertEquals(LanguageVersion.KOTLIN_1_0, apiLevel!!)
                 Assert.assertEquals("1.8", (compilerArguments as K2JVMCompilerArguments).jvmTarget)
                 Assert.assertEquals(
-                    listOf("-Xdump-declarations-to=dumpDir2"),
+                    listOf("-Xjava-source-roots=javaDir2"),
                     compilerSettings!!.additionalArgumentsAsList
                 )
             }
@@ -2264,7 +2260,7 @@ abstract class AbstractKotlinMavenImporterTest(private val createStdProjectFolde
                 Assert.assertEquals(LanguageVersion.KOTLIN_1_0, apiLevel!!)
                 Assert.assertEquals("1.8", (compilerArguments as K2JVMCompilerArguments).jvmTarget)
                 Assert.assertEquals(
-                    listOf("-Xdump-declarations-to=dumpDir", "-java-parameters", "-kotlin-home", "temp2"),
+                    listOf("-java-parameters", "-Xjava-source-roots=javaDir", "-kotlin-home", "temp2"),
                     compilerSettings!!.additionalArgumentsAsList
                 )
             }

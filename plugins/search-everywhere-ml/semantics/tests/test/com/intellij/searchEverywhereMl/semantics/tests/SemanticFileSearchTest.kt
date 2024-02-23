@@ -3,16 +3,14 @@ package com.intellij.searchEverywhereMl.semantics.tests
 import com.intellij.ide.actions.searcheverywhere.PsiItemWithSimilarity
 import com.intellij.ide.actions.searcheverywhere.SearchEverywhereUI
 import com.intellij.ide.util.gotoByName.GotoFileModel
-import com.intellij.platform.ml.embeddings.services.LocalArtifactsManager
 import com.intellij.openapi.command.WriteCommandAction
-import com.intellij.platform.ml.embeddings.search.services.FileEmbeddingsStorage
+import com.intellij.openapi.util.Disposer
+import com.intellij.platform.ml.embeddings.search.services.*
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
 import com.intellij.searchEverywhereMl.semantics.contributors.SemanticFileSearchEverywhereContributor
-import com.intellij.platform.ml.embeddings.search.services.IndexableClass
-import com.intellij.platform.ml.embeddings.search.settings.SemanticSearchSettings
 import com.intellij.platform.ml.embeddings.search.utils.ScoredText
-import com.intellij.platform.ml.embeddings.search.services.SemanticSearchFileChangeListener
+import com.intellij.searchEverywhereMl.semantics.settings.SearchEverywhereSemanticSettings
 import com.intellij.testFramework.PlatformTestUtil
 import com.intellij.testFramework.utils.vfs.deleteRecursively
 import com.intellij.util.TimeoutUtil
@@ -32,7 +30,7 @@ class SemanticFileSearchTest : SemanticSearchBaseTestCase() {
     setupTest("java/IndexProjectAction.java", "kotlin/ProjectIndexingTask.kt", "java/ScoresFileManager.java")
     assertEquals(3, storage.index.size)
 
-    var neighbours = storage.searchNeighboursIfEnabled("index project job", 10, 0.5).asSequence().filterByModel()
+    var neighbours = storage.searchNeighbours("index project job", 10, 0.5).asSequence().filterByModel()
     assertEquals(setOf("IndexProjectAction.java", "ProjectIndexingTask.kt"), neighbours)
 
     neighbours = storage.streamSearchNeighbours("index project job", 0.5).filterByModel()
@@ -52,18 +50,23 @@ class SemanticFileSearchTest : SemanticSearchBaseTestCase() {
 
   fun `test search everywhere contributor`() = runTest {
     setupTest("java/IndexProjectAction.java", "kotlin/ProjectIndexingTask.kt", "java/ScoresFileManager.java")
-    val searchEverywhereUI = SearchEverywhereUI(project, listOf(SemanticFileSearchEverywhereContributor(createEvent())),
-                                                { _ -> null }, null)
+    assertEquals(3, storage.index.size)
+
+    val contributor = SemanticFileSearchEverywhereContributor(createEvent())
+    Disposer.register(project, contributor)
+    val searchEverywhereUI = SearchEverywhereUI(project, listOf(contributor), { _ -> null }, null)
+    Disposer.register(project, searchEverywhereUI)
+
     val elements = PlatformTestUtil.waitForFuture(searchEverywhereUI.findElementsForPattern("index project job"))
     assertEquals(2, elements.size)
 
     val items: List<PsiElement> = elements.filterIsInstance<PsiItemWithSimilarity<*>>().mapNotNull { extractPsiElement(it) }
     assertEquals(2, items.size)
 
-    val methods = items.filterIsInstance<PsiFile>().map { IndexableClass(it.name) }
+    val files = items.filterIsInstance<PsiFile>().map { IndexableFile(it.virtualFile) }
 
-    assertEquals(2, methods.size)
-    assertEquals(setOf("IndexProjectAction.java", "ProjectIndexingTask.kt"), methods.map { it.id }.toSet())
+    assertEquals(2, files.size)
+    assertEquals(setOf("IndexProjectAction.java", "ProjectIndexingTask.kt"), files.map { it.id }.toSet())
   }
 
   fun `test file renaming changes the index`() = runTest {
@@ -145,10 +148,9 @@ class SemanticFileSearchTest : SemanticSearchBaseTestCase() {
   }
 
   private suspend fun setupTest(vararg filePaths: String) {
-    SemanticSearchFileChangeListener.getInstance(project).clearEvents()
     myFixture.configureByFiles(*filePaths)
-    LocalArtifactsManager.getInstance().downloadArtifactsIfNecessary()
-    SemanticSearchSettings.getInstance().enabledInFilesTab = true
-    storage.generateEmbeddingsIfNecessary().join()
+    SearchEverywhereSemanticSettings.getInstance().enabledInFilesTab = true
+    storage.index.clear()
+    FileBasedEmbeddingStoragesManager.getInstance(project).prepareForSearch().join()
   }
 }

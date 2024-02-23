@@ -1,20 +1,25 @@
 package git4idea.performanceTesting
 
+import com.intellij.openapi.application.EDT
+import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.guessProjectDir
 import com.intellij.openapi.ui.playback.PlaybackContext
 import com.intellij.openapi.vcs.FileStatus
 import com.intellij.openapi.vcs.LocalFilePath
-import com.intellij.openapi.vcs.ProjectLevelVcsManager
 import com.intellij.openapi.vcs.changes.Change
 import com.intellij.openapi.vcs.changes.ChangeListManager
 import com.intellij.openapi.vcs.changes.CommitContext
 import com.intellij.vcs.commit.ChangeListCommitState
 import com.intellij.vcs.commit.LocalChangesCommitter
+import com.intellij.vcs.log.data.DataPack
+import com.intellij.vcs.log.data.DataPackChangeListener
+import com.intellij.vcs.log.impl.VcsProjectLog
 import com.jetbrains.performancePlugin.commands.PerformanceCommandCoroutineAdapter
-import com.jetbrains.performancePlugin.commands.Waiter
 import git4idea.GitContentRevision
 import git4idea.GitRevisionNumber
-import java.time.temporal.ChronoUnit
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withContext
 
 /**
  * Command for committing file changes to git
@@ -44,9 +49,31 @@ class GitCommitCommand(text: String, line: Int) : PerformanceCommandCoroutineAda
     val change = Change(beforeRevision, beforeRevision, FileStatus.MODIFIED)
     val listCommitState = ChangeListCommitState(changeList, listOf(change), commitMessage)
 
-    //TODO Return sync=false and remove Waiter when IDEA-337260 will be fixed
-    LocalChangesCommitter(context.project, listCommitState, CommitContext()).runCommit("", false)
-    Waiter.waitOrThrow(5, ChronoUnit.MINUTES) { ProjectLevelVcsManager.getInstance(context.project).isBackgroundVcsOperationRunning }
+    runWithLogRefresh(context.project) {
+      LocalChangesCommitter(context.project, listCommitState, CommitContext()).runCommit("", true)
+    }
+  }
+
+  private suspend fun runWithLogRefresh(project: Project, runnable: () -> Unit) {
+    withContext(Dispatchers.EDT) {
+      val logManager = VcsProjectLog.getInstance(project).logManager ?: throw RuntimeException("VcsLogManager instance is null")
+      suspendCancellableCoroutine { continuation ->
+        val dataPackListener = object : DataPackChangeListener {
+          override fun onDataPackChange(newDataPack: DataPack) {
+            if (logManager.isLogUpToDate) {
+              logManager.dataManager.removeDataPackChangeListener(this)
+              continuation.resumeWith(Result.success(Unit))
+            }
+          }
+        }
+        logManager.dataManager.addDataPackChangeListener(dataPackListener)
+        continuation.invokeOnCancellation { logManager.dataManager.removeDataPackChangeListener(dataPackListener) }
+
+        runnable()
+
+        logManager.scheduleUpdate()
+      }
+    }
   }
 
   override fun getName(): String = NAME

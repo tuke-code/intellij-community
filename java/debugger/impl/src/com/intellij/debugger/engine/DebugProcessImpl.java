@@ -140,6 +140,12 @@ public abstract class DebugProcessImpl extends UserDataHolderBase implements Deb
 
   private final ThreadBlockedMonitor myThreadBlockedMonitor = new ThreadBlockedMonitor(this, myDisposable);
 
+  // These 3 fields are needs to switching from found suspend-thread context to user-friendly suspend-all context.
+  // The main related logic is in [SuspendOtherThreadsRequestor].
+  final Object myEvaluationStateLock = new Object();
+  volatile ParametersForSuspendAllReplacing myParametersForSuspendAllReplacing = null;
+  volatile boolean myPreparingToSuspendAll = false;
+
   protected DebugProcessImpl(Project project) {
     myProject = project;
     myDebuggerManagerThread = new DebuggerManagerThreadImpl(myDisposable, myProject);
@@ -448,7 +454,7 @@ public abstract class DebugProcessImpl extends UserDataHolderBase implements Deb
     }
   }
 
-  static boolean isPositionFiltered(Location location) {
+  public static boolean isPositionFiltered(@Nullable Location location) {
     List<ClassFilter> activeFilters = getActiveFilters();
     if (!activeFilters.isEmpty()) {
       ReferenceType referenceType = location != null ? location.declaringType() : null;
@@ -476,6 +482,10 @@ public abstract class DebugProcessImpl extends UserDataHolderBase implements Deb
       stream = stream.prepend(settings.getSteppingFilters());
     }
     return stream.filter(ClassFilter::isEnabled).toList();
+  }
+
+  public static boolean shouldHideStackFramesUsingSteppingFilters() {
+    return DebuggerSettings.getInstance().HIDE_STACK_FRAMES_USING_STEPPING_FILTER;
   }
 
   void deleteStepRequests(@Nullable final ThreadReference stepThread) {
@@ -742,11 +752,15 @@ public abstract class DebugProcessImpl extends UserDataHolderBase implements Deb
 
   /*Event dispatching*/
   public void addEvaluationListener(EvaluationListener evaluationListener) {
-    myEvaluationDispatcher.addListener(evaluationListener);
+    synchronized (myEvaluationStateLock) {
+      myEvaluationDispatcher.addListener(evaluationListener);
+    }
   }
 
   public void removeEvaluationListener(EvaluationListener evaluationListener) {
-    myEvaluationDispatcher.removeListener(evaluationListener);
+    synchronized (myEvaluationStateLock) {
+      myEvaluationDispatcher.removeListener(evaluationListener);
+    }
   }
 
 
@@ -876,13 +890,28 @@ public abstract class DebugProcessImpl extends UserDataHolderBase implements Deb
                                                      @NotNull SteppingBreakpoint breakpoint,
                                                      RequestHint hint,
                                                      boolean resetThreadFilter) {
+    prepareAndSetSteppingBreakpoint(context, breakpoint, hint, resetThreadFilter, -1);
+  }
+
+  public static void prepareAndSetSteppingBreakpoint(SuspendContextImpl context,
+                                                     @NotNull SteppingBreakpoint breakpoint,
+                                                     RequestHint hint,
+                                                     boolean resetThreadFilter,
+                                                     int explicitSuspendPolicy) {
     DebugProcessImpl debugProcess = context.getDebugProcess();
     if (resetThreadFilter) {
       BreakpointManager breakpointManager = DebuggerManagerEx.getInstanceEx(debugProcess.getProject()).getBreakpointManager();
       breakpointManager.removeThreadFilter(debugProcess); // clear the filter on resume
     }
+    int suspendPolicy;
+    if (explicitSuspendPolicy != -1) {
+      suspendPolicy = explicitSuspendPolicy;
+    }
+    else {
+      suspendPolicy = context.getSuspendPolicy();
+    }
     breakpoint.setSuspendPolicy(
-      context.getSuspendPolicy() == EventRequest.SUSPEND_EVENT_THREAD ? DebuggerSettings.SUSPEND_THREAD : DebuggerSettings.SUSPEND_ALL);
+      suspendPolicy == EventRequest.SUSPEND_EVENT_THREAD ? DebuggerSettings.SUSPEND_THREAD : DebuggerSettings.SUSPEND_ALL);
     breakpoint.createRequest(debugProcess);
     breakpoint.setRequestHint(hint);
     debugProcess.setSteppingBreakpoint(breakpoint);
@@ -1142,7 +1171,9 @@ public abstract class DebugProcessImpl extends UserDataHolderBase implements Deb
         }
 
         resumeData = SuspendManagerUtil.prepareForResume(suspendContext);
-        suspendContext.setIsEvaluating(evaluationContext);
+        synchronized (myEvaluationStateLock) {
+          suspendContext.setIsEvaluating(evaluationContext);
+        }
 
         getVirtualMachineProxy().clearCaches();
 
@@ -1153,7 +1184,9 @@ public abstract class DebugProcessImpl extends UserDataHolderBase implements Deb
         throw EvaluateExceptionUtil.createEvaluateException(e);
       }
       finally {
-        suspendContext.setIsEvaluating(null);
+        synchronized (myEvaluationStateLock) {
+          suspendContext.setIsEvaluating(null);
+        }
         if (resumeData != null) {
           SuspendManagerUtil.restoreAfterResume(suspendContext, resumeData);
         }
@@ -1329,7 +1362,9 @@ public abstract class DebugProcessImpl extends UserDataHolderBase implements Deb
   }
 
   private static ThreadReference getEvaluationThread(final EvaluationContext evaluationContext) throws EvaluateException {
-    ThreadReferenceProxy evaluationThread = evaluationContext.getSuspendContext().getThread();
+    ThreadReferenceProxy fromStackFrame =
+      ObjectUtils.doIfNotNull(evaluationContext.getFrameProxy(), stackFrameProxy -> stackFrameProxy.threadProxy());
+    ThreadReferenceProxy evaluationThread = fromStackFrame != null ? fromStackFrame : evaluationContext.getSuspendContext().getThread();
     if (evaluationThread == null) {
       throw EvaluateExceptionUtil.NULL_STACK_FRAME;
     }
@@ -1553,7 +1588,7 @@ public abstract class DebugProcessImpl extends UserDataHolderBase implements Deb
     }
     final Method forNameMethod;
     List<Value> args = new ArrayList<>(); // do not use unmodifiable lists because the list is modified by JPDA
-    args.add(virtualMachine.mirrorOf(qName));
+    args.add(DebuggerUtilsEx.mirrorOfString(qName, virtualMachine, evaluationContext));
     if (classLoader != null) {
       //forNameMethod = classClassType.concreteMethodByName("forName", "(Ljava/lang/String;ZLjava/lang/ClassLoader;)Ljava/lang/Class;");
       forNameMethod = DebuggerUtils.findMethod(classClassType, "forName", "(Ljava/lang/String;ZLjava/lang/ClassLoader;)Ljava/lang/Class;");
@@ -1838,8 +1873,9 @@ public abstract class DebugProcessImpl extends UserDataHolderBase implements Deb
     public RunToCursorCommand(SuspendContextImpl suspendContext, @NotNull XSourcePosition position, final boolean ignoreBreakpoints) {
       super(suspendContext, null);
       myIgnoreBreakpoints = ignoreBreakpoints;
-      myRunToCursorBreakpoint =
-        DebuggerManagerEx.getInstanceEx(myProject).getBreakpointManager().addRunToCursorBreakpoint(position, ignoreBreakpoints);
+      boolean needReplaceWithAllThreadSuspendContext = suspendContext.getSuspendPolicy() == EventRequest.SUSPEND_ALL;
+      myRunToCursorBreakpoint = DebuggerManagerEx.getInstanceEx(myProject).getBreakpointManager()
+        .addRunToCursorBreakpoint(position, ignoreBreakpoints, needReplaceWithAllThreadSuspendContext);
     }
 
     @Override
@@ -1852,8 +1888,16 @@ public abstract class DebugProcessImpl extends UserDataHolderBase implements Deb
       if (myIgnoreBreakpoints) {
         DebuggerManagerEx.getInstanceEx(myProject).getBreakpointManager().disableBreakpoints(DebugProcessImpl.this);
       }
-      applyThreadFilter(getThreadFilterFromContext(context));
-      prepareAndSetSteppingBreakpoint(context, myRunToCursorBreakpoint, null, false);
+      LightOrRealThreadInfo threadFilterFromContext = getThreadFilterFromContext(context);
+      applyThreadFilter(threadFilterFromContext);
+      int explicitSuspendPolicy;
+      if (threadFilterFromContext != null && threadFilterFromContext.getRealThread() == null) {
+        explicitSuspendPolicy = EventRequest.SUSPEND_EVENT_THREAD;
+      }
+      else {
+        explicitSuspendPolicy = -1;
+      }
+      prepareAndSetSteppingBreakpoint(context, myRunToCursorBreakpoint, null, false, explicitSuspendPolicy);
       final DebugProcessImpl debugProcess = context.getDebugProcess();
 
       if (debugProcess.getRequestsManager().getWarning(myRunToCursorBreakpoint) == null) {
@@ -1919,7 +1963,22 @@ public abstract class DebugProcessImpl extends UserDataHolderBase implements Deb
 
     public ResumeCommand(SuspendContextImpl suspendContext) {
       super(suspendContext);
-      final ThreadReferenceProxyImpl thread = suspendContext != null ? suspendContext.getThread() : null;
+      final ThreadReferenceProxyImpl thread;
+      if (suspendContext != null) {
+        JavaExecutionStack activeExecutionStack = suspendContext.getActiveExecutionStack();
+        if (activeExecutionStack != null) {
+          thread = activeExecutionStack.getThreadProxy();
+        }
+        else if (suspendContext.getAnotherThreadToFocus() != null) {
+          thread = suspendContext.getAnotherThreadToFocus();
+        }
+        else {
+          thread = suspendContext.getThread();
+        }
+      }
+      else {
+        thread = null;
+      }
       myContextThread = thread != null ? thread : getDebuggerContext().getThreadProxy();
     }
 
@@ -1950,7 +2009,8 @@ public abstract class DebugProcessImpl extends UserDataHolderBase implements Deb
     }
 
     protected void applyThreadFilter(@Nullable LightOrRealThreadInfo threadInfo) {
-      if (getSuspendContext().getSuspendPolicy() == EventRequest.SUSPEND_ALL) {
+      boolean isLightThread = threadInfo != null && threadInfo.getRealThread() == null;
+      if (isLightThread || getSuspendContext().getSuspendPolicy() == EventRequest.SUSPEND_ALL) {
         // there could be explicit resume as a result of call to voteSuspend()
         // e.g. when breakpoint was considered invalid, in that case the filter will be applied _after_
         // resuming and all breakpoints in other threads will be ignored.

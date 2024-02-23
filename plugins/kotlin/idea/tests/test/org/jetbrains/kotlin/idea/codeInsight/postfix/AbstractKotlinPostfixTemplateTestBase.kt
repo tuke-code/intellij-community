@@ -3,13 +3,13 @@ package org.jetbrains.kotlin.idea.codeInsight.postfix
 
 import com.intellij.codeInsight.template.impl.TemplateManagerImpl
 import com.intellij.testFramework.LightProjectDescriptor
-import org.jetbrains.kotlin.idea.base.plugin.KotlinPluginKind
+import org.jetbrains.kotlin.idea.base.plugin.KotlinPluginMode
+import org.jetbrains.kotlin.idea.base.test.IgnoreTests
 import org.jetbrains.kotlin.idea.base.test.KotlinJvmLightProjectDescriptor
 import org.jetbrains.kotlin.idea.base.test.KotlinTestHelpers
 import org.jetbrains.kotlin.idea.base.test.NewLightKotlinCodeInsightFixtureTestCase
 import org.jetbrains.kotlin.idea.util.application.executeCommand
 import org.jetbrains.kotlin.test.InTextDirectivesUtils
-import org.jetbrains.kotlin.test.utils.IgnoreTests
 import java.nio.file.Paths
 import kotlin.io.path.name
 import kotlin.io.path.relativeTo
@@ -28,15 +28,15 @@ abstract class AbstractKotlinPostfixTemplateTestBase : NewLightKotlinCodeInsight
 
     protected fun performTest() {
         val disableDirective = when (pluginKind) {
-            KotlinPluginKind.FE10_PLUGIN -> IgnoreTests.DIRECTIVES.IGNORE_K1
-            KotlinPluginKind.FIR_PLUGIN -> IgnoreTests.DIRECTIVES.IGNORE_K2
+            KotlinPluginMode.K1 -> IgnoreTests.DIRECTIVES.IGNORE_K1
+            KotlinPluginMode.K2 -> IgnoreTests.DIRECTIVES.IGNORE_K2
         }
         IgnoreTests.runTestIfNotDisabledByFileDirective(testRootPath.resolve(testMethodPath), disableDirective, "after") {
             myFixture.configureByDefaultFile()
             templateName?.let { myFixture.type(".$it") }
 
             val fileText = file.text
-            val template = InTextDirectivesUtils.findStringWithPrefixes(fileText, "// $TEMPLATE:")
+            val template = InTextDirectivesUtils.findStringWithPrefixes(fileText, TEMPLATE_DIRECTIVE)
 
             if (template != null) {
                 myFixture.type(template.replace("\\t", "\t"))
@@ -75,6 +75,6 @@ abstract class AbstractKotlinPostfixTemplateTestBase : NewLightKotlinCodeInsight
 
     companion object {
         const val ALLOW_MULTIPLE_EXPRESSIONS = "ALLOW_MULTIPLE_EXPRESSIONS"
-        const val TEMPLATE = "TEMPLATE"
+        const val TEMPLATE_DIRECTIVE = "TEMPLATE:"
     }
 }

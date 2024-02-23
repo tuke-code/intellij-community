@@ -8,36 +8,36 @@ import com.intellij.ide.startup.importSettings.data.ActionsDataProvider
 import com.intellij.ide.startup.importSettings.data.DialogImportData
 import com.intellij.ide.startup.importSettings.data.SettingsContributor
 import com.intellij.ide.startup.importSettings.data.SettingsService
-import com.intellij.openapi.rd.createLifetime
-import com.intellij.openapi.ui.DialogWrapper
-import com.jetbrains.rd.util.lifetime.Lifetime
-import org.jetbrains.annotations.Nls
-import javax.swing.JButton
+import com.intellij.openapi.util.Disposer
 
-interface ImportSettingsController {
+interface ImportSettingsController : BaseController {
   companion object {
-    fun createController(dialog: OnboardingDialog): ImportSettingsController {
-      return ImportSettingsControllerImpl(dialog)
+    fun createController(dialog: OnboardingDialog, skipImportAction: () -> Unit): ImportSettingsController {
+      return ImportSettingsControllerImpl(dialog, skipImportAction)
     }
   }
+
+  val skipImportAction: () -> Unit
 
   fun goToSettingsPage(provider: ActionsDataProvider<*>, product: SettingsContributor)
   fun goToProductChooserPage()
   fun goToImportPage(importFromProduct: DialogImportData)
-  fun createButton(name: @Nls String, handler: () -> Unit): JButton
-  fun createDefaultButton(name: @Nls String, handler: () -> Unit): JButton
 
   fun skipImport()
 
-  val lifetime: Lifetime
+  fun configChosen()
+
 }
 
-private class ImportSettingsControllerImpl(val dialog: OnboardingDialog) : ImportSettingsController {
-  override val lifetime: Lifetime = dialog.disposable.createLifetime()
+private class ImportSettingsControllerImpl(dialog: OnboardingDialog, override val skipImportAction: () -> Unit) : ImportSettingsController, BaseControllerImpl(dialog) {
   init {
     val settService = SettingsService.getInstance()
     settService.doClose.advise(lifetime) {
-      skipImport()
+      /**TODO
+       * what should we do here?
+       */
+      /*skipImportAction.invoke()*/
+      dialog.dialogClose()
     }
 
     settService.error.advise(lifetime) {
@@ -47,28 +47,27 @@ private class ImportSettingsControllerImpl(val dialog: OnboardingDialog) : Impor
 
   override fun goToSettingsPage(provider: ActionsDataProvider<*>, product: SettingsContributor) {
     val page = SettingChooserPage.createPage(provider, product, this)
+    Disposer.tryRegister(dialog.disposable, page)
     dialog.changePage(page)
   }
 
   override fun goToProductChooserPage() {
     val page = ProductChooserPage(this)
+    Disposer.tryRegister(dialog.disposable, page)
     dialog.changePage(page)
   }
 
   override fun goToImportPage(importFromProduct: DialogImportData) {
     val page = ImportProgressPage(importFromProduct, this)
+    Disposer.tryRegister(dialog.disposable, page)
     dialog.changePage(page)
   }
 
-  override fun createButton(@Nls name: String, handler: () -> Unit): JButton {
-    return dialog.createButton(name, handler)
-  }
-
-  override fun createDefaultButton(@Nls name: String, handler: () -> Unit): JButton {
-    return dialog.createDefaultButton(name, handler)
-  }
-
   override fun skipImport() {
-    dialog.doClose(DialogWrapper.CANCEL_EXIT_CODE)
+    dialog.dialogClose()
+  }
+
+  override fun configChosen() {
+    SettingsService.getInstance().configChosen()
   }
 }

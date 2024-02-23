@@ -53,10 +53,17 @@ class MavenDuplicateDependenciesInspection : DomElementsInspection<MavenDomProje
           for (d in dependencies) {
             if (d === dependency) continue
 
-            if (d.parent === dependency.parent) {
+            val dependencyParent = dependency.parent
+            if (d.parent === dependencyParent) {
               // Dependencies in the same file must be unique by groupId:artifactId:type:classifier
               MavenLog.LOG.debug("Duplicate dependencies in the same file: ${dependencyToString(d)}, ${dependencyToString(dependency)}")
-              duplicateDependencies.add(d)
+
+              val siblingDependencies = (dependencyParent as MavenDomDependencies).dependencies
+
+              MavenLog.LOG.debug("Sibling dependencies: ${siblingDependencies.size}")
+              if (siblingDependencies.contains(d)) {
+                duplicateDependencies.add(d)
+              }
             }
             else {
               if (scope(d) == scope(dependency) && d.version.stringValue == dependency.version.stringValue) {

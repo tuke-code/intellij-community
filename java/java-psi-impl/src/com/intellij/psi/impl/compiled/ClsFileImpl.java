@@ -309,9 +309,7 @@ public class ClsFileImpl extends PsiBinaryFileImpl
   public @NotNull PsiElement getNavigationElement() {
     for (ClsCustomNavigationPolicy navigationPolicy : ClsCustomNavigationPolicy.EP_NAME.getExtensionList()) {
       try {
-        @SuppressWarnings({"deprecation", "ScheduledForRemoval"}) PsiElement navigationElement =
-          navigationPolicy instanceof ClsCustomNavigationPolicyEx ? ((ClsCustomNavigationPolicyEx)navigationPolicy).getFileNavigationElement(this) :
-          navigationPolicy.getNavigationElement(this);
+        PsiElement navigationElement = navigationPolicy.getNavigationElement(this);
         if (navigationElement != null) return navigationElement;
       }
       catch (IndexNotReadyException ignore) { }
@@ -552,11 +550,9 @@ public class ClsFileImpl extends PsiBinaryFileImpl
 
   public static @Nullable PsiJavaFileStub buildFileStub(@NotNull VirtualFile file, byte @NotNull [] bytes) throws ClsFormatException {
     try {
-      if (ClassFileViewProvider.isInnerClass(file, bytes)) {
-        return null;
-      }
-
       ClassReader reader = new ClassReader(bytes);
+      if (ClassFileViewProvider.isInnerClass(file, reader)) return null;
+
       String className = file.getNameWithoutExtension();
       String internalName = reader.getClassName();
       boolean module = internalName.equals("module-info") && BitUtil.isSet(reader.getAccess(), Opcodes.ACC_MODULE);

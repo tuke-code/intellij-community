@@ -1,27 +1,35 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 @file:Suppress("ReplaceGetOrSet", "ReplaceNegatedIsEmptyWithIsNotEmpty")
 package org.jetbrains.intellij.build.impl
 
+import com.intellij.diagnostic.COROUTINE_DUMP_HEADER
+import com.intellij.diagnostic.dumpCoroutines
+import com.intellij.diagnostic.enableCoroutineDump
 import com.intellij.openapi.util.io.FileUtilRt
 import com.intellij.openapi.util.io.NioFiles
-import com.intellij.platform.diagnostic.telemetry.helpers.use
 import com.intellij.platform.diagnostic.telemetry.helpers.useWithScope
+import com.intellij.platform.diagnostic.telemetry.helpers.useWithoutActiveScope
 import com.intellij.util.PathUtilRt
 import com.intellij.util.SystemProperties
+import com.jetbrains.JBR
 import io.opentelemetry.api.common.AttributeKey
 import io.opentelemetry.api.common.Attributes
 import io.opentelemetry.api.trace.Span
-import kotlinx.coroutines.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import org.jetbrains.annotations.ApiStatus.Internal
 import org.jetbrains.annotations.ApiStatus.Obsolete
 import org.jetbrains.intellij.build.*
+import org.jetbrains.intellij.build.BuildPaths.Companion.COMMUNITY_ROOT
 import org.jetbrains.intellij.build.TraceManager.spanBuilder
-import org.jetbrains.intellij.build.dependencies.BuildDependenciesCommunityRoot
 import org.jetbrains.intellij.build.dependencies.DependenciesProperties
 import org.jetbrains.intellij.build.dependencies.JdkDownloader
 import org.jetbrains.intellij.build.impl.JdkUtils.defineJdk
 import org.jetbrains.intellij.build.impl.JdkUtils.readModulesFromReleaseFile
 import org.jetbrains.intellij.build.impl.compilation.CompiledClasses
+import org.jetbrains.intellij.build.impl.compilation.PortableCompilationCache
 import org.jetbrains.intellij.build.impl.logging.BuildMessagesHandler
 import org.jetbrains.intellij.build.impl.logging.BuildMessagesImpl
 import org.jetbrains.intellij.build.io.logFreeDiskSpace
@@ -36,53 +44,58 @@ import org.jetbrains.jps.model.library.sdk.JpsSdkReference
 import org.jetbrains.jps.model.module.JpsModule
 import org.jetbrains.jps.model.serialization.JpsModelSerializationDataService
 import org.jetbrains.jps.model.serialization.JpsPathMapper
-import org.jetbrains.jps.model.serialization.JpsProjectLoader.loadProject
+import org.jetbrains.jps.model.serialization.JpsProjectLoader
 import org.jetbrains.jps.util.JpsPathUtil
 import java.nio.file.Files
 import java.nio.file.Path
-import kotlin.io.path.name
+import kotlin.io.path.invariantSeparatorsPathString
+import kotlin.io.path.relativeToOrNull
 
 @Obsolete
-fun createCompilationContextBlocking(communityHome: BuildDependenciesCommunityRoot,
-                                     projectHome: Path,
+fun createCompilationContextBlocking(projectHome: Path,
                                      defaultOutputRoot: Path,
                                      options: BuildOptions = BuildOptions()): CompilationContextImpl {
   return runBlocking(Dispatchers.Default) {
-    createCompilationContext(communityHome = communityHome,
-                             projectHome = projectHome,
+    createCompilationContext(projectHome = projectHome,
                              defaultOutputRoot = defaultOutputRoot,
                              options = options)
   }
 }
 
-suspend fun createCompilationContext(communityHome: BuildDependenciesCommunityRoot,
-                                     projectHome: Path,
+suspend fun createCompilationContext(projectHome: Path,
                                      defaultOutputRoot: Path,
                                      options: BuildOptions = BuildOptions()): CompilationContextImpl {
   val logDir = options.logPath?.let { Path.of(it) }
-               ?: (options.outputRootPath ?: defaultOutputRoot).resolve("log")
+               ?: (options.outRootDir ?: defaultOutputRoot).resolve("log")
   JaegerJsonSpanExporterManager.setOutput(logDir.toAbsolutePath().normalize().resolve("trace.json"))
-  return CompilationContextImpl.createCompilationContext(communityHome = communityHome,
-                                                         projectHome = projectHome,
+  return CompilationContextImpl.createCompilationContext(projectHome = projectHome,
                                                          setupTracer = false,
                                                          buildOutputRootEvaluator = { defaultOutputRoot },
                                                          options = options)
 }
 
-private fun computeBuildPaths(options: BuildOptions,
+internal fun computeBuildPaths(options: BuildOptions,
                               project: JpsProject,
-                              communityHome: BuildDependenciesCommunityRoot,
                               buildOutputRootEvaluator: (JpsProject) -> Path,
-                              projectHome: Path): BuildPaths {
-  val buildOut = options.outputRootPath ?: buildOutputRootEvaluator(project)
+  artifactPathSupplier: (() -> Path)?,
+  projectHome: Path,
+): BuildPaths {
+  val buildOut = options.outRootDir ?: buildOutputRootEvaluator(project)
   val logDir = options.logPath?.let { Path.of(it).toAbsolutePath().normalize() } ?: buildOut.resolve("log")
-  return BuildPathsImpl(communityHome = communityHome, projectHome = projectHome, buildOut = buildOut, logDir = logDir)
+  val result = BuildPaths(
+    communityHomeDirRoot = COMMUNITY_ROOT,
+    buildOutputDir = buildOut,
+    logDir = logDir,
+    projectHome = projectHome,
+    artifactDir = artifactPathSupplier?.invoke() ?: buildOut.resolve("artifacts"),
+  )
+  Files.createDirectories(result.tempDir)
+  return result
 }
 
 @Internal
 class CompilationContextImpl private constructor(
   model: JpsModel,
-  private val communityHome: BuildDependenciesCommunityRoot,
   override val messages: BuildMessages,
   override val paths: BuildPaths,
   override val options: BuildOptions,
@@ -101,10 +114,18 @@ class CompilationContextImpl private constructor(
     }
 
   override val project: JpsProject = model.project
+
   override val projectModel: JpsModel = model
+
   override val dependenciesProperties: DependenciesProperties
+
   override val bundledRuntime: BundledRuntime
+
   override lateinit var compilationData: JpsCompilationData
+
+  override val portableCompilationCache: PortableCompilationCache by lazy {
+    PortableCompilationCache(this)
+  }
 
   @Volatile
   private var cachedJdkHome: Path? = null
@@ -112,7 +133,7 @@ class CompilationContextImpl private constructor(
   override suspend fun getStableJdkHome(): Path {
     var jdkHome = cachedJdkHome
     if (jdkHome == null) {
-      jdkHome = JdkDownloader.getJdkHome(communityHome, Span.current()::addEvent)
+      jdkHome = JdkDownloader.getJdkHome(COMMUNITY_ROOT, Span.current()::addEvent)
       cachedJdkHome = jdkHome
     }
     return jdkHome
@@ -122,7 +143,7 @@ class CompilationContextImpl private constructor(
     var jdkHome = cachedJdkHome
     if (jdkHome == null) {
       // blocking doesn't matter, getStableJdkHome is mostly always called before
-      jdkHome = JdkDownloader.blockingGetJdkHome(communityHome, Span.current()::addEvent)
+      jdkHome = JdkDownloader.blockingGetJdkHome(COMMUNITY_ROOT, Span.current()::addEvent)
       cachedJdkHome = jdkHome
     }
     JdkDownloader.getJavaExecutable(jdkHome)
@@ -136,21 +157,23 @@ class CompilationContextImpl private constructor(
   }
 
   companion object {
-    suspend fun createCompilationContext(communityHome: BuildDependenciesCommunityRoot,
-                                         projectHome: Path,
-                                         buildOutputRootEvaluator: (JpsProject) -> Path,
-                                         options: BuildOptions,
-                                         setupTracer: Boolean): CompilationContextImpl {
+    suspend fun createCompilationContext(
+      projectHome: Path,
+      buildOutputRootEvaluator: (JpsProject) -> Path,
+      options: BuildOptions,
+      setupTracer: Boolean,
+      enableCoroutinesDump: Boolean = true,
+    ): CompilationContextImpl {
       check(sequenceOf("platform/build-scripts", "bin/idea.properties", "build.txt").all {
-        Files.exists(communityHome.communityRoot.resolve(it))
+        Files.exists(COMMUNITY_ROOT.communityRoot.resolve(it))
       }) {
-        "communityHome ($communityHome) doesn\'t point to a directory containing IntelliJ Community sources"
+        "communityHome ($COMMUNITY_ROOT) doesn\'t point to a directory containing IntelliJ Community sources"
       }
 
       val messages = BuildMessagesImpl.create()
       if (options.printEnvironmentInfo) {
         Span.current().addEvent("environment info", Attributes.of(
-          AttributeKey.stringKey("community home"), communityHome.communityRoot.toString(),
+          AttributeKey.stringKey("community home"), COMMUNITY_ROOT.communityRoot.toString(),
           AttributeKey.stringKey("project home"), projectHome.toString(),
         ))
         printEnvironmentDebugInfo()
@@ -160,17 +183,18 @@ class CompilationContextImpl private constructor(
         logFreeDiskSpace(dir = projectHome, phase = "before downloading dependencies")
       }
 
-      val isCompilationRequired = CompiledClasses.isCompilationRequired(options)
-
-      val model = coroutineScope {
-        loadProject(projectHome = projectHome, kotlinBinaries = KotlinBinaries(communityHome, messages), isCompilationRequired)
-      }
+      val model = loadProject(
+        projectHome = projectHome,
+        kotlinBinaries = KotlinBinaries(COMMUNITY_ROOT),
+        isCompilationRequired = CompiledClasses.isCompilationRequired(options),
+      )
 
       val buildPaths = computeBuildPaths(project = model.project,
-                                         communityHome = communityHome,
                                          options = options,
                                          buildOutputRootEvaluator = buildOutputRootEvaluator,
-                                         projectHome = projectHome)
+                                         projectHome = projectHome,
+        artifactPathSupplier = null,
+      )
 
       // not as part of prepareForBuild because prepareForBuild may be called several times per each product or another flavor
       // (see createCopyForProduct)
@@ -179,7 +203,6 @@ class CompilationContextImpl private constructor(
       }
 
       val context = CompilationContextImpl(model = model,
-                                           communityHome = communityHome,
                                            messages = messages,
                                            paths = buildPaths,
                                            options = options)
@@ -189,6 +212,11 @@ class CompilationContextImpl private constructor(
        */
       spanBuilder("define JDK").useWithScope {
         defineJavaSdk(context)
+      }
+      if (enableCoroutinesDump) {
+        spanBuilder("enabled coroutines dump").useWithScope {
+          context.enableCoroutinesDump(it)
+        }
       }
       spanBuilder("prepare for build").useWithScope {
         context.prepareForBuild()
@@ -201,18 +229,17 @@ class CompilationContextImpl private constructor(
     }
   }
 
-  fun createCopy(messages: BuildMessages,
-                 options: BuildOptions,
-                 buildOutputRootEvaluator: (JpsProject) -> Path): CompilationContextImpl {
-    val copy = CompilationContextImpl(model = projectModel,
-                                      communityHome = paths.communityHomeDirRoot,
-                                      messages = messages,
-                                      paths = computeBuildPaths(options = options,
-                                                                project = project,
-                                                                communityHome = communityHome,
-                                                                buildOutputRootEvaluator = buildOutputRootEvaluator,
-                                                                projectHome = paths.projectHome),
-                                      options = options)
+  internal fun createCopy(
+    messages: BuildMessages,
+    options: BuildOptions,
+    paths: BuildPaths,
+  ): CompilationContextImpl {
+    val copy = CompilationContextImpl(
+      model = projectModel,
+      messages = messages,
+      paths = paths,
+      options = options,
+    )
     copy.compilationData = compilationData
     return copy
   }
@@ -247,11 +274,18 @@ class CompilationContextImpl private constructor(
     }
     suppressWarnings(project)
     ConsoleSpanExporter.setPathRoot(paths.buildOutputDir)
-    cleanOutput(keepCompilationState = CompiledClasses.keepCompilationState(options))
+    if (options.cleanOutDir || options.forceRebuild) {
+      cleanOutput()
+    }
+    else {
+      Span.current().addEvent("skip output cleaning", Attributes.of(
+        AttributeKey.stringKey("dir"), "${paths.buildOutputDir}",
+      ))
+    }
   }
 
   private fun overrideClassesOutputDirectory() {
-    val override = options.classesOutputDirectory
+    val override = options.classOutDir
     when {
       !override.isNullOrEmpty() -> classesOutputDirectory = Path.of(override)
       options.useCompiledClassesFromProjectOutput -> check(Files.exists(classesOutputDirectory)) {
@@ -316,6 +350,21 @@ class CompilationContextImpl private constructor(
     }
     messages.artifactBuilt(pathToReport)
   }
+
+  private fun enableCoroutinesDump(span: Span) {
+    try {
+      enableCoroutineDump()
+      JBR.getJstack()?.includeInfoFrom {
+        """
+          $COROUTINE_DUMP_HEADER
+          ${dumpCoroutines()}
+        """.trimIndent()
+      }
+    }
+    catch (e: NoClassDefFoundError) {
+      span.addEvent("Cannot enable coroutines dump, JetBrains Runtime is required: ${e.message}")
+    }
+  }
 }
 
 private suspend fun loadProject(projectHome: Path, kotlinBinaries: KotlinBinaries, isCompilationRequired: Boolean): JpsModel {
@@ -331,10 +380,10 @@ private suspend fun loadProject(projectHome: Path, kotlinBinaries: KotlinBinarie
 
   withContext(Dispatchers.IO) {
     spanBuilder("load project").useWithScope { span ->
-      pathVariablesConfiguration.addPathVariable("MAVEN_REPOSITORY", FileUtilRt.toSystemIndependentName(
-        Path.of(SystemProperties.getUserHome(), ".m2/repository").toString()))
+      pathVariablesConfiguration.addPathVariable("MAVEN_REPOSITORY",
+                                                 Path.of(SystemProperties.getUserHome(), ".m2/repository").invariantSeparatorsPathString)
       val pathVariables = JpsModelSerializationDataService.computeAllPathVariables(model.global)
-      loadProject(model.project, pathVariables, JpsPathMapper.IDENTITY, projectHome, { launch { it.run() } }, false)
+      JpsProjectLoader.loadProject(model.project, pathVariables, JpsPathMapper.IDENTITY, projectHome, { launch { it.run() } }, false)
       span.setAllAttributes(Attributes.of(
         AttributeKey.stringKey("project"), projectHome.toString(),
         AttributeKey.longKey("moduleCount"), model.project.modules.size.toLong(),
@@ -349,19 +398,7 @@ private fun suppressWarnings(project: JpsProject) {
   val compilerOptions = JpsJavaExtensionService.getInstance().getCompilerConfiguration(project).currentCompilerOptions
   compilerOptions.GENERATE_NO_WARNINGS = true
   compilerOptions.DEPRECATION = false
-  @Suppress("SpellCheckingInspection")
   compilerOptions.ADDITIONAL_OPTIONS_STRING = compilerOptions.ADDITIONAL_OPTIONS_STRING.replace("-Xlint:unchecked", "")
-}
-
-private class BuildPathsImpl(communityHome: BuildDependenciesCommunityRoot, projectHome: Path, buildOut: Path, logDir: Path)
-  : BuildPaths(communityHomeDirRoot = communityHome,
-               buildOutputDir = buildOut,
-               logDir = logDir,
-               projectHome = projectHome) {
-  init {
-    artifactDir = buildOutputDir.resolve("artifacts")
-    artifacts = FileUtilRt.toSystemIndependentName(artifactDir.toString())
-  }
 }
 
 private suspend fun defineJavaSdk(context: CompilationContext) {
@@ -403,39 +440,44 @@ private fun readModulesFromReleaseFile(model: JpsModel, sdkName: String, sdkHome
   }
 }
 
-private fun CompilationContext.cleanOutput(keepCompilationState: Boolean) {
-  val outDir = paths.buildOutputDir
-  if (!options.cleanOutputFolder) {
-    Span.current().addEvent("skip output cleaning", Attributes.of(
-      AttributeKey.stringKey("dir"), "$outDir",
-    ))
-    return
+internal fun CompilationContext.cleanOutput(keepCompilationState: Boolean = CompiledClasses.keepCompilationState(options)) {
+  val compilationState = setOf(
+    compilationData.dataStorageRoot,
+    classesOutputDirectory,
+    paths.jpsArtifacts,
+  )
+  val outputDirectoriesToKeep = buildSet {
+    add(paths.logDir)
+    if (keepCompilationState) {
+      addAll(compilationState)
+    }
   }
-  val outputDirectoriesToKeep = HashSet<String>(4)
-  outputDirectoriesToKeep.add("log")
-  if (keepCompilationState) {
-    outputDirectoriesToKeep.add(compilationData.dataStorageRoot.name)
-    outputDirectoriesToKeep.add("classes")
-    outputDirectoriesToKeep.add(paths.jpsArtifacts.name)
-  }
-  spanBuilder("clean output")
-    .setAttribute("path", outDir.toString())
-    .setAttribute(AttributeKey.stringArrayKey("outputDirectoriesToKeep"), java.util.List.copyOf(outputDirectoriesToKeep))
-    .use { span ->
-      Files.newDirectoryStream(outDir).use { dirStream ->
-        for (file in dirStream) {
-          val attributes = Attributes.of(AttributeKey.stringKey("dir"), outDir.relativize(file).toString())
-          if (outputDirectoriesToKeep.contains(file.name)) {
-            span.addEvent("skip cleaning", attributes)
-          }
-          else {
-            span.addEvent("delete", attributes)
-            NioFiles.deleteRecursively(file)
+  spanBuilder("clean output").useWithoutActiveScope { span ->
+    val outDir = paths.buildOutputDir
+    outputDirectoriesToKeep.forEach {
+      val path = it.relativeToOrNull(outDir) ?: it
+      span.addEvent("skip cleaning", Attributes.of(AttributeKey.stringKey("dir"), path.toString()))
+    }
+    Files.newDirectoryStream(outDir).use { dirStream ->
+      var pathsToBeCleanedStream = dirStream - outputDirectoriesToKeep
+      if (!keepCompilationState) {
+        pathsToBeCleanedStream = pathsToBeCleanedStream + compilationState
+      }
+      for (path in pathsToBeCleanedStream) {
+        val pathToBeCleaned = outDir.relativize(path)
+        span.addEvent("delete", Attributes.of(AttributeKey.stringKey("dir"), "$pathToBeCleaned"))
+        outputDirectoriesToKeep.forEach {
+          check(!it.startsWith(path)) {
+            val outputDirectoryToKeep = outDir.relativize(it)
+            "'$outputDirectoryToKeep' is going to be cleaned together with '$pathToBeCleaned'. " +
+            "Please configure a different location for '$outputDirectoryToKeep'"
           }
         }
+        NioFiles.deleteRecursively(path)
       }
-      null
     }
+    Files.createDirectories(paths.tempDir)
+  }
 }
 
 private fun printEnvironmentDebugInfo() {

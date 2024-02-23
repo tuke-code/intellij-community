@@ -1,4 +1,4 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.ide.plugins
 
 import com.fasterxml.jackson.databind.type.TypeFactory
@@ -287,6 +287,11 @@ object DynamicPlugins {
     // if not a sub plugin descriptor, then check that any dependent plugin also reloadable
     if (parentModule != null && module !== parentModule) {
       return null
+    }
+
+    if (isPluginWhichDependsOnKotlinPluginInK2ModeAndItDoesNotSupportK2Mode(module)) {
+      // force restarting the IDE in the case the dynamic plugin is incompatible with Kotlin Plugin K2 mode KTIJ-24797
+      return "Plugin ${module.pluginId} depends on the Kotlin plugin in K2 Mode, but the plugin does not support K2 Mode"
     }
 
     var dependencyMessage: String? = null
@@ -968,9 +973,6 @@ private fun clearNewFocusOwner() {
 }
 
 private fun cancelAndJoinPluginScopes(classLoaders: WeakList<PluginClassLoader>) {
-  if (!Registry.`is`("ide.await.scope.completion")) {
-    return
-  }
   for (classLoader in classLoaders) {
     cancelAndJoinBlocking(classLoader.pluginCoroutineScope, "Plugin ${classLoader.pluginId}") { job, _ ->
       while (job.isActive) {

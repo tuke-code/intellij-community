@@ -1,10 +1,10 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 @file:Suppress("ReplaceGetOrSet", "UnstableApiUsage")
 
 package org.jetbrains.intellij.build.impl.compilation
 
+import com.intellij.platform.diagnostic.telemetry.helpers.useWithoutActiveScope
 import com.intellij.platform.diagnostic.telemetry.helpers.use
-import com.intellij.platform.diagnostic.telemetry.helpers.useWithScopeBlocking
 import com.intellij.util.containers.ContainerUtil
 import io.opentelemetry.api.common.AttributeKey
 import io.opentelemetry.api.common.Attributes
@@ -31,6 +31,7 @@ import java.nio.file.attribute.FileTime
 import java.security.MessageDigest
 import java.util.*
 import java.util.concurrent.*
+import java.util.concurrent.atomic.AtomicLong
 import java.util.zip.GZIPOutputStream
 import kotlin.math.min
 
@@ -90,13 +91,13 @@ fun packAndUploadToServer(context: CompilationContext, zipDir: Path, config: Com
     }
   }
   else {
-    spanBuilder("pack classes").useWithScopeBlocking {
+    spanBuilder("pack classes").use {
       packCompilationResult(context, zipDir)
     }
   }
 
   createBufferPool().use { bufferPool ->
-    spanBuilder("upload packed classes").use {
+    spanBuilder("upload packed classes").useWithoutActiveScope {
       upload(config = config, zipDir = zipDir, messages = context.messages, items = items, bufferPool = bufferPool)
     }
   }
@@ -119,7 +120,7 @@ fun packCompilationResult(context: CompilationContext, zipDir: Path, addDirEntri
   Files.createDirectories(zipDir)
 
   val items = ArrayList<PackAndUploadItem>(2048)
-  spanBuilder("compute module list to pack").use { span ->
+  spanBuilder("compute module list to pack").useWithoutActiveScope { span ->
     // production, test
     for (subRoot in Files.newDirectoryStream(context.classesOutputDirectory).use(DirectoryStream<Path>::toList)) {
       if (!Files.isDirectory(subRoot)) {
@@ -158,11 +159,11 @@ fun packCompilationResult(context: CompilationContext, zipDir: Path, addDirEntri
     }
   }
 
-  spanBuilder("build zip archives").useWithScopeBlocking {
+  spanBuilder("build zip archives").use {
     val traceContext = Context.current()
     ForkJoinTask.invokeAll(items.map { item ->
       ForkJoinTask.adapt(Callable {
-        spanBuilder("pack").setParent(traceContext).setAttribute("name", item.name).use {
+        spanBuilder("pack").setParent(traceContext).setAttribute("name", item.name).useWithoutActiveScope {
           // we compress the whole file using ZSTD
           zip(
             targetFile = item.archive,
@@ -172,7 +173,7 @@ fun packCompilationResult(context: CompilationContext, zipDir: Path, addDirEntri
             addDirEntriesMode = addDirEntriesMode
           )
         }
-        spanBuilder("compute hash").setParent(traceContext).setAttribute("name", item.name).use {
+        spanBuilder("compute hash").setParent(traceContext).setAttribute("name", item.name).useWithoutActiveScope {
           item.hash = computeHash(item.archive)
         }
       })
@@ -223,7 +224,7 @@ private fun upload(config: CompilationCacheUploadConfiguration,
   }
 
   spanBuilder("upload archives").setAttribute(AttributeKey.stringArrayKey("items"),
-                                              items.map(PackAndUploadItem::name)).useWithScopeBlocking {
+                                              items.map(PackAndUploadItem::name)).use {
     uploadArchives(reportStatisticValue = messages::reportStatisticValue,
                    config = config,
                    metadataJson = metadataJson,
@@ -254,7 +255,7 @@ fun fetchAndUnpackCompiledClasses(reportStatisticValue: (key: String, value: Str
 
     var verifyTime = 0L
     val upToDate = ContainerUtil.newConcurrentSet<String>()
-    spanBuilder("check previously unpacked directories").useWithScopeBlocking { span ->
+    spanBuilder("check previously unpacked directories").use { span ->
       verifyTime += checkPreviouslyUnpackedDirectories(items = items,
                                                        span = span,
                                                        upToDate = upToDate,
@@ -264,7 +265,7 @@ fun fetchAndUnpackCompiledClasses(reportStatisticValue: (key: String, value: Str
     reportStatisticValue("compile-parts:up-to-date:count", upToDate.size.toString())
 
     val toUnpack = LinkedHashSet<FetchAndUnpackItem>(items.size)
-    val toDownload = spanBuilder("check previously downloaded archives").useWithScopeBlocking { span ->
+    val toDownload = spanBuilder("check previously downloaded archives").use { span ->
       val start = System.nanoTime()
       val result = ForkJoinTask.invokeAll(items.mapNotNull { item ->
         if (upToDate.contains(item.name)) {
@@ -337,7 +338,8 @@ fun fetchAndUnpackCompiledClasses(reportStatisticValue: (key: String, value: Str
       val prefix = metadata.prefix
       val serverUrl = metadata.serverUrl
 
-      val failed = if (toDownload.isEmpty()) {
+      val downloadedBytes = AtomicLong()
+      val failed: List<Throwable> = if (toDownload.isEmpty()) {
         emptyList()
       }
       else {
@@ -348,17 +350,15 @@ fun fetchAndUnpackCompiledClasses(reportStatisticValue: (key: String, value: Str
                                    toDownload = toDownload,
                                    client = httpClientWithoutFollowingRedirects,
                                    bufferPool = bufferPool,
+                                   downloadedBytes = downloadedBytes,
                                    saveHash = saveHash)
         }
       }
 
       reportStatisticValue("compile-parts:download:time", TimeUnit.NANOSECONDS.toMillis((System.nanoTime() - start)).toString())
 
-      val downloadedSuccessfully = toDownload - failed.toSet()
-      val downloadedSuccessfullyBytes = downloadedSuccessfully.sumOf { Files.size(it.file) }
-
-      reportStatisticValue("compile-parts:downloaded:bytes", downloadedSuccessfullyBytes.toString())
-      reportStatisticValue("compile-parts:downloaded:count", downloadedSuccessfully.size.toString())
+      reportStatisticValue("compile-parts:downloaded:bytes", downloadedBytes.get().toString())
+      reportStatisticValue("compile-parts:downloaded:count", (toDownload.size - failed.size).toString())
       reportStatisticValue("compile-parts:failed:count", failed.size.toString())
 
       if (!failed.isEmpty()) {
@@ -542,7 +542,7 @@ internal val THREAD_ID: AttributeKey<Long> = AttributeKey.longKey("thread.id")
  *
  * See [Span](https://opentelemetry.io/docs/reference/specification).
  */
-inline fun <T> forkJoinTask(spanBuilder: SpanBuilder, crossinline operation: () -> T): ForkJoinTask<T> {
+inline fun <T> forkJoinTask(spanBuilder: SpanBuilder, crossinline operation: (Span) -> T): ForkJoinTask<T> {
   val context = Context.current()
   return ForkJoinTask.adapt(Callable {
     val thread = Thread.currentThread()
@@ -550,8 +550,8 @@ inline fun <T> forkJoinTask(spanBuilder: SpanBuilder, crossinline operation: () 
       .setParent(context)
       .setAttribute(THREAD_NAME, thread.name)
       .setAttribute(THREAD_ID, thread.id)
-      .useWithScopeBlocking {
-        operation()
+      .use { span ->
+        operation(span)
       }
   })
 }

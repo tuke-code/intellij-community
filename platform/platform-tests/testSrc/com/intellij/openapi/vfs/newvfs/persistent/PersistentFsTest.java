@@ -1,4 +1,4 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.openapi.vfs.newvfs.persistent;
 
 import com.intellij.CacheSwitcher;
@@ -33,8 +33,8 @@ import com.intellij.openapi.vfs.newvfs.impl.VirtualFileSystemEntry;
 import com.intellij.testFramework.*;
 import com.intellij.testFramework.fixtures.BareTestFixtureTestCase;
 import com.intellij.testFramework.rules.TempDirectory;
-import com.intellij.testFramework.utils.vfs.SkipVFSHealthCheck;
 import com.intellij.testFramework.utils.vfs.CheckVFSHealthRule;
+import com.intellij.testFramework.utils.vfs.SkipVFSHealthCheck;
 import com.intellij.util.ArrayUtil;
 import com.intellij.util.PathUtil;
 import com.intellij.util.containers.ContainerUtil;
@@ -1038,6 +1038,34 @@ public class PersistentFsTest extends BareTestFixtureTestCase {
     assertEquals(-1, stream3.read());
     byte[] portion2 = stream2.readNBytes(initialContent.length - 40);
     assertArrayEquals(initialContent, ArrayUtil.mergeArrays(portion1, portion2));
+  }
+
+  @Test
+  public void testSearchingForJarRootWhenItsNotCached() throws IOException {
+    // IDEA-341011 PersistentFSImpl.cacheMissedRootFromPersistence fails to find jars because it uses name instead of path
+    PersistentFSImpl fs = (PersistentFSImpl)PersistentFS.getInstance();
+    // ensure clean VFS
+    fs.disconnect();
+    fs.connect();
+
+    File root = tempDirectory.newDirectory("out");
+    FileUtil.writeToFile(new File(root, "fileInJar.txt"), "some text");
+
+    File jar = IoTestUtil.createTestJar(tempDirectory.newFile("test.jar"), root);
+    VirtualFile vFile = LocalFileSystem.getInstance().refreshAndFindFileByIoFile(jar);
+    VirtualFile jarRoot = JarFileSystem.getInstance().getJarRootForLocalFile(vFile);
+
+    VirtualFile fileInJar = jarRoot.findChild("fileInJar.txt");
+    assertNotNull(fileInJar);
+
+    // clear in-memory caches:
+    fs.disconnect();
+    fs.connect();
+
+    // this will trigger PersistentFSImpl.cacheMissedRootFromPersistence which should be able to find jar root
+    VirtualFile fileInJar2 = ManagingFS.getInstance().findFileById(((VirtualFileWithId)fileInJar).getId());
+
+    assertNotNull(fileInJar2);
   }
 
 

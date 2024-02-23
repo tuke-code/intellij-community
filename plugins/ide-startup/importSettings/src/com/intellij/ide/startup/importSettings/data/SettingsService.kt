@@ -1,15 +1,20 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.ide.startup.importSettings.data
 
+import com.intellij.ide.BootstrapBundle
 import com.intellij.ide.startup.importSettings.StartupImportIcons
+import com.intellij.ide.startup.importSettings.jb.IDEData
 import com.intellij.ide.startup.importSettings.jb.JbImportServiceImpl
 import com.intellij.ide.startup.importSettings.sync.SyncServiceImpl
 import com.intellij.ide.startup.importSettings.transfer.SettingTransferService
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationNamesInfo
+import com.intellij.openapi.application.ConfigImportHelper
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.diagnostic.thisLogger
+import com.intellij.openapi.fileChooser.FileChooser
+import com.intellij.openapi.fileChooser.FileChooserDescriptor
 import com.intellij.openapi.rd.createLifetime
 import com.intellij.openapi.rd.createNestedDisposable
 import com.intellij.openapi.util.registry.Registry
@@ -19,8 +24,14 @@ import com.intellij.ui.JBAccountInfoService
 import com.intellij.util.PlatformUtils
 import com.intellij.util.SystemProperties
 import com.jetbrains.rd.swing.proxyProperty
-import com.jetbrains.rd.util.reactive.*
+import com.jetbrains.rd.util.reactive.IPropertyView
+import com.jetbrains.rd.util.reactive.ISignal
+import com.jetbrains.rd.util.reactive.Property
+import com.jetbrains.rd.util.reactive.Signal
+import kotlinx.coroutines.*
+import kotlinx.coroutines.selects.select
 import org.jetbrains.annotations.Nls
+import java.nio.file.Path
 import java.time.LocalDate
 import javax.swing.Icon
 
@@ -33,6 +44,8 @@ interface SettingsService {
   fun getJbService(): JbService
   fun getExternalService(): ExternalService
 
+  suspend fun shouldShowImport(): Boolean
+
   val importCancelled: Signal<Unit>
 
   val error: ISignal<NotificationData>
@@ -42,6 +55,8 @@ interface SettingsService {
   val isSyncEnabled: IPropertyView<Boolean>
 
   val doClose: ISignal<Unit>
+
+  fun configChosen()
 
   fun isLoggedIn(): Boolean = jbAccount.value != null
 }
@@ -55,12 +70,27 @@ class SettingsServiceImpl : SettingsService, Disposable.Default {
     else SyncServiceImpl.getInstance()
 
   override fun getJbService() =
-    if (shouldUseMockData) TestJbService()
+    if (shouldUseMockData) TestJbService.getInstance()
     else JbImportServiceImpl.getInstance()
 
   override fun getExternalService(): ExternalService =
     if (shouldUseMockData) TestExternalService()
     else SettingTransferService.getInstance()
+
+  override suspend fun shouldShowImport(): Boolean {
+    val startTime = System.currentTimeMillis()
+    return coroutineScope {
+      val importFromJetBrainsAvailable = async { getJbService().hasDataToImport() }
+      val importFromExternalAvailable = async { getExternalService().hasDataToImport() }
+      val result = select {
+        importFromJetBrainsAvailable.onAwait { it || importFromExternalAvailable.await() }
+        importFromExternalAvailable.onAwait { it || importFromJetBrainsAvailable.await() }
+      }
+      coroutineContext.job.cancelChildren()
+      thisLogger().info("Took ${System.currentTimeMillis() - startTime}ms. to calculate shouldShowImport")
+      result
+    }
+  }
 
   override val importCancelled = Signal<Unit>().apply {
     advise(createLifetime()) {
@@ -73,6 +103,28 @@ class SettingsServiceImpl : SettingsService, Disposable.Default {
   override val jbAccount = Property<JBAccountInfoService.JBAData?>(null)
 
   override val doClose = Signal<Unit>()
+
+  override fun configChosen() {
+    if (shouldUseMockData) {
+      TestJbService.getInstance().configChosen()
+    } else {
+      val fileChooserDescriptor = FileChooserDescriptor(true, true, false, false, false, false)
+      val selectedDir = FileChooser.chooseFile(fileChooserDescriptor, null, null)
+      if (selectedDir != null) {
+        val prevPath = selectedDir.toNioPath()
+        if (ConfigImportHelper.findConfigDirectoryByPath(prevPath) != null) {
+          getJbService().importFromCustomFolder(prevPath)
+        } else {
+          error.fire(object : NotificationData {
+            override val status = NotificationData.NotificationStatus.ERROR
+            override val message = BootstrapBundle.message("import.chooser.error.unrecognized", selectedDir,
+                                                           IDEData.getSelf()?.fullName ?: "Current IDE")
+            override val customActionList = emptyList<NotificationData.Action>()
+          })
+        }
+      }
+    }
+  }
 
   private fun unloggedSyncHide(): IPropertyView<Boolean> {
     fun getValue(): Boolean = Registry.`is`("import.setting.unlogged.sync.hide")
@@ -88,7 +140,8 @@ class SettingsServiceImpl : SettingsService, Disposable.Default {
     }
   }
 
-  override val isSyncEnabled = Property(shouldUseMockData) //jbAccount.compose(unloggedSyncHide()) { account, reg -> !reg || account != null }
+  override val isSyncEnabled = Property(
+    shouldUseMockData) //jbAccount.compose(unloggedSyncHide()) { account, reg -> !reg || account != null }
 
   init {
     if (shouldUseMockData) {
@@ -118,11 +171,15 @@ interface SyncService : JbService {
 }
 
 interface ExternalService : BaseService {
-  suspend fun warmUp()
+  suspend fun hasDataToImport(): Boolean
+  fun warmUp(scope: CoroutineScope)
 }
 
 interface JbService : BaseService {
+  suspend fun hasDataToImport(): Boolean
+  suspend fun warmUp()
   fun getOldProducts(): List<Product>
+  fun importFromCustomFolder(folderPath: Path)
 }
 
 interface BaseService {
@@ -182,7 +239,7 @@ interface ChildSetting {
   val rightComment: @Nls String?
 }
 
-data class DataForSave(val id: String, val childIds: List<String>? = null)
+data class DataForSave(val id: String, val selectedChildIds: List<String>? = null, val unselectedChildIds: List<String>? = null)
 
 interface ImportFromProduct : DialogImportData {
   val from: DialogImportItem
@@ -193,12 +250,6 @@ interface DialogImportData {
   val message: @Nls String?
   val progress: ImportProgress
 }
-
-interface ImportProgress {
-  val progressMessage: IPropertyView<@Nls String?>
-  val progress: IOptPropertyView<Int>
-}
-
 
 data class DialogImportItem(val item: SettingsContributor, val icon: Icon) {
 
@@ -237,4 +288,3 @@ data class DialogImportItem(val item: SettingsContributor, val icon: Icon) {
     }
   }
 }
-

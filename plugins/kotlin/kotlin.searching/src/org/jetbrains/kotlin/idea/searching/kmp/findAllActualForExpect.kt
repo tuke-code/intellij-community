@@ -10,14 +10,13 @@ import com.intellij.refactoring.suggested.createSmartPointer
 import com.intellij.util.concurrency.annotations.RequiresBackgroundThread
 import org.jetbrains.kotlin.analysis.api.analyze
 import org.jetbrains.kotlin.analysis.api.symbols.KtDeclarationSymbol
-import org.jetbrains.kotlin.idea.searching.kmp.matchesWithActual
+import org.jetbrains.kotlin.idea.base.psi.isEffectivelyActual
 import org.jetbrains.kotlin.idea.stubindex.KotlinFullClassNameIndex
 import org.jetbrains.kotlin.idea.stubindex.KotlinTopLevelFunctionFqnNameIndex
 import org.jetbrains.kotlin.idea.stubindex.KotlinTopLevelPropertyFqnNameIndex
 import org.jetbrains.kotlin.idea.stubindex.KotlinTopLevelTypeAliasFqNameIndex
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.psi.*
-import org.jetbrains.kotlin.psi.psiUtil.hasActualModifier
 import kotlin.collections.any
 import kotlin.let
 
@@ -30,18 +29,28 @@ fun KtDeclaration.findAllActualForExpect(searchScope: SearchScope = runReadActio
     containingClassOrObjectOrSelf?.fqName?.let { fqName ->
         val fqNameAsString = fqName.asString()
         val targetDeclarations: List<KtDeclaration> = KotlinFullClassNameIndex.getAllElements(fqNameAsString, project, scope, filter = {
-            it.matchesWithActual(containingClassOrObjectOrSelf)
+            it.matchesWithExpect(containingClassOrObjectOrSelf)
         }) + KotlinTopLevelTypeAliasFqNameIndex.getAllElements(fqNameAsString, project, scope, filter = {
-            it.matchesWithActual(containingClassOrObjectOrSelf)
+            it.matchesWithExpect(containingClassOrObjectOrSelf)
         })
 
         return targetDeclarations.asSequence().mapNotNull { targetDeclaration ->
             when (declaration) {
                 is KtClassOrObject -> targetDeclaration
+                is KtConstructor<*> -> {
+                    if (targetDeclaration is KtClass) {
+                        val primaryConstructor = targetDeclaration.primaryConstructor
+                        if (primaryConstructor?.matchesWithExpect(declaration) == true) {
+                            primaryConstructor
+                        } else {
+                            targetDeclaration.secondaryConstructors.find { it.matchesWithExpect(declaration) }
+                        }
+                    } else null
+                }
                 is KtNamedDeclaration ->
                     when (targetDeclaration) {
                         is KtClassOrObject -> targetDeclaration.declarations.firstOrNull {
-                            it is KtNamedDeclaration && it.name == declaration.name && it.matchesWithActual(declaration)
+                            it is KtNamedDeclaration && it.name == declaration.name && it.matchesWithExpect(declaration)
                         }
                         else -> null
                     }
@@ -57,13 +66,13 @@ fun KtDeclaration.findAllActualForExpect(searchScope: SearchScope = runReadActio
     return when (declaration) {
         is KtNamedFunction -> {
             KotlinTopLevelFunctionFqnNameIndex.getAllElements(topLevelFqName, project, scope) {
-                it.matchesWithActual(declaration)
+                it.matchesWithExpect(declaration)
             }.asSequence().map(KtNamedFunction::createSmartPointer)
         }
 
         is KtProperty -> {
             KotlinTopLevelPropertyFqnNameIndex.getAllElements(topLevelFqName, project, scope) {
-                it.matchesWithActual(declaration)
+                it.matchesWithExpect(declaration)
             }.asSequence().map(KtProperty::createSmartPointer)
         }
 
@@ -71,10 +80,10 @@ fun KtDeclaration.findAllActualForExpect(searchScope: SearchScope = runReadActio
     }
 }
 
-private fun KtDeclaration.matchesWithActual(actualDeclaration: KtDeclaration): Boolean {
+private fun KtDeclaration.matchesWithExpect(expectDeclaration: KtDeclaration): Boolean {
     val declaration = this
-    return declaration.hasActualModifier() && analyze(declaration) {
+    return declaration.isEffectivelyActual() && analyze(declaration) {
         val symbol: KtDeclarationSymbol = declaration.getSymbol()
-        return symbol.getExpectsForActual().any { it.psi == actualDeclaration }
+        return symbol.getExpectsForActual().any { it.psi == expectDeclaration }
     }
 }

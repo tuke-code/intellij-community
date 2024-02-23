@@ -1,6 +1,7 @@
-// Copyright 2000-2021 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
+// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.platform.workspace.storage.tests.impl
 
+import com.intellij.platform.workspace.storage.ExternalMappingKey
 import com.intellij.platform.workspace.storage.impl.ChangeEntry
 import com.intellij.platform.workspace.storage.impl.MutableEntityStorageImpl
 import com.intellij.platform.workspace.storage.impl.asBase
@@ -22,6 +23,8 @@ import kotlin.test.*
 class WorkspaceBuilderChangeLogTest {
   internal lateinit var builder: MutableEntityStorageImpl
   internal lateinit var another: MutableEntityStorageImpl
+
+  private val externalMappingKey = ExternalMappingKey.create<Any>("test.my.mapping")
 
   @BeforeEach
   fun setUp() {
@@ -437,7 +440,8 @@ class WorkspaceBuilderChangeLogTest {
     }
 
     val log = builder.changeLog.changeLog
-    assertEquals(0, log.size)
+    assertEquals(1, log.size)
+    log.values.single().assertReplaceEntity()
   }
 
   @Test
@@ -535,7 +539,7 @@ class WorkspaceBuilderChangeLogTest {
     }
 
     val log = builder.changeLog.changeLog
-    assertEquals(0, log.size)
+    assertEquals(1, log.size)
   }
 
   @Test
@@ -561,7 +565,8 @@ class WorkspaceBuilderChangeLogTest {
     }
 
     val log = builder.changeLog.changeLog
-    assertEquals(0, log.size)
+    assertEquals(1, log.size)
+    log.values.single().assertReplaceEntity()
   }
 
   @Test
@@ -725,7 +730,7 @@ class WorkspaceBuilderChangeLogTest {
     builder.addEntity(moduleTestEntity)
     builder.changeLog.clear()
     val contentRoot = builder.entities(ModuleTestEntity::class.java).single().contentRoots.single()
-    builder.getMutableExternalMapping<Any>("data").addMapping(contentRoot, 1)
+    builder.getMutableExternalMapping(externalMappingKey).addMapping(contentRoot, 1)
     val original = builder.toSnapshot()
     builder.removeEntity(contentRoot)
     builder.addEntity(ContentRootTestEntity(MySource) {
@@ -750,7 +755,7 @@ class WorkspaceBuilderChangeLogTest {
       module = moduleTestEntity
     }
     builder.addEntity(newContentRoot)
-    builder.getMutableExternalMapping<Any>("data").addMapping(newContentRoot, 1)
+    builder.getMutableExternalMapping(externalMappingKey).addMapping(newContentRoot, 1)
     assertFalse(builder.hasSameEntities())
   }
 
@@ -781,7 +786,7 @@ class WorkspaceBuilderChangeLogTest {
   fun updateParentOfOneToOneChild() {
     val child = builder addEntity ChildSampleEntity("data", MySource)
     val newBuilder = builder.toSnapshot().toBuilder() as MutableEntityStorageImpl
-    newBuilder addEntity SampleEntity(true, "", listOf(), emptyMap(), VirtualFileUrlManagerImpl().fromUrl("file:///tmp"), MySource) {
+    newBuilder addEntity SampleEntity(true, "", listOf(), emptyMap(), VirtualFileUrlManagerImpl().getOrCreateFromUri("file:///tmp"), MySource) {
       this.children = listOf(child)
     }
 
@@ -897,10 +902,12 @@ class WorkspaceBuilderChangeLogTest {
     assertNull(replaceEvent.data)
   }
 
-  private fun ChangeEntry?.assertReplaceEntity(removedChildren: Int = 0,
-                                               newChildren: Int = 0,
-                                               newParents: Int = 0,
-                                               removedParents: Int = 0): ChangeEntry.ReplaceEntity {
+  private fun ChangeEntry?.assertReplaceEntity(
+    removedChildren: Int = 0,
+    newChildren: Int = 0,
+    newParents: Int = 0,
+    removedParents: Int = 0,
+  ): ChangeEntry.ReplaceEntity {
     assertTrue(this is ChangeEntry.ReplaceEntity)
     assertAll(
       { assertEquals(removedChildren, references!!.removedChildren.size) },

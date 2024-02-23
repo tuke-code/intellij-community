@@ -23,11 +23,14 @@ import com.intellij.history.integration.revertion.SelectionReverter;
 import com.intellij.history.integration.ui.models.*;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.platform.lvcs.impl.statistics.LocalHistoryCounter;
 import org.jetbrains.annotations.NotNull;
+
+import java.util.Set;
 
 
 public final class SelectionHistoryDialogModel extends FileHistoryDialogModel {
-  private SelectionCalculator myCalculatorCache;
+  private RevisionSelectionCalculator myCalculatorCache;
   private final int myFrom;
   private final int myTo;
 
@@ -55,9 +58,9 @@ public final class SelectionHistoryDialogModel extends FileHistoryDialogModel {
                                         isCurrentRevisionSelected());
   }
 
-  private SelectionCalculator getCalculator() {
+  private RevisionSelectionCalculator getCalculator() {
     if (myCalculatorCache == null) {
-      myCalculatorCache = new SelectionCalculator(myGateway, RevisionDataKt.getAllRevisions(getRevisionData()), myFrom, myTo);
+      myCalculatorCache = new RevisionSelectionCalculator(myGateway, RevisionDataKt.getAllRevisions(getRevisionData()), myFrom, myTo);
     }
     return myCalculatorCache;
   }
@@ -65,5 +68,15 @@ public final class SelectionHistoryDialogModel extends FileHistoryDialogModel {
   @Override
   public Reverter createReverter() {
     return new SelectionReverter(myProject, myVcs, myGateway, getCalculator(), getLeftRevision(), getRightEntry(), myFrom, myTo);
+  }
+
+  @Override
+  public @NotNull Set<Long> filterContents(@NotNull String filter) {
+    return RevisionDataKt.filterContents(getCalculator(), filter);
+  }
+
+  @Override
+  public @NotNull LocalHistoryCounter.Kind getKind() {
+    return LocalHistoryCounter.Kind.Selection;
   }
 }

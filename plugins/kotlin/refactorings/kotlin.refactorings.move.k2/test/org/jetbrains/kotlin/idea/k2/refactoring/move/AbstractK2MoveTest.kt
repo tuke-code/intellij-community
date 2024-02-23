@@ -4,6 +4,7 @@ package org.jetbrains.kotlin.idea.k2.refactoring.move
 import com.google.gson.JsonObject
 import com.intellij.openapi.application.runWriteAction
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.util.registry.Registry
 import com.intellij.openapi.vfs.VfsUtil
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.isFile
@@ -18,7 +19,7 @@ import com.intellij.refactoring.move.moveMembers.MoveMembersProcessor
 import org.jetbrains.kotlin.idea.core.util.toPsiDirectory
 import org.jetbrains.kotlin.idea.core.util.toPsiFile
 import org.jetbrains.kotlin.idea.jsonUtils.getNullableString
-import org.jetbrains.kotlin.idea.jsonUtils.getString
+import org.jetbrains.kotlin.idea.base.util.getString
 import org.jetbrains.kotlin.idea.k2.refactoring.move.descriptor.K2MoveDescriptor
 import org.jetbrains.kotlin.idea.k2.refactoring.move.descriptor.K2MoveSourceDescriptor
 import org.jetbrains.kotlin.idea.k2.refactoring.move.descriptor.K2MoveTargetDescriptor
@@ -46,6 +47,7 @@ abstract class AbstractK2MoveTest : AbstractMultifileRefactoringTest() {
 
     override fun runRefactoring(path: String, config: JsonObject, rootDir: VirtualFile, project: Project) {
         if (config.get("enabledInK2")?.asBoolean == true && onlyPassingDisabledTests) fail()
+        Registry.get("kotlin.k2.smart.move").setValue(true, testRootDisposable)
         runMoveRefactoring(path, config, rootDir, project)
     }
 

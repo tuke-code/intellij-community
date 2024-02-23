@@ -15,6 +15,7 @@ import com.jediterm.core.util.TermSize
 import com.jediterm.terminal.*
 import com.jediterm.terminal.model.*
 import org.jetbrains.plugins.terminal.TerminalUtil
+import org.jetbrains.plugins.terminal.shell_integration.CommandBlockIntegration
 import org.jetbrains.plugins.terminal.util.ShellIntegration
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CopyOnWriteArrayList
@@ -32,6 +33,7 @@ class BlockTerminalSession(settings: JBTerminalSystemSettingsProviderBase,
   internal val commandManager: ShellCommandManager
   private val typeAheadManager: TerminalTypeAheadManager
   private val terminationListeners: MutableList<Runnable> = CopyOnWriteArrayList()
+  val commandBlockIntegration: CommandBlockIntegration = shellIntegration.commandBlockIntegration!!
 
   init {
     val styleState = StyleState()
@@ -40,9 +42,13 @@ class BlockTerminalSession(settings: JBTerminalSystemSettingsProviderBase,
     styleState.setDefaultStyle(defaultStyle)
     textBuffer = TerminalTextBuffer(80, 24, styleState, AdvancedSettings.getInt("terminal.buffer.max.lines.count"), null)
     model = TerminalModel(textBuffer)
-    controller = JediTerminal(ModelUpdatingTerminalDisplay(model, settings), textBuffer, styleState)
+    val alarmManager = TerminalAlarmManager(settings)
+    controller = JediTerminal(ModelUpdatingTerminalDisplay(alarmManager, model, settings), textBuffer, styleState)
 
     commandManager = ShellCommandManager(this)
+    // Add AlarmManager listener now, because we can't add it in its constructor.
+    // Because AlarmManager need to be created before ShellCommandManager
+    commandManager.addListener(alarmManager, this)
 
     val typeAheadTerminalModel = JediTermTypeAheadModel(controller, textBuffer, settings)
     typeAheadManager = TerminalTypeAheadManager(typeAheadTerminalModel)

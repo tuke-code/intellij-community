@@ -22,13 +22,13 @@ import org.jetbrains.kotlin.idea.codeInliner.CodeToInlineBuilder
 import org.jetbrains.kotlin.idea.codeInliner.PropertyUsageReplacementStrategy
 import org.jetbrains.kotlin.idea.codeInliner.unwrapSpecialUsageOrNull
 import org.jetbrains.kotlin.idea.codeinsight.utils.findExistingEditor
-import org.jetbrains.kotlin.idea.j2k.IdeaJavaToKotlinServices
 import org.jetbrains.kotlin.idea.refactoring.inline.J2KInlineCache.Companion.findOrCreateUsageReplacementStrategy
 import org.jetbrains.kotlin.idea.refactoring.inline.J2KInlineCache.Companion.findUsageReplacementStrategy
 import org.jetbrains.kotlin.idea.refactoring.inline.codeInliner.UsageReplacementStrategy
 import org.jetbrains.kotlin.j2k.ConverterSettings
 import org.jetbrains.kotlin.j2k.J2kConverterExtension
-import org.jetbrains.kotlin.j2k.JKMultipleFilesPostProcessingTarget
+import org.jetbrains.kotlin.j2k.J2kConverterExtension.Kind.K1_NEW
+import org.jetbrains.kotlin.j2k.PostProcessingTarget.MultipleFilesPostProcessingTarget
 import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.nj2k.NewJavaToKotlinConverter
 import org.jetbrains.kotlin.nj2k.NewJavaToKotlinConverter.Companion.addImports
@@ -96,8 +96,8 @@ private fun NewJavaToKotlinConverter.convertToKotlinNamedDeclaration(
     referenced: PsiMember,
     context: PsiElement,
 ): KtNamedDeclaration {
-    val converterExtension = J2kConverterExtension.extension(useNewJ2k = true)
-    val postProcessor = converterExtension.createPostProcessor(formatCode = true)
+    val converterExtension = J2kConverterExtension.extension(kind = K1_NEW)
+    val postProcessor = converterExtension.createPostProcessor()
     val processor = converterExtension.createWithProgressProcessor(
         progress = ProgressManager.getInstance().progressIndicator,
         files = listOf(referenced.containingFile as PsiJavaFile),
@@ -122,7 +122,7 @@ private fun NewJavaToKotlinConverter.convertToKotlinNamedDeclaration(
     }
 
     postProcessor.doAdditionalProcessing(
-        target = JKMultipleFilesPostProcessingTarget(files = listOf(file)),
+        target = MultipleFilesPostProcessingTarget(files = listOf(file)),
         converterContext = j2kContext,
         onPhaseChanged = { i, s -> processor.updateState(null, phasesCount + i, s) },
     )
@@ -175,8 +175,7 @@ class J2KInlineCache(private val strategy: UsageReplacementStrategy, private val
             val converter = NewJavaToKotlinConverter(
                 javaMember.project,
                 javaMember.module,
-                ConverterSettings.defaultSettings,
-                IdeaJavaToKotlinServices
+                ConverterSettings.defaultSettings
             )
 
             val declaration = converter.convertToKotlinNamedDeclaration(

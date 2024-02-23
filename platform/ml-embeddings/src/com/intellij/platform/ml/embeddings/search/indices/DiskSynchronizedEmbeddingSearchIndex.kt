@@ -4,6 +4,7 @@ package com.intellij.platform.ml.embeddings.search.indices
 import ai.grazie.emb.FloatTextEmbedding
 import com.intellij.platform.ml.embeddings.search.utils.ScoredText
 import com.intellij.concurrency.ConcurrentCollectionFactory
+import com.intellij.platform.ml.embeddings.search.utils.LockedSequenceWrapper
 import com.intellij.util.containers.CollectionFactory
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.ensureActive
@@ -22,6 +23,7 @@ class DiskSynchronizedEmbeddingSearchIndex(val root: Path, limit: Int? = null) :
   private var indexToId: MutableMap<Int, String> = CollectionFactory.createSmallMemoryFootprintMap()
   private var idToEntry: MutableMap<String, IndexEntry> = CollectionFactory.createSmallMemoryFootprintMap()
   private val uncheckedIds: MutableSet<String> = ConcurrentCollectionFactory.createConcurrentSet()
+  var changed: Boolean = false
 
   private val lock = ReentrantReadWriteLock()
 
@@ -52,13 +54,23 @@ class DiskSynchronizedEmbeddingSearchIndex(val root: Path, limit: Int? = null) :
     id in idToEntry
   }
 
+  override fun clear() = lock.write {
+    indexToId.clear()
+    idToEntry.clear()
+    uncheckedIds.clear()
+    changed = false
+  }
+
   override fun onIndexingStart() {
     uncheckedIds.clear()
     uncheckedIds.addAll(idToEntry.keys)
   }
 
   override fun onIndexingFinish() = lock.write {
-    uncheckedIds.forEach { delete(it, all = true, shouldSaveIds = false) }
+    if (uncheckedIds.size > 0) changed = true
+    uncheckedIds.forEach {
+      delete(it, all = true, shouldSaveIds = false)
+    }
     uncheckedIds.clear()
   }
 
@@ -68,6 +80,7 @@ class DiskSynchronizedEmbeddingSearchIndex(val root: Path, limit: Int? = null) :
       for ((id, embedding) in values) {
         ensureActive()
         val entry = idToEntry.getOrPut(id) {
+          changed = true
           if (limit != null && idToEntry.size >= limit!!) return@write
           val index = idToEntry.size
           indexToId[index] = id
@@ -100,8 +113,13 @@ class DiskSynchronizedEmbeddingSearchIndex(val root: Path, limit: Int? = null) :
     return idToEntry.mapValues { it.value.embedding }.findClosest(searchEmbedding, topK, similarityThreshold)
   }
 
-  override fun streamFindClose(searchEmbedding: FloatTextEmbedding, similarityThreshold: Double?): Sequence<ScoredText> = lock.read {
-    return idToEntry.asSequence().map { it.key to it.value.embedding }.streamFindClose(searchEmbedding, similarityThreshold)
+  override fun streamFindClose(searchEmbedding: FloatTextEmbedding, similarityThreshold: Double?): Sequence<ScoredText> {
+    return LockedSequenceWrapper(lock::readLock) {
+      this.idToEntry // manually use the receiver here to make sure the property is not captured by reference
+        .asSequence()
+        .map { it.key to it.value.embedding }
+        .streamFindClose(searchEmbedding, similarityThreshold)
+    }
   }
 
   override fun estimateMemoryUsage() = fileManager.embeddingSizeInBytes.toLong() * size
@@ -150,6 +168,7 @@ class DiskSynchronizedEmbeddingSearchIndex(val root: Path, limit: Int? = null) :
 
   private fun add(id: String, embedding: FloatTextEmbedding, shouldCount: Boolean = false) {
     val entry = idToEntry.getOrPut(id) {
+      changed = true
       if (limit != null && idToEntry.size >= limit!!) return@add
       val index = idToEntry.size
       fileManager[index] = embedding

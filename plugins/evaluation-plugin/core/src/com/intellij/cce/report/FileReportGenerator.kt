@@ -12,6 +12,7 @@ import java.io.File
 import java.io.FileWriter
 import java.io.OutputStreamWriter
 import java.nio.file.Path
+import java.text.DecimalFormat
 import java.util.zip.GZIPOutputStream
 
 abstract class FileReportGenerator(
@@ -38,7 +39,7 @@ abstract class FileReportGenerator(
     val resourceFile = File(resourcePath.toString())
     resourceFile.writeText("var sessions = {};\nvar features={};\nvar fullLineLog=[];\nsessions = ${parseJsonInJs(sessionsJson)};\n")
     processStorages(sessions, resourceFile)
-    val reportTitle = "Code Completion Report for file $fileName ($filterName and $comparisonFilterName filter)"
+    val reportTitle = "Evaluation Report for file $fileName (project: ${fileInfo.sessionsInfo.projectName})"
     createHTML().html {
       head {
         createHead(this, reportTitle, resourcePath)
@@ -90,6 +91,8 @@ abstract class FileReportGenerator(
     }
     return resultStream.toString()
   }
+
+  protected fun Double.format() = DecimalFormat("0.##").format(this)
 
   companion object {
     private val sessionSerializer = SessionSerializer()

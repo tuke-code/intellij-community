@@ -1,46 +1,101 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+@file:OptIn(IntellijInternalApi::class)
+@file:Suppress("ReplaceJavaStaticMethodWithKotlinAnalog")
+
 package com.intellij.platform.settings.local
 
-import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.components.ComponentManager
 import com.intellij.openapi.components.StoragePathMacros
 import com.intellij.openapi.extensions.ExtensionPointName
-import com.intellij.platform.settings.ChainedSettingsController
-import com.intellij.platform.settings.SettingDescriptor
-import com.intellij.platform.settings.SettingsController
-import com.intellij.platform.settings.SettingsControllerInternal
+import com.intellij.openapi.util.IntellijInternalApi
+import com.intellij.platform.settings.*
+import org.jetbrains.annotations.ApiStatus.Internal
+import org.jetbrains.annotations.TestOnly
+import org.jetbrains.annotations.VisibleForTesting
+import java.nio.file.Path
 
-private val SETTINGS_CONTROLLER_EP_NAME: ExtensionPointName<ChainedSettingsController> =
+@VisibleForTesting
+internal val SETTINGS_CONTROLLER_EP_NAME: ExtensionPointName<DelegatedSettingsController> =
   ExtensionPointName("com.intellij.settingsController")
 
-private val delegateToSettingsController = System.getProperty("idea.settings.cache.delegate.to.controller", "true").toBoolean()
+@VisibleForTesting
+@IntellijInternalApi
+@Internal
+class SettingsControllerMediator(
+  private val controllers: List<DelegatedSettingsController> = SETTINGS_CONTROLLER_EP_NAME.extensionList,
+  private val isPersistenceStateComponentProxy: Boolean = controllers.size > 1,
+) : SettingsController {
+  @TestOnly
+  constructor(isPersistenceStateComponentProxy: Boolean)
+    : this(controllers = SETTINGS_CONTROLLER_EP_NAME.extensionList, isPersistenceStateComponentProxy = isPersistenceStateComponentProxy)
 
-internal class SettingsControllerMediator : SettingsController, SettingsControllerInternal {
-  private val first: ChainedSettingsController
-  private val chain: List<ChainedSettingsController>
-
-  init {
-    val extensions = SETTINGS_CONTROLLER_EP_NAME.extensionList
-    first = extensions.first()
-    chain = extensions.subList(1, extensions.size)
+  override fun <T : Any> getItem(key: SettingDescriptor<T>): T? {
+    return doGetItem(key).get()
   }
 
-  override fun <T : Any> getItem(key: SettingDescriptor<T>): T? = first.getItem(key, chain)
+  override fun <T : Any> doGetItem(key: SettingDescriptor<T>): GetResult<T?> {
+    for (controller in controllers) {
+      val result = controller.getItem(key)
+      if (result.isResolved) {
+        return result
+      }
+    }
 
-  override suspend fun <T : Any> setItem(key: SettingDescriptor<T>, value: T?) {
-    return first.setItem(key = key, value = value, chain = chain)
+    return GetResult.inapplicable()
   }
 
-  override fun hasKeyStartsWith(key: String) = first.hasKeyStartsWith(key)
+  override fun <T : Any> setItem(key: SettingDescriptor<T>, value: T?) {
+    doSetItem(key, value)
+  }
 
-  fun <T : Any> putIfDiffers(key: SettingDescriptor<T>, value: T?) = first.putIfDiffers(key = key, value = value, chain = chain)
+  @IntellijInternalApi
+  override fun <T : Any> doSetItem(key: SettingDescriptor<T>, value: T?): SetResult {
+    var totalResult = SetResult.INAPPLICABLE
+    for (controller in controllers) {
+      val result = controller.setItem(key = key, value = value)
+      if (result == SetResult.FORBID) {
+        return result
+      }
+      else if (result == SetResult.DONE) {
+        totalResult = result
+      }
+    }
+    return totalResult
+  }
 
-  override fun createStateStorage(collapsedPath: String): Any? {
-    if (collapsedPath == StoragePathMacros.CACHE_FILE &&
-        (delegateToSettingsController || ApplicationManager.getApplication().isUnitTestMode)) {
-      return StateStorageBackedByController(this)
+  override fun createStateStorage(collapsedPath: String, file: Path): Any? {
+    return when (collapsedPath) {
+      StoragePathMacros.CACHE_FILE -> {
+        StateStorageBackedByController(controller = this, tags = java.util.List.of(CacheTag))
+      }
+      else -> null
+    }
+  }
+
+  @IntellijInternalApi
+  override fun release() {
+    for (controller in controllers) {
+      controller.close()
+    }
+  }
+
+  @IntellijInternalApi
+  override fun isPersistenceStateComponentProxy(): Boolean = isPersistenceStateComponentProxy
+
+  @IntellijInternalApi
+  override fun createChild(container: ComponentManager): SettingsController? {
+    val result = ArrayList<DelegatedSettingsController>()
+    for (controller in controllers) {
+      controller.createChild(container)?.let {
+        result.add(it)
+      }
+    }
+
+    if (result.isEmpty()) {
+      return null
     }
     else {
-      return null
+      return SettingsControllerMediator(controllers = java.util.List.copyOf(result), isPersistenceStateComponentProxy = true)
     }
   }
 }

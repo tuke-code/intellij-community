@@ -78,6 +78,11 @@ class KotlinUnusedHighlightingVisitor(private val ktFile: KtFile) {
     private fun registerLocalReferences(elements: List<PsiElement>) {
         val registerDeclarationAccessVisitor = object : KtVisitorVoid() {
             override fun visitSimpleNameExpression(expression: KtSimpleNameExpression) {
+                if (expression.parent is KtValueArgumentName) {
+                    // usage of parameter in form of named argument is not counted
+                    return
+                }
+
                 val symbol = expression.mainReference.resolveToSymbol()
                 if (symbol is KtLocalVariableSymbol || symbol is KtValueParameterSymbol || symbol is KtKotlinPropertySymbol) {
                     refHolder.registerLocalRef(symbol.psi, expression)
@@ -199,13 +204,21 @@ class KotlinRefsHolder {
 class SafeDeleteFix(declaration: KtNamedDeclaration) : LocalQuickFixAndIntentionActionOnPsiElement(declaration) {
     @Nls
     private val name: String =
-      KotlinBaseHighlightingBundle.message("safe.delete.text", declaration.name ?: declaration.text)
+        KotlinBaseHighlightingBundle.message(declaration.toNameKey(), declaration.name ?: declaration.text)
+
+    private fun KtNamedDeclaration.toNameKey(): String =
+        when (this) {
+            is KtPrimaryConstructor -> "safe.delete.primary.ctor.text.0"
+            is KtSecondaryConstructor -> "safe.delete.secondary.ctor.text.0"
+            is KtParameter -> "safe.delete.parameter.text.0"
+            else -> "safe.delete.text.0"
+        }
 
     override fun getText(): @IntentionName String {
        return name
     }
 
-    override fun getFamilyName() = KotlinBaseHighlightingBundle.message("safe.delete.family")
+    override fun getFamilyName(): String = KotlinBaseHighlightingBundle.message("safe.delete.family")
 
     override fun startInWriteAction(): Boolean = false
 

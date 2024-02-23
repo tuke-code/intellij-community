@@ -36,6 +36,7 @@ import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.plugins.terminal.fus.TerminalUsageTriggerCollector;
+import org.jetbrains.plugins.terminal.shell_integration.CommandBlockIntegration;
 import org.jetbrains.plugins.terminal.util.ShellIntegration;
 import org.jetbrains.plugins.terminal.util.ShellType;
 import org.jetbrains.plugins.terminal.util.TerminalEnvironment;
@@ -52,14 +53,14 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
-import static org.jetbrains.plugins.terminal.LocalBlockTerminalRunner.BLOCK_TERMINAL_FISH_REGISTRY;
-import static org.jetbrains.plugins.terminal.LocalBlockTerminalRunner.BLOCK_TERMINAL_POWERSHELL_REGISTRY;
+import static org.jetbrains.plugins.terminal.LocalBlockTerminalRunner.*;
 
 public class LocalTerminalDirectRunner extends AbstractTerminalRunner<PtyProcess> {
   private static final Logger LOG = Logger.getInstance(LocalTerminalDirectRunner.class);
   private static final String JEDITERM_USER_RCFILE = "JEDITERM_USER_RCFILE";
   private static final String ZDOTDIR = "ZDOTDIR";
   private static final String IJ_ZSH_DIR = "JETBRAINS_INTELLIJ_ZSH_DIR";
+  private static final String IJ_COMMAND_END_MARKER = "JETBRAINS_INTELLIJ_COMMAND_END_MARKER";
   private static final String IJ_COMMAND_HISTORY_FILE_ENV = "__INTELLIJ_COMMAND_HISTFILE__";
   private static final String LOGIN_SHELL = "LOGIN_SHELL";
   private static final String LOGIN_CLI_OPTION = "--login";
@@ -235,7 +236,10 @@ public class LocalTerminalDirectRunner extends AbstractTerminalRunner<PtyProcess
       throw new IllegalStateException("Working directory must not be null, startup options: " + options);
     }
 
-    TerminalUsageTriggerCollector.triggerLocalShellStarted(myProject, command);
+    var shellIntegration = options.getShellIntegration();
+    boolean isBlockTerminal = isBlockTerminalEnabled() && shellIntegration != null && shellIntegration.getCommandBlockIntegration() != null;
+    TerminalUsageTriggerCollector.triggerLocalShellStarted(myProject, command, isBlockTerminal);
+
     try {
       long startNano = System.nanoTime();
       PtyProcessBuilder builder = new PtyProcessBuilder(command)
@@ -274,11 +278,18 @@ public class LocalTerminalDirectRunner extends AbstractTerminalRunner<PtyProcess
   }
 
   public static @NotNull List<String> convertShellPathToCommand(@NotNull String shellPath) {
-    List<String> shellCommand = ParametersListUtil.parse(shellPath, false, !SystemInfo.isWindows);
+    List<String> shellCommand;
+    if (isAbsoluteFilePathAndExists(shellPath)) {
+      shellCommand = List.of(shellPath);
+    }
+    else {
+      shellCommand = ParametersListUtil.parse(shellPath, false, !SystemInfo.isWindows);
+    }
     String shellExe = ContainerUtil.getFirstItem(shellCommand);
     if (shellExe == null) return shellCommand;
     String shellName = PathUtil.getFileName(shellExe);
     if (!containsLoginOrInteractiveOption(shellCommand)) {
+      shellCommand = new ArrayList<>(shellCommand);
       if (isLoginOptionAvailable(shellName) && SystemInfo.isMac) {
         shellCommand.add(LOGIN_CLI_OPTION);
       }
@@ -286,7 +297,12 @@ public class LocalTerminalDirectRunner extends AbstractTerminalRunner<PtyProcess
         shellCommand.add(INTERACTIVE_CLI_OPTION);
       }
     }
-    return shellCommand;
+    return List.copyOf(shellCommand);
+  }
+
+  private static boolean isAbsoluteFilePathAndExists(@NotNull String path) {
+    File file = new File(path);
+    return file.isAbsolute() && file.isFile();
   }
 
   private static @NotNull String stringifyProcessInfo(String @NotNull[] command,
@@ -426,8 +442,7 @@ public class LocalTerminalDirectRunner extends AbstractTerminalRunner<PtyProcess
 
     List<String> arguments = new ArrayList<>(shellCommand.subList(1, shellCommand.size()));
     Map<String, String> envs = ShellStartupOptionsKt.createEnvVariablesMap(options.getEnvVariables());
-    ShellType shellType = null;
-    boolean withCommandBlocks = false;
+    ShellIntegration integration = null;
 
     List<String> resultCommand = new ArrayList<>();
     resultCommand.add(shellExe);
@@ -435,14 +450,14 @@ public class LocalTerminalDirectRunner extends AbstractTerminalRunner<PtyProcess
     String shellName = PathUtil.getFileName(shellExe);
     String rcFilePath = findRCFile(shellName);
     if (rcFilePath != null) {
+      boolean isBlockTerminal = isBlockTerminalSupported(shellName);
       if (shellName.equals(BASH_NAME) || (SystemInfo.isMac && shellName.equals(SH_NAME))) {
         addRcFileArgument(envs, arguments, resultCommand, rcFilePath, "--rcfile");
         // remove --login to enable --rcfile sourcing
         boolean loginShell = arguments.removeAll(LOGIN_CLI_OPTIONS);
         setLoginShellEnv(envs, loginShell);
         setCommandHistoryFile(options, envs);
-        shellType = ShellType.BASH;
-        withCommandBlocks = true;
+        integration = new ShellIntegration(ShellType.BASH, isBlockTerminal ? new CommandBlockIntegration() : null);
       }
       else if (shellName.equals(ZSH_NAME)) {
         String zdotdir = envs.get(ZDOTDIR);
@@ -452,37 +467,40 @@ public class LocalTerminalDirectRunner extends AbstractTerminalRunner<PtyProcess
         String zshDir = PathUtil.getParentPath(rcFilePath);
         envs.put(ZDOTDIR, zshDir);
         envs.put(IJ_ZSH_DIR, zshDir);
-        shellType = ShellType.ZSH;
-        withCommandBlocks = true;
+        integration = new ShellIntegration(ShellType.ZSH, isBlockTerminal ? new CommandBlockIntegration() : null);
       }
       else if (shellName.equals(FISH_NAME)) {
         // `--init-command=COMMANDS` is available since Fish 2.7.0 (released November 23, 2017)
         // Multiple `--init-command=COMMANDS` are supported.
         resultCommand.add("--init-command=source " + CommandLineUtil.posixQuote(rcFilePath));
-        shellType = ShellType.FISH;
-        withCommandBlocks = Registry.is(BLOCK_TERMINAL_FISH_REGISTRY, false);
+        integration = new ShellIntegration(ShellType.FISH, isBlockTerminal ? new CommandBlockIntegration() : null);
       }
       else if (isPowerShell(shellName)) {
         resultCommand.addAll(arguments);
         arguments.clear();
         resultCommand.addAll(List.of("-NoExit", "-ExecutionPolicy", "Bypass", "-File", rcFilePath));
-        shellType = ShellType.POWERSHELL;
-        withCommandBlocks = Registry.is(BLOCK_TERMINAL_POWERSHELL_REGISTRY, false);
+        integration = new ShellIntegration(ShellType.POWERSHELL, isBlockTerminal ? new CommandBlockIntegration(true) : null);
       }
     }
 
-    if (isBlockTerminalEnabled() && withCommandBlocks) {
+    if (isBlockTerminalEnabled() && integration != null && integration.getCommandBlockIntegration() != null) {
       envs.put("INTELLIJ_TERMINAL_COMMAND_BLOCKS", "1");
       // Pretend to be Fig.io terminal to avoid it breaking IntelliJ shell integration:
       // at startup it runs a sub-shell without IntelliJ shell integration
       envs.put("FIG_TERM", "1");
     }
 
+    CommandBlockIntegration commandIntegration = integration != null ? integration.getCommandBlockIntegration() : null;
+    String commandEndMarker = commandIntegration != null ? commandIntegration.getCommandEndMarker() : null;
+    if (commandEndMarker != null) {
+      envs.put(IJ_COMMAND_END_MARKER, commandEndMarker);
+    }
+
     resultCommand.addAll(arguments);
     return options.builder()
       .shellCommand(resultCommand)
       .envVariables(envs)
-      .shellIntegration(shellType != null ? new ShellIntegration(shellType, withCommandBlocks) : null)
+      .shellIntegration(integration)
       .build();
   }
 
@@ -496,6 +514,21 @@ public class LocalTerminalDirectRunner extends AbstractTerminalRunner<PtyProcess
         widget.setCommandHistoryFilePath(commandHistoryFile.toString());
       }
     }
+  }
+
+  /**
+   * @return true if block terminal can be used with the provided shell name
+   */
+  @ApiStatus.Internal
+  public static boolean isBlockTerminalSupported(@NotNull String shellName) {
+    if (isPowerShell(shellName)) {
+      return SystemInfo.isWin11OrNewer && Registry.is(BLOCK_TERMINAL_POWERSHELL_WIN11_REGISTRY, false) ||
+             SystemInfo.isWin10OrNewer && !SystemInfo.isWin11OrNewer && Registry.is(BLOCK_TERMINAL_POWERSHELL_WIN10_REGISTRY, false);
+    }
+    return shellName.equals(BASH_NAME)
+           || SystemInfo.isMac && shellName.equals(SH_NAME)
+           || shellName.equals(ZSH_NAME)
+           || shellName.equals(FISH_NAME) && Registry.is(BLOCK_TERMINAL_FISH_REGISTRY, false);
   }
 
   private static boolean isLoginOptionAvailable(@NotNull String shellName) {

@@ -549,6 +549,11 @@ interface UastResolveApiFixtureTestBase : UastPluginSelection {
         val resolved = (uCallExpression.receiver?.tryResolve() as? PsiParameter)
             .orFail("cant resolve implicit lambda parameter")
         TestCase.assertEquals("it", resolved.name)
+
+        // Inspired by https://issuetracker.google.com/issues/298483892
+        val uParameter = resolved.toUElementOfType<UParameter>()
+        TestCase.assertNotNull(uParameter)
+        TestCase.assertEquals(resolved.name, uParameter!!.name)
     }
 
     fun checkResolveImplicitLambdaParameter_binary(myFixture: JavaCodeInsightTestFixture) {
@@ -858,6 +863,70 @@ interface UastResolveApiFixtureTestBase : UastPluginSelection {
                 // But, at least, UCallExpression#getArgumentForParameter should not raise an out-of-bound exception.
                 TestCase.assertNull(arg)
             }
+        }
+    }
+
+    fun checkArgumentMappingSAM(myFixture: JavaCodeInsightTestFixture) {
+        myFixture.configureByText(
+            "main.kt", """
+                class Test {
+                    fun interface Foo {
+                        fun foo()
+                    }
+
+                    fun uiMethod() {}
+
+                    fun test(foo: Foo) {}
+
+                    fun testLambda() {
+                        te<caret>st { uiMethod() }
+                    }
+                }
+            """.trimIndent()
+        )
+
+        val uCallExpression = myFixture.file.findElementAt(myFixture.caretOffset).toUElement().getUCallExpression()
+            .orFail("cant convert to UCallExpression")
+        val resolved = uCallExpression.resolve()
+            .orFail("cant resolve from $uCallExpression")
+
+        resolved.parameters.forEachIndexed { index, _ ->
+            val arg = uCallExpression.getArgumentForParameter(index)
+            TestCase.assertNotNull(arg)
+            TestCase.assertTrue(arg is ULambdaExpression)
+            TestCase.assertEquals("Test.Foo", (arg as ULambdaExpression).functionalInterfaceType?.canonicalText)
+        }
+    }
+
+    fun checkArgumentMappingSAM_methodReference(myFixture: JavaCodeInsightTestFixture) {
+        myFixture.configureByText(
+            "main.kt", """
+                class Test {
+                    fun interface Foo {
+                        fun foo()
+                    }
+
+                    fun uiMethod() {}
+
+                    fun test(foo: Foo) {}
+                    
+                    fun testMethodRef() {
+                      te<caret>st(this::uiMethod)
+                    }
+                }
+            """.trimIndent()
+        )
+
+        val uCallExpression = myFixture.file.findElementAt(myFixture.caretOffset).toUElement().getUCallExpression()
+            .orFail("cant convert to UCallExpression")
+        val resolved = uCallExpression.resolve()
+            .orFail("cant resolve from $uCallExpression")
+
+        resolved.parameters.forEachIndexed { index, _ ->
+            val arg = uCallExpression.getArgumentForParameter(index)
+            TestCase.assertNotNull(arg)
+            TestCase.assertTrue(arg is UCallableReferenceExpression)
+            TestCase.assertEquals("uiMethod", (arg as UCallableReferenceExpression).callableName)
         }
     }
 
@@ -2031,6 +2100,158 @@ interface UastResolveApiFixtureTestBase : UastPluginSelection {
 
             super.afterVisitFile(node)
         }
+    }
+
+    fun checkResolveTopLevelInlineReifiedFromLibrary(myFixture: JavaCodeInsightTestFixture, withJvmName: Boolean) {
+        val anno = if (withJvmName) "@file:JvmName(\"Mocking\")" else ""
+        val mockLibraryFacility = myFixture.configureLibraryByText(
+            "Mocking.kt", """
+                $anno
+                package test
+
+                inline fun <reified T : Any> mock(): T = TODO()
+
+                object Mock {
+                  inline fun <reified T : Any> mock(): T = TODO()
+                }
+            """.trimIndent()
+        )
+        myFixture.configureByText(
+            "main.kt", """
+                import test.Mock
+                import test.mock as tMock
+
+                class MyClass
+
+                fun test(): Boolean {
+                  val instance1 = Mock.mock<MyClass>()
+                  val instance2 = tMock<MyClass>()
+                  return instance1 == instance2
+                }
+            """.trimIndent()
+        )
+
+        val uFile = myFixture.file.toUElementOfType<UFile>()!!
+        uFile.accept(object : AbstractUastVisitor() {
+            var first: Boolean = true
+
+            override fun visitCallExpression(node: UCallExpression): Boolean {
+                val resolved = node.resolve()
+                TestCase.assertNotNull(resolved)
+                TestCase.assertEquals("mock", resolved!!.name)
+                if (first) {
+                    TestCase.assertEquals("Mock", resolved.containingClass?.name)
+                    first = false
+                } else {
+                    TestCase.assertEquals(
+                        if (withJvmName) "Mocking" else "MockingKt",
+                        resolved.containingClass?.name
+                    )
+                }
+
+                return super.visitCallExpression(node)
+            }
+        })
+
+        mockLibraryFacility.tearDown(myFixture.module)
+    }
+
+    fun checkResolveTopLevelInlineInFacadeFromLibrary(myFixture: JavaCodeInsightTestFixture, isK2: Boolean) {
+        val mockLibraryFacility = myFixture.configureLibraryByText(
+            "MyStringJVM.kt", """
+                @file:kotlin.jvm.JvmMultifileClass
+                @file:kotlin.jvm.JvmName("MyStringsKt")
+                
+                package test.pkg
+                
+                inline fun belongsToClassPart(): String = TODO()
+                
+                inline fun <reified T : Any> needFake(): String = TODO()
+            """.trimIndent()
+        )
+        myFixture.configureByText(
+            "main.kt", """
+                import test.pkg.*
+                
+                fun test() {
+                  belongsToClassPart()
+                  needFake()
+                }
+            """.trimIndent()
+        )
+
+        val uFile = myFixture.file.toUElementOfType<UFile>()!!
+        uFile.accept(object : AbstractUastVisitor() {
+            override fun visitCallExpression(node: UCallExpression): Boolean {
+                val resolved = node.resolve()
+                TestCase.assertNotNull(resolved)
+
+                val containingClass = resolved!!.containingClass
+                val expectedName =
+                    if (isK2) "MyStringsKt" // multi-file facade
+                    else "MyStringsKt__MyStringJVMKt" // multi-file class part
+                TestCase.assertEquals(expectedName, containingClass?.name)
+
+                return super.visitCallExpression(node)
+            }
+        })
+
+        mockLibraryFacility.tearDown(myFixture.module)
+    }
+
+    fun checkResolveInnerInlineFromLibrary(myFixture: JavaCodeInsightTestFixture) {
+        val mockLibraryFacility = myFixture.configureLibraryByText(
+            "Dependency.kt", """
+                package test
+                
+                class Mock {
+                  companion object {
+                    inline fun <reified T : Any> mock(): T = TODO()
+                  }
+                }
+                
+                class AnotherMock {
+                  companion object Named {
+                    inline fun <reified T : Any> mock(): T = TODO()
+                  }
+                }
+            """.trimIndent()
+        )
+        myFixture.configureByText(
+            "main.kt", """
+                import test.Mock
+                import test.AnotherMock
+
+                class MyClass
+
+                fun test(): Boolean {
+                  val instance1 = Mock.mock<MyClass>()
+                  val instance2 = AnotherMock.mock<MyClass>()
+                  return instance1 == instance2
+                }
+            """.trimIndent()
+        )
+
+        val uFile = myFixture.file.toUElementOfType<UFile>()!!
+        uFile.accept(object : AbstractUastVisitor() {
+            var first: Boolean = true
+
+            override fun visitCallExpression(node: UCallExpression): Boolean {
+                val resolved = node.resolve()
+                TestCase.assertNotNull(resolved)
+                TestCase.assertEquals("mock", resolved!!.name)
+                if (first) {
+                    TestCase.assertEquals("Companion", resolved.containingClass?.name)
+                    first = false
+                } else {
+                    TestCase.assertEquals("Named", resolved.containingClass?.name)
+                }
+
+                return super.visitCallExpression(node)
+            }
+        })
+
+        mockLibraryFacility.tearDown(myFixture.module)
     }
 
     private fun JavaCodeInsightTestFixture.configureLibraryByText(

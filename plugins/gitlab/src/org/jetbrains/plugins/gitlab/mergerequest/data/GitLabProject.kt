@@ -5,6 +5,7 @@ import com.intellij.collaboration.api.page.ApiPageUtil
 import com.intellij.collaboration.async.modelFlow
 import com.intellij.collaboration.async.withInitial
 import com.intellij.collaboration.util.ResultUtil.runCatchingUser
+import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.project.Project
 import com.intellij.platform.util.coroutines.childScope
@@ -13,6 +14,7 @@ import kotlinx.coroutines.flow.*
 import org.jetbrains.plugins.gitlab.api.*
 import org.jetbrains.plugins.gitlab.api.data.GitLabPlan
 import org.jetbrains.plugins.gitlab.api.dto.GitLabLabelDTO
+import org.jetbrains.plugins.gitlab.api.dto.GitLabProjectDTO
 import org.jetbrains.plugins.gitlab.api.dto.GitLabUserDTO
 import org.jetbrains.plugins.gitlab.api.dto.GitLabWorkItemDTO.GitLabWidgetDTO.WorkItemWidgetAssignees
 import org.jetbrains.plugins.gitlab.api.dto.GitLabWorkItemDTO.WorkItemType
@@ -32,8 +34,10 @@ interface GitLabProject {
 
   val labels: SharedFlow<Result<List<GitLabLabelDTO>>>
   val members: SharedFlow<Result<List<GitLabUserDTO>>>
-  val defaultBranch: Deferred<String>
+  val defaultBranch: Deferred<String?>
   val allowsMultipleReviewers: SharedFlow<Boolean>
+
+  val emojis: Deferred<List<ParsedGitLabEmoji>>
 
   /**
    * Creates a merge request on the GitLab server and returns a DTO containing the merge request
@@ -54,6 +58,7 @@ class GitLabLazyProject(
   private val api: GitLabApi,
   private val glMetadata: GitLabServerMetadata?,
   override val projectMapping: GitLabProjectMapping,
+  private val currentUser: GitLabUserDTO,
   private val tokenRefreshFlow: Flow<Unit>
 ) : GitLabProject {
 
@@ -64,7 +69,7 @@ class GitLabLazyProject(
   private val projectDataReloadSignal = MutableSharedFlow<Unit>()
 
   override val mergeRequests by lazy {
-    CachingGitLabProjectMergeRequestsStore(project, cs, api, glMetadata, projectMapping, tokenRefreshFlow)
+    CachingGitLabProjectMergeRequestsStore(project, cs, api, glMetadata, projectMapping, currentUser, tokenRefreshFlow)
   }
 
   override val labels: SharedFlow<Result<List<GitLabLabelDTO>>> = resultListFlow {
@@ -78,24 +83,31 @@ class GitLabLazyProject(
   }.triggerOn(projectDataReloadSignal.withInitial(Unit))
     .modelFlow(parentCs, LOG)
 
-  override val defaultBranch: Deferred<String> = cs.async(Dispatchers.IO, start = CoroutineStart.LAZY) {
-    val projectRepository = api.graphQL.getProjectRepository(projectCoordinates).body()
-    projectRepository.rootRef
+  private val initialData: Deferred<GitLabProjectDTO> = cs.async(Dispatchers.IO, start = CoroutineStart.LAZY) {
+    api.graphQL.getProject(projectCoordinates).body()
   }
 
-  private val plan: Deferred<GitLabPlan?> = cs.async(Dispatchers.IO, start = CoroutineStart.LAZY) {
-    runCatchingUser {
-      val namespace = api.rest.getProjectNamespace(projectMapping.repository.projectPath.owner).body()
-      namespace?.plan
-    }.getOrNull()
+  override val defaultBranch: Deferred<String?> = cs.async(Dispatchers.IO, start = CoroutineStart.LAZY) {
+    val project = initialData.await()
+    project.repository?.rootRef
   }
 
-  // TODO: Change the implementation after adding `allowsMultipleReviewers` field to the API
-  //  https://gitlab.com/gitlab-org/gitlab/-/issues/431829
   override val allowsMultipleReviewers: SharedFlow<Boolean> = channelFlow {
-    val glPlan = plan.await()
-    if (glPlan != null) {
-      send(glPlan != GitLabPlan.FREE)
+    if (glMetadata != null && glMetadata.version >= GitLabVersion(16, 8)) {
+      val project = initialData.await()
+      send(project.allowsMultipleMergeRequestReviewers!!)
+      return@channelFlow
+    }
+
+    val plan = cs.async(Dispatchers.IO, start = CoroutineStart.LAZY) {
+      runCatchingUser {
+        val namespace = api.rest.getProjectNamespace(projectMapping.repository.projectPath.owner).body()
+        namespace?.plan
+      }.getOrNull()
+    }.await()
+
+    if (plan != null) {
+      send(plan != GitLabPlan.FREE)
       return@channelFlow
     }
 
@@ -106,6 +118,8 @@ class GitLabLazyProject(
 
     send(false)
   }.modelFlow(parentCs, LOG)
+
+  override val emojis: Deferred<List<ParsedGitLabEmoji>> = project.service<GitLabEmojiService>().emojis
 
   @Throws(GitLabGraphQLMutationException::class)
   override suspend fun createMergeRequestAndAwaitCompletion(sourceBranch: String, targetBranch: String, title: String): GitLabMergeRequestDTO {

@@ -6,7 +6,6 @@ package com.intellij.openapi.keymap.impl
 import com.intellij.configurationStore.LazySchemeProcessor
 import com.intellij.configurationStore.SchemeDataHolder
 import com.intellij.ide.IdeBundle
-import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.ConfigImportHelper
 import com.intellij.openapi.components.*
@@ -33,8 +32,10 @@ const val KEYMAPS_DIR_PATH: String = "keymaps"
 
 private const val ACTIVE_KEYMAP = "active_keymap"
 private const val NAME_ATTRIBUTE = "name"
+private const val COMPONENT_NAME = "KeymapManager"
+private const val STORAGE_VALUE = "keymap.xml"
 
-@State(name = "KeymapManager", storages = [(Storage(value = "keymap.xml", roamingType = RoamingType.PER_OS))],
+@State(name = COMPONENT_NAME, storages = [(Storage(value = STORAGE_VALUE, roamingType = RoamingType.PER_OS))],
        additionalExportDirectory = KEYMAPS_DIR_PATH,
        category = SettingsCategory.KEYMAP)
 class KeymapManagerImpl : KeymapManagerEx(), PersistentStateComponent<Element> {
@@ -45,6 +46,10 @@ class KeymapManagerImpl : KeymapManagerEx(), PersistentStateComponent<Element> {
     @JvmStatic
     var isKeymapManagerInitialized: Boolean = false
       private set
+
+    const val KEYMAP_MANAGER_COMPONENT_NAME = COMPONENT_NAME
+    const val KEYMAP_STORAGE = STORAGE_VALUE
+    const val KEYMAP_FIELD = ACTIVE_KEYMAP
   }
 
   init {
@@ -197,12 +202,6 @@ class KeymapManagerImpl : KeymapManagerEx(), PersistentStateComponent<Element> {
   private fun getActiveKeymapName(child : Element?) : String {
     val value = child?.getAttributeValue(NAME_ATTRIBUTE)
     return if (!value.isNullOrBlank()) value else DefaultKeymap.getInstance().defaultKeymapName
-  }
-
-  @Suppress("OverridingDeprecatedMember", "removal")
-  override fun addKeymapManagerListener(listener: KeymapManagerListener, parentDisposable: Disposable) {
-    pollQueue()
-    ApplicationManager.getApplication().messageBus.connect(parentDisposable).subscribe(KeymapManagerListener.TOPIC, listener)
   }
 
   private fun pollQueue() {

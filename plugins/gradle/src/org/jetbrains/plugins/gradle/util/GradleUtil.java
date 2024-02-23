@@ -1,9 +1,11 @@
 // Copyright 2000-2020 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
 package org.jetbrains.plugins.gradle.util;
 
+import com.intellij.gradle.toolingExtension.util.GradleVersionUtil;
 import com.intellij.ide.util.PropertiesComponent;
 import com.intellij.openapi.externalSystem.ExternalSystemManager;
 import com.intellij.openapi.externalSystem.model.DataNode;
+import com.intellij.openapi.externalSystem.model.ExternalSystemException;
 import com.intellij.openapi.externalSystem.model.ProjectKeys;
 import com.intellij.openapi.externalSystem.model.project.ContentRootData;
 import com.intellij.openapi.externalSystem.model.project.ExternalSystemSourceType;
@@ -195,6 +197,18 @@ public final class GradleUtil {
     return null;
   }
 
+  public static @NotNull URI getWrapperDistributionUri(@NotNull GradleVersion gradleVersion) {
+    var distributionSource = gradleVersion.isSnapshot() ?
+                             "https://services.gradle.org/distributions-snapshots" :
+                             "https://services.gradle.org/distributions";
+    try {
+      return new URI(String.format("%s/gradle-%s-bin.zip", distributionSource, gradleVersion.getVersion()));
+    }
+    catch (URISyntaxException e) {
+      throw new ExternalSystemException(e);
+    }
+  }
+
   /**
    * Allows to build file system path to the target gradle sub-project given the root project path.
    *
@@ -359,6 +373,7 @@ public final class GradleUtil {
     return modelsProvider.findIdeModule(moduleData);
   }
 
+  @SuppressWarnings("unused") // used externally
   public static @NotNull GradleVersion getGradleVersion(Project project, PsiFile file) {
     VirtualFile virtualFile = file.getVirtualFile();
     if (virtualFile != null) {
@@ -368,6 +383,7 @@ public final class GradleUtil {
     return GradleVersion.current();
   }
 
+  @SuppressWarnings("unused") // used externally
   public static @NotNull GradleVersion getGradleVersion(Project project, String filePath) {
     ExternalSystemManager<?, ?, ?, ?, ?> manager = ExternalSystemApiUtil.getManager(GradleConstants.SYSTEM_ID);
     if (manager instanceof GradleManager gradleManager) {
@@ -383,8 +399,9 @@ public final class GradleUtil {
     return GradleVersion.current();
   }
 
+  @SuppressWarnings("unused") // used externally
   public static boolean isSupportedImplementationScope(@NotNull GradleVersion gradleVersion) {
-    return gradleVersion.getBaseVersion().compareTo(GradleVersion.version("3.4")) >= 0;
+    return GradleVersionUtil.isGradleAtLeast(gradleVersion, "3.4");
   }
 
   @Nullable

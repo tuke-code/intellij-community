@@ -8,6 +8,7 @@ import org.jetbrains.kotlin.idea.fir.actions.AbstractK2AddImportActionTest
 import org.jetbrains.kotlin.idea.fir.actions.AbstractK2BytecodeToolWindowTest
 import org.jetbrains.kotlin.idea.fir.analysis.providers.AbstractIdeKotlinAnnotationsResolverTest
 import org.jetbrains.kotlin.idea.fir.analysis.providers.dependents.AbstractModuleDependentsTest
+import org.jetbrains.kotlin.idea.fir.analysis.providers.sealedInheritors.AbstractSealedInheritorsProviderTest
 import org.jetbrains.kotlin.idea.fir.analysis.providers.sessions.AbstractGlobalSessionInvalidationTest
 import org.jetbrains.kotlin.idea.fir.analysis.providers.sessions.AbstractLocalSessionInvalidationTest
 import org.jetbrains.kotlin.idea.fir.analysis.providers.trackers.AbstractProjectWideOutOfBlockKotlinModificationTrackerTest
@@ -17,27 +18,34 @@ import org.jetbrains.kotlin.idea.fir.completion.test.handlers.AbstractFirKeyword
 import org.jetbrains.kotlin.idea.fir.completion.test.handlers.AbstractHighLevelBasicCompletionHandlerTest
 import org.jetbrains.kotlin.idea.fir.completion.test.handlers.AbstractHighLevelJavaCompletionHandlerTest
 import org.jetbrains.kotlin.idea.fir.completion.test.handlers.AbstractK2CompletionCharFilterTest
+import org.jetbrains.kotlin.idea.fir.completion.test.handlers.AbstractK2CompletionIncrementalResolveTest
 import org.jetbrains.kotlin.idea.fir.completion.wheigher.AbstractHighLevelWeigherTest
+import org.jetbrains.kotlin.idea.fir.copyPaste.AbstractFirLiteralKotlinToKotlinCopyPasteTest
+import org.jetbrains.kotlin.idea.fir.copyPaste.AbstractFirLiteralTextToKotlinCopyPasteTest
 import org.jetbrains.kotlin.idea.fir.documentation.AbstractFirQuickDocTest
 import org.jetbrains.kotlin.idea.fir.externalAnnotations.AbstractK2ExternalAnnotationTest
 import org.jetbrains.kotlin.idea.fir.findUsages.*
+import org.jetbrains.kotlin.idea.fir.folding.AbstractFirFoldingTest
 import org.jetbrains.kotlin.idea.fir.imports.AbstractFirJvmOptimizeImportsTest
+import org.jetbrains.kotlin.idea.fir.imports.AbstractK2AutoImportTest
+import org.jetbrains.kotlin.idea.fir.imports.AbstractK2FilteringAutoImportTest
 import org.jetbrains.kotlin.idea.fir.low.level.api.AbstractFirLibraryModuleDeclarationResolveTest
 import org.jetbrains.kotlin.idea.fir.navigation.AbstractFirGotoDeclarationTest
+import org.jetbrains.kotlin.idea.fir.navigation.AbstractFirGotoRelatedSymbolMultiModuleTest
+import org.jetbrains.kotlin.idea.fir.navigation.AbstractFirGotoTest
 import org.jetbrains.kotlin.idea.fir.navigation.AbstractFirGotoTypeDeclarationTest
 import org.jetbrains.kotlin.idea.fir.parameterInfo.AbstractFirParameterInfoTest
+import org.jetbrains.kotlin.idea.fir.projectView.AbstractK2ProjectViewTest
 import org.jetbrains.kotlin.idea.fir.quickfix.AbstractHighLevelQuickFixMultiFileTest
 import org.jetbrains.kotlin.idea.fir.quickfix.AbstractHighLevelQuickFixMultiModuleTest
 import org.jetbrains.kotlin.idea.fir.quickfix.AbstractHighLevelQuickFixTest
 import org.jetbrains.kotlin.idea.fir.resolve.*
 import org.jetbrains.kotlin.idea.fir.search.AbstractHLImplementationSearcherTest
 import org.jetbrains.kotlin.idea.fir.shortenRefs.AbstractFirShortenRefsTest
-import org.jetbrains.kotlin.idea.fir.imports.AbstractK2AutoImportTest
-import org.jetbrains.kotlin.idea.fir.imports.AbstractK2FilteringAutoImportTest
 import org.jetbrains.kotlin.idea.k2.copyright.AbstractFirUpdateKotlinCopyrightTest
+import org.jetbrains.kotlin.idea.k2.refactoring.rename.AbstractFirMultiModuleRenameTest
 import org.jetbrains.kotlin.idea.k2.refactoring.rename.AbstractFirRenameTest
 import org.jetbrains.kotlin.idea.k2.refactoring.rename.AbstractK2InplaceRenameTest
-import org.jetbrains.kotlin.idea.fir.projectView.AbstractK2ProjectViewTest
 import org.jetbrains.kotlin.parcelize.ide.test.AbstractParcelizeK2QuickFixTest
 import org.jetbrains.kotlin.testGenerator.generator.TestGenerator
 import org.jetbrains.kotlin.testGenerator.model.*
@@ -92,6 +100,10 @@ private fun assembleWorkspace(): TWorkspace = workspace {
 
         testClass<AbstractModuleDependentsTest> {
             model("moduleDependents", pattern = DIRECTORY, isRecursive = false)
+        }
+
+        testClass<AbstractSealedInheritorsProviderTest> {
+            model("sealedInheritors", pattern = DIRECTORY, isRecursive = false)
         }
     }
 
@@ -149,8 +161,26 @@ private fun assembleWorkspace(): TWorkspace = workspace {
             model("navigation/gotoTypeDeclaration", pattern = TEST)
         }
 
+        testClass<AbstractFirGotoTest> {
+            model("navigation/gotoClass", testMethodName = "doClassTest")
+            model("navigation/gotoSymbol", testMethodName = "doSymbolTest")
+        }
+
+        testClass<AbstractFirGotoRelatedSymbolMultiModuleTest> {
+            model("navigation/relatedSymbols/multiModule", isRecursive = false, pattern = DIRECTORY)
+        }
+
+
         testClass<AbstractFirGotoDeclarationTest> {
             model("navigation/gotoDeclaration", pattern = TEST)
+        }
+
+        testClass<AbstractFirLiteralTextToKotlinCopyPasteTest> {
+            model("copyPaste/plainTextLiteral", pattern = Patterns.forRegex("""^([^.]+)\.txt$"""))
+        }
+
+        testClass<AbstractFirLiteralKotlinToKotlinCopyPasteTest> {
+            model("copyPaste/literal", pattern = Patterns.forRegex("""^([^.]+)\.kt$"""))
         }
 
         testClass<AbstractHighLevelQuickFixTest> {
@@ -310,7 +340,7 @@ private fun assembleWorkspace(): TWorkspace = workspace {
             model("quickfix/removeSuspend", pattern = pattern, isIgnored = true)
             model("quickfix/removeToStringInStringTemplate", pattern = pattern, isIgnored = true)
             model("quickfix/removeTypeVariance", pattern = pattern, isIgnored = true)
-            model("quickfix/removeUnused", pattern = pattern, isIgnored = true)
+            model("quickfix/removeUnused", pattern = pattern)
             model("quickfix/removeUnusedParameter", pattern = pattern, isIgnored = true)
             model("quickfix/removeUnusedReceiver", pattern = pattern, isIgnored = true)
             model("quickfix/removeUseSiteTarget", pattern = pattern, isIgnored = true)
@@ -455,6 +485,11 @@ private fun assembleWorkspace(): TWorkspace = workspace {
         testClass<AbstractFirWithMppStdlibCompletionTest> {
             model("basic/stdlibWithCommon", isRecursive = false, pattern = KT_WITHOUT_FIR_PREFIX)
         }
+
+        // Smart completion does not work in K2, see KTIJ-26166
+        testClass<AbstractK2CompletionIncrementalResolveTest> {
+            model("incrementalResolve", excludedDirectories = listOf("smart"))
+        }
     }
 
     testGroup("fir/tests", testDataPath = "../../code-insight/testData") {
@@ -467,6 +502,11 @@ private fun assembleWorkspace(): TWorkspace = workspace {
         testClass<AbstractK2ProjectViewTest> {
             model("projectView", pattern = TEST)
         }
+
+        testClass<AbstractFirFoldingTest> {
+            model("folding/noCollapse")
+            model("folding/checkCollapse", testMethodName = "doSettingsFoldingTest")
+        }
     }
 
     testGroup("refactorings/rename.k2", testDataPath = "../../idea/tests/testData") {
@@ -475,6 +515,9 @@ private fun assembleWorkspace(): TWorkspace = workspace {
         }
         testClass<AbstractK2InplaceRenameTest> {
             model("refactoring/rename/inplace", pattern = KT, flatten = true)
+        }
+        testClass<AbstractFirMultiModuleRenameTest> {
+            model("refactoring/renameMultiModule", pattern = TEST, flatten = true)
         }
     }
 

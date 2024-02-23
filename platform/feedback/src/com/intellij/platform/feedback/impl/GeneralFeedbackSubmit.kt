@@ -119,7 +119,6 @@ private fun sendFeedback(feedbackUrl: String,
                          feedbackData: FeedbackRequestDataHolder,
                          onDone: () -> Unit,
                          onError: () -> Unit) {
-  FeedbackSendActionCountCollector.logFeedbackSendSuccess()
   val requestData = feedbackData.toJsonObject().toString()
 
   try {
@@ -155,6 +154,9 @@ private fun sendFeedback(feedbackUrl: String,
           onError()
           FeedbackSendActionCountCollector.logFeedbackSendFail()
           return@connect
+        }
+        if (feedbackData is FeedbackRequestData) {
+          FeedbackSendActionCountCollector.logFeedbackSendSuccess()
         }
         onDone()
       }

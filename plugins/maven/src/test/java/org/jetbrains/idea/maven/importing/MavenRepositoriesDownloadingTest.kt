@@ -11,11 +11,16 @@ import org.jetbrains.idea.maven.MavenCustomRepositoryHelper
 import org.jetbrains.idea.maven.model.MavenProjectProblem
 import org.jetbrains.idea.maven.server.MavenServerManager
 import org.jetbrains.idea.maven.server.MisconfiguredPlexusDummyEmbedder
+import org.jetbrains.idea.maven.utils.MavenLog
 import org.junit.Assume.assumeTrue
 import org.junit.Test
+import java.io.BufferedReader
 import java.io.File
+import java.io.InputStreamReader
 import java.net.HttpURLConnection
 import java.net.URL
+import java.util.stream.Collectors
+
 
 class MavenRepositoriesDownloadingTest : MavenMultiVersionImportingTestCase() {
   
@@ -26,17 +31,30 @@ class MavenRepositoriesDownloadingTest : MavenMultiVersionImportingTestCase() {
     super.setUp()
     httpServerFixture.setUp()
     myUrl = httpServerFixture.url()
-    ping(myUrl)
   }
 
-  private fun ping(urlString: String) {
+  private fun sendGetRequest(urlString: String) {
+    MavenLog.LOG.warn("Get $urlString")
     val url = URL(urlString)
     val connection: HttpURLConnection = url.openConnection() as HttpURLConnection
     connection.setRequestMethod("GET")
     connection.connect()
-    val responseCode = connection.getResponseCode()
+    val response = getResponse(connection)
+    MavenLog.LOG.warn("Response $response")
+    val responseCode = connection.responseCode
     connection.disconnect()
-    assertEquals(404, responseCode)
+
+    assertEquals(200, responseCode)
+  }
+
+  private fun getResponse(conn: HttpURLConnection): String {
+    val br = if (conn.responseCode in 100..399) {
+      BufferedReader(InputStreamReader(conn.inputStream))
+    }
+    else {
+      return ""
+    }
+    return br.lines().collect(Collectors.joining())
   }
 
   public override fun tearDown() {
@@ -177,7 +195,7 @@ class MavenRepositoriesDownloadingTest : MavenMultiVersionImportingTestCase() {
     removeFromLocalRepository("org/mytest/myartifact/")
     assertFalse(helper.getTestData("local1/org/mytest/myartifact/1.0/myartifact-1.0.jar").isFile)
     createProjectPom(pom())
-    doImportProjects(listOf(projectPom), false)
+    doImportProjectsAsync(listOf(projectPom), false)
     TestCase.assertEquals(1, projectsManager.rootProjects.size)
     TestCase.assertEquals("status code: 401, reason phrase: Unauthorized (401)",
                           projectsManager.rootProjects[0].problems.single { it.type == MavenProjectProblem.ProblemType.REPOSITORY }.description)
@@ -319,6 +337,11 @@ class MavenRepositoriesDownloadingTest : MavenMultiVersionImportingTestCase() {
 
     File(dir, "myartifact-1.0.jar.lastUpdated").writeText(lastUpdatedText)
     File(dir, "myartifact-1.0.pom.lastUpdated").writeText(lastUpdatedText)
+
+    sendGetRequest("$myUrl/org/mytest/myartifact/1.0/myartifact-1.0.pom")
+    sendGetRequest("$myUrl/org/mytest/myartifact/1.0/myartifact-1.0.pom.sha1")
+    sendGetRequest("$myUrl/org/mytest/myartifact/1.0/myartifact-1.0.jar")
+    sendGetRequest("$myUrl/org/mytest/myartifact/1.0/myartifact-1.0.jar.sha1")
 
     importProjectAsync(pomContent)
     checks()

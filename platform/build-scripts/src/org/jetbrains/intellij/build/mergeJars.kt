@@ -1,4 +1,4 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 @file:JvmName("JarBuilder")
 @file:Suppress("ReplaceJavaStaticMethodWithKotlinAnalog")
 
@@ -41,7 +41,8 @@ data class ZipSource(
   @JvmField val file: Path,
   @JvmField val excludes: List<Regex> = emptyList(),
   @JvmField val isPreSignedAndExtractedCandidate: Boolean = false,
-  val distributionFileEntryProducer: DistributionFileEntryProducer?,
+  @JvmField val optimizeConfigId: String? = null,
+  @JvmField val distributionFileEntryProducer: DistributionFileEntryProducer?,
 ) : Source, Comparable<ZipSource> {
   override var size: Int = 0
   override var hash: Long = 0
@@ -86,6 +87,8 @@ data class DirSource(@JvmField val dir: Path,
                      @JvmField val removeModuleInfo: Boolean = true) : Source {
   override var size: Int = 0
   override var hash: Long = 0
+
+  var exist: Boolean? = null
 
   override fun toString(): String {
     val shortPath = if (dir.startsWith(USER_HOME)) "~/${USER_HOME.relativize(dir)}" else dir.toString()
@@ -138,6 +141,8 @@ data class InMemoryContentSource(@JvmField val relativePath: String, @JvmField v
 internal interface NativeFileHandler {
   val sourceToNativeFiles: MutableMap<ZipSource, List<String>>
 
+  fun isNative(name: String): Boolean
+
   suspend fun sign(name: String, dataSupplier: () -> ByteBuffer): Path?
 }
 
@@ -187,13 +192,43 @@ internal suspend fun buildJar(targetFile: Path,
           }
 
           is ZipSource -> {
-            handleZipSource(source = source,
-                            nativeFileHandler = nativeFileHandler,
-                            uniqueNames = uniqueNames,
-                            sources = sources,
-                            packageIndexBuilder = packageIndexBuilder,
-                            zipCreator = zipCreator,
-                            compress = compress)
+            val sourceFile = source.file
+            try {
+              //if (source.optimizeConfigId != null) {
+              //  TraceManager.spanBuilder("optimize").setAttribute("library", source.optimizeConfigId).useWithoutActiveScope {
+              //    val tempDir = optimizeLibraryContext!!.tempDir
+              //    val suffix = System.nanoTime().toString(Character.MAX_RADIX)
+              //    sourceFile = tempDir.resolve("${source.optimizeConfigId}-$suffix.jar")
+              //    val mappingFile = tempDir.resolve("${source.optimizeConfigId}-${System.nanoTime().toString(Character.MAX_RADIX)}.jar")
+              //    try {
+              //      optimizeLibrary(name = source.optimizeConfigId,
+              //                      input = source.file,
+              //                      output = sourceFile,
+              //                      javaHome = optimizeLibraryContext.javaHome.toString(),
+              //                      mapping = mappingFile)
+              //      zipCreator.file("${source.optimizeConfigId}.map.txt", mappingFile)
+              //    }
+              //    finally {
+              //      Files.deleteIfExists(mappingFile)
+              //    }
+              //  }
+              //}
+
+              handleZipSource(source = source,
+                              sourceFile = sourceFile,
+                              nativeFileHandler = nativeFileHandler,
+                              uniqueNames = uniqueNames,
+                              sources = sources,
+                              packageIndexBuilder = packageIndexBuilder,
+                              zipCreator = zipCreator,
+                              compress = compress)
+            }
+            finally {
+              @Suppress("KotlinConstantConditions")
+              if (sourceFile !== source.file) {
+                Files.deleteIfExists(sourceFile)
+              }
+            }
           }
         }
 
@@ -209,6 +244,7 @@ internal suspend fun buildJar(targetFile: Path,
 }
 
 private suspend fun handleZipSource(source: ZipSource,
+                                    sourceFile: Path,
                                     nativeFileHandler: NativeFileHandler?,
                                     uniqueNames: MutableMap<String, Path>,
                                     sources: List<Source>,
@@ -226,7 +262,6 @@ private suspend fun handleZipSource(source: ZipSource,
     }
   }
 
-  val sourceFile = source.file
   // FileChannel is strongly required because only FileChannel provides `read(ByteBuffer dst, long position)` method -
   // ability to read data without setting channel position, as setting channel position will require synchronization
   suspendAwareReadZipFile(sourceFile) { name, dataSupplier ->
@@ -239,7 +274,7 @@ private suspend fun handleZipSource(source: ZipSource,
     }
 
     if (isIncluded && !isDuplicated(uniqueNames, name, sourceFile)) {
-      if (nativeFileHandler != null && isNative(name)) {
+      if (nativeFileHandler?.isNative(name) == true) {
         if (source.isPreSignedAndExtractedCandidate) {
           nativeFiles!!.value.add(name)
         }
@@ -284,19 +319,6 @@ private fun isDuplicated(uniqueNames: MutableMap<String, Path>, name: String, so
     AttributeKey.stringKey("secondSource"), sourceFile.toString(),
   ))
   return true
-}
-
-fun isNative(name: String): Boolean {
-  @Suppress("SpellCheckingInspection")
-  return name.endsWith(".jnilib") ||
-         name.endsWith(".dylib") ||
-         name.endsWith(".so") ||
-         name.endsWith(".exe") ||
-         name.endsWith(".dll") ||
-         name.endsWith(".node") ||
-         name.endsWith(".tbd") ||
-         // needed for skiko (Compose backend) on Windows
-         name == "icudtl.dat"
 }
 
 @Suppress("SpellCheckingInspection")
@@ -353,7 +375,8 @@ private fun getIgnoredNames(): Set<String> {
       set.add("META-INF/$name.md")
     }
   }
-  //set.add("kotlinx/coroutines/debug/internal/ByteBuddyDynamicAttach.class")
+  set.add("kotlinx/coroutines/debug/internal/ByteBuddyDynamicAttach.class")
+  set.add("kotlin/coroutines/jvm/internal/DebugProbesKt.class")
   return java.util.Set.copyOf(set)
 }
 
@@ -406,7 +429,7 @@ private fun checkNameForZipSource(name: String, excludes: List<Regex>, includeMa
          !name.startsWith("META-INF/versions/10/org/bouncycastle/") &&
          !name.startsWith("META-INF/versions/15/org/bouncycastle/") &&
 
-         //!name.startsWith("kotlinx/coroutines/repackaged/") &&
+         !name.startsWith("kotlinx/coroutines/repackaged/") &&
 
          !name.startsWith("native/") &&
          !name.startsWith("licenses/") &&

@@ -1,26 +1,27 @@
 // Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.platform.lvcs.impl.actions
 
-import com.intellij.history.integration.LocalHistoryImpl
+import com.intellij.history.core.LocalHistoryFacade
+import com.intellij.history.integration.IdeaGateway
 import com.intellij.openapi.actionSystem.ActionUpdateThread
-import com.intellij.openapi.actionSystem.AnActionEvent
-import com.intellij.platform.lvcs.impl.createReverter
-import com.intellij.platform.lvcs.impl.toRevisionSelection
-import com.intellij.platform.lvcs.impl.ui.ActivityViewDataKeys
+import com.intellij.openapi.project.Project
+import com.intellij.platform.lvcs.impl.ActivityScope
+import com.intellij.platform.lvcs.impl.ChangeSetSelection
+import com.intellij.platform.lvcs.impl.USE_OLD_CONTENT
+import com.intellij.platform.lvcs.impl.operations.createReverter
+import com.intellij.platform.lvcs.impl.statistics.LocalHistoryCounter
 
-class RevertAction : RevisionSelectionAction() {
+class RevertAction : ChangeSetSelectionAction() {
 
-  override fun actionPerformed(e: AnActionEvent) {
-    val project = e.project ?: return
-    val activityScope = e.getRequiredData(ActivityViewDataKeys.SCOPE)
-    val activitySelection = e.getRequiredData(ActivityViewDataKeys.SELECTION)
+  override fun actionPerformed(project: Project,
+                               facade: LocalHistoryFacade,
+                               gateway: IdeaGateway,
+                               activityScope: ActivityScope,
+                               selection: ChangeSetSelection) {
+    LocalHistoryCounter.logActionInvoked(LocalHistoryCounter.ActionKind.RevertRevisions, activityScope)
 
-    val facade = LocalHistoryImpl.getInstanceImpl().facade ?: return
-    val gateway = LocalHistoryImpl.getInstanceImpl().gateway ?: return
-    val selection = activitySelection.toRevisionSelection(activityScope) ?: return
-
-    val reverter = activityScope.createReverter(project, facade, gateway, selection)
-    if (reverter.checkCanRevert().isNotEmpty()) return
+    val reverter = facade.createReverter(project, gateway, activityScope, selection, USE_OLD_CONTENT)
+    if (reverter == null || reverter.checkCanRevert().isNotEmpty()) return
     reverter.revert()
   }
 

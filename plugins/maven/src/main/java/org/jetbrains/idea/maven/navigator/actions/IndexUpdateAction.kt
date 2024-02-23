@@ -3,34 +3,28 @@ package org.jetbrains.idea.maven.navigator.actions
 
 import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnActionEvent
+import com.intellij.openapi.progress.ProgressManager
+import com.intellij.openapi.progress.blockingContext
+import com.intellij.openapi.progress.blockingContextToIndicator
 import com.intellij.openapi.project.DumbAwareAction
-import kotlinx.coroutines.CoroutineName
+import com.intellij.platform.ide.progress.TaskCancellation
+import com.intellij.platform.ide.progress.withBackgroundProgress
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.jetbrains.idea.maven.indices.MavenSystemIndicesManager
+import org.jetbrains.idea.maven.utils.MavenCoroutineScopeProvider
 import org.jetbrains.idea.maven.utils.MavenDataKeys
+import org.jetbrains.idea.maven.utils.MavenProgressIndicator
 
 
-class UpdateLocalIndexAction : IndexUpdateAction() {
-
-}
-
-class ShowIndexAction : DumbAwareAction() {
-  override fun actionPerformed(e: AnActionEvent) {
-    TODO("Not yet implemented")
-  }
-
-}
-
-abstract class IndexUpdateAction : DumbAwareAction() {
+class IndexUpdateAction : DumbAwareAction() {
 
   override fun actionPerformed(e: AnActionEvent) {
     val mavenRepo = e.getData(MavenDataKeys.MAVEN_REPOSITORY) ?: return
+    val project = e.project ?: return
 
     val manager = MavenSystemIndicesManager.getInstance()
-    MavenSystemIndicesManager.getInstance().cs.launch(Dispatchers.IO + CoroutineName(this.javaClass.name)) {
-      manager.startUpdateIndex(mavenRepo)
-    }
+    manager.updateIndexContent(mavenRepo, project)
   }
 
   override fun getActionUpdateThread(): ActionUpdateThread {

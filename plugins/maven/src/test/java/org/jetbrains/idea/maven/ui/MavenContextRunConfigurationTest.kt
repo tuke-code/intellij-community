@@ -7,6 +7,7 @@ import com.intellij.maven.testFramework.MavenDomTestCase
 import com.intellij.openapi.application.EDT
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.psi.PsiManager
+import com.intellij.testFramework.RunAll
 import junit.framework.TestCase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
@@ -31,14 +32,22 @@ class MavenContextRunConfigurationTest : MavenDomTestCase() {
     myNavigator.groupModules = true
   }
 
-  @Test fun testCreateMavenRunConfigurationFromToolWindow() = runBlocking {
+  public override fun tearDown() {
+    RunAll.runAll({
+                    waitForMavenUtilRunnablesComplete()
+                  },
+                  { super.tearDown() })
+  }
+
+  @Test
+  fun testCreateMavenRunConfigurationFromToolWindow() = runBlocking {
     val projectPom = createProjectPom("""
   <groupId>test</groupId>
   <artifactId>project</artifactId>
   <version>1</version>
   """.trimIndent())
-    projectsManager.resetManagedFilesAndProfilesInTests(listOf(projectPom), MavenExplicitProfiles.NONE)
-    importProjectAsync()
+    projectsManager.projectsTree.resetManagedFilesAndProfiles(listOf(projectPom), MavenExplicitProfiles.NONE)
+    updateAllProjects()
     projectsManager.fireActivatedInTests()
 
     withContext(Dispatchers.EDT) {
@@ -55,8 +64,8 @@ class MavenContextRunConfigurationTest : MavenDomTestCase() {
   <artifactId>project</artifactId>
   <version>1</version>
   """.trimIndent())
-    projectsManager.resetManagedFilesAndProfilesInTests(listOf(projectPom), MavenExplicitProfiles.NONE)
-    importProjectAsync()
+    projectsManager.projectsTree.resetManagedFilesAndProfiles(listOf(projectPom), MavenExplicitProfiles.NONE)
+    updateAllProjects()
     projectsManager.fireActivatedInTests()
 
     withContext(Dispatchers.EDT) {
@@ -71,10 +80,12 @@ class MavenContextRunConfigurationTest : MavenDomTestCase() {
       TestCase.assertTrue(RunConfigurationProducer.getInstance(
         MavenConfigurationProducer::class.java).isConfigurationFromContext(runConfiguration!!, context))
     }
+
   }
 
 
-  @Test fun testMavenRunConfigurationFromToolWindowShouldBeDifferent() = runBlocking {
+  @Test
+  fun testMavenRunConfigurationFromToolWindowShouldBeDifferent() = runBlocking {
     createProjectPom("""
   <groupId>test</groupId>
   <artifactId>project</artifactId>
@@ -97,8 +108,8 @@ class MavenContextRunConfigurationTest : MavenDomTestCase() {
                             <version>1</version>
                           </parent>
                           <artifactId>m2</artifactId>""")
-    projectsManager.resetManagedFilesAndProfilesInTests(listOf(projectPom, m2, m2), MavenExplicitProfiles.NONE)
-    importProjectAsync()
+    projectsManager.projectsTree.resetManagedFilesAndProfiles(listOf(projectPom, m2, m2), MavenExplicitProfiles.NONE)
+    updateAllProjects()
     projectsManager.fireActivatedInTests()
 
     withContext(Dispatchers.EDT) {
@@ -131,7 +142,8 @@ class MavenContextRunConfigurationTest : MavenDomTestCase() {
   }
 
 
-  @Test fun testMavenRunConfigurationFromToolWindowForMultimodule() = runBlocking {
+  @Test
+  fun testMavenRunConfigurationFromToolWindowForMultimodule() = runBlocking {
     createProjectPom("""
   <groupId>test</groupId>
   <artifactId>project</artifactId>
@@ -154,8 +166,8 @@ class MavenContextRunConfigurationTest : MavenDomTestCase() {
                             <version>1</version>
                           </parent>
                           <artifactId>m2</artifactId>""")
-    projectsManager.resetManagedFilesAndProfilesInTests(listOf(projectPom, m2, m2), MavenExplicitProfiles.NONE)
-    importProjectAsync()
+    projectsManager.projectsTree.resetManagedFilesAndProfiles(listOf(projectPom, m2, m2), MavenExplicitProfiles.NONE)
+    updateAllProjects()
     projectsManager.fireActivatedInTests()
 
     withContext(Dispatchers.EDT) {

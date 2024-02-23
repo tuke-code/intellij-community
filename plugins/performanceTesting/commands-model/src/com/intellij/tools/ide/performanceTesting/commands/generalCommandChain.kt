@@ -1,5 +1,8 @@
 package com.intellij.tools.ide.performanceTesting.commands
 
+import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import com.intellij.tools.ide.performanceTesting.commands.dto.MavenGoalConfigurationDto
+import com.intellij.tools.ide.performanceTesting.commands.dto.NewMavenProjectDto
 import java.io.File
 import java.lang.reflect.Modifier
 import java.nio.file.Path
@@ -13,6 +16,7 @@ private const val CMD_PREFIX = '%'
 
 const val WARMUP = "WARMUP"
 const val ENABLE_SYSTEM_METRICS = "ENABLE_SYSTEM_METRICS"
+val objectMapper = jacksonObjectMapper()
 
 fun <T : CommandChain> T.waitForSmartMode(): T = apply {
   addCommand("${CMD_PREFIX}waitForSmart")
@@ -471,12 +475,21 @@ fun <T : CommandChain> T.recordStateCollectors(): T = apply {
   addCommand("${CMD_PREFIX}recordStateCollectors")
 }
 
+@Suppress("unused")
+fun <T : CommandChain> T.flushFusEvents(): T = apply {
+  addCommand("${CMD_PREFIX}flushFusEvents")
+}
+
 fun <T : CommandChain> T.reloadFiles(filePaths: List<String> = listOf()): T = apply {
   addCommand("${CMD_PREFIX}reloadFiles ${filePaths.joinToString(" ")}")
 }
 
 fun <T : CommandChain> T.addFile(path: String, fileName: String): T = apply {
   addCommand("${CMD_PREFIX}addFile ${path}, ${fileName}")
+}
+
+fun <T : CommandChain> T.renameFile(path: String, oldFileName: String, newFileName: String): T = apply {
+  addCommand("${CMD_PREFIX}renameFile ${path}, ${oldFileName}, ${newFileName}")
 }
 
 fun <T : CommandChain> T.call(method: KFunction<String?>, vararg args: String): T = apply {
@@ -513,6 +526,22 @@ fun <T : CommandChain> T.importMavenProject(): T = apply {
   addCommand("${CMD_PREFIX}importMavenProject")
 }
 
+enum class AssertModuleJdkVersionMode {
+  CONTAINS,
+  EQUALS
+}
+
+fun <T : CommandChain> T.assertModuleJdkVersion(moduleName: String,
+                                                jdkVersion: String,
+                                                mode: AssertModuleJdkVersionMode = AssertModuleJdkVersionMode.CONTAINS): T {
+  val command = mutableListOf("${CMD_PREFIX}assertModuleJdkVersionCommand")
+  command.add("-moduleName=$moduleName")
+  command.add("-jdkVersion=$jdkVersion")
+  command.add("-mode=$mode")
+  addCommandWithSeparator("|", *command.toTypedArray())
+  return this
+}
+
 fun <T : CommandChain> T.setModuleJdk(moduleName: String, jdk: SdkObject): T {
   val command = mutableListOf("${CMD_PREFIX}setModuleJdk")
   command.add("-moduleName=$moduleName")
@@ -543,6 +572,35 @@ fun <T : CommandChain> T.unlinkMavenProject(projectPath: Path): T = apply {
   addCommand("${CMD_PREFIX}unlinkMavenProject ${projectPath}")
 }
 
+fun <T : CommandChain> T.downloadGradleSources(): T = apply {
+  addCommand("${CMD_PREFIX}downloadGradleSources")
+}
+
+fun <T : CommandChain> T.downloadMavenArtifacts(sources: Boolean = true, docs: Boolean = true): T = apply {
+  addCommand("${CMD_PREFIX}downloadMavenArtifacts $sources $docs")
+}
+
+fun <T : CommandChain> T.createMavenProject(newMavenProjectDto: NewMavenProjectDto): T = apply {
+  val options = objectMapper.writeValueAsString(newMavenProjectDto)
+  addCommand("${CMD_PREFIX}createMavenProject $options")
+}
+
+fun <T : CommandChain> T.updateMavenGoal(settings: MavenGoalConfigurationDto): T = apply {
+  val options = objectMapper.writeValueAsString(settings)
+  addCommand("${CMD_PREFIX}updateMavenGoal $options")
+}
+
+fun <T : CommandChain> T.validateMavenGoal(settings: MavenGoalConfigurationDto): T = apply {
+  val options = objectMapper.writeValueAsString(settings)
+  addCommand("${CMD_PREFIX}validateMavenGoal $options")
+}
+
+fun <T : CommandChain> T.executeMavenGoals(settings: MavenGoalConfigurationDto): T {
+  val options = objectMapper.writeValueAsString(settings)
+  addCommand("${CMD_PREFIX}executeMavenGoals $options")
+  return this
+}
+
 fun <T : CommandChain> T.inlineRename(to: String): T = apply {
   startInlineRename()
   delayType(150, to)
@@ -558,6 +616,10 @@ fun <T : CommandChain> T.startInlineRename(): T = apply {
 }
 
 fun <T : CommandChain> T.setRegistry(registry: String, value: Boolean): T = apply {
+  addCommand("${CMD_PREFIX}set $registry=$value")
+}
+
+fun <T : CommandChain> T.setRegistry(registry: String, value: String): T = apply {
   addCommand("${CMD_PREFIX}set $registry=$value")
 }
 
@@ -625,8 +687,17 @@ fun <T : CommandChain> T.showFileHistory(): T = apply {
   addCommand("${CMD_PREFIX}showFileHistory")
 }
 
-fun <T : CommandChain> T.filterVcsLogTab(userName: String): T = apply {
-  addCommand("${CMD_PREFIX}filterVcsLogTab $userName")
+fun <T : CommandChain> T.filterVcsLogTab(params: Map<String, String>): T = apply {
+  val cmdParams = params.map { "-${it.key} '${it.value}'" }.joinToString(" ")
+  addCommand("${CMD_PREFIX}filterVcsLogTab $cmdParams")
+}
+
+fun <T : CommandChain> T.showBranchWidget(): T = apply {
+  addCommand("${CMD_PREFIX}gitShowBranchWidget")
+}
+
+fun <T : CommandChain> T.showFileAnnotations(): T = apply {
+  addCommand("${CMD_PREFIX}showFileAnnotation")
 }
 
 fun <T : CommandChain> T.chooseCompletionCommand(completionName: String): T = apply {
@@ -656,8 +727,8 @@ fun <T : CommandChain> T.goToDeclaration(expectedOpenedFile: String): T = apply 
   executeEditorAction("GotoDeclaration expectedOpenedFile $expectedOpenedFile")
 }
 
-fun <T : CommandChain> T.collectAllFiles(extension: String): T = apply {
-  addCommand("${CMD_PREFIX}collectAllFiles $extension")
+fun <T : CommandChain> T.collectAllFiles(extension: String, fromSources: Boolean = true): T = apply {
+  addCommand("${CMD_PREFIX}collectAllFiles $extension $fromSources")
 }
 
 fun <T : CommandChain> T.recompileFiles(relativeFilePaths: List<String>): T = apply {
@@ -731,6 +802,7 @@ fun <T : CommandChain> T.waitForCodeAnalysisFinished(): T = apply {
   addCommand("${CMD_PREFIX}waitForFinishedCodeAnalysis")
 }
 
+@Suppress("unused")
 fun <T : CommandChain> T.checkChatBotResponse(textToCheck: String): T = apply {
   addCommand("${CMD_PREFIX}checkResponseContains ${textToCheck}")
 }
@@ -799,8 +871,16 @@ fun <T : CommandChain> T.waitInlineCompletion(): T = apply {
   addCommand("${CMD_PREFIX}waitInlineCompletion")
 }
 
+fun <T : CommandChain> T.waitInlineCompletionWarmup(): T = apply {
+  addCommand("${CMD_PREFIX}waitInlineCompletion WARMUP")
+}
+
 fun <T : CommandChain> T.clearLLMInlineCompletionCache(): T = apply {
   addCommand("${CMD_PREFIX}clearLLMInlineCompletionCache")
+}
+
+fun <T : CommandChain> T.waitForVcsLogUpdate(): T = apply {
+  addCommand("${CMD_PREFIX}waitForVcsLogUpdate")
 }
 
 /**
@@ -861,6 +941,7 @@ fun <T : CommandChain> T.startNewLine(): T = apply {
   executeEditorAction("EditorStartNewLine")
 }
 
+@Suppress("unused")
 fun <T : CommandChain> T.captureMemoryMetrics(suffix: String): T = apply {
   addCommand("${CMD_PREFIX}captureMemoryMetrics $suffix")
 }
@@ -869,9 +950,17 @@ fun <T : CommandChain> T.sleep(timeOut: Long, unit: TimeUnit = TimeUnit.MILLISEC
   addCommand("${CMD_PREFIX}sleep ${unit.toMillis(timeOut)}")
 }
 
+fun <T : CommandChain> T.waitForEDTQueueUnstuck(): T = apply {
+  addCommand("${CMD_PREFIX}waitForEDTQueueUnstuck")
+}
 
 fun <T : CommandChain> T.repeatCommand(times: Int, commandChain: (CommandChain) -> Unit): T = apply {
   repeat(times) {
     commandChain.invoke(this)
   }
+}
+
+fun <T : CommandChain> T.createScratchFile(filename: String, content: String): T = apply {
+  val modifiedContent = content.replace("\n", "\\n").replace(" ", "_")
+  addCommand("${CMD_PREFIX}createScratchFile $filename $modifiedContent")
 }

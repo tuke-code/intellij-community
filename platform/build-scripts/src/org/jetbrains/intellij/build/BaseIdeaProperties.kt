@@ -1,4 +1,4 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 @file:Suppress("ReplaceJavaStaticMethodWithKotlinAnalog")
 
 package org.jetbrains.intellij.build
@@ -64,7 +64,6 @@ val IDEA_BUNDLED_PLUGINS: PersistentList<String> = DEFAULT_BUNDLED_PLUGINS + per
   "intellij.vcs.git",
   "intellij.vcs.svn",
   "intellij.vcs.hg",
-  "intellij.vcs.github",
   "intellij.vcs.gitlab",
   "intellij.groovy",
   "intellij.junit",
@@ -112,7 +111,7 @@ val TEST_FRAMEWORK_WITH_JAVA_RT: (PlatformLayout, BuildContext) -> Unit = { layo
                       "intellij.platform.testFramework.impl",
                       "intellij.tools.testsBootstrap",
                       "intellij.java.rt")) {
-    layout.withModule(name, "testFramework.jar")
+    layout.withModule(name, TEST_FRAMEWORK_JAR)
   }
 }
 
@@ -172,7 +171,5 @@ abstract class BaseIdeaProperties : JetBrainsProductProperties() {
     )
     additionalModulesToCompile = persistentListOf("intellij.tools.jps.build.standalone")
     modulesToCompileTests = persistentListOf("intellij.platform.jps.build.tests")
-
-    isAntRequired = true
   }
 }

@@ -1,4 +1,4 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 
 package org.jetbrains.kotlin.idea.intentions;
 
@@ -12608,6 +12608,11 @@ public abstract class K1IntentionTestGenerated extends AbstractK1IntentionTest {
             runTest("testData/intentions/lambdaToAnonymousFunction/extention2.kt");
         }
 
+        @TestMetadata("flexibleType.kt")
+        public void testFlexibleType() throws Exception {
+            runTest("testData/intentions/lambdaToAnonymousFunction/flexibleType.kt");
+        }
+
         @TestMetadata("fullyQualified.kt")
         public void testFullyQualified() throws Exception {
             runTest("testData/intentions/lambdaToAnonymousFunction/fullyQualified.kt");
@@ -17446,6 +17451,11 @@ public abstract class K1IntentionTestGenerated extends AbstractK1IntentionTest {
             runTest("testData/intentions/specifyTypeExplicitly/constructor.kt");
         }
 
+        @TestMetadata("constructorParameter.kt")
+        public void testConstructorParameter() throws Exception {
+            runTest("testData/intentions/specifyTypeExplicitly/constructorParameter.kt");
+        }
+
         @TestMetadata("definitelyNonNullType.kt")
         public void testDefinitelyNonNullType() throws Exception {
             runTest("testData/intentions/specifyTypeExplicitly/definitelyNonNullType.kt");
@@ -17494,6 +17504,11 @@ public abstract class K1IntentionTestGenerated extends AbstractK1IntentionTest {
         @TestMetadata("forAsExpression.kt")
         public void testForAsExpression() throws Exception {
             runTest("testData/intentions/specifyTypeExplicitly/forAsExpression.kt");
+        }
+
+        @TestMetadata("functionParameter.kt")
+        public void testFunctionParameter() throws Exception {
+            runTest("testData/intentions/specifyTypeExplicitly/functionParameter.kt");
         }
 
         @TestMetadata("functionType.kt")
@@ -17639,6 +17654,11 @@ public abstract class K1IntentionTestGenerated extends AbstractK1IntentionTest {
         @TestMetadata("unitType.kt")
         public void testUnitType() throws Exception {
             runTest("testData/intentions/specifyTypeExplicitly/unitType.kt");
+        }
+
+        @TestMetadata("variableWithoutInitializer.kt")
+        public void testVariableWithoutInitializer() throws Exception {
+            runTest("testData/intentions/specifyTypeExplicitly/variableWithoutInitializer.kt");
         }
     }
 

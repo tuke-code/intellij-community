@@ -45,6 +45,7 @@ import org.jetbrains.kotlin.config.JvmTarget
 import org.jetbrains.kotlin.config.LanguageVersion
 import org.jetbrains.kotlin.idea.KotlinFileType
 import org.jetbrains.kotlin.idea.base.facet.hasKotlinFacet
+import org.jetbrains.kotlin.idea.base.test.InTextDirectivesUtils
 import org.jetbrains.kotlin.idea.base.test.KotlinRoot
 import org.jetbrains.kotlin.idea.compiler.configuration.IdeKotlinVersion
 import org.jetbrains.kotlin.idea.compiler.configuration.KotlinCommonCompilerArgumentsHolder
@@ -254,7 +255,7 @@ abstract class KotlinLightCodeInsightFixtureTestCase : KotlinLightCodeInsightFix
                     KotlinWithJdkAndRuntimeLightProjectDescriptor.getInstanceFullJdk()
 
                 InTextDirectivesUtils.isDirectiveDefined(fileText, "RUNTIME_WITH_JDK_10") ->
-                    KotlinWithJdkAndRuntimeLightProjectDescriptor.getInstance(LanguageLevel.JDK_10)
+                    KotlinWithJdkAndRuntimeLightProjectDescriptor.getInstanceWithStdlibJdk10()
 
                 InTextDirectivesUtils.isDirectiveDefined(fileText, "RUNTIME_WITH_REFLECT") ->
                     KotlinWithJdkAndRuntimeLightProjectDescriptor.getInstanceWithReflect()
@@ -327,8 +328,8 @@ abstract class KotlinLightCodeInsightFixtureTestCase : KotlinLightCodeInsightFix
         val managerEx = ActionManagerEx.getInstanceEx()
         val action = managerEx.getAction(actionId)
         val event = AnActionEvent(null, dataContext, ActionPlaces.UNKNOWN, Presentation(), managerEx, 0)
-
-        if (ActionUtil.lastUpdateAndCheckDumb(action, event, false)) {
+        ActionUtil.performDumbAwareUpdate(action, event, false)
+        if (event.presentation.isEnabled) {
             ActionUtil.performActionDumbAwareWithCallbacks(action, event)
             return true
         }

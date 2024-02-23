@@ -3,10 +3,13 @@ package org.jetbrains.plugins.gradle.service.project;
 
 import com.intellij.build.events.MessageEvent;
 import com.intellij.build.issue.BuildIssue;
-import com.intellij.gradle.toolingExtension.impl.model.dependencyDownloadPolicyModel.GradleDependencyDownloadPolicyProvider;
+import com.intellij.gradle.toolingExtension.impl.model.buildScriptClasspathModel.GradleBuildScriptClasspathModelProvider;
 import com.intellij.gradle.toolingExtension.impl.model.projectModel.GradleExternalProjectModelProvider;
+import com.intellij.gradle.toolingExtension.impl.model.sourceSetDependencyModel.GradleSourceSetDependencyModelProvider;
 import com.intellij.gradle.toolingExtension.impl.model.sourceSetModel.GradleSourceSetModelProvider;
 import com.intellij.gradle.toolingExtension.impl.model.taskModel.GradleTaskModelProvider;
+import com.intellij.gradle.toolingExtension.impl.modelAction.AllModels;
+import com.intellij.gradle.toolingExtension.util.GradleVersionUtil;
 import com.intellij.openapi.application.ApplicationNamesInfo;
 import com.intellij.openapi.application.PathManager;
 import com.intellij.openapi.diagnostic.Logger;
@@ -43,7 +46,6 @@ import org.gradle.tooling.model.GradleModuleVersion;
 import org.gradle.tooling.model.GradleTask;
 import org.gradle.tooling.model.UnsupportedMethodException;
 import org.gradle.tooling.model.idea.*;
-import org.gradle.util.GradleVersion;
 import org.jetbrains.annotations.NonNls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -263,7 +265,7 @@ public final class CommonGradleProjectResolverExtension extends AbstractProjectR
                             new ConfigurationDataImpl(GradleConstants.SYSTEM_ID, intellijSettings.getSettings()));
     }
 
-    ProjectImportAction.AllModels models = resolverCtx.getModels();
+    AllModels models = resolverCtx.getModels();
     ExternalTestsModel externalTestsModel = models.getModel(gradleModule, ExternalTestsModel.class);
     if (externalTestsModel != null) {
       for (ExternalTestSourceMapping testSourceMapping : externalTestsModel.getTestSourceMappings()) {
@@ -753,7 +755,6 @@ public final class CommonGradleProjectResolverExtension extends AbstractProjectR
   @Override
   public @NotNull Set<Class<?>> getExtraProjectModelClasses() {
     return ContainerUtil.newLinkedHashSet(
-      BuildScriptClasspathModel.class,
       GradleExtensions.class,
       ExternalTestsModel.class,
       IntelliJProjectSettings.class,
@@ -774,10 +775,11 @@ public final class CommonGradleProjectResolverExtension extends AbstractProjectR
   public @NotNull List<ProjectImportModelProvider> getModelProviders() {
     return ContainerUtil.append(
       super.getModelProviders(),
-      new GradleSourceSetModelProvider(),
       new GradleTaskModelProvider(),
-      new GradleDependencyDownloadPolicyProvider(),
-      new GradleExternalProjectModelProvider()
+      new GradleSourceSetModelProvider(),
+      new GradleSourceSetDependencyModelProvider(),
+      new GradleExternalProjectModelProvider(),
+      new GradleBuildScriptClasspathModelProvider()
     );
   }
 
@@ -888,10 +890,9 @@ public final class CommonGradleProjectResolverExtension extends AbstractProjectR
     throws IllegalStateException {
 
     final GradleExecutionSettings gradleExecutionSettings = resolverContext.getSettings();
-    final String projectGradleVersionString = resolverContext.getProjectGradleVersion();
-    if (gradleExecutionSettings != null && projectGradleVersionString != null) {
-      final GradleVersion projectGradleVersion = GradleVersion.version(projectGradleVersionString);
-      if (projectGradleVersion.compareTo(GradleVersion.version("4.0")) < 0) {
+    final String projectGradleVersion = resolverContext.getProjectGradleVersion();
+    if (gradleExecutionSettings != null && projectGradleVersion != null) {
+      if (GradleVersionUtil.isGradleOlderThan(projectGradleVersion, "4.0")) {
         final IdeaModule dependencyModule = getDependencyModuleByReflection(dependency);
         if (dependencyModule != null) {
           final ModuleData moduleData =

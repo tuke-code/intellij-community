@@ -141,10 +141,10 @@
     },
 
     "ActionButton": {
-      "hoverBackground": "Grey12",
-      "hoverBorderColor": "Grey12",
-      "pressedBackground": "Grey11",
-      "pressedBorderColor": "Grey11",
+      "hoverBackground": "#00000012",
+      "hoverBorderColor": "#00000000",
+      "pressedBackground": "#0000001D",
+      "pressedBorderColor": "#00000000",
       "focusedBorderColor": "Blue5",
       "hoverSeparatorColor": "Grey8"
     },
@@ -163,6 +163,8 @@
     "Breakpoint.iconHoverAlpha": 0.3,
 
     "Button": {
+      "arc": 8,
+      "border": "com.intellij.ide.ui.laf.darcula.ui.DarculaButtonBorder",
       "startBorderColor": "Grey9",
       "endBorderColor": "Grey9",
       "focusedBorderColor": "Grey14",
@@ -200,11 +202,27 @@
 
     "ComboBox": {
       "background": "Grey14",
+      "border": "com.intellij.ide.ui.laf.darcula.ui.DarculaComboBoxBorder",
       "disabledBackground": "Grey13",
       "minimumSize": "49,28",
+      "padding": "1,9,1,6",
       "ArrowButton": {
         "background": "Grey14",
         "nonEditableBackground": "Grey14"
+      }
+    },
+
+    "Code": {
+      "Inline": {
+        "backgroundColor": "Grey5",
+        "backgroundOpacity": 10
+      },
+      "Block": {
+        "backgroundOpacity": 100,
+        "borderColor":"Grey12",
+        "inlineQuickDoc.backgroundColor": "Grey5",
+        "inlineQuickDoc.backgroundOpacity": 4,
+        "inlineQuickDoc.borderColor":"Grey12"
       }
     },
 
@@ -218,10 +236,9 @@
       }
     },
 
-    "PasswordField.background": "Grey14",
-
     "Component": {
-      "arc": "8",
+      "arc": 8,
+      "arrowAreaWidth": "28",
       "borderColor": "Grey9",
       "focusedBorderColor": "Grey14",
       "errorFocusColor": "Red4",
@@ -449,6 +466,11 @@
       "Notification.hoverBackground": "Grey13"
     },
 
+    "PasswordField": {
+      "background": "Grey14",
+      "border": "com.intellij.ide.ui.laf.darcula.ui.DarculaTextBorderNew"
+    },
+
     "Plugins": {
       "background": "Grey14",
       "SearchField.background": "Grey14",
@@ -513,11 +535,6 @@
       "iconTextGap": 4
     },
 
-    "SearchField": {
-      "errorForeground": "Red4",
-      "errorBackground": "Red9"
-    },
-
     "SearchEverywhere": {
       "Tab.selectedBackground": "Blue11",
       "SearchField.background": "Grey14",
@@ -526,6 +543,15 @@
         "foreground": "Grey7",
         "background": "Grey13"
       }
+    },
+
+    "SearchField": {
+      "errorForeground": "Red4",
+      "errorBackground": "Red9"
+    },
+
+    "SearchFieldWithExtension": {
+      "border": "com.intellij.ui.components.DarculaSearchFieldWithExtensionBorder"
     },
 
     "SearchMatch": {
@@ -545,6 +571,7 @@
     },
 
     "Spinner": {
+      "border": "com.intellij.ide.ui.laf.darcula.ui.DarculaSpinnerBorderNew",
       "minimumSize": "72,28"
     },
 
@@ -587,6 +614,7 @@
 
     "TextField": {
       "background": "Grey14",
+      "border": "com.intellij.ide.ui.laf.darcula.ui.DarculaTextBorderNew",
       "minimumSize": "49,28"
     },
 
@@ -610,13 +638,16 @@
       "borderColor": "Grey2",
       "foreground": "Grey9",
       "stepForeground": "Grey7",
+      "secondaryActionForeground": "Grey7",
       "Header.foreground": "Grey14",
       "shortcutForeground": "Grey14",
-      "shortcutBackground": "Grey5",
+      "shortcutBackground": "Grey4",
       "codeForeground": "Grey14",
       "codeBackground": "Grey2",
       "codeBorderColor": "Grey6",
-      "linkForeground": "Blue7",
+      "linkForeground": "Blue8",
+      "linkUnderlineHoveredColor": "Blue8",
+      "linkUnderlineDefaultColor": "#FFFFFF00",
       "imageBorderColor": "Grey4",
       "animationBackground": "Grey13",
       "Button": {
@@ -624,7 +655,8 @@
         "startBackground": "Grey4",
         "endBackground": "Grey4",
         "startBorderColor": "Grey4",
-        "endBorderColor": "Grey4"
+        "endBorderColor": "Grey4",
+        "contrastBackground": "Blue4"
       }
     },
 
@@ -648,6 +680,7 @@
         "hoverInactiveBackground": "Grey12"
       },
       "Button": {
+        "foreground": "Grey5",
         "selectedForeground": "Grey14",
         "selectedBackground": "Blue4",
         "hoverBackground": "Grey12",
@@ -749,11 +782,18 @@
     "Tooltip.Learning": {
       "background": "Blue4",
       "borderColor": "Blue4",
-      "spanBackground": "Blue2",
+      "spanBackground": "Blue1",
       "spanForeground": "Grey14",
       "foreground": "Grey14",
       "stepNumberForeground": "Blue9",
-      "codeBorderColor": "#FFFFFFBF"
+      "secondaryActionForeground": "Blue9",
+      "codeBorderColor": "#FFFFFF80",
+      "linkForeground": "Grey14",
+      "linkUnderlineHoveredColor": "#FFFFFF80",
+      "linkUnderlineDefaultColor": "#FFFFFF80",
+      "Header.foreground": "Grey14",
+      "iconFillColor": "Blue6",
+      "iconBorderColor": "Grey14"
     },
 
     "PackageSearch": {
@@ -1018,6 +1058,17 @@
       }
     },
 
+    "ParameterInfo": {
+      "background": "Grey12",
+      "currentOverloadBackground": "Blue9",
+      "borderColor": "Grey8",
+      "foreground": "Grey3",
+      "currentParameterForeground": "Grey3",
+      "disabledForeground": "Grey8",
+      "infoForeground": "Grey3",
+      "lineSeparatorColor": "Grey12"
+    },
+
     "DataSummary.Chart.barColor": "Blue4",
 
     "ManagedIdeBadgeBorder": "Grey5",
@@ -1026,7 +1077,7 @@
     "ManagedIdeMenuItemHover": "Grey12",
 
     "InlineBanner.hoverBackground": "#0000000F",
-    "InlineBanner.pressedBackground": "00000019"
+    "InlineBanner.pressedBackground": "#00000019"
   },
 
   "icons": {
@@ -1039,32 +1090,32 @@
     "/windows/restore.svg": "/expui/windows/restore.svg",
     "/windows/restoreInactive.svg": "/expui/windows/restoreInactive.svg",
 
-    "/com/intellij/ide/ui/laf/icons/intellij/checkBox.svg": "/themes/expUI/icons/light/checkBox.svg",
-    "/com/intellij/ide/ui/laf/icons/intellij/checkBoxDisabled.svg": "/themes/expUI/icons/light/checkBoxDisabled.svg",
-    "/com/intellij/ide/ui/laf/icons/intellij/checkBoxFocused.svg": "/themes/expUI/icons/light/checkBoxFocused.svg",
-    "/com/intellij/ide/ui/laf/icons/intellij/checkBoxIndeterminateSelected.svg": "/themes/expUI/icons/light/checkBoxIndeterminateSelected.svg",
-    "/com/intellij/ide/ui/laf/icons/intellij/checkBoxIndeterminateSelectedDisabled.svg": "/themes/expUI/icons/light/checkBoxIndeterminateSelectedDisabled.svg",
-    "/com/intellij/ide/ui/laf/icons/intellij/checkBoxIndeterminateSelectedFocused.svg": "/themes/expUI/icons/light/checkBoxIndeterminateSelectedFocused.svg",
-    "/com/intellij/ide/ui/laf/icons/intellij/checkBoxSelected.svg": "/themes/expUI/icons/light/checkBoxSelected.svg",
-    "/com/intellij/ide/ui/laf/icons/intellij/checkBoxSelectedDisabled.svg": "/themes/expUI/icons/light/checkBoxSelectedDisabled.svg",
-    "/com/intellij/ide/ui/laf/icons/intellij/checkBoxSelectedFocused.svg": "/themes/expUI/icons/light/checkBoxSelectedFocused.svg",
-    "/com/intellij/ide/ui/laf/icons/intellij/radio.svg": "/themes/expUI/icons/light/radio.svg",
-    "/com/intellij/ide/ui/laf/icons/intellij/radioDisabled.svg": "/themes/expUI/icons/light/radioDisabled.svg",
-    "/com/intellij/ide/ui/laf/icons/intellij/radioFocused.svg": "/themes/expUI/icons/light/radioFocused.svg",
-    "/com/intellij/ide/ui/laf/icons/intellij/radioSelected.svg": "/themes/expUI/icons/light/radioSelected.svg",
-    "/com/intellij/ide/ui/laf/icons/intellij/radioSelectedDisabled.svg": "/themes/expUI/icons/light/radioSelectedDisabled.svg",
-    "/com/intellij/ide/ui/laf/icons/intellij/radioSelectedFocused.svg": "/themes/expUI/icons/light/radioSelectedFocused.svg",
+    "/com/intellij/ide/ui/laf/icons/intellij/checkBox.svg": "/themes/expUI/icons/dark/checkBox.svg",
+    "/com/intellij/ide/ui/laf/icons/intellij/checkBoxDisabled.svg": "/themes/expUI/icons/dark/checkBoxDisabled.svg",
+    "/com/intellij/ide/ui/laf/icons/intellij/checkBoxFocused.svg": "/themes/expUI/icons/dark/checkBoxFocused.svg",
+    "/com/intellij/ide/ui/laf/icons/intellij/checkBoxIndeterminateSelected.svg": "/themes/expUI/icons/dark/checkBoxIndeterminateSelected.svg",
+    "/com/intellij/ide/ui/laf/icons/intellij/checkBoxIndeterminateSelectedDisabled.svg": "/themes/expUI/icons/dark/checkBoxIndeterminateSelectedDisabled.svg",
+    "/com/intellij/ide/ui/laf/icons/intellij/checkBoxIndeterminateSelectedFocused.svg": "/themes/expUI/icons/dark/checkBoxIndeterminateSelectedFocused.svg",
+    "/com/intellij/ide/ui/laf/icons/intellij/checkBoxSelected.svg": "/themes/expUI/icons/dark/checkBoxSelected.svg",
+    "/com/intellij/ide/ui/laf/icons/intellij/checkBoxSelectedDisabled.svg": "/themes/expUI/icons/dark/checkBoxSelectedDisabled.svg",
+    "/com/intellij/ide/ui/laf/icons/intellij/checkBoxSelectedFocused.svg": "/themes/expUI/icons/dark/checkBoxSelectedFocused.svg",
+    "/com/intellij/ide/ui/laf/icons/intellij/radio.svg": "/themes/expUI/icons/dark/radio.svg",
+    "/com/intellij/ide/ui/laf/icons/intellij/radioDisabled.svg": "/themes/expUI/icons/dark/radioDisabled.svg",
+    "/com/intellij/ide/ui/laf/icons/intellij/radioFocused.svg": "/themes/expUI/icons/dark/radioFocused.svg",
+    "/com/intellij/ide/ui/laf/icons/intellij/radioSelected.svg": "/themes/expUI/icons/dark/radioSelected.svg",
+    "/com/intellij/ide/ui/laf/icons/intellij/radioSelectedDisabled.svg": "/themes/expUI/icons/dark/radioSelectedDisabled.svg",
+    "/com/intellij/ide/ui/laf/icons/intellij/radioSelectedFocused.svg": "/themes/expUI/icons/dark/radioSelectedFocused.svg",
 
     "ColorPalette": {
+      "Checkbox.Background.Default": "Grey14",
       "Checkbox.Border.Default": "Grey8",
+      "Checkbox.Foreground.Selected": "Grey14",
       "Checkbox.Background.Selected": "Blue4",
       "Checkbox.Border.Selected": "Blue4",
-      "Checkbox.Focus.Thin.Default": "Grey14",
-      "Checkbox.Focus.Thin.Selected": "Grey14",
       "Checkbox.Focus.Wide": "Blue4",
-      "Checkbox.Foreground.Disabled": "Grey8",
-      "Checkbox.Border.Disabled": "Grey11",
-      "Checkbox.Background.Disabled": "Grey13"
+      "Checkbox.Foreground.Disabled": "Grey9",
+      "Checkbox.Background.Disabled": "Grey13",
+      "Checkbox.Border.Disabled": "Grey11"
     }
   }
 }

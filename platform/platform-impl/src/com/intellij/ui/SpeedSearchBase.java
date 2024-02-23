@@ -27,6 +27,7 @@ import com.intellij.ui.components.fields.ExtendableTextField;
 import com.intellij.ui.scale.JBUIScale;
 import com.intellij.ui.speedSearch.SpeedSearch;
 import com.intellij.ui.speedSearch.SpeedSearchActivator;
+import com.intellij.ui.speedSearch.SpeedSearchInputMethodRequests;
 import com.intellij.ui.speedSearch.SpeedSearchSupply;
 import com.intellij.util.ReflectionUtil;
 import com.intellij.util.concurrency.ThreadingAssertions;
@@ -46,8 +47,11 @@ import javax.swing.text.BadLocationException;
 import javax.swing.text.PlainDocument;
 import java.awt.*;
 import java.awt.event.*;
+import java.awt.font.TextHitInfo;
+import java.awt.im.InputMethodRequests;
 import java.beans.PropertyChangeListener;
 import java.beans.PropertyChangeSupport;
+import java.text.AttributedCharacterIterator;
 import java.util.ListIterator;
 import java.util.NoSuchElementException;
 
@@ -160,6 +164,22 @@ public abstract class SpeedSearchBase<Comp extends JComponent> extends SpeedSear
       }
     });
 
+    if (allowInputMethodsInSpeedSearch()) {
+      myComponent.addInputMethodListener(new InputMethodListener() {
+        @Override
+        public void inputMethodTextChanged(InputMethodEvent e) {
+          processInputMethodEvent(e);
+        }
+
+        @Override
+        public void caretPositionChanged(InputMethodEvent e) {
+          processInputMethodEvent(e);
+        }
+      });
+
+      myComponent.enableInputMethods(true);
+    }
+
     new DumbAwareAction() {
       @Override
       public void actionPerformed(@NotNull AnActionEvent e) {
@@ -193,6 +213,42 @@ public abstract class SpeedSearchBase<Comp extends JComponent> extends SpeedSear
 
   protected boolean keepEvenWhenFocusLost() {
     return false;
+  }
+
+  protected boolean allowInputMethodsInSpeedSearch() {
+    return true;
+  }
+
+  private InputMethodRequests myInputMethodRequests;
+
+  @Override
+  public InputMethodRequests getInputMethodRequests() {
+    if (!allowInputMethodsInSpeedSearch()) {
+      return null;
+    }
+
+    if (myInputMethodRequests == null) {
+      myInputMethodRequests = new SpeedSearchInputMethodRequests() {
+        @Override
+        protected void ensurePopupIsShown() {
+          if (mySearchPopup == null) {
+            showPopup();
+          }
+        }
+
+        @Override
+        protected InputMethodRequests getDelegate() {
+          JTextField field = getSearchField();
+          if (field == null) {
+            return null;
+          } else {
+            return field.getInputMethodRequests();
+          }
+        }
+      };
+    }
+
+    return myInputMethodRequests;
   }
 
   public @Nullable JTextField getSearchField() {
@@ -439,6 +495,18 @@ public abstract class SpeedSearchBase<Comp extends JComponent> extends SpeedSear
     }
   }
 
+  public void processInputMethodEvent(InputMethodEvent e) {
+    if (!isSpeedSearchEnabled()) return;
+
+    if (mySearchPopup == null && e.getID() == InputMethodEvent.INPUT_METHOD_TEXT_CHANGED) {
+      showPopup();
+    }
+
+    if (mySearchPopup != null) {
+      mySearchPopup.processInputMethodEvent(e);
+    }
+  }
+
   protected @NotNull SpeedSearchBase<Comp>.SearchPopup createPopup(String s) {
     return new SearchPopup(s);
   }
@@ -615,6 +683,16 @@ public abstract class SpeedSearchBase<Comp extends JComponent> extends SpeedSear
       }
     }
 
+    @Override
+    public void processInputMethodEvent(InputMethodEvent e) {
+      mySearchField.processInputMethodEvent(e);
+      if (e.isConsumed()) {
+        updateLastPattern();
+        String s = mySearchField.getText();
+        updateSelection(findElement(s), s);
+      }
+    }
+
     void refreshSelection() {
       findAndSelectElement(mySearchField.getText());
     }
@@ -783,6 +861,11 @@ public abstract class SpeedSearchBase<Comp extends JComponent> extends SpeedSear
       if (i == KeyEvent.VK_BACK_SPACE) {
         e.consume();
       }
+    }
+
+    @Override
+    public void processInputMethodEvent(InputMethodEvent e) {
+      super.processInputMethodEvent(e);
     }
 
     @Override

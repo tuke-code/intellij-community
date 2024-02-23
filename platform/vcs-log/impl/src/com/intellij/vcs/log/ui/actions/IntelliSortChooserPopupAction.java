@@ -26,8 +26,11 @@ public class IntelliSortChooserPopupAction extends DefaultActionGroup {
 
   @Override
   public AnAction @NotNull [] getChildren(@Nullable AnActionEvent e) {
-    VcsLogUi logUI = e.getRequiredData(VcsLogDataKeys.VCS_LOG_UI);
-    VcsLogUiProperties properties = e.getRequiredData(VcsLogInternalDataKeys.LOG_UI_PROPERTIES);
+    if (e == null) return EMPTY_ARRAY;
+    VcsLogUi logUI = e.getData(VcsLogDataKeys.VCS_LOG_UI);
+    if (logUI == null) return EMPTY_ARRAY;
+    VcsLogUiProperties properties = e.getData(VcsLogInternalDataKeys.LOG_UI_PROPERTIES);
+    if (properties == null) return EMPTY_ARRAY;
 
     return Arrays.stream(PermanentGraph.SortType.values())
       .map(sortType -> new SelectIntelliSortTypeAction(logUI, properties, sortType))

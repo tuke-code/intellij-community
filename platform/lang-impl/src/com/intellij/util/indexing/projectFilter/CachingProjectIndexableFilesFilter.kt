@@ -3,13 +3,18 @@ package com.intellij.util.indexing.projectFilter
 
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.newvfs.ManagingFS
+import com.intellij.openapi.vfs.newvfs.impl.VfsRootAccess.VfsRootAccessNotAllowedError
 import com.intellij.util.containers.ConcurrentThreeStateBitSet
 import com.intellij.util.indexing.IndexableFilesIndex
 
-internal class CachingProjectIndexableFilesFilter(private val project: Project) : ProjectIndexableFilesFilter() {
-  private val fileIds: ConcurrentThreeStateBitSet = ConcurrentThreeStateBitSet.create()
+internal class CachingProjectIndexableFilesFilterFactory : ProjectIndexableFilesFilterFactory() {
+  override fun create(project: Project): ProjectIndexableFilesFilter {
+    return CachingProjectIndexableFilesFilter(project)
+  }
+}
 
-  override fun getFilteringScopeType(): FilterScopeType = FilterScopeType.PROJECT_AND_LIBRARIES
+internal class CachingProjectIndexableFilesFilter(project: Project) : ProjectIndexableFilesFilter(project, false) {
+  private val fileIds: ConcurrentThreeStateBitSet = ConcurrentThreeStateBitSet.create()
 
   override fun containsFileId(fileId: Int): Boolean {
     return containsFileId(fileIds, fileId)
@@ -19,10 +24,15 @@ internal class CachingProjectIndexableFilesFilter(private val project: Project) 
   private fun containsFileId(_fileIds: ConcurrentThreeStateBitSet, fileId: Int): Boolean {
     while (true) {
       _fileIds[fileId]?.let { return it }
-      val file = ManagingFS.getInstance().findFileById(fileId)
-      val isIndexable = file == null || IndexableFilesIndex.getInstance(project).shouldBeIndexed(file)
-      if (_fileIds.compareAndSet(fileId, null, isIndexable)) {
-        return isIndexable
+      try {
+        val file = ManagingFS.getInstance().findFileById(fileId)
+        val isIndexable = file == null || IndexableFilesIndex.getInstance(project).shouldBeIndexed(file)
+        if (_fileIds.compareAndSet(fileId, null, isIndexable)) {
+          return isIndexable
+        }
+      }
+      catch (error: VfsRootAccessNotAllowedError) {
+        return false
       }
     }
   }
@@ -56,12 +66,9 @@ internal class CachingProjectIndexableFilesFilter(private val project: Project) 
     fileIds.clear()
   }
 
-  override fun runHealthCheck(project: Project): List<HealthCheckError> {
-    return runAndCheckThatNoChangesHappened {
-      val fileStatuses = (0 until fileIds.size()).asSequence().mapNotNull { fileId ->
-        fileIds[fileId]?.let { status -> fileId to status }
-      }
-      runHealthCheck(project, false, fileStatuses)
+  override fun getFileStatuses(): Sequence<Pair<Int, Boolean>> {
+    return (0 until fileIds.size()).asSequence().mapNotNull { fileId ->
+      fileIds[fileId]?.let { status -> fileId to status }
     }
   }
 }

@@ -3,6 +3,7 @@ package com.intellij.psi.util;
 
 import com.intellij.codeInsight.runner.JavaMainMethodProvider;
 import com.intellij.openapi.util.Condition;
+import com.intellij.pom.java.JavaFeature;
 import com.intellij.pom.java.LanguageLevel;
 import com.intellij.psi.*;
 import com.intellij.util.containers.ContainerUtil;
@@ -14,7 +15,7 @@ public final class PsiMethodUtil {
   public static final Condition<PsiClass> MAIN_CLASS = psiClass -> {
     if (PsiUtil.isLocalOrAnonymousClass(psiClass)) return false;
     if (psiClass.isAnnotationType()) return false;
-    if (psiClass.isInterface() && !PsiUtil.isLanguageLevel8OrHigher(psiClass)) return false;
+    if (psiClass.isInterface() && !PsiUtil.isAvailable(JavaFeature.EXTENSION_METHODS, psiClass)) return false;
     return psiClass.getContainingClass() == null || psiClass.hasModifierProperty(PsiModifier.STATIC);
   };
 
@@ -67,9 +68,11 @@ public final class PsiMethodUtil {
   }
 
   /**
-   * ATTENTION: does not check the method name equals "main"
+   * ATTENTION 1: does not check the method name equals "main"<br>
+   * ATTENTION 2: does not use implementations of {@link JavaMainMethodProvider}
+   * (unlike {@link #hasMainMethod(PsiClass)} or {@link #findMainMethod(PsiClass)})
    *
-   * @param method  the method to check
+   * @param method the method to check
    * @return true, if the method satisfies a main method signature. false, otherwise
    */
   public static boolean isMainMethod(final PsiMethod method) {
@@ -109,7 +112,8 @@ public final class PsiMethodUtil {
         return provider.hasMainMethod(psiClass);
       }
     }
-    return findMainMethod(psiClass.findMethodsByName("main", true), psiClass) != null;
+    final PsiMethod[] mainMethods = psiClass.findMethodsByName("main", true);
+    return findMainMethod(mainMethods, psiClass) != null;
   }
 
   @Nullable

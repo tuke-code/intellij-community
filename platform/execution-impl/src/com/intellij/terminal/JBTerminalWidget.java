@@ -1,10 +1,7 @@
 // Copyright 2000-2020 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
 package com.intellij.terminal;
 
-import com.intellij.execution.filters.Filter;
-import com.intellij.execution.filters.HyperlinkInfo;
-import com.intellij.execution.filters.HyperlinkWithHoverInfo;
-import com.intellij.execution.filters.HyperlinkWithPopupMenuInfo;
+import com.intellij.execution.filters.*;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.actionSystem.ActionGroup;
 import com.intellij.openapi.actionSystem.AnAction;
@@ -44,7 +41,7 @@ import com.jediterm.terminal.model.hyperlinks.LinkResultItem;
 import com.jediterm.terminal.ui.*;
 import com.jediterm.terminal.ui.hyperlinks.LinkInfoEx;
 import com.jediterm.terminal.ui.settings.SettingsProvider;
-import com.jediterm.terminal.util.Pair;
+import kotlin.Pair;
 import org.jetbrains.annotations.Nls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -105,6 +102,10 @@ public class JBTerminalWidget extends JediTermWidget implements Disposable, Data
         if (LOG.isDebugEnabled()) {
           LOG.debug("Skipping running filters on " + line, e);
         }
+        return null;
+      }
+      catch (CompositeFilter.ApplyFilterException applyFilterException) {
+        LOG.error(applyFilterException);
         return null;
       }
     }).executeSynchronously();
@@ -310,7 +311,7 @@ public class JBTerminalWidget extends JediTermWidget implements Disposable, Data
     buffer.lock();
     try {
       Pair<Point, Point> points = selection.pointsForRun(buffer.getWidth());
-      return SelectionUtil.getSelectionText(points.first, points.second, buffer);
+      return SelectionUtil.getSelectionText(points.getFirst(), points.getSecond(), buffer);
     }
     finally {
       buffer.unlock();
@@ -333,7 +334,7 @@ public class JBTerminalWidget extends JediTermWidget implements Disposable, Data
         new Point(0, -buffer.getHistoryLinesCount()),
         new Point(buffer.getWidth(), buffer.getScreenLinesCount() - 1));
       Pair<Point, Point> points = selection.pointsForRun(buffer.getWidth());
-      return SelectionUtil.getSelectionText(points.first, points.second, buffer);
+      return SelectionUtil.getSelectionText(points.getFirst(), points.getSecond(), buffer);
     }
     finally {
       buffer.unlock();

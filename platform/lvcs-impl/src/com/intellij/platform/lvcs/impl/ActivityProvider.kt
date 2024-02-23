@@ -6,10 +6,10 @@ import org.jetbrains.annotations.ApiStatus
 
 @ApiStatus.Experimental
 interface ActivityProvider {
-  val activityItemsChanged: Flow<Unit>
+  fun getActivityItemsChanged(scope: ActivityScope): Flow<Unit>
 
   fun loadActivityList(scope: ActivityScope, scopeFilter: String?): List<ActivityItem>
-  fun filterActivityList(scope: ActivityScope, items: List<ActivityItem>, activityFilter: String?): Set<ActivityItem>?
+  fun filterActivityList(scope: ActivityScope, data: ActivityData, activityFilter: String?): Set<ActivityItem>?
   fun loadDiffData(scope: ActivityScope, selection: ActivitySelection): ActivityDiffData?
 
   fun isScopeFilterSupported(scope: ActivityScope): Boolean

@@ -1,6 +1,8 @@
-// Copyright 2000-2021 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
+// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.diff.util;
 
+import com.intellij.diff.DiffContext;
+import com.intellij.diff.FrameDiffTool;
 import com.intellij.lang.Language;
 import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.DataProvider;
@@ -136,18 +138,12 @@ public interface DiffUserDataKeys {
   Key<Boolean> ALIGNED_TWO_SIDED_DIFF = Key.create("Diff.AlignTwoSidedDiff");
 
   /**
-   * Controls whether the aligning view mode is available for a specific editor.
-   * This can be disabled for viewers, where this feature is not implemented (e.g. {@link com.intellij.jupyter.diff.util.JupyterDiffViewer})
-   *
-   * @see com.intellij.diff.actions.impl.ToggleDiffAligningModeAction#update
+   * Enable search in editor inside diff changes areas in additional to the editor selection for the current {@link DiffContext}
    */
-  Key<Boolean> ALIGNING_VIEW_NOT_SUPPORTED = Key.create("Diff.DisableAligningView");
+  Key<Boolean> ENABLE_SEARCH_IN_CHANGES = Key.create("Diff.EnableSearchInChanges");
 
   /**
-   * Determines if line markers should always be visible in the editor gutter, regardless of the current folding state.
-   * This can be particularly useful in specialized diff viewers (e.g., {@link com.intellij.jupyter.diff.util.JupyterDiffViewer})
-   *
-   * @see com.intellij.openapi.editor.impl.EditorGutterComponentImpl#isLineMarkerVisible
+   * {@link FrameDiffTool.DiffViewer} reference accessible from particular {@link com.intellij.openapi.editor.Editor}
    */
-  Key<Boolean> LINE_MARKER_ALWAYS_VISIBLE = Key.create("Diff.LineMarkerAlwaysVisible");
+  Key<FrameDiffTool.DiffViewer> DIFF_VIEWER = Key.create("Diff.FrameViewer");
 }

@@ -105,7 +105,7 @@ class StructureImportingTest : MavenMultiVersionImportingTestCase() {
 
     val mFour = WorkspaceModel.getInstance(project).currentSnapshot.resolve(ModuleId("m4"))
     assertNotNull(mFour)
-    val sourceEntitySource = mFour!!.contentRoots.first().sourceRoots.filter { it.url.url.endsWith("java") }.first().entitySource
+    val sourceEntitySource = mFour!!.contentRoots.first().sourceRoots.first { it.url.url.endsWith("java") }.entitySource
     assertTrue(sourceEntitySource is FileInDirectory)
   }
 
@@ -253,7 +253,7 @@ class StructureImportingTest : MavenMultiVersionImportingTestCase() {
       <version>1</version>
       """.trimIndent())
 
-    importProjectAsync()
+    updateAllProjects()
     assertModules("project", "m2", "userModule")
     assertMavenizedModule("project")
     assertMavenizedModule("m2")
@@ -647,7 +647,7 @@ class StructureImportingTest : MavenMultiVersionImportingTestCase() {
   @Test
   fun testParentInRemoteRepository() = runBlocking {
     val pathToJUnit = "asm/asm-parent/3.0"
-    val parentDir = File(getRepositoryPath(), pathToJUnit)
+    val parentDir = File(repositoryPath, pathToJUnit)
 
     removeFromLocalRepository(pathToJUnit)
     assertFalse(parentDir.exists())
@@ -944,7 +944,7 @@ class StructureImportingTest : MavenMultiVersionImportingTestCase() {
       </dependencies>
       """.trimIndent())
 
-    doImportProjects(listOf(projectPom), false, "profile-test")
+    doImportProjectsAsync(listOf(projectPom), false, "profile-test")
   }
 
   @Test
@@ -1034,7 +1034,7 @@ class StructureImportingTest : MavenMultiVersionImportingTestCase() {
                        """.trimIndent())
 
     val disabledProfiles = listOf("one")
-    doImportProjects(listOf(projectPom), true, disabledProfiles)
+    doImportProjectsAsync(listOf(projectPom), true, disabledProfiles)
     assertModules("project-two")
   }
 }

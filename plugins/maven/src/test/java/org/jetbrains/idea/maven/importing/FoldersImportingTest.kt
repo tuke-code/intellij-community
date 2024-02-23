@@ -123,7 +123,9 @@ class FoldersImportingTest : MavenMultiVersionImportingTestCase() {
       assertSources("project", "userSourceFolder")
     }
     assertExcludes("project", "target", "userExcludedFolder")
-    updateAllProjects()
+
+    // incremental sync doesn't support updating source folders if effective pom dependencies haven't changed
+    updateAllProjectsFullSync()
     if (supportsImportOfNonExistingFolders()) {
       assertSources("project", "src/main/java")
     }
@@ -161,11 +163,12 @@ class FoldersImportingTest : MavenMultiVersionImportingTestCase() {
                        """.trimIndent())
     resolveFoldersAndImport()
     assertSources("project", "src")
-    importProjectAsync("""
+    createProjectPom("""
                     <groupId>test</groupId>
                     <artifactId>project</artifactId>
                     <version>1</version>
                     """.trimIndent())
+    updateAllProjects()
     assertSources("project", "src/main/java")
     assertDefaultResources("project")
   }
@@ -771,7 +774,7 @@ class FoldersImportingTest : MavenMultiVersionImportingTestCase() {
     try {
       val helper = MavenCustomRepositoryHelper(dir, "local1")
       repositoryPath = helper.getTestDataPath("local1")
-      val pluginFile = File(getRepositoryPath(),
+      val pluginFile = File(repositoryPath,
                             "org/codehaus/mojo/build-helper-maven-plugin/1.2/build-helper-maven-plugin-1.2.jar")
       assertFalse(pluginFile.exists())
       importProjectAsync("""
@@ -807,7 +810,7 @@ class FoldersImportingTest : MavenMultiVersionImportingTestCase() {
     }
     finally {
       // do not lock files by maven process
-      MavenServerManager.getInstance().shutdown(true)
+      MavenServerManager.getInstance().closeAllConnectorsAndWait()
     }
   }
 
@@ -1675,7 +1678,9 @@ class FoldersImportingTest : MavenMultiVersionImportingTestCase() {
       }
     }
     testAssertions.accept(true)
-    updateAllProjects()
+
+    // incremental sync doesn't support updating source folders if effective pom dependencies haven't changed
+    updateAllProjectsFullSync()
     testAssertions.accept(supportsLegacyKeepingFoldersFromPreviousImport())
     resolveFoldersAndImport()
     testAssertions.accept(supportsLegacyKeepingFoldersFromPreviousImport())

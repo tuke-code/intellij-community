@@ -1,4 +1,4 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.openapi.application.impl;
 
 import com.intellij.CommonBundle;
@@ -19,12 +19,10 @@ import com.intellij.openapi.application.*;
 import com.intellij.openapi.application.ex.ApplicationEx;
 import com.intellij.openapi.application.ex.ApplicationUtil;
 import com.intellij.openapi.client.ClientAwareComponentManager;
+import com.intellij.openapi.components.impl.stores.IComponentStore;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.extensions.Extensions;
-import com.intellij.openapi.progress.EmptyProgressIndicator;
-import com.intellij.openapi.progress.ProcessCanceledException;
-import com.intellij.openapi.progress.ProgressIndicator;
-import com.intellij.openapi.progress.ProgressManager;
+import com.intellij.openapi.progress.*;
 import com.intellij.openapi.progress.impl.CoreProgressManager;
 import com.intellij.openapi.progress.impl.ProgressResult;
 import com.intellij.openapi.progress.impl.ProgressRunner;
@@ -69,6 +67,7 @@ import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 import static com.intellij.ide.ShutdownKt.cancelAndJoinBlocking;
+import static com.intellij.openapi.application.RuntimeFlagsKt.isNewLockEnabled;
 import static com.intellij.util.concurrency.AppExecutorUtil.propagateContextOrCancellation;
 
 @ApiStatus.Internal
@@ -77,6 +76,7 @@ public final class ApplicationImpl extends ClientAwareComponentManager implement
     return Logger.getInstance(ApplicationImpl.class);
   }
 
+  private final static boolean isNewLockEnabled = isNewLockEnabled();
   private ReadMostlyRWLock myLock;
 
   /**
@@ -276,7 +276,7 @@ public final class ApplicationImpl extends ClientAwareComponentManager implement
 
   @Override
   public void invokeLater(@NotNull Runnable runnable, @NotNull ModalityState state, @NotNull Condition<?> expired) {
-    if (myLock == null) {
+    if (!isNewLockEnabled && myLock == null) {
       getLogger().error("Do not call invokeLater when app is not yet fully initialized");
     }
 
@@ -298,7 +298,17 @@ public final class ApplicationImpl extends ClientAwareComponentManager implement
     //noinspection deprecation
     myDispatcher.getMulticaster().applicationExiting();
 
+    IComponentStore componentStore = getServiceIfCreated(IComponentStore.class);
     super.dispose();
+    if (componentStore != null) {
+      try {
+        componentStore.release();
+      }
+      catch (Exception e) {
+        getLogger().error(e);
+      }
+    }
+
     // Remove IW lock from EDT as EDT might be re-created, which might lead to deadlock if anybody uses this disposed app
     if (!StartupUtil.isImplicitReadOnEDTDisabled() || isUnitTestMode()) {
       invokeLater(() -> releaseWriteIntentLock(), ModalityState.nonModal());
@@ -540,23 +550,37 @@ public final class ApplicationImpl extends ClientAwareComponentManager implement
   }
 
   private void doExit(int flags, boolean restart, String @NotNull [] beforeRestart, int exitCode) {
+    Integer actualExitCode = null;
+    try {
+      actualExitCode = destructApplication(flags, restart, beforeRestart, exitCode);
+    }
+    catch (Throwable err) {
+      logErrorDuringExit("Failed to destruct the application", err);
+    }
+    finally {
+      if (actualExitCode != null) {
+        System.exit(actualExitCode);
+      }
+    }
+  }
+
+  private @Nullable Integer destructApplication(int flags, boolean restart, String @NotNull [] beforeRestart, int exitCode) {
     IJTracer tracer = TelemetryManager.getInstance().getTracer(new com.intellij.platform.diagnostic.telemetry.Scope("exitApp", null));
     Span exitSpan = tracer.spanBuilder("application.exit").startSpan();
     boolean force = BitUtil.isSet(flags, FORCE_EXIT);
     try (Scope scope = exitSpan.makeCurrent()) {
       if (!force && !confirmExitIfNeeded(BitUtil.isSet(flags, EXIT_CONFIRMED))) {
-        return;
+        return null;
       }
 
       AppLifecycleListener lifecycleListener = getMessageBus().syncPublisher(AppLifecycleListener.TOPIC);
       lifecycleListener.appClosing();
 
       if (!force && !canExit()) {
-        return;
+        return null;
       }
 
       stopServicePreloading();
-
 
       if (BitUtil.isSet(flags, SAVE)) {
         TraceUtil.runWithSpanThrows(tracer, "saveSettingsOnExit",
@@ -573,7 +597,7 @@ public final class ApplicationImpl extends ClientAwareComponentManager implement
         lifecycleListener.appWillBeClosed(restart);
       }
       catch (Throwable t) {
-        getLogger().error(t);
+        logErrorDuringExit("Failed to invoke lifecycle listeners", t);
       }
 
       LifecycleUsageTriggerCollector.onIdeClose(restart);
@@ -590,17 +614,17 @@ public final class ApplicationImpl extends ClientAwareComponentManager implement
           }
         }
         catch (Throwable e) {
-          getLogger().error(e);
+          logErrorDuringExit("Failed to close and dispose all projects", e);
         }
       }
-      try {
+      try (var ignored = Cancellation.withNonCancelableSection()) {
         scope.close();
         exitSpan.end();
         //noinspection TestOnlyProblems
         disposeContainer();
       }
       catch (Throwable t) {
-        getLogger().error(t);
+        logErrorDuringExit("Failed to dispose the container", t);
       }
 
       //noinspection SpellCheckingInspection
@@ -609,7 +633,7 @@ public final class ApplicationImpl extends ClientAwareComponentManager implement
         if (Boolean.getBoolean("idea.test.guimode")) {
           shutdown();
         }
-        return;
+        return null;
       }
 
       IdeaLogger.dropFrequentExceptionsCaches();
@@ -618,18 +642,36 @@ public final class ApplicationImpl extends ClientAwareComponentManager implement
           Restarter.scheduleRestart(BitUtil.isSet(flags, ELEVATE), beforeRestart);
         }
         catch (Throwable t) {
-          getLogger().error("Restart failed", t);
+          logErrorDuringExit("Failed to restart the application", t);
           StartupErrorReporter.showMessage(BootstrapBundle.message("restart.failed.title"), t);
           if (exitCode == 0) {
             exitCode = AppExitCodes.RESTART_FAILED;
           }
         }
       }
-      System.exit(exitCode);
+      return exitCode;
     }
     finally {
       exitSpan.end();
       myExitInProgress = false;
+    }
+  }
+
+  private static void logErrorDuringExit(String message, Throwable err) {
+    // A special class to bypass problems with logging ControlFlowException.
+    class ApplicationExitException extends RuntimeException {
+      ApplicationExitException(Throwable cause) {
+        super(cause);
+      }
+    }
+
+    if (err != null) {
+      try {
+        getLogger().error(message, new ApplicationExitException(err));
+      }
+      catch (Throwable ignored) {
+        // Do nothing.
+      }
     }
   }
 
@@ -784,7 +826,7 @@ public final class ApplicationImpl extends ClientAwareComponentManager implement
 
   @ApiStatus.Internal
   public boolean isCurrentWriteOnEdt() {
-    return EDT.isEdt(myLock.writeThread);
+    return !isNewLockEnabled && EDT.isEdt(myLock.writeThread);
   }
 
   @Override
@@ -913,11 +955,6 @@ public final class ApplicationImpl extends ClientAwareComponentManager implement
         ThreadingAssertions.assertEventDispatchThread();
       }
     }
-  }
-
-  @Override
-  public void assertTimeConsuming() {
-    assertIsNonDispatchThread();
   }
 
   @Override
@@ -1176,6 +1213,6 @@ public final class ApplicationImpl extends ClientAwareComponentManager implement
 
   @NotNull
   private static ThreadingSupport getThreadingSupport() {
-    return RwLockHolder.INSTANCE;
+    return isNewLockEnabled ? AnyThreadWriteThreadingSupport.INSTANCE : RwLockHolder.INSTANCE;
   }
 }

@@ -1,9 +1,11 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.codeInsight.generation;
 
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.diagnostic.Logger;
+import com.intellij.openapi.project.DumbService;
 import com.intellij.openapi.project.Project;
+import com.intellij.pom.java.JavaFeature;
 import com.intellij.psi.*;
 import com.intellij.psi.codeStyle.CodeStyleManager;
 import com.intellij.psi.codeStyle.JavaCodeStyleManager;
@@ -81,7 +83,7 @@ public class GenerateEqualsHelper implements Runnable {
   private static boolean shouldAddOverrideAnnotation(PsiElement context) {
     JavaCodeStyleSettings style = JavaCodeStyleSettings.getInstance(context.getContainingFile());
 
-    return style.INSERT_OVERRIDE_ANNOTATION && PsiUtil.isLanguageLevel5OrHigher(context);
+    return style.INSERT_OVERRIDE_ANNOTATION && PsiUtil.isAvailable(JavaFeature.ANNOTATIONS, context);
   }
 
   @Override
@@ -100,13 +102,13 @@ public class GenerateEqualsHelper implements Runnable {
   public Collection<PsiMethod> generateMembers() throws IncorrectOperationException {
     PsiMethod equals = null;
     if (myEqualsFields != null && GenerateEqualsHandler.needToGenerateMethod(findMethod(myClass, getEqualsSignature(myProject, myClass.getResolveScope())))) {
-      equals = createEquals();
+      equals = DumbService.getInstance(myProject).computeWithAlternativeResolveEnabled(() -> createEquals());
     }
 
     PsiMethod hashCode = null;
     if (myHashCodeFields != null && GenerateEqualsHandler.needToGenerateMethod(findMethod(myClass, getHashCodeSignature()))) {
       if (myHashCodeFields.length > 0) {
-        hashCode = createHashCode();
+        hashCode = DumbService.getInstance(myProject).computeWithAlternativeResolveEnabled(() -> createHashCode());
       }
       else {
         if (!mySuperHasHashCode) {

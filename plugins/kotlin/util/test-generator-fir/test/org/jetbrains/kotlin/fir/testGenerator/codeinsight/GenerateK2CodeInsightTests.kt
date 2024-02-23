@@ -2,9 +2,11 @@
 package org.jetbrains.kotlin.fir.testGenerator.codeinsight
 
 import org.jetbrains.kotlin.idea.k2.AbstractKotlinFirBreadcrumbsTest
+import org.jetbrains.kotlin.idea.k2.hints.AbstractKtLambdasHintsProvider
+import org.jetbrains.kotlin.idea.k2.hints.AbstractKtRangesHintsProviderTest
+import org.jetbrains.kotlin.idea.k2.hints.AbstractKtReferenceTypeHintsProviderTest
 import org.jetbrains.kotlin.idea.k2.moveUpDown.AbstractFirMoveLeftRightTest
 import org.jetbrains.kotlin.idea.k2.moveUpDown.AbstractKotlinFirMoveStatementTest
-import org.jetbrains.kotlin.idea.k2.quickDoc.AbstractFirRenderingKDocTest
 import org.jetbrains.kotlin.idea.k2.structureView.AbstractKotlinGoToSuperDeclarationsHandlerTest
 import org.jetbrains.kotlin.idea.k2.surroundWith.AbstractKotlinFirSurroundWithTest
 import org.jetbrains.kotlin.idea.k2.unwrap.AbstractKotlinFirUnwrapRemoveTest
@@ -16,6 +18,7 @@ internal fun MutableTWorkspace.generateK2CodeInsightTests() {
     generateK2IntentionTests()
     generateK2StructureViewTests()
     generateK2PostfixTemplateTests()
+    generateK2LiveTemplateTests()
     generateK2LineMarkerTests()
 
     testGroup("code-insight/kotlin.code-insight.k2") {
@@ -70,8 +73,14 @@ internal fun MutableTWorkspace.generateK2CodeInsightTests() {
             model("../../../idea/tests/testData/codeInsight/moveLeftRight")
         }
 
-        testClass<AbstractFirRenderingKDocTest> {
-            model("../../../idea/tests/testData/codeInsight/renderingKDoc", testMethodName = "doTest")
+        testClass<AbstractKtReferenceTypeHintsProviderTest> {
+            model("../../../idea/tests/testData/codeInsight/hints/types")
+        }
+        testClass<AbstractKtLambdasHintsProvider> {
+            model("../../../idea/tests/testData/codeInsight/hints/lambda")
+        }
+        testClass<AbstractKtRangesHintsProviderTest> {
+            model("../../../idea/tests/testData/codeInsight/hints/ranges")
         }
     }
 }

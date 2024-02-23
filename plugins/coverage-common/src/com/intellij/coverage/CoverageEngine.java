@@ -19,6 +19,7 @@ import com.intellij.openapi.roots.ProjectFileIndex;
 import com.intellij.openapi.roots.ProjectRootManager;
 import com.intellij.openapi.util.NlsActions;
 import com.intellij.openapi.util.NlsContexts.TabTitle;
+import com.intellij.openapi.util.TextRange;
 import com.intellij.openapi.util.io.FileUtil;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.openapi.vfs.VfsUtilCore;
@@ -82,7 +83,7 @@ public abstract class CoverageEngine {
   /**
    * Create a suite from a run configuration.
    */
-  public final @Nullable CoverageSuite createCoverageSuite(@NotNull CoverageEnabledConfiguration config) {
+  public @Nullable CoverageSuite createCoverageSuite(@NotNull CoverageEnabledConfiguration config) {
     CoverageRunner runner = config.getCoverageRunner();
     if (runner == null) return null;
     return createCoverageSuite(runner, config.createSuiteName(), config.createFileProvider(), config);
@@ -245,6 +246,18 @@ public abstract class CoverageEngine {
   }
 
   /**
+   * Content of a brief report which will be shown by click on coverage icon
+   */
+  public String generateBriefReport(@NotNull CoverageSuitesBundle bundle,
+                                    @NotNull Editor editor,
+                                    @NotNull PsiFile psiFile,
+                                    @NotNull TextRange range,
+                                    @Nullable LineData lineData) {
+    int lineNumber = editor.getDocument().getLineNumber(range.getStartOffset());
+    return generateBriefReport(editor, psiFile, lineNumber, range.getStartOffset(), range.getEndOffset(), lineData);
+  }
+
+  /**
    * @return true to enable 'Generate Coverage Report...' action
    */
   public boolean isReportGenerationAvailable(@NotNull Project project,
@@ -288,7 +301,7 @@ public abstract class CoverageEngine {
 
   public CoverageLineMarkerRenderer getLineMarkerRenderer(int lineNumber,
                                                           @Nullable final String className,
-                                                          final TreeMap<Integer, LineData> lines,
+                                                          @NotNull final TreeMap<Integer, LineData> lines,
                                                           final boolean coverageByTestApplicable,
                                                           @NotNull final CoverageSuitesBundle coverageSuite,
                                                           final Function<? super Integer, Integer> newToOldConverter,
