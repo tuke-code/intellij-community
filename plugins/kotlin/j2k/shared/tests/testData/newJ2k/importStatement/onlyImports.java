@@ -1,3 +1,3 @@
-//file
+// IGNORE_K2
 import java.util.Arrays;
 import java.util.concurrent.ArrayBlockingQueues;

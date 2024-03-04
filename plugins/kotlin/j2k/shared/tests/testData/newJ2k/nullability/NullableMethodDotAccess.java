@@ -1,4 +1,4 @@
-//file
+// IGNORE_K2
 class C {
     String getString(boolean b) {
         return b ? "a" : null;

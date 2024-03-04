@@ -22,9 +22,10 @@ data class ComponentData(val xpath: String,
                          val foundComponent: Component?)
 
 open class UiComponent(private val data: ComponentData) : Finder, WithKeyboard {
-  val component: Component by lazy {
-    data.foundComponent ?: findThisComponent()
-  }
+  private var cachedComponent: Component? = null
+  val component: Component
+    get() = data.foundComponent ?: cachedComponent?.takeIf { it.isShowing() } ?: findThisComponent().apply { cachedComponent = this }
+
 
   private fun findThisComponent(): Component {
     waitFor(DEFAULT_FIND_TIMEOUT_SECONDS.seconds,

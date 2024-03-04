@@ -2,6 +2,7 @@
 package org.jetbrains.kotlin.idea.k2.refactoring.changeSignature.ui
 
 
+import com.intellij.openapi.actionSystem.ex.ActionUtil
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.NlsContexts
@@ -18,9 +19,12 @@ import org.jetbrains.annotations.Nls
 import org.jetbrains.kotlin.analysis.api.KtAllowAnalysisOnEdt
 import org.jetbrains.kotlin.analysis.api.analyze
 import org.jetbrains.kotlin.analysis.api.lifetime.allowAnalysisOnEdt
+import org.jetbrains.kotlin.analysis.api.renderer.types.impl.KtTypeRendererForSource
 import org.jetbrains.kotlin.analysis.api.types.KtErrorType
 import org.jetbrains.kotlin.descriptors.Visibilities
 import org.jetbrains.kotlin.descriptors.Visibility
+import org.jetbrains.kotlin.idea.base.analysis.api.utils.analyzeInModalWindow
+import org.jetbrains.kotlin.idea.base.resources.KotlinBundle
 import org.jetbrains.kotlin.idea.codeinsight.utils.AddQualifiersUtil
 import org.jetbrains.kotlin.idea.k2.refactoring.changeSignature.*
 import org.jetbrains.kotlin.idea.refactoring.changeSignature.KotlinModifiableMethodDescriptor.Kind
@@ -77,8 +81,18 @@ internal class KotlinChangeSignatureDialog(
                 )
 
             val psiFactory = KtPsiFactory(myDefaultValueContext.project)
-            val paramTypeCodeFragment: PsiCodeFragment = psiFactory.createTypeCodeFragment(
-                resultParameterInfo.typeText,
+
+            val contentElement = psiFactory.createTypeCodeFragment(resultParameterInfo.typeText, typeContext).getContentElement()
+            val presentableText = if (contentElement != null) {
+                analyzeInModalWindow(contentElement, KotlinBundle.message("fix.change.signature.prepare")) {
+                    contentElement.getKtType().render(KtTypeRendererForSource.WITH_SHORT_NAMES, position = Variance.INVARIANT)
+                }
+            } else {
+                resultParameterInfo.typeText
+            }
+
+            val paramTypeCodeFragment = psiFactory.createTypeCodeFragment(
+                presentableText,
                 typeContext,
             )
 
@@ -120,7 +134,7 @@ internal class KotlinChangeSignatureDialog(
 
 
     override fun createRefactoringProcessor(): BaseRefactoringProcessor {
-        val changeInfo = evaluateChangeSignatureInfo(false)
+        val changeInfo = ActionUtil.underModalProgress(project, KotlinBundle.message("fix.change.signature.prepare")) { evaluateChangeSignatureInfo(false) }
         return KotlinChangeSignatureProcessor(project, changeInfo)
     }
 
@@ -134,7 +148,7 @@ internal class KotlinChangeSignatureDialog(
                 receiverInfo = parameterInfo
             }
 
-            parameterInfo.setType(parameter.typeCodeFragment.text)
+            parameterInfo.setType((parameter.typeCodeFragment as KtTypeCodeFragment).getCanonicalText(forPreview))
 
             val codeFragment = parameter.defaultValueCodeFragment as KtExpressionCodeFragment
 
@@ -161,7 +175,7 @@ internal class KotlinChangeSignatureDialog(
             parameterInfos = parametersWithReceiverInFirstPosition,
             receiver = receiverInfo,
             aNewVisibility = myVisibilityPanel.visibility ?: methodDescriptor.visibility,
-            newReturnTypeInfo = KotlinTypeInfo(myReturnTypeCodeFragment?.text, callable)
+            newReturnTypeInfo = KotlinTypeInfo((myReturnTypeCodeFragment as? KtTypeCodeFragment)?.getCanonicalText(forPreview), callable)
         )
     }
 
@@ -170,7 +184,7 @@ internal class KotlinChangeSignatureDialog(
         return KtPsiFactory(project).createTypeCodeFragment(
             allowAnalysisOnEdt {
                 analyze(method) {
-                    method.getReturnKtType().render(position = Variance.INVARIANT)
+                    method.getReturnKtType().render(KtTypeRendererForSource.WITH_SHORT_NAMES, position = Variance.INVARIANT)
                 }
             },
             KotlinCallableParameterTableModel.getTypeCodeFragmentContext(myMethod.baseDeclaration)
@@ -253,4 +267,15 @@ internal class KotlinChangeSignatureDialog(
             Visibilities.Public
         )
     )
+}
+
+internal fun KtTypeCodeFragment.getCanonicalText(forPreview: Boolean): String {
+    val contextElement = getContentElement()
+    if (contextElement != null && !forPreview) {
+        analyze(contextElement) {
+            return contextElement.getKtType().render(position = Variance.INVARIANT)
+        }
+    } else {
+        return text
+    }
 }

@@ -10,7 +10,7 @@ import com.intellij.icons.AllIcons
 import com.intellij.ide.IdeBundle
 import com.intellij.ide.actions.QuickChangeLookAndFeel
 import com.intellij.ide.ui.*
-import com.intellij.ide.ui.laf.SystemDarkThemeDetector.Companion.createDetector
+import com.intellij.ide.ui.laf.SystemDarkThemeDetector.Companion.createParametrizedDetector
 import com.intellij.ide.ui.laf.darcula.DarculaLaf
 import com.intellij.ide.ui.laf.intellij.IdeaPopupMenuUI
 import com.intellij.ide.util.PropertiesComponent
@@ -44,7 +44,6 @@ import com.intellij.platform.ide.bootstrap.createBaseLaF
 import com.intellij.ui.*
 import com.intellij.ui.popup.HeavyWeightPopup
 import com.intellij.ui.popup.KeepingPopupOpenAction
-import com.intellij.ui.scale.JBUIScale
 import com.intellij.ui.scale.JBUIScale.getFontScale
 import com.intellij.ui.scale.JBUIScale.scale
 import com.intellij.ui.scale.JBUIScale.scaleFontSize
@@ -118,13 +117,6 @@ class LafManagerImpl(private val coroutineScope: CoroutineScope) : LafManager(),
   private val lafComboBoxModel = SynchronizedClearableLazy<CollectionComboBoxModel<LafReference>> {
     LafComboBoxModel(ThemeListProvider.getInstance().getShownThemes())
   }
-  private val settingsToolbar = lazy {
-    val group = DefaultActionGroup(PreferredLafAndSchemeAction())
-    val toolbar = ActionManager.getInstance().createActionToolbar(ActionPlaces.TOOLBAR, group, true)
-    toolbar.targetComponent = toolbar.component
-    toolbar.component.isOpaque = false
-    toolbar
-  }
 
   // SystemDarkThemeDetector must be created as part of LafManagerImpl initialization and not on demand because system listeners are added
   private var themeDetector: SystemDarkThemeDetector? = null
@@ -151,7 +143,6 @@ class LafManagerImpl(private val coroutineScope: CoroutineScope) : LafManager(),
 
   companion object {
     private var ourTestInstance: LafManagerImpl? = null
-    private val LANGUAGE_WITH_PACK_LIST = listOf(Locale.CHINESE.language, Locale.KOREAN.language, Locale.JAPANESE.language)
 
     @OptIn(DelicateCoroutinesApi::class)
     @TestOnly
@@ -225,21 +216,21 @@ class LafManagerImpl(private val coroutineScope: CoroutineScope) : LafManager(),
     })
   }
 
-  private fun detectAndSyncLaf() {
+  private fun detectAndSyncLaf(async: Boolean = true) {
     if (autodetect) {
       val lafDetector = getGetOrCreateLafDetector()
       if (lafDetector.detectionSupported) {
-        lafDetector.check()
+        lafDetector.check(async)
       }
     }
   }
 
-  private fun syncThemeAndEditorScheme(systemIsDark: Boolean) {
-    syncTheme(systemIsDark)
+  private fun syncThemeAndEditorScheme(systemIsDark: Boolean, async: Boolean?) {
+    syncTheme(systemIsDark, async ?: true)
     syncEditorScheme(systemIsDark)
   }
 
-  private fun syncTheme(systemIsDark: Boolean) {
+  private fun syncTheme(systemIsDark: Boolean, async: Boolean) {
     if (!autodetect) {
       return
     }
@@ -255,7 +246,7 @@ class LafManagerImpl(private val coroutineScope: CoroutineScope) : LafManager(),
       preferredLightThemeId?.let { UiThemeProviderListManager.getInstance().findThemeById(it) } ?: defaultLightLaf
     }
     if (currentIsDark != systemIsDark || currentTheme !== expectedTheme) {
-      QuickChangeLookAndFeel.switchLafAndUpdateUI(/* lafManager = */ this, /* laf = */ expectedTheme, /* async = */ true, false, true)
+      QuickChangeLookAndFeel.switchLafAndUpdateUI(/* lafManager = */ this, /* laf = */ expectedTheme, /* async = */ async, false, true)
     }
   }
 
@@ -495,7 +486,13 @@ class LafManagerImpl(private val coroutineScope: CoroutineScope) : LafManager(),
   override fun getLookAndFeelCellRenderer(component: JComponent): ListCellRenderer<LafReference> =
     LafCellRenderer(lafComboBoxModel.value as? LafComboBoxModel, component)
 
-  override fun getSettingsToolbar(): JComponent = settingsToolbar.value.component
+  override fun createSettingsToolbar(): JComponent {
+    val group = DefaultActionGroup(PreferredLafAndSchemeAction())
+    val toolbar = ActionManager.getInstance().createActionToolbar(ActionPlaces.TOOLBAR, group, true)
+    toolbar.targetComponent = toolbar.component
+    toolbar.component.isOpaque = false
+    return toolbar.component
+  }
 
   private fun loadDefaultTheme(): Supplier<out UIThemeLookAndFeelInfo?> {
     // use HighContrast theme for IDE in Windows if HighContrast desktop mode is set
@@ -717,15 +714,8 @@ class LafManagerImpl(private val coroutineScope: CoroutineScope) : LafManager(),
   private val defaultInterFont: FontUIResource
     get() {
       val userScaleFactor = defaultUserScaleFactor
-      val fontName =
-        if (shouldFallbackToSystemFont) JBUIScale.getSystemFontDataIfInitialized()?.first ?: INTER_NAME
-        else INTER_NAME
-
-      return getFontWithFallback(fontName, Font.PLAIN, scaleFontSize(INTER_SIZE.toFloat(), userScaleFactor).toFloat())
+      return getFontWithFallback(INTER_NAME, Font.PLAIN, scaleFontSize(INTER_SIZE.toFloat(), userScaleFactor).toFloat())
     }
-
-  private val shouldFallbackToSystemFont: Boolean get() =
-    LANGUAGE_WITH_PACK_LIST.contains(Locale.getDefault().language)
 
   private val storedLafFont: Font?
     get() = storedDefaults.get(currentTheme?.id)?.get("Label.font") as Font?
@@ -784,7 +774,7 @@ class LafManagerImpl(private val coroutineScope: CoroutineScope) : LafManager(),
   private fun getGetOrCreateLafDetector(): SystemDarkThemeDetector {
     var result = themeDetector
     if (result == null) {
-      result = createDetector(::syncThemeAndEditorScheme)
+      result = createParametrizedDetector(::syncThemeAndEditorScheme)
       themeDetector = result
     }
 
@@ -982,12 +972,12 @@ class LafManagerImpl(private val coroutineScope: CoroutineScope) : LafManager(),
       if (isDark) {
         if (preferredDarkThemeId != themeId) {
           preferredDarkThemeId = themeId.takeIf { it != defaultDarkLaf.id }
-          detectAndSyncLaf()
+          detectAndSyncLaf(false)
         }
       }
       else if (preferredLightThemeId != themeId) {
         preferredLightThemeId = themeId.takeIf { it != defaultLightLaf.id }
-        detectAndSyncLaf()
+        detectAndSyncLaf(false)
       }
     }
 
@@ -1225,8 +1215,12 @@ private fun fixPopupWeight() {
 }
 
 private fun useInterFont(): Boolean {
-  return (ExperimentalUI.isNewUI() && SystemInfo.isJetBrainsJvm) || Registry.`is`("ide.ui.font.force.use.inter.font", false)
+  return ((ExperimentalUI.isNewUI() && SystemInfo.isJetBrainsJvm) || Registry.`is`("ide.ui.font.force.use.inter.font", false))
+         && !shouldFallbackToSystemFont
 }
+
+private val LANGUAGE_WITH_PACK_LIST = listOf(Locale.CHINESE.language, Locale.KOREAN.language, Locale.JAPANESE.language)
+private val shouldFallbackToSystemFont: Boolean get() = LANGUAGE_WITH_PACK_LIST.contains(Locale.getDefault().language)
 
 private fun updateUI(window: Window) {
   IJSwingUtilities.updateComponentTreeUI(window)

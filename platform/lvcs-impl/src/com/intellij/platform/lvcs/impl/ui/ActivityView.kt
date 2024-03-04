@@ -1,6 +1,7 @@
 // Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.platform.lvcs.impl.ui
 
+import com.intellij.diff.chains.DiffRequestProducer
 import com.intellij.find.SearchTextArea
 import com.intellij.find.editorHeaderActions.Utils
 import com.intellij.history.integration.IdeaGateway
@@ -11,7 +12,6 @@ import com.intellij.ide.IdeBundle
 import com.intellij.ide.actions.ReportFeedbackService
 import com.intellij.ide.actions.SendFeedbackAction
 import com.intellij.ide.util.PropertiesComponent
-import com.intellij.idea.AppMode
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.actionSystem.*
 import com.intellij.openapi.application.ApplicationInfo
@@ -25,6 +25,7 @@ import com.intellij.openapi.ui.popup.IconButton
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.util.NlsContexts
 import com.intellij.openapi.util.registry.Registry
+import com.intellij.openapi.vcs.changes.DiffPreview
 import com.intellij.openapi.vcs.changes.EditorTabDiffPreviewManager
 import com.intellij.openapi.vcs.changes.VcsEditorTabFilesManager
 import com.intellij.openapi.wm.IdeFocusManager
@@ -40,6 +41,8 @@ import com.intellij.ui.components.ProgressBarLoadingDecorator
 import com.intellij.ui.components.TextComponentEmptyText
 import com.intellij.ui.content.ContentFactory
 import com.intellij.util.ui.JBUI
+import com.intellij.util.ui.ProportionKey
+import com.intellij.util.ui.TwoKeySplitter
 import com.intellij.util.ui.components.BorderLayoutPanel
 import com.intellij.vcs.ui.ProgressStripe
 import kotlinx.coroutines.CoroutineScope
@@ -64,13 +67,10 @@ class ActivityView(private val project: Project, gateway: IdeaGateway, val activ
   private val activityList = ActivityList { model.activityProvider.getPresentation(it) }.apply {
     updateEmptyText(true)
   }
-  private val editorDiffPreview = object : CombinedActivityDiffPreview(project, activityList, activityScope, this@ActivityView) {
-    override fun loadDiffDataSynchronously() = model.loadDiffDataSynchronously()
+  private val changesBrowser = createChangesBrowser()
+  private val editorDiffPreview = createDiffPreview(changesBrowser)
 
-    override fun returnFocusToSourceComponent() {
-      IdeFocusManager.getInstance(project).requestFocus(activityList, true)
-    }
-  }
+  private val changesSplitter: TwoKeySplitter
 
   init {
     PopupHandler.installPopupMenu(activityList, "ActivityView.Popup", "ActivityView.Popup")
@@ -80,7 +80,6 @@ class ActivityView(private val project: Project, gateway: IdeaGateway, val activ
       border = IdeBorderFactory.createBorder(SideBorder.TOP)
     }
     val progressStripe = ProgressStripe(scrollPane, this)
-    add(progressStripe, BorderLayout.CENTER)
 
     val toolbarComponent = BorderLayoutPanel()
 
@@ -103,7 +102,17 @@ class ActivityView(private val project: Project, gateway: IdeaGateway, val activ
     val notificationPanel = createNotificationPanel()
     if (notificationPanel != null) toolbarComponent.add(notificationPanel, BorderLayout.NORTH)
 
-    add(toolbarComponent, BorderLayout.NORTH)
+    val mainComponent = BorderLayoutPanel()
+    mainComponent.add(progressStripe, BorderLayout.CENTER)
+    mainComponent.add(toolbarComponent, BorderLayout.NORTH)
+
+    changesSplitter = TwoKeySplitter(true,
+                                     ProportionKey("lvcs.changes.splitter.vertical", 0.5f,
+                                                   "lvcs.changes.splitter.horizontal", 0.5f))
+    changesSplitter.firstComponent = mainComponent
+    changesSplitter.secondComponent = changesBrowser
+
+    add(changesSplitter, BorderLayout.CENTER)
 
     activityList.addListener(object : ActivityList.Listener {
       override fun onSelectionChanged(selection: ActivitySelection) {
@@ -128,9 +137,6 @@ class ActivityView(private val project: Project, gateway: IdeaGateway, val activ
         activityList.updateEmptyText(false)
         progressStripe.stopLoading()
       }
-      override fun onDiffDataLoaded(diffData: ActivityDiffData?) {
-        editorDiffPreview.setDiffData(diffData)
-      }
       override fun onFilteringStarted() {
         filterProgress?.startLoading(false)
         activityList.updateEmptyText(true)
@@ -151,6 +157,46 @@ class ActivityView(private val project: Project, gateway: IdeaGateway, val activ
   }
 
   val preferredFocusedComponent: JComponent get() = activityList
+
+  private fun createChangesBrowser(): ActivityChangesBrowser? {
+    if (model.isSingleDiffSupported) return null
+
+    val changesBrowser = ActivityChangesBrowser(project)
+    model.addListener(object : ActivityModelListener {
+      override fun onDiffDataLoadingStarted() {
+        changesBrowser.updateEmptyText(true)
+      }
+      override fun onDiffDataLoadingStopped(diffData: ActivityDiffData?) {
+        changesBrowser.updateEmptyText(false)
+        changesBrowser.diffData = diffData
+      }
+    }, changesBrowser)
+    changesBrowser.updateEmptyText(true)
+    Disposer.register(this, changesBrowser)
+    return changesBrowser
+  }
+
+  private fun createDiffPreview(changesBrowser: ActivityChangesBrowser?): DiffPreview {
+    if (changesBrowser != null) {
+      val diffPreview = MultiFileActivityDiffPreview(activityScope, changesBrowser.viewer, this@ActivityView)
+      changesBrowser.setShowDiffActionPreview(diffPreview)
+      return diffPreview
+    }
+
+    return object : SingleFileActivityDiffPreview(project, activityScope, this@ActivityView) {
+      override val selection: ActivitySelection? get() = model.selection
+
+      override fun onSelectionChange(disposable: Disposable, runnable: () -> Unit) {
+        model.addListener(object : ActivityModelListener {
+          override fun onSelectionChanged(selection: ActivitySelection?) = runnable()
+        }, disposable)
+      }
+
+      override fun getDiffRequestProducer(scope: ActivityScope, selection: ActivitySelection): DiffRequestProducer? {
+        return model.activityProvider.loadSingleDiff(scope, selection)
+      }
+    }
+  }
 
   private fun createSearchField(): SearchTextArea {
     val textArea = JBTextArea()
@@ -212,10 +258,10 @@ class ActivityView(private val project: Project, gateway: IdeaGateway, val activ
     return notificationPanel
   }
 
-  private fun ActivityList.updateEmptyText(isLoading: Boolean) = setEmptyText(getEmptyText(isLoading))
+  private fun ActivityList.updateEmptyText(isLoading: Boolean) = setEmptyText(getListEmptyText(isLoading))
 
-  private fun getEmptyText(isLoading: Boolean): @NlsContexts.StatusText String {
-    if (isLoading) return LocalHistoryBundle.message("activity.list.empty.text.loading")
+  private fun getListEmptyText(isLoading: Boolean): @NlsContexts.StatusText String {
+    if (isLoading) return LocalHistoryBundle.message("activity.empty.text.loading")
     if (model.isFilterSet) {
       if (activityScope is ActivityScope.Recent) {
         return LocalHistoryBundle.message("activity.list.empty.text.recent.matching")
@@ -228,7 +274,21 @@ class ActivityView(private val project: Project, gateway: IdeaGateway, val activ
     return LocalHistoryBundle.message("activity.list.empty.text.in.scope", activityScope.presentableName)
   }
 
+  private fun ActivityChangesBrowser.updateEmptyText(isLoading: Boolean) = viewer.setEmptyText(getBrowserEmptyText(isLoading))
+
+  private fun getBrowserEmptyText(isLoading: Boolean): @NlsContexts.StatusText String {
+    if (isLoading) return LocalHistoryBundle.message("activity.empty.text.loading")
+    if (model.selection?.selectedItems.isNullOrEmpty()) {
+      return LocalHistoryBundle.message("activity.browser.empty.text.no.selection")
+    }
+    return LocalHistoryBundle.message("activity.browser.empty.text")
+  }
+
   internal fun showDiff() = editorDiffPreview.performDiffAction()
+
+  internal fun setVertical(isVertical: Boolean) {
+    changesSplitter.orientation = isVertical
+  }
 
   override fun dispose() {
     coroutineScope.cancel()
@@ -259,21 +319,20 @@ class ActivityView(private val project: Project, gateway: IdeaGateway, val activ
       ActivityToolWindow.onContentVisibilityChanged(project, content, activityView) { isVisible ->
         activityView.model.setVisible(isVisible)
       }
+      ActivityToolWindow.onOrientationChanged(project, activityView) { isVertical ->
+        activityView.setVertical(isVertical)
+      }
     }
 
     private fun ActivityView.openDiffWhenLoaded() {
+      if (changesBrowser != null) return
+
       val disposable = Disposer.newDisposable()
       Disposer.register(this, disposable)
       model.addListener(object : ActivityModelListener {
         override fun onItemsLoadingStopped(data: ActivityData) {
           if (data.items.isEmpty()) Disposer.dispose(disposable)
-        }
-
-        override fun onDiffDataLoaded(diffData: ActivityDiffData?) {
-          if (diffData != null) {
-            showDiff()
-            Disposer.dispose(disposable)
-          }
+          else showDiff()
         }
       }, disposable)
     }
@@ -286,7 +345,6 @@ class ActivityView(private val project: Project, gateway: IdeaGateway, val activ
 
     @JvmStatic
     fun isViewAvailable(): Boolean {
-      if (AppMode.isRemoteDevHost()) return false
       return ApplicationInfo.getInstance().isEAP || Registry.`is`("lvcs.show.activity.view")
     }
   }

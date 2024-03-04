@@ -267,6 +267,120 @@ public abstract class K2BindToElementTestGenerated extends AbstractK2BindToEleme
     }
 
     @RunWith(JUnit3RunnerWithInners.class)
+    @TestMetadata("../../idea/tests/testData/refactoring/bindToElement/extensionFunctionCall")
+    public static class ExtensionFunctionCall extends AbstractK2BindToElementTest {
+        private void runTest(String testDataFilePath) throws Exception {
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+        }
+
+        @TestMetadata("ChangeImport.kt")
+        public void testChangeImport() throws Exception {
+            runTest("../../idea/tests/testData/refactoring/bindToElement/extensionFunctionCall/ChangeImport.kt");
+        }
+
+        @TestMetadata("ConflictingImport.kt")
+        public void testConflictingImport() throws Exception {
+            runTest("../../idea/tests/testData/refactoring/bindToElement/extensionFunctionCall/ConflictingImport.kt");
+        }
+
+        @TestMetadata("ExtensionOverload.kt")
+        public void testExtensionOverload() throws Exception {
+            runTest("../../idea/tests/testData/refactoring/bindToElement/extensionFunctionCall/ExtensionOverload.kt");
+        }
+
+        @TestMetadata("RootPkg.kt")
+        public void testRootPkg() throws Exception {
+            runTest("../../idea/tests/testData/refactoring/bindToElement/extensionFunctionCall/RootPkg.kt");
+        }
+
+        @TestMetadata("UnQualified.kt")
+        public void testUnQualified() throws Exception {
+            runTest("../../idea/tests/testData/refactoring/bindToElement/extensionFunctionCall/UnQualified.kt");
+        }
+
+        @TestMetadata("UnQualifiedToTopLevel.kt")
+        public void testUnQualifiedToTopLevel() throws Exception {
+            runTest("../../idea/tests/testData/refactoring/bindToElement/extensionFunctionCall/UnQualifiedToTopLevel.kt");
+        }
+    }
+
+    @RunWith(JUnit3RunnerWithInners.class)
+    @TestMetadata("../../idea/tests/testData/refactoring/bindToElement/extensionProperty")
+    public static class ExtensionProperty extends AbstractK2BindToElementTest {
+        private void runTest(String testDataFilePath) throws Exception {
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+        }
+
+        @TestMetadata("ChangeImport.kt")
+        public void testChangeImport() throws Exception {
+            runTest("../../idea/tests/testData/refactoring/bindToElement/extensionProperty/ChangeImport.kt");
+        }
+
+        @TestMetadata("ConflictingImport.kt")
+        public void testConflictingImport() throws Exception {
+            runTest("../../idea/tests/testData/refactoring/bindToElement/extensionProperty/ConflictingImport.kt");
+        }
+
+        @TestMetadata("ExtensionOverload.kt")
+        public void testExtensionOverload() throws Exception {
+            runTest("../../idea/tests/testData/refactoring/bindToElement/extensionProperty/ExtensionOverload.kt");
+        }
+
+        @TestMetadata("RootPkg.kt")
+        public void testRootPkg() throws Exception {
+            runTest("../../idea/tests/testData/refactoring/bindToElement/extensionProperty/RootPkg.kt");
+        }
+
+        @TestMetadata("SafeAccess.kt")
+        public void testSafeAccess() throws Exception {
+            runTest("../../idea/tests/testData/refactoring/bindToElement/extensionProperty/SafeAccess.kt");
+        }
+
+        @TestMetadata("UnQualified.kt")
+        public void testUnQualified() throws Exception {
+            runTest("../../idea/tests/testData/refactoring/bindToElement/extensionProperty/UnQualified.kt");
+        }
+
+        @TestMetadata("UnQualifiedToTopLevel.kt")
+        public void testUnQualifiedToTopLevel() throws Exception {
+            runTest("../../idea/tests/testData/refactoring/bindToElement/extensionProperty/UnQualifiedToTopLevel.kt");
+        }
+    }
+
+    @RunWith(JUnit3RunnerWithInners.class)
+    @TestMetadata("../../idea/tests/testData/refactoring/bindToElement/extensionVariableAccessCall")
+    public static class ExtensionVariableAccessCall extends AbstractK2BindToElementTest {
+        private void runTest(String testDataFilePath) throws Exception {
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+        }
+
+        @TestMetadata("ChangeImport.kt")
+        public void testChangeImport() throws Exception {
+            runTest("../../idea/tests/testData/refactoring/bindToElement/extensionVariableAccessCall/ChangeImport.kt");
+        }
+
+        @TestMetadata("ConflictingImport.kt")
+        public void testConflictingImport() throws Exception {
+            runTest("../../idea/tests/testData/refactoring/bindToElement/extensionVariableAccessCall/ConflictingImport.kt");
+        }
+
+        @TestMetadata("RootPkg.kt")
+        public void testRootPkg() throws Exception {
+            runTest("../../idea/tests/testData/refactoring/bindToElement/extensionVariableAccessCall/RootPkg.kt");
+        }
+
+        @TestMetadata("UnQualified.kt")
+        public void testUnQualified() throws Exception {
+            runTest("../../idea/tests/testData/refactoring/bindToElement/extensionVariableAccessCall/UnQualified.kt");
+        }
+
+        @TestMetadata("UnQualifiedWithoutExplicitType.kt")
+        public void testUnQualifiedWithoutExplicitType() throws Exception {
+            runTest("../../idea/tests/testData/refactoring/bindToElement/extensionVariableAccessCall/UnQualifiedWithoutExplicitType.kt");
+        }
+    }
+
+    @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../idea/tests/testData/refactoring/bindToElement/importReference")
     public static class ImportReference extends AbstractK2BindToElementTest {
         private void runTest(String testDataFilePath) throws Exception {
@@ -304,6 +418,24 @@ public abstract class K2BindToElementTestGenerated extends AbstractK2BindToEleme
         @TestMetadata("UnQualified.kt")
         public void testUnQualified() throws Exception {
             runTest("../../idea/tests/testData/refactoring/bindToElement/objectProperty/UnQualified.kt");
+        }
+    }
+
+    @RunWith(JUnit3RunnerWithInners.class)
+    @TestMetadata("../../idea/tests/testData/refactoring/bindToElement/operationReference")
+    public static class OperationReference extends AbstractK2BindToElementTest {
+        private void runTest(String testDataFilePath) throws Exception {
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+        }
+
+        @TestMetadata("RootPkg.kt")
+        public void testRootPkg() throws Exception {
+            runTest("../../idea/tests/testData/refactoring/bindToElement/operationReference/RootPkg.kt");
+        }
+
+        @TestMetadata("UnQualified.kt")
+        public void testUnQualified() throws Exception {
+            runTest("../../idea/tests/testData/refactoring/bindToElement/operationReference/UnQualified.kt");
         }
     }
 
@@ -416,11 +548,6 @@ public abstract class K2BindToElementTestGenerated extends AbstractK2BindToEleme
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
 
-        @TestMetadata("ExtensionOverload.kt")
-        public void testExtensionOverload() throws Exception {
-            runTest("../../idea/tests/testData/refactoring/bindToElement/topLevelFunctionCall/ExtensionOverload.kt");
-        }
-
         @TestMetadata("Qualified.kt")
         public void testQualified() throws Exception {
             runTest("../../idea/tests/testData/refactoring/bindToElement/topLevelFunctionCall/Qualified.kt");
@@ -434,6 +561,11 @@ public abstract class K2BindToElementTestGenerated extends AbstractK2BindToEleme
         @TestMetadata("UnQualified.kt")
         public void testUnQualified() throws Exception {
             runTest("../../idea/tests/testData/refactoring/bindToElement/topLevelFunctionCall/UnQualified.kt");
+        }
+
+        @TestMetadata("UnQualifiedToExtensionFunction.kt")
+        public void testUnQualifiedToExtensionFunction() throws Exception {
+            runTest("../../idea/tests/testData/refactoring/bindToElement/topLevelFunctionCall/UnQualifiedToExtensionFunction.kt");
         }
     }
 

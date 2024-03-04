@@ -1,4 +1,4 @@
-//file
+// IGNORE_K2
 package switch_demo;
 
 public class SwitchDemo {

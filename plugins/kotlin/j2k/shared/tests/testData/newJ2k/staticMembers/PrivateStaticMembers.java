@@ -1,4 +1,4 @@
-//file
+// IGNORE_K2
 class A {
     private static final String s = "abc";
 

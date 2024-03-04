@@ -2,6 +2,7 @@
 package com.intellij.ide.startup.importSettings.data
 
 import com.intellij.icons.AllIcons
+import com.intellij.ide.startup.importSettings.TransferableIdeId
 import com.intellij.ide.startup.importSettings.chooser.ui.OnboardingController
 import com.intellij.openapi.diagnostic.logger
 import com.jetbrains.rd.util.lifetime.Lifetime
@@ -250,18 +251,28 @@ class TestJbService private constructor(): JbService {
 }
 
 class TestExternalService : ExternalService {
-  companion object {
-    private val LOG = logger<TestExternalService>()
-  }
 
   override suspend fun hasDataToImport() = true
 
   override fun warmUp(scope: CoroutineScope) {}
 
+  override val productServices: List<ExternalProductService> = listOf(TestExternalProductService())
+}
+
+class TestExternalProductService : ExternalProductService {
+
+  companion object {
+    private val LOG = logger<TestExternalService>()
+  }
+
+  override val productId: TransferableIdeId
+    get() = TransferableIdeId.VSCode
+  override val productTitle: String
+    get() = ""
+
   override fun products(): List<Product> {
     return listOf(TestJbService.main2)
   }
-
 
   override fun getProductIcon(itemId: String, size: IconProductSize): Icon {
     return TestJbService.getProductIcon(itemId, size)

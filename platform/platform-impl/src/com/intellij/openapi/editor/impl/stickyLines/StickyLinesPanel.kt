@@ -89,10 +89,9 @@ internal class StickyLinesPanel(private val editor: EditorEx) : JBPanel<StickyLi
       if (logicalLine == stickyLogicalLine) {
         return true
       }
-      if (logicalLine == stickyLogicalLine - 1) {
+      if (logicalLine == stickyLogicalLine - 1 || logicalLine == stickyLogicalLine + 1) {
         // case when lineOf(psiElement.startOffset) != lineOf(psiElement.textOffset)
         // e.g., when a method starts with @Override
-        // "stickyLogicalLine - 1" won't cover all the cases, but the fair approach looks difficult to implement
         return true
       }
     }
@@ -160,14 +159,18 @@ internal class StickyLinesPanel(private val editor: EditorEx) : JBPanel<StickyLi
     val lineHeight: Int = editor.lineHeight
     var panelHeight = 0
     val panelWidth = (editor as EditorImpl).stickyLinesPanelWidth
+    var isBreak = false
     for (lineComp: StickyLineComponent in stickyLinesComp) {
-      if (lineComp.isEmpty() || isPanelTooBig(panelHeight, lineHeight)) {
+      if (isBreak || lineComp.isEmpty() || isPanelTooBig(panelHeight, lineHeight)) {
         lineComp.isVisible = false
       } else {
         val addedHeight: Int = placeComponentOnPanel(lineComp, panelWidth, panelHeight, lineHeight)
         // 0 <= addedHeight <= lineHeight
         if (addedHeight == 0) {
           lineComp.isVisible = false
+        } else if (addedHeight < lineHeight) {
+          // last sticky line on the panel
+          isBreak = true
         }
         panelHeight += addedHeight
       }
@@ -190,11 +193,10 @@ internal class StickyLinesPanel(private val editor: EditorEx) : JBPanel<StickyLi
   ): Int {
     val startY1: Int = editor.visualLineToY(lineComp.primaryVisualLine)
     val startY2: Int = startY1 + lineHeight
-    val endY1: Int = editor.visualLineToY(lineComp.scopeVisualLine)
-    val endY2: Int = endY1 + lineHeight
-
+    val endY1:   Int = editor.visualLineToY(lineComp.scopeVisualLine)
+    val endY2:   Int = endY1 + lineHeight
     val stickyY: Int = editorY + panelHeight + lineHeight
-    if (stickyY in startY2..endY2) {
+    if (startY2 < stickyY && stickyY <= endY2) {
       val lineYShift = if (stickyY <= endY1) 0 else stickyY - endY1
       lineComp.isVisible = true
       lineComp.setBounds(0, panelHeight - lineYShift, panelWidth, lineHeight)

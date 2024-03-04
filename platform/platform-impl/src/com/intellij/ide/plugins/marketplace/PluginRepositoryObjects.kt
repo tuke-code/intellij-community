@@ -109,11 +109,15 @@ internal class MarketplaceSearchPluginData(
 }
 
 @JsonIgnoreProperties(ignoreUnknown = true)
-internal class NearestUpdate(
+class NearestUpdate(
   @get:JsonProperty("id")
   val id: String? = null,
+  @get:JsonProperty("xmlId")
+  val pluginId: String = "",
   @get:JsonProperty("products")
   val products: List<String> = emptyList(),
+  @get:JsonProperty("updateCompatibility")
+  val updateCompatibility: Map<String, Long> = emptyMap(),
   @get:JsonProperty("isCompatible")
   val compatible: Boolean = true
 )

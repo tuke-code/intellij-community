@@ -192,9 +192,7 @@ public abstract class MergeableLineMarkerInfo<T extends PsiElement> extends Line
       for (int i = 0; i < myGroups.size(); i++) {
         ActionGroup popupActions = myGroups.get(i);
         if (popupActions != null) {
-          if (commonActionGroup.getChildrenCount() > 0) {
-            commonActionGroup.addSeparator();
-          }
+          commonActionGroup.addSeparator();
           commonActionGroup.addAll(popupActions);
         }
         else {
@@ -229,6 +227,11 @@ public abstract class MergeableLineMarkerInfo<T extends PsiElement> extends Line
         @Override
         public boolean isNavigateAction() {
           return true;
+        }
+
+        @Override
+        public @NotNull ActionGroup getPopupMenuActions() {
+          return ActionGroup.EMPTY_GROUP; // stub for remote client
         }
 
         @Override

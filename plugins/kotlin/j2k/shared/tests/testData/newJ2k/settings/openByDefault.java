@@ -1,4 +1,4 @@
-//file
+// IGNORE_K2
 // !OPEN_BY_DEFAULT: true
 
 class A {

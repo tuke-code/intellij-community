@@ -1,4 +1,4 @@
-//file
+// IGNORE_K2
 package org.test
 
 class Library {}

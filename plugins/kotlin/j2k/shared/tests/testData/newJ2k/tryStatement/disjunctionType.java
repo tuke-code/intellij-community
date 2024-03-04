@@ -1,4 +1,4 @@
-//file
+// IGNORE_K2
 import java.io.IOException;
 
 class A {

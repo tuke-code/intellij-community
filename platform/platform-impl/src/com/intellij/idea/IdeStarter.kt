@@ -73,6 +73,8 @@ open class IdeStarter : ModernApplicationStarter() {
 
       val openProjectBlock: suspend CoroutineScope.() -> Unit = {
         openProjectIfNeeded(args = args, app = app, asyncCoroutineScope = this, lifecyclePublisher = lifecyclePublisher)
+        // update "open projects" state to whichever projects were decided to be opened in openProjectIfNeeded (=which are open now)
+        serviceAsync<RecentProjectsManager>().updateLastProjectPath()
       }
 
       val starter = FUSProjectHotStartUpMeasurer.getStartUpContextElementIntoIdeStarter(this@IdeStarter)
@@ -155,10 +157,6 @@ open class IdeStarter : ModernApplicationStarter() {
     }
 
     if (project != null) {
-      // the IDE is started with an argument to open a specific project => forget which projects were opened in the last session,
-      // otherwise irrelevant projects may be opened after a restart.
-      // `project` will remain with "opened" status because it is open at this point
-      recentProjectManager.updateLastProjectPath()
       return
     }
 

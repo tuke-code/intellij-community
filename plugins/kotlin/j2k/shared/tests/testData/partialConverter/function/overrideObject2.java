@@ -1,4 +1,4 @@
-//file
+// IGNORE_K2
 class Base {}
 
 class X extends Base {

@@ -1,32 +1,42 @@
 // Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
-@file:Suppress("ReplaceGetOrSet")
-@file:ApiStatus.Internal
+@file:Suppress("ReplaceGetOrSet", "ReplacePutWithAssignment")
+@file:Internal
 
 package com.intellij.util.xmlb
 
+import com.intellij.openapi.diagnostic.Logger
+import com.intellij.openapi.diagnostic.logger
+import com.intellij.serialization.ClassUtil
 import com.intellij.serialization.MutableAccessor
 import com.intellij.serialization.PropertyCollector
 import com.intellij.util.ThreeState
 import com.intellij.util.xml.dom.XmlElement
+import com.intellij.util.xmlb.XmlSerializerImpl.createClassBinding
 import com.intellij.util.xmlb.annotations.*
 import it.unimi.dsi.fastutil.objects.Object2FloatMap
 import it.unimi.dsi.fastutil.objects.Object2FloatOpenHashMap
-import org.jdom.Attribute
+import it.unimi.dsi.fastutil.objects.Object2ObjectArrayMap
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import org.jdom.Element
+import org.jdom.Namespace
 import org.jdom.Text
-import org.jetbrains.annotations.ApiStatus
+import org.jetbrains.annotations.ApiStatus.Internal
 import java.lang.reflect.AccessibleObject
 import java.lang.reflect.AnnotatedElement
 import java.lang.reflect.InvocationTargetException
 import java.lang.reflect.Type
 import java.util.*
 
-interface NestedBinding : Binding {
-  val accessor: MutableAccessor
-}
+@JvmField
+internal val LOG: Logger = logger<Binding>()
 
-interface PrimitiveValueBinding : NestedBinding {
-  fun setValue(bean: Any, value: String?)
+abstract class Converter<T> {
+  abstract fun fromString(value: String): T?
+
+  abstract fun toString(value: T): String?
 }
 
 private val PROPERTY_COLLECTOR = XmlSerializerPropertyCollector(MyPropertyCollectorConfiguration())
@@ -34,8 +44,12 @@ private val EMPTY_BINDINGS = arrayOf<NestedBinding>()
 
 fun getBeanAccessors(aClass: Class<*>): List<MutableAccessor> = PROPERTY_COLLECTOR.collect(aClass)
 
-open class BeanBinding(@JvmField val beanClass: Class<*>) : NotNullDeserializeBinding {
-  private val tagName: String
+internal const val JSON_CLASS_DISCRIMINATOR_KEY: String = "_class"
+
+open class BeanBinding(@JvmField val beanClass: Class<*>) : Binding, RootBinding {
+  @JvmField
+  val tagName: String
+
   @JvmField
   var bindings: Array<NestedBinding>? = null
 
@@ -50,7 +64,7 @@ open class BeanBinding(@JvmField val beanClass: Class<*>) : NotNullDeserializeBi
   }
 
   @Synchronized
-  override fun init(originalType: Type, serializer: Serializer) {
+  final override fun init(originalType: Type, serializer: Serializer) {
     assert(bindings == null)
     val accessors = PROPERTY_COLLECTOR.collect(beanClass)
     if (accessors.isEmpty()) {
@@ -67,108 +81,121 @@ open class BeanBinding(@JvmField val beanClass: Class<*>) : NotNullDeserializeBi
     }
   }
 
-  override fun serialize(bean: Any, context: Any?, filter: SerializationFilter?): Any? {
-    return serializeInto(bean = bean, preCreatedElement = if (context == null) null else Element(tagName), filter = filter)
+  override fun toJson(bean: Any, filter: SerializationFilter?): JsonElement? {
+    val map = serializeToJsonImpl(bean, filter, includeClassDiscriminator = false)
+    return if (map == null) JsonObject(Collections.emptyMap()) else JsonObject(map)
   }
 
-  fun serialize(bean: Any, createElementIfEmpty: Boolean, filter: SerializationFilter?): Element? {
-    return serializeInto(bean = bean, preCreatedElement = if (createElementIfEmpty) Element(tagName) else null, filter = filter)
+  internal fun toJson(bean: Any, filter: SerializationFilter?, includeClassDiscriminator: Boolean): JsonElement {
+    val map = serializeToJsonImpl(bean, filter, includeClassDiscriminator = includeClassDiscriminator)
+    return if (map == null) {
+      JsonObject(if (includeClassDiscriminator) Collections.singletonMap(JSON_CLASS_DISCRIMINATOR_KEY, JsonPrimitive(tagName)) else Collections.emptyMap())
+    }
+    else {
+      JsonObject(map)
+    }
   }
 
-  open fun serializeInto(bean: Any, preCreatedElement: Element?, filter: SerializationFilter?): Element? {
-    var element = preCreatedElement
-    for (binding in bindings!!) {
-      if (bean is SerializationFilter && !bean.accepts(binding.accessor, bean)) {
+  private fun serializeToJsonImpl(bean: Any, filter: SerializationFilter?, includeClassDiscriminator: Boolean): Map<String, JsonElement>? {
+    // do not waste time to compute hashCode and preserving uniqueness, use simple Object2ObjectArrayMap
+    var keys: Array<String?>? = null
+    var values: Array<JsonElement?>? = null
+    val bindings = bindings!!
+    var index = 0
+    val extraSize = if (includeClassDiscriminator) 1 else 0
+    for (binding in bindings) {
+      if (isPropertySkipped(filter = filter, binding = binding, bean = bean, isFilterPropertyItself = true)) {
         continue
       }
 
-      element = serializePropertyInto(
-        binding = binding,
-        bean = bean,
-        preCreatedElement = element,
-        filter = filter,
-        isFilterPropertyItself = true,
-      )
+      // yes, empty map to denote an empty object
+      if (keys == null) {
+        keys = arrayOfNulls(bindings.size + extraSize)
+        values = arrayOfNulls(bindings.size + extraSize)
+
+        if (includeClassDiscriminator) {
+          keys[index] = JSON_CLASS_DISCRIMINATOR_KEY
+          values[index] = JsonPrimitive(tagName)
+          index++
+        }
+      }
+
+      val jsonElement = binding.toJson(bean = bean, filter = filter)
+      if (jsonElement != null) {
+        keys[index] = normalizePropertyNameForKotlinx(binding)
+        values!![index] = jsonElement
+        index++
+      }
     }
-    return element
+    return if (keys == null) null else Object2ObjectArrayMap(keys, values!!, index)
   }
 
-  fun serializePropertyInto(
-    binding: NestedBinding,
-    bean: Any,
-    preCreatedElement: Element?,
-    filter: SerializationFilter?,
-    isFilterPropertyItself: Boolean,
-  ): Element? {
+  override fun fromJson(currentValue: Any?, element: JsonElement): Any? {
+    if (element === JsonNull) {
+      return null
+    }
+
+    val result = newInstance()
+    if (element !is JsonObject) {
+      LOG.warn("JsonObject is expected but got $element")
+      return result
+    }
+
+    for (binding in bindings!!) {
+      val key = normalizePropertyNameForKotlinx(binding)
+      val value = element.get(key) ?: continue
+      binding.setFromJson(result, value)
+    }
+    return result
+  }
+
+  override fun serialize(bean: Any, filter: SerializationFilter?): Element? {
+    return serializeProperties(bean = bean, preCreatedElement = null, filter = filter)
+  }
+
+  final override fun serialize(bean: Any, parent: Element, filter: SerializationFilter?) {
+    val element = Element(true, tagName, Namespace.NO_NAMESPACE)
+    serializeProperties(bean = bean, preCreatedElement = element, filter = filter)
+    parent.addContent(element)
+  }
+
+  fun serialize(bean: Any, createElementIfEmpty: Boolean, filter: SerializationFilter?): Element? {
+    return serializeProperties(bean = bean, preCreatedElement = if (createElementIfEmpty) Element(tagName) else null, filter = filter)
+  }
+
+  open fun serializeProperties(bean: Any, preCreatedElement: Element?, filter: SerializationFilter?): Element? {
     var element = preCreatedElement
-    val accessor = binding.accessor
-    val property = accessor.getAnnotation(Property::class.java)
-    if (property == null || !property.alwaysWrite) {
-      if (filter != null && isFilterPropertyItself) {
-        if (filter is SkipDefaultsSerializationFilter) {
-          if (filter.equal(binding, bean)) {
-            return element
-          }
-        }
-        else if (!filter.accepts(accessor, bean)) {
-          return element
-        }
-      }
-
-      //todo: optimize. Cache it.
-      if (property != null) {
-        val propertyFilter = XmlSerializerUtil.getPropertyFilter(property)
-        if (propertyFilter != null && !propertyFilter.accepts(accessor, bean)) {
-          return element
-        }
-      }
-    }
-
-    if (element == null) {
-      element = Element(tagName)
-    }
-
-    val node = binding.serialize(bean = bean, context = element, filter = filter)
-    if (node != null) {
-      if (node is Attribute) {
-        element.setAttribute(node)
-      }
-      else {
-        BasePrimitiveBinding.addContent(element, node)
-      }
+    for (binding in bindings!!) {
+      element = serializeProperty(binding = binding, bean = bean, parentElement = element, filter = filter, isFilterPropertyItself = true)
     }
     return element
   }
 
-  override fun deserialize(context: Any?, element: Element): Any {
+  fun serializeProperty(binding: NestedBinding, bean: Any, parentElement: Element?, filter: SerializationFilter?, isFilterPropertyItself: Boolean): Element? {
+    if (isPropertySkipped(filter = filter, binding = binding, bean = bean, isFilterPropertyItself = isFilterPropertyItself)) {
+      return parentElement
+    }
+
+    val element = parentElement ?: Element(tagName)
+    binding.serialize(bean = bean, parent = element, filter = filter)
+    return element
+  }
+
+  override fun <T : Any> deserialize(context: Any?, element: T, adapter: DomAdapter<T>): Any {
     val instance = newInstance()
-    deserializeInto(result = instance, element = element)
+    when (adapter) {
+      JdomAdapter -> deserializeInto(bean = instance, element = element as Element)
+      XmlDomAdapter -> deserializeInto(bean = instance, element = element as XmlElement)
+    }
     return instance
   }
 
-  fun deserializeInto(result: Any, element: Element) {
-    deserializeBeanInto(
-      result = result,
-      element = element,
-      accessorNameTracker = null,
-      bindings = bindings!!,
-    )
+  fun deserializeInto(bean: Any, element: Element) {
+    deserializeBeanInto(result = bean, element = element, accessorNameTracker = null, bindings = bindings!!)
   }
 
-  fun deserializeInto(result: Any, element: XmlElement) {
-    deserializeBeanInto(
-      result = result,
-      element = element,
-      bindings = bindings!!,
-      start = 0,
-      end = bindings!!.size,
-    )
-  }
-
-  override fun deserialize(context: Any?, element: XmlElement): Any {
-    val instance = newInstance()
-    deserializeBeanInto(result = instance, element = element, bindings = bindings!!)
-    return instance
+  fun deserializeInto(bean: Any, element: XmlElement) {
+    deserializeBeanInto(result = bean, element = element, bindings = bindings!!, start = 0, end = bindings!!.size)
   }
 
   open fun newInstance(): Any {
@@ -228,11 +255,14 @@ open class BeanBinding(@JvmField val beanClass: Class<*>) : NotNullDeserializeBi
     }
   }
 
-  override fun isBoundTo(element: Element): Boolean = element.name == tagName
+  override fun <T : Any> isBoundTo(element: T, adapter: DomAdapter<T>): Boolean = adapter.getName(element) == tagName
 
-  override fun isBoundTo(element: XmlElement): Boolean = element.name == tagName
+  override fun toString(): String = "BeanBinding(${beanClass.name}, tagName=$tagName)"
 
-  override fun toString(): String = "BeanBinding[${beanClass.name}, tagName=$tagName]"
+  @Deprecated("Don't use internal API", ReplaceWith(""))
+  fun serializeInto(bean: Any, preCreatedElement: Element?, filter: SerializationFilter?): Element? {
+    return serializeProperties(bean, preCreatedElement, filter)
+  }
 }
 
 // binding value will be not set if no data
@@ -265,7 +295,7 @@ fun deserializeBeanInto(
   nextNode@ for (child in element.children) {
     for (i in start until end) {
       val binding = bindings[i]
-      if (binding is AttributeBinding || binding is TextBinding || !binding.isBoundTo(child)) {
+      if (binding is AttributeBinding || binding is TextBinding || !binding.isBoundTo(child, XmlDomAdapter)) {
         continue
       }
 
@@ -276,7 +306,7 @@ fun deserializeBeanInto(
         data.computeIfAbsent(binding) { ArrayList() }.add(child)
       }
       else {
-        binding.deserializeUnsafe(result, child)
+        binding.deserialize(result, child, XmlDomAdapter)
       }
       continue@nextNode
     }
@@ -285,18 +315,18 @@ fun deserializeBeanInto(
   for (i in start until end) {
     val binding = bindings[i]
     if (binding is AccessorBindingWrapper && binding.isFlat) {
-      binding.deserializeUnsafe(result, element)
+      binding.deserialize(result, element, XmlDomAdapter)
     }
   }
 
   if (data != null) {
     for (binding in data.keys) {
-      binding.deserializeList(result, data.get(binding)!!)
+      binding.deserializeList(result, data.get(binding)!!, XmlDomAdapter)
     }
   }
 }
 
-fun deserializeBeanInto(
+internal fun deserializeBeanInto(
   result: Any,
   element: Element,
   bindings: Array<NestedBinding>,
@@ -306,7 +336,7 @@ fun deserializeBeanInto(
     if (attribute.namespaceURI.isNullOrEmpty()) {
       for (binding in bindings) {
         if (binding is AttributeBinding && binding.name == attribute.name) {
-          accessorNameTracker?.add((binding as PrimitiveValueBinding).accessor.name)
+          accessorNameTracker?.add(binding.accessor.name)
           binding.setValue(result, attribute.value)
           continue@nextAttribute
         }
@@ -325,7 +355,7 @@ fun deserializeBeanInto(
       }
 
       val child = content as Element
-      if (binding.isBoundTo(child)) {
+      if (binding.isBoundTo(child, JdomAdapter)) {
         if (binding is MultiNodeBinding && binding.isMulti) {
           if (data == null) {
             data = LinkedHashMap()
@@ -334,7 +364,7 @@ fun deserializeBeanInto(
         }
         else {
           accessorNameTracker?.add(binding.accessor.name)
-          binding.deserializeUnsafe(result, child)
+          binding.deserialize(result, child, JdomAdapter)
         }
         continue@nextNode
       }
@@ -343,14 +373,14 @@ fun deserializeBeanInto(
 
   for (binding in bindings) {
     if (binding is AccessorBindingWrapper && binding.isFlat) {
-      binding.deserializeUnsafe(result, element)
+      binding.deserialize(result, element, JdomAdapter)
     }
   }
 
   if (data != null) {
     for (binding in data.keys) {
       accessorNameTracker?.add(binding.accessor.name)
-      (binding as MultiNodeBinding).deserializeJdomList(result, data.get(binding)!!)
+      (binding as MultiNodeBinding).deserializeList(result, data.get(binding)!!, JdomAdapter)
     }
   }
 }
@@ -375,7 +405,7 @@ fun deserializeBeanInto(result: Any, element: Element, binding: NestedBinding, c
     }
 
     val child = content as Element
-    if (binding.isBoundTo(child)) {
+    if (binding.isBoundTo(child, JdomAdapter)) {
       if (binding is MultiNodeBinding && binding.isMulti) {
         if (data == null) {
           data = ArrayList()
@@ -383,14 +413,14 @@ fun deserializeBeanInto(result: Any, element: Element, binding: NestedBinding, c
         data.add(child)
       }
       else {
-        binding.deserializeUnsafe(result, child)
+        binding.deserialize(result, child, JdomAdapter)
         break
       }
     }
   }
 
   if (binding is AccessorBindingWrapper && binding.isFlat) {
-    binding.deserializeUnsafe(result, element)
+    binding.deserialize(result, element, JdomAdapter)
   }
 
   return data
@@ -416,33 +446,55 @@ private class MyPropertyCollectorConfiguration : PropertyCollector.Configuration
 }
 
 private fun createBinding(accessor: MutableAccessor, serializer: Serializer, propertyStyle: Property.Style): NestedBinding {
-  val attribute = accessor.getAnnotation(com.intellij.util.xmlb.annotations.Attribute::class.java)
-  if (attribute != null) {
-    return AttributeBinding(accessor, attribute)
+  accessor.getAnnotation(com.intellij.util.xmlb.annotations.Attribute::class.java)?.let {
+    return AttributeBinding(accessor, it)
   }
 
-  val text = accessor.getAnnotation(com.intellij.util.xmlb.annotations.Text::class.java)
-  if (text != null) {
+  if (accessor.isAnnotationPresent(com.intellij.util.xmlb.annotations.Text::class.java)) {
     return TextBinding(accessor)
   }
 
-  val optionTag = accessor.getAnnotation(OptionTag::class.java)
-  if (optionTag != null && optionTag.converter != Converter::class.java) {
-    return OptionTagBinding(accessor, optionTag)
+  val type = accessor.genericType
+  val aClass = ClassUtil.typeToClass(type)
+  var binding: Binding?
+  if (ClassUtil.isPrimitive(aClass)) {
+    binding = null
+  }
+  else {
+    // do not cache because it depends on accessor
+    binding = createClassBinding(aClass, accessor, type, serializer)
+    if (binding == null) {
+      // BeanBinding doesn't depend on accessor, get from cache or compute
+      binding = serializer.getRootBinding(aClass, type)
+    }
+    else {
+      binding.init(type, serializer)
+      if (binding is CompactCollectionBinding) {
+        return binding
+      }
+    }
   }
 
-  val binding = serializer.getBinding(accessor)
+  val optionTag: OptionTag? = accessor.getAnnotation(OptionTag::class.java)
+  if (optionTag != null && XmlSerializerUtil.getConverter(optionTag) != null) {
+    return createOptionTagBindingByAnnotation(optionTag = optionTag, accessor = accessor, binding = binding)
+  }
+
   if (binding is JDOMElementBinding) {
     return binding
   }
 
-  val tag = accessor.getAnnotation(Tag::class.java)
-  if (tag != null) {
-    return TagBinding(accessor, tag)
-  }
-
-  if (binding is CompactCollectionBinding) {
-    return AccessorBindingWrapper(accessor, binding, false, Property.Style.OPTION_TAG)
+  accessor.getAnnotation(Tag::class.java)?.let { tagAnnotation ->
+    return TagBinding(
+      binding = binding,
+      accessor = accessor,
+      nameAttributeValue = null,
+      converterClass = null,
+      tag = tagAnnotation.value.ifEmpty { accessor.getName() },
+      nameAttribute = null,
+      valueAttribute = null,
+      textIfTagValueEmpty = tagAnnotation.textIfEmpty,
+    )
   }
 
   var surroundWithTag = true
@@ -465,19 +517,67 @@ private fun createBinding(accessor: MutableAccessor, serializer: Serializer, pro
 
   val xCollection = accessor.getAnnotation(XCollection::class.java)
   if (xCollection != null && (!xCollection.propertyElementName.isEmpty() || xCollection.style == XCollection.Style.v2)) {
-    return TagBinding(accessor, xCollection.propertyElementName)
+    return TagBinding(
+      binding = binding,
+      accessor = accessor,
+      nameAttributeValue = null,
+      converterClass = null,
+      tag = xCollection.propertyElementName.ifEmpty { accessor.name },
+      nameAttribute = null,
+      valueAttribute = null,
+      textIfTagValueEmpty = "",
+    )
   }
 
   if (optionTag == null) {
-    accessor.getAnnotation(XMap::class.java)?.let {
-      return TagBinding(accessor, it.propertyElementName)
+    accessor.getAnnotation(XMap::class.java)?.let { xMapAnnotation ->
+      return TagBinding(
+        binding = binding,
+        accessor = accessor,
+        nameAttributeValue = null,
+        converterClass = null,
+        tag = xMapAnnotation.propertyElementName.ifEmpty { accessor.name },
+        nameAttribute = null,
+        valueAttribute = null,
+      )
     }
   }
 
   if (propertyStyle == Property.Style.ATTRIBUTE) {
     return AttributeBinding(accessor, null)
   }
-  return OptionTagBinding(accessor, optionTag)
+
+  if (optionTag == null) {
+    return TagBinding(
+      binding = binding,
+      accessor = accessor,
+      nameAttributeValue = accessor.name,
+      converterClass = null,
+      tag = Constants.OPTION,
+      nameAttribute = Constants.NAME,
+      valueAttribute = if (binding == null) Constants.VALUE else null,
+    )
+  }
+  else {
+    return createOptionTagBindingByAnnotation(optionTag = optionTag, accessor = accessor, binding = binding)
+  }
+}
+
+private fun createOptionTagBindingByAnnotation(optionTag: OptionTag, accessor: MutableAccessor, binding: Binding?): TagBinding {
+  val customTag = optionTag.tag
+  val nameAttribute = optionTag.nameAttribute.takeIf { it.isNotEmpty() }
+  val converter = XmlSerializerUtil.getConverter(optionTag)
+  val isSerializedAsPrimitive = binding == null || converter != null
+  return TagBinding(
+    binding = binding,
+    accessor = accessor,
+    nameAttributeValue = if (nameAttribute == null) null else optionTag.value.ifEmpty { accessor.name },
+    converterClass = converter,
+    tag = if (nameAttribute == null && customTag == Constants.OPTION) accessor.name else customTag,
+    nameAttribute = nameAttribute,
+    valueAttribute = if (isSerializedAsPrimitive) optionTag.valueAttribute.takeIf { it.isNotEmpty() } else null,
+    serializeBeanBindingWithoutWrapperTag = binding is BeanBinding && optionTag.valueAttribute.isEmpty()
+  )
 }
 
 private class XmlSerializerPropertyCollector(configuration: Configuration) : PropertyCollector(configuration) {
@@ -546,3 +646,43 @@ private fun getTagName(aClass: Class<*>): String {
 }
 
 private fun getTagNameFromAnnotation(aClass: Class<*>): String? = aClass.getAnnotation(Tag::class.java)?.value?.takeIf { it.isNotEmpty() }
+
+@Internal
+fun isPropertySkipped(filter: SerializationFilter?, binding: NestedBinding, bean: Any, isFilterPropertyItself: Boolean): Boolean {
+  val accessor = binding.accessor
+
+  if (bean is SerializationFilter && !bean.accepts(accessor, bean)) {
+    return true
+  }
+
+  val property = accessor.getAnnotation(Property::class.java)
+  if (property == null || !property.alwaysWrite) {
+    if (filter != null && isFilterPropertyItself) {
+      if (filter is SkipDefaultsSerializationFilter) {
+        if (filter.equal(binding, bean)) {
+          return true
+        }
+      }
+      else if (!filter.accepts(accessor, bean)) {
+        return true
+      }
+    }
+
+    if (property != null) {
+      val propertyFilter = XmlSerializerUtil.getPropertyFilter(property)
+      if (propertyFilter != null && !propertyFilter.accepts(accessor, bean)) {
+        return true
+      }
+    }
+  }
+  return false
+}
+
+private fun normalizePropertyNameForKotlinx(binding: NestedBinding): String {
+  val s = binding.propertyName
+  if (s.all { it.isUpperCase() || it == '_' || it.isDigit() }) {
+    // lower-case it
+    return s.lowercase()
+  }
+  return s
+}

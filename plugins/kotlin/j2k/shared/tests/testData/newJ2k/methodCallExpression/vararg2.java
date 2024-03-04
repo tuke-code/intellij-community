@@ -1,4 +1,4 @@
-//file
+// IGNORE_K2
 import javaApi.WithVarargConstructor;
 
 import java.lang.String;

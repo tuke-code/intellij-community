@@ -6,6 +6,7 @@ import com.intellij.openapi.components.serviceAsync
 import com.intellij.openapi.diagnostic.debug
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.diagnostic.trace
+import com.intellij.util.io.computeDetached
 import com.intellij.util.io.copyToAsync
 import kotlinx.coroutines.*
 import org.jetbrains.annotations.ApiStatus
@@ -13,7 +14,6 @@ import java.io.InputStream
 import java.io.OutputStream
 import kotlin.io.path.fileSize
 import kotlin.io.path.inputStream
-import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
 /**
@@ -209,7 +209,8 @@ private suspend fun doBootstrapOverShellSession(
   val joinedCmd = getIjentGrpcArgv(remotePathToBinary, selfDeleteOnExit = true).joinToString(" ")
   val commandLineArgs =
     """cd ${posixQuote(remotePathToBinary.substringBeforeLast('/'))}""" +
-    """; exec "$(getent passwd "${'$'}(whoami)" | cut -d: -f7)" -c ${posixQuote(joinedCmd)}""" +
+    """; export SHELL="${'$'}(getent passwd "${'$'}(whoami)" | cut -d: -f7)" """ +
+    """; exec "${'$'}SHELL" -c ${posixQuote(joinedCmd)}""" +
     "\n"
   LOG.trace { "Executing IJent inside a shell: ${commandLineArgs.trimEnd()}" }
 
@@ -220,22 +221,18 @@ private suspend fun doBootstrapOverShellSession(
 }
 
 /** The same stdin and stdout will be used for transferring binary data. Some buffering wrapper may occasionally consume too much data. */
+@OptIn(DelicateCoroutinesApi::class)
 private suspend fun readLineWithoutBuffering(process: Process): String =
-  withContext(Dispatchers.IO) {
+  computeDetached {
     val buffer = StringBuilder()
     val stream = process.inputStream
     while (process.isAlive) {
-      val available = stream.available()
-      if (available > 0) {
-        val c = stream.read()
-        if (c < 0 || c == '\n'.code) {
-          break
-        }
-        buffer.append(c.toChar())
+      ensureActive()
+      val c = stream.read()
+      if (c < 0 || c == '\n'.code) {
+        break
       }
-      else {
-        delay(50.milliseconds) // Just a random timeout, which was chosen without any research.
-      }
+      buffer.append(c.toChar())
     }
     LOG.trace { "Read line from stdout: $buffer" }
     buffer.toString()

@@ -2,7 +2,9 @@
 package com.intellij.ide.startup.importSettings.data
 
 import com.intellij.ide.BootstrapBundle
+import com.intellij.ide.plugins.marketplace.MarketplaceRequests
 import com.intellij.ide.startup.importSettings.StartupImportIcons
+import com.intellij.ide.startup.importSettings.TransferableIdeId
 import com.intellij.ide.startup.importSettings.jb.IDEData
 import com.intellij.ide.startup.importSettings.jb.JbImportServiceImpl
 import com.intellij.ide.startup.importSettings.sync.SyncServiceImpl
@@ -12,11 +14,14 @@ import com.intellij.openapi.application.ApplicationNamesInfo
 import com.intellij.openapi.application.ConfigImportHelper
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.logger
+import com.intellij.openapi.diagnostic.runAndLogException
 import com.intellij.openapi.diagnostic.thisLogger
+import com.intellij.openapi.extensions.PluginId
 import com.intellij.openapi.fileChooser.FileChooser
 import com.intellij.openapi.fileChooser.FileChooserDescriptor
 import com.intellij.openapi.rd.createLifetime
 import com.intellij.openapi.rd.createNestedDisposable
+import com.intellij.openapi.util.NlsSafe
 import com.intellij.openapi.util.registry.Registry
 import com.intellij.openapi.util.registry.RegistryValue
 import com.intellij.openapi.util.registry.RegistryValueListener
@@ -28,7 +33,9 @@ import com.jetbrains.rd.util.reactive.IPropertyView
 import com.jetbrains.rd.util.reactive.ISignal
 import com.jetbrains.rd.util.reactive.Property
 import com.jetbrains.rd.util.reactive.Signal
-import kotlinx.coroutines.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.async
 import kotlinx.coroutines.selects.select
 import org.jetbrains.annotations.Nls
 import java.nio.file.Path
@@ -44,6 +51,8 @@ interface SettingsService {
   fun getJbService(): JbService
   fun getExternalService(): ExternalService
 
+  suspend fun warmUp()
+
   suspend fun shouldShowImport(): Boolean
 
   val importCancelled: Signal<Unit>
@@ -56,14 +65,17 @@ interface SettingsService {
 
   val doClose: ISignal<Unit>
 
+  val pluginIdsPreloaded: Boolean
+
   fun configChosen()
 
   fun isLoggedIn(): Boolean = jbAccount.value != null
 }
 
-class SettingsServiceImpl : SettingsService, Disposable.Default {
+class SettingsServiceImpl(private val coroutineScope: CoroutineScope) : SettingsService, Disposable.Default {
 
   private val shouldUseMockData = SystemProperties.getBooleanProperty("intellij.startup.wizard.use-mock-data", false)
+  private var pluginsPreloadedDeferred: Deferred<Set<PluginId>>? = null
 
   override fun getSyncService() =
     if (shouldUseMockData) TestSyncService()
@@ -77,19 +89,26 @@ class SettingsServiceImpl : SettingsService, Disposable.Default {
     if (shouldUseMockData) TestExternalService()
     else SettingTransferService.getInstance()
 
+  override suspend fun warmUp() {
+    pluginsPreloadedDeferred = coroutineScope.async { MarketplaceRequests.getInstance().getMarketplacePlugins(null) }
+    coroutineScope.async { getJbService().warmUp() }
+    coroutineScope.async { getExternalService().warmUp(coroutineScope) }
+  }
+
   override suspend fun shouldShowImport(): Boolean {
     val startTime = System.currentTimeMillis()
-    return coroutineScope {
-      val importFromJetBrainsAvailable = async { getJbService().hasDataToImport() }
-      val importFromExternalAvailable = async { getExternalService().hasDataToImport() }
-      val result = select {
-        importFromJetBrainsAvailable.onAwait { it || importFromExternalAvailable.await() }
-        importFromExternalAvailable.onAwait { it || importFromJetBrainsAvailable.await() }
-      }
-      coroutineContext.job.cancelChildren()
-      thisLogger().info("Took ${System.currentTimeMillis() - startTime}ms. to calculate shouldShowImport")
-      result
+    val importFromJetBrainsAvailable = coroutineScope.async {
+      logger.runAndLogException { getJbService().hasDataToImport() } ?: false
     }
+    val importFromExternalAvailable = coroutineScope.async {
+      logger.runAndLogException { getExternalService().hasDataToImport() } ?: false
+    }
+    val result = select {
+      importFromExternalAvailable.onAwait { it || importFromJetBrainsAvailable.await() }
+      importFromJetBrainsAvailable.onAwait { it || importFromExternalAvailable.await() }
+    }
+    thisLogger().info("Took ${System.currentTimeMillis() - startTime}ms. to calculate shouldShowImport")
+    return result
   }
 
   override val importCancelled = Signal<Unit>().apply {
@@ -103,6 +122,8 @@ class SettingsServiceImpl : SettingsService, Disposable.Default {
   override val jbAccount = Property<JBAccountInfoService.JBAData?>(null)
 
   override val doClose = Signal<Unit>()
+  override val pluginIdsPreloaded: Boolean
+    get() = pluginsPreloadedDeferred?.isCompleted == true
 
   override fun configChosen() {
     if (shouldUseMockData) {
@@ -150,6 +171,7 @@ class SettingsServiceImpl : SettingsService, Disposable.Default {
   }
 }
 
+private val logger = logger<SettingsServiceImpl>()
 
 interface SyncService : JbService {
   enum class SYNC_STATE {
@@ -170,9 +192,15 @@ interface SyncService : JbService {
   fun generalSync()
 }
 
-interface ExternalService : BaseService {
+interface ExternalService {
+  val productServices: List<ExternalProductService>
   suspend fun hasDataToImport(): Boolean
   fun warmUp(scope: CoroutineScope)
+}
+
+interface ExternalProductService : BaseService {
+  val productId: TransferableIdeId
+  val productTitle: @NlsSafe String
 }
 
 interface JbService : BaseService {

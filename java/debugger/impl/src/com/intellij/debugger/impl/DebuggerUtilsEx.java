@@ -682,12 +682,18 @@ public abstract class DebuggerUtilsEx extends DebuggerUtils {
     }
   }
 
-  public static String getSourceName(Location location, Function<? super Throwable, String> defaultName) {
+  @Nullable
+  public static String getSourceName(Location location, @Nullable String defaultName) {
+    return getSourceName(location, e -> defaultName);
+  }
+
+  @Nullable
+  public static String getSourceName(Location location, @NotNull Function<? super Throwable, String> defaultNameProvider) {
     try {
       return location.sourceName();
     }
     catch (InternalError | AbsentInformationException | IllegalArgumentException e) {
-      return defaultName.apply(e);
+      return defaultNameProvider.apply(e);
     }
   }
 
@@ -1227,6 +1233,22 @@ public abstract class DebuggerUtilsEx extends DebuggerUtils {
         return projectFileIndex.isInLibrary(file);
       }
     });
+  }
+
+  @NotNull
+  public static Location findOrCreateLocation(DebugProcessImpl debugProcess, StackTraceElement stackTraceElement) {
+    return findOrCreateLocation(debugProcess, debugProcess.getVirtualMachineProxy()::classesByName, stackTraceElement);
+  }
+
+  @NotNull
+  public static Location findOrCreateLocation(DebugProcessImpl debugProcess,
+                                              @NotNull ClassesByNameProvider classesByName,
+                                              StackTraceElement stackTraceElement) {
+    return findOrCreateLocation(debugProcess,
+                                classesByName,
+                                stackTraceElement.getClassName(),
+                                stackTraceElement.getMethodName(),
+                                stackTraceElement.getLineNumber());
   }
 
   @NotNull

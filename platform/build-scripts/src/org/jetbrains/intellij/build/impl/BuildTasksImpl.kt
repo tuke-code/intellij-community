@@ -123,8 +123,10 @@ class BuildTasksImpl(private val context: BuildContextImpl) : BuildTasks {
     val currentOs = OsFamily.currentOs
     context.paths.distAllDir = targetDirectory
     context.options.targetOs = persistentListOf(currentOs)
-    context.options.buildStepsToSkip.add(BuildOptions.GENERATE_JAR_ORDER_STEP)
-    context.options.buildStepsToSkip.add(SoftwareBillOfMaterials.STEP_ID)
+    context.options.buildStepsToSkip += listOf(
+      BuildOptions.GENERATE_JAR_ORDER_STEP,
+      SoftwareBillOfMaterials.STEP_ID,
+    )
     BundledMavenDownloader.downloadMaven4Libs(context.paths.communityHomeDirRoot)
     BundledMavenDownloader.downloadMaven3Libs(context.paths.communityHomeDirRoot)
     BundledMavenDownloader.downloadMavenDistribution(context.paths.communityHomeDirRoot)
@@ -1026,6 +1028,15 @@ private fun buildCrossPlatformZip(distResults: List<DistributionForOsTaskResult>
     context = context,
   )
 
+  val runtimeModuleRepositoryPath = if (context.generateRuntimeModuleRepository) {
+    spanBuilder("generate runtime repository for cross-platform distribution").use {
+      generateCrossPlatformRepository(context.paths.distAllDir, distResults.filter { it.arch == JvmArchitecture.x64 }.map { it.outDir }, context)
+    }
+  }
+  else {
+    null
+  }
+  
   val zipFileName = context.productProperties.getCrossPlatformZipFileName(context.applicationInfo, context.buildNumber)
   val targetFile = context.paths.artifactDir.resolve(zipFileName)
   val dependenciesFile = copyDependenciesFile(context)
@@ -1045,6 +1056,7 @@ private fun buildCrossPlatformZip(distResults: List<DistributionForOsTaskResult>
     extraFiles = mapOf("dependencies.txt" to dependenciesFile),
     distAllDir = context.paths.distAllDir,
     compress = context.options.compressZipFiles,
+    runtimeModuleRepositoryPath = runtimeModuleRepositoryPath,
   )
 
   checkInArchive(archiveFile = targetFile, pathInArchive = "", context = context)
@@ -1127,7 +1139,9 @@ private fun crossPlatformZip(macX64DistDir: Path,
                              distFiles: Collection<DistFile>,
                              extraFiles: Map<String, Path>,
                              distAllDir: Path,
-                             compress: Boolean) {
+                             compress: Boolean,
+                             runtimeModuleRepositoryPath: Path?,
+) {
   writeNewFile(targetFile) { outFileChannel ->
     NoDuplicateZipArchiveOutputStream(outFileChannel, compress = compress).use { out ->
       out.setUseZip64(Zip64Mode.Never)
@@ -1207,7 +1221,7 @@ private fun crossPlatformZip(macX64DistDir: Path,
         relPath != "bin/idea.properties" &&
         !relPath.startsWith("help/") &&
         relPath != "license/launcher-third-party-libraries.html" &&
-        relPath != MODULE_DESCRIPTORS_JAR_PATH && //todo merge module-descriptors.jar for different OS into a single one instead
+        relPath != MODULE_DESCRIPTORS_JAR_PATH &&
         relPath != PLUGIN_CLASSPATH &&
         !relPath.startsWith("bin/remote-dev-server") &&
         relPath != "license/remote-dev-server.html"
@@ -1216,6 +1230,9 @@ private fun crossPlatformZip(macX64DistDir: Path,
       val zipFileUniqueGuard = HashMap<String, DistFileContent>()
 
       out.dir(distAllDir, "", fileFilter = { _, relPath -> relPath != "bin/idea.properties" }, entryCustomizer = entryCustomizer)
+      if (runtimeModuleRepositoryPath != null) {
+        out.entry(MODULE_DESCRIPTORS_JAR_PATH, runtimeModuleRepositoryPath)
+      }
 
       for (macDistDir in arrayOf(macX64DistDir, macArm64DistDir)) {
         out.dir(macDistDir, "", fileFilter = { _, relPath ->

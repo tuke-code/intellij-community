@@ -1,4 +1,4 @@
-//file
+// IGNORE_K2
 import kotlinApi.KotlinInterface;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;

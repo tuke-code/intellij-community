@@ -1,8 +1,9 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.ide.startup.importSettings.data
 
 import com.intellij.ide.startup.importSettings.ImportSettingsBundle
 import com.intellij.ide.startup.importSettings.data.ActionsDataProvider.Companion.toRelativeFormat
+import com.intellij.ide.startup.importSettings.transfer.ExternalProductInfo
 import org.jetbrains.annotations.Nls
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
@@ -206,13 +207,7 @@ class SyncActionsDataProvider private constructor() : ActionsDataProvider<SyncSe
 
 }
 
-class ExtActionsDataProvider private constructor() : ActionsDataProvider<ExternalService> {
-  companion object {
-    private val provider = ExtActionsDataProvider()
-    fun getInstance() = provider
-  }
-
-  override val productService = settingsService.getExternalService()
+class ExtActionsDataProvider(override val productService: ExternalProductService) : ActionsDataProvider<ExternalProductService> {
 
   override fun getProductIcon(productId: String, size: IconProductSize): Icon? {
     return productService.getProductIcon(productId, size)
@@ -222,16 +217,14 @@ class ExtActionsDataProvider private constructor() : ActionsDataProvider<Externa
     return contributor.name
   }
 
-  override fun getComment(contributor: SettingsContributor): String? {
-    return null
-  }
+  override fun getComment(contributor: SettingsContributor): String? =
+    (contributor as? ExternalProductInfo)?.comment
 
   override val title: String
-    get() = ""
-  override val main: List<Product>?
+    get() = productService.productTitle
+  override val main: List<Product>
     get() = productService.products()
-  override val other: List<Product>?
-    get() = null
+  override val other: List<Product>? = null
 
 }
 

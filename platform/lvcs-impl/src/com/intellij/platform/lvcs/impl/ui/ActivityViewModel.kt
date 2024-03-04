@@ -2,14 +2,10 @@
 package com.intellij.platform.lvcs.impl.ui
 
 import com.intellij.history.integration.IdeaGateway
-import com.intellij.history.integration.LocalHistoryBundle
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.EDT
 import com.intellij.openapi.diagnostic.thisLogger
-import com.intellij.openapi.progress.ProgressManager
-import com.intellij.openapi.progress.runBlockingCancellable
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.util.ThrowableComputable
 import com.intellij.platform.lvcs.impl.*
 import com.intellij.platform.lvcs.impl.statistics.LocalHistoryCounter
 import com.intellij.util.EventDispatcher
@@ -26,7 +22,6 @@ internal class ActivityViewModel(private val project: Project, gateway: IdeaGate
 
   private val activityItemsFlow = MutableStateFlow(ActivityData.EMPTY)
   private val selectionFlow = MutableStateFlow<ActivitySelection?>(null)
-  private val diffDataFlow = MutableStateFlow<Pair<ActivitySelection?, ActivityDiffData?>>(Pair(null, null))
 
   private val scopeFilterFlow = MutableStateFlow<String?>(null)
   private val activityFilterFlow = MutableStateFlow<String?>(null)
@@ -54,19 +49,23 @@ internal class ActivityViewModel(private val project: Project, gateway: IdeaGate
           }
         }
     }
-    coroutineScope.launch {
-      selectionFlow.collectLatest { selection ->
-        thisLogger<ActivityViewModel>().debug("Loading diff data for $activityScope")
-        val diffData = selection?.let {
-          withContext(Dispatchers.Default) {
-            LocalHistoryCounter.logLoadDiff(project, activityScope) {
-              activityProvider.loadDiffData(activityScope, selection)
+    if (!isSingleDiffSupported) {
+      coroutineScope.launch {
+        selectionFlow.collectLatest { selection ->
+          thisLogger<ActivityViewModel>().debug("Loading diff data for $activityScope")
+          withContext(Dispatchers.EDT) {
+            eventDispatcher.multicaster.onDiffDataLoadingStarted()
+          }
+          val diffData = selection?.let {
+            withContext(Dispatchers.Default) {
+              LocalHistoryCounter.logLoadDiff(project, activityScope) {
+                activityProvider.loadDiffData(activityScope, selection)
+              }
             }
           }
-        }
-        diffDataFlow.value = selection to diffData
-        withContext(Dispatchers.EDT) {
-          eventDispatcher.multicaster.onDiffDataLoaded(diffData)
+          withContext(Dispatchers.EDT) {
+            eventDispatcher.multicaster.onDiffDataLoadingStopped(diffData)
+          }
         }
       }
     }
@@ -90,20 +89,9 @@ internal class ActivityViewModel(private val project: Project, gateway: IdeaGate
     }
   }
 
-  @RequiresEdt
-  internal fun loadDiffDataSynchronously(): ActivityDiffData? {
-    val lastSelection = selectionFlow.value ?: return null
+  internal val selection get() = selectionFlow.value
 
-    val (lastSelectionWithDiffData, lastDiffData) = diffDataFlow.value
-    if (lastSelectionWithDiffData == lastSelection) return lastDiffData
-
-    return ProgressManager.getInstance().runProcessWithProgressSynchronously(ThrowableComputable {
-      runBlockingCancellable {
-        diffDataFlow.first { it.first == lastSelection }
-      }
-    }, LocalHistoryBundle.message("activity.diff.loading"), true, project).second
-  }
-
+  internal val isSingleDiffSupported get() = !activityScope.hasMultipleFiles
   internal val isScopeFilterSupported get() = activityProvider.isScopeFilterSupported(activityScope)
   internal val isActivityFilterSupported get() = activityProvider.isActivityFilterSupported(activityScope)
 
@@ -121,6 +109,7 @@ internal class ActivityViewModel(private val project: Project, gateway: IdeaGate
   @RequiresEdt
   fun setSelection(selection: ActivitySelection?) {
     selectionFlow.value = selection
+    eventDispatcher.multicaster.onSelectionChanged(selection)
   }
 
   fun setVisible(isVisible: Boolean) {
@@ -135,7 +124,9 @@ internal class ActivityViewModel(private val project: Project, gateway: IdeaGate
 interface ActivityModelListener : EventListener {
   fun onItemsLoadingStarted() = Unit
   fun onItemsLoadingStopped(data: ActivityData) = Unit
-  fun onDiffDataLoaded(diffData: ActivityDiffData?) = Unit
+  fun onSelectionChanged(selection: ActivitySelection?) = Unit
+  fun onDiffDataLoadingStarted() = Unit
+  fun onDiffDataLoadingStopped(diffData: ActivityDiffData?) = Unit
   fun onFilteringStarted() = Unit
   fun onFilteringStopped(result: Set<ActivityItem>?) = Unit
 }

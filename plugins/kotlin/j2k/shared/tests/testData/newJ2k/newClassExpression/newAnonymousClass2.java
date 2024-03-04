@@ -1,4 +1,4 @@
-//file
+// IGNORE_K2
 abstract class A {}
 
 class C {
