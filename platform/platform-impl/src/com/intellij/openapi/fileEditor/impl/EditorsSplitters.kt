@@ -922,14 +922,17 @@ private class UiBuilder(private val splitters: EditorsSplitters) {
 
       val virtualFileManager = VirtualFileManager.getInstance()
       var focusedFile: VirtualFile? = null
-      var isFirst = true
+      var isFirstInBulk = sorted.size > 1
       for ((index, fileEntry) in sorted) {
         span("opening editor") {
           val file = resolveFileOrLogError(virtualFileManager, fileEntry) ?: return@span
-          if (!isFirst) { // IJPL-687 not bulk mode allows painting the first file as soon as possible
-            file.putUserData(AsyncEditorLoader.OPENED_IN_BULK, true)
+          file.putUserData(AsyncEditorLoader.OPENED_IN_BULK, true)
+          if (isFirstInBulk) {
+            // add selected tab on EditorTabs without waiting for the rest tabs on startup.
+            // this allows painting the first editor as soon as it is ready IJPL-687
+            file.putUserData(AsyncEditorLoader.FIRST_IN_BULK, true)
+            isFirstInBulk = false
           }
-          isFirst = false
           try {
             openFile(file = file,
                      fileEntry = fileEntry,
@@ -944,6 +947,7 @@ private class UiBuilder(private val splitters: EditorsSplitters) {
           }
           finally {
             file.putUserData(AsyncEditorLoader.OPENED_IN_BULK, null)
+            file.putUserData(AsyncEditorLoader.FIRST_IN_BULK, null)
           }
         }
       }

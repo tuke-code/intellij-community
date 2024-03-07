@@ -18,7 +18,6 @@ import com.intellij.platform.settings.RawSettingSerializerDescriptor
 import com.intellij.platform.settings.SettingDescriptor
 import com.intellij.platform.settings.SettingTag
 import com.intellij.serialization.SerializationException
-import com.intellij.serialization.xml.KotlinxSerializationBinding
 import com.intellij.util.xmlb.*
 import kotlinx.serialization.ExperimentalSerializationApi
 import org.jdom.Element
@@ -123,10 +122,7 @@ internal class StateStorageBackedByController(
           result = beanBinding.newInstance() as T
         }
 
-        val l = deserializeBeanInto(result = result, element = element, binding = binding, checkAttributes = true)
-        if (l != null) {
-          (binding as MultiNodeBinding).deserializeList(result, l, JdomAdapter)
-        }
+        deserializeNestedBindingInto(result = result, element = element, binding = binding)
       }
     }
     return result

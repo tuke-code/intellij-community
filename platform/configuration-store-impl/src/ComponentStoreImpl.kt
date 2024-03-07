@@ -19,6 +19,7 @@ import com.intellij.openapi.components.impl.stores.IComponentStore
 import com.intellij.openapi.diagnostic.*
 import com.intellij.openapi.extensions.PluginId
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.project.impl.shared.ConfigFolderChangedListener
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.util.buildNsUnawareJdom
 import com.intellij.openapi.util.registry.Registry
@@ -71,6 +72,13 @@ internal fun restoreDefaultNotRoamableComponentSaveThreshold() {
 @TestOnly
 internal fun setRoamableComponentSaveThreshold(thresholdInSeconds: Int) {
   NOT_ROAMABLE_COMPONENT_SAVE_THRESHOLD = thresholdInSeconds
+}
+
+class ComponentStoreImplReloadListener : ConfigFolderChangedListener {
+  override fun onChange(changedFileSpecs: Set<String>, deletedFileSpecs: Set<String>) {
+    val componentStore = ApplicationManager.getApplication().stateStore as ComponentStoreImpl
+    componentStore.reloadComponents(changedFileSpecs, deletedFileSpecs)
+  }
 }
 
 @ApiStatus.Internal
@@ -527,20 +535,19 @@ abstract class ComponentStoreImpl : IComponentStore {
     // all other components follow a general rule: initial modCount is calculated after loadState phase
     val postLoadStateUpdateModificationCount = name != "PathMacrosImpl"
 
-    val defaultState = if (stateSpec.defaultStateAsResource) getDefaultState(component, name, stateClass) else null
+    val defaultState = if (stateSpec.defaultStateAsResource) getDefaultState(component = component, componentName = name, stateClass = stateClass) else null
     if (loadPolicy == StateLoadPolicy.LOAD || info.stateSpec?.allowLoadInTests == true) {
       val storageChooser = component as? StateStorageChooserEx
-      for (storageSpec in getStorageSpecs(component, stateSpec, StateStorageOperation.READ)) {
+      for (storageSpec in getStorageSpecs(component = component, stateSpec = stateSpec, operation = StateStorageOperation.READ)) {
         if (storageChooser?.getResolution(storageSpec, StateStorageOperation.READ) == Resolution.SKIP) {
           continue
         }
 
         val storage = storageManager.getStateStorage(storageSpec)
 
-        // if storage marked as changed,
-        // it means that analyzeExternalChangesAndUpdateIfNeeded was called for it and storage is already reloaded
+        // if storage marked as changed, it means that analyzeExternalChangesAndUpdateIfNeeded was called for it and storage is already reloaded
         val isReloadDataForStorage = if (reloadData == ThreeState.UNSURE) {
-          isStorageChanged(changedStorages!!, storage)
+          changedStorages == null || isStorageChanged(changedStorages = changedStorages, storage = storage)
         }
         else {
           reloadData.toBoolean()
@@ -605,11 +612,6 @@ abstract class ComponentStoreImpl : IComponentStore {
     return !storageSpec.deprecated && stateSpec.reportStatistic && storageSpec.value != StoragePathMacros.CACHE_FILE
   }
 
-  private fun isStorageChanged(changedStorages: Set<StateStorage>, storage: StateStorage): Boolean {
-    return changedStorages.contains(storage) ||
-           (storage is ExternalStorageWithInternalPart && changedStorages.contains(storage.internalStorage))
-  }
-
   protected open fun doCreateStateGetter(
     reloadData: Boolean,
     storage: StateStorage,
@@ -649,7 +651,7 @@ abstract class ComponentStoreImpl : IComponentStore {
   }
 
   protected open fun isUseLoadedStateAsExisting(storage: StateStorage): Boolean {
-    return (storage as? XmlElementStorage)?.storageRoamingType != RoamingType.DISABLED && isUseLoadedStateAsExistingVmProperty
+    return (storage as? XmlElementStorage)?.roamingType != RoamingType.DISABLED && isUseLoadedStateAsExistingVmProperty
   }
 
   protected open fun getPathMacroManagerForDefaults(): PathMacroManager? = null
@@ -875,4 +877,8 @@ internal suspend fun getStateForComponent(component: PersistentStateComponent<*>
     stateSpec.getStateRequiresEdt -> withContext(Dispatchers.EDT) { component.state }
     else -> readAction { component.state }
   }
+}
+
+private fun isStorageChanged(changedStorages: Set<StateStorage>, storage: StateStorage): Boolean {
+  return changedStorages.contains(storage) || (storage is ExternalStorageWithInternalPart && changedStorages.contains(storage.internalStorage))
 }

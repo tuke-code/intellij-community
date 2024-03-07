@@ -10,6 +10,7 @@ import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.apache.commons.compress.archivers.zip.ZipArchiveEntry;
 import org.apache.commons.compress.compressors.CompressorException;
 import org.apache.commons.compress.compressors.CompressorStreamFactory;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -28,12 +29,15 @@ import java.util.zip.ZipFile;
 public abstract class Decompressor {
   /**
    * The Tar decompressor automatically detects the compression of an input file/stream.
+   * <p>
+   * <b>NOTE</b>: requires {@code commons-compress} and {@code commons-io} libraries to be on the classpath.
    */
   public static final class Tar extends Decompressor {
     public Tar(@NotNull Path file) {
       mySource = file;
     }
 
+    @ApiStatus.Obsolete
     public Tar(@NotNull File file) {
       mySource = file.toPath();
     }
@@ -99,13 +103,15 @@ public abstract class Decompressor {
       mySource = file;
     }
 
+    @ApiStatus.Obsolete
     public Zip(@NotNull File file) {
       mySource = file.toPath();
     }
 
     /**
-     * <p>Returns an alternative implementation that is slower but supports ZIP extensions (UNIX/DOS attributes, symlinks).</p>
-     * <p><b>NOTE</b>: requires the Apache Commons Compress library to be on the classpath.</p>
+     * Returns an alternative implementation that is slower but supports ZIP extensions (UNIX/DOS attributes, symlinks).
+     * <p>
+     * <b>NOTE</b>: requires {@code commons-compress} and {@code commons-io} libraries to be on the classpath.
      */
     public @NotNull Decompressor withZipExtensions() {
       return new ExtZip(mySource);
@@ -289,7 +295,7 @@ public abstract class Decompressor {
     return this;
   }
 
-  public Decompressor escapingSymlinkPolicy(EscapingSymlinkPolicy policy) {
+  public Decompressor escapingSymlinkPolicy(@NotNull EscapingSymlinkPolicy policy) {
     myEscapingSymlinkPolicy = policy;
     return this;
   }
@@ -319,6 +325,7 @@ public abstract class Decompressor {
     return this;
   }
 
+  @ApiStatus.Obsolete
   public final void extract(@NotNull File outputDir) throws IOException {
     extract(outputDir.toPath());
   }

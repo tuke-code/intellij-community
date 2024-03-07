@@ -5,7 +5,6 @@ package org.jetbrains.kotlin.idea.codeInsight.postfix
 import com.intellij.codeInsight.template.postfix.templates.*
 import com.intellij.openapi.editor.Document
 import com.intellij.openapi.editor.Editor
-import com.intellij.openapi.project.DumbAware
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
 import com.intellij.psi.util.PsiTreeUtil.findElementOfClassAtRange
@@ -28,40 +27,41 @@ import org.jetbrains.kotlin.types.typeUtil.isBoolean
 
 // K1 PostfixTemplateProvider
 class KtPostfixTemplateProvider : PostfixTemplateProvider {
-    private val templatesSet by lazy {
+    private val templateSet: Set<PostfixTemplateWithExpressionSelector> by lazy {
+        @Suppress("SpellCheckingInspection")
         setOf(
-            KtNotPostfixTemplate(this), // k2
-            KtIfExpressionPostfixTemplate(this), // k2
+            KtNotPostfixTemplate(this),
+            KtIfExpressionPostfixTemplate(this),
             KtElseExpressionPostfixTemplate(this),
-            KtNotNullPostfixTemplate("notnull", this), // k2
-            KtNotNullPostfixTemplate("nn", this), // k2
+            KtNotNullPostfixTemplate("notnull", this),
+            KtNotNullPostfixTemplate("nn", this),
             KtIsNullPostfixTemplate(this),
             KtWhenExpressionPostfixTemplate(this),
-            KtTryPostfixTemplate(this), // k2
-            KtIntroduceVariablePostfixTemplate("val", this), // k2
-            KtIntroduceVariablePostfixTemplate("var", this), // k2
-            KtForEachPostfixTemplate("for", this), // k2
-            KtForEachPostfixTemplate("iter", this), // k2
-            KtForReversedPostfixTemplate("forr", this), // k2
-            KtForWithIndexPostfixTemplate("fori", this), // k2
-            KtForLoopNumbersPostfixTemplate("fori", this), // k2
+            KtTryPostfixTemplate(this),
+            KtIntroduceVariablePostfixTemplate("val", this),
+            KtIntroduceVariablePostfixTemplate("var", this),
+            KtForEachPostfixTemplate("for", this),
+            KtForEachPostfixTemplate("iter", this),
+            KtForReversedPostfixTemplate("forr", this),
+            KtForWithIndexPostfixTemplate("fori", this),
+            KtForLoopNumbersPostfixTemplate("fori", this),
             KtForLoopReverseNumbersPostfixTemplate("forr", this),
-            KtAssertPostfixTemplate(this), // k2
-            KtParenthesizedPostfixTemplate(this), // k2
-            KtSoutPostfixTemplate(this), // k2
-            KtReturnPostfixTemplate(this), // k2
-            KtWhilePostfixTemplate(this), // k2
-            KtWrapWithListOfPostfixTemplate(this), // k2
-            KtWrapWithSetOfPostfixTemplate(this), // k2
+            KtAssertPostfixTemplate(this),
+            KtParenthesizedPostfixTemplate(this),
+            KtSoutPostfixTemplate(this),
+            KtReturnPostfixTemplate(this),
+            KtWhilePostfixTemplate(this),
+            KtWrapWithListOfPostfixTemplate(this),
+            KtWrapWithSetOfPostfixTemplate(this),
             KtWrapWithArrayOfPostfixTemplate(this),
             KtWrapWithSequenceOfPostfixTemplate(this),
-            KtSpreadPostfixTemplate(this), // k2
+            KtSpreadPostfixTemplate(this),
             KtArgumentPostfixTemplate(this),
-            KtWithPostfixTemplate(this), // k2
+            KtWithPostfixTemplate(this),
         )
     }
 
-    override fun getTemplates(): Set<PostfixTemplateWithExpressionSelector> = templatesSet
+    override fun getTemplates(): Set<PostfixTemplateWithExpressionSelector> = templateSet
 
     override fun isTerminalSymbol(currentChar: Char): Boolean = currentChar == '.' || currentChar == '!'
 
@@ -83,7 +83,7 @@ private class KtNotPostfixTemplate(provider: PostfixTemplateProvider) : NotPostf
 private class KtIntroduceVariablePostfixTemplate(
     val kind: String,
     provider: PostfixTemplateProvider
-) : PostfixTemplateWithExpressionSelector(kind, kind, "$kind name = expression", createExpressionSelector(), provider), DumbAware {
+) : PostfixTemplateWithExpressionSelector(kind, kind, "$kind name = expression", createExpressionSelector(), provider) {
     override fun expandForChooseExpression(expression: PsiElement, editor: Editor) {
         K1IntroduceVariableHandler.collectCandidateTargetContainersAndDoRefactoring(
             expression.project, editor, expression as KtExpression,

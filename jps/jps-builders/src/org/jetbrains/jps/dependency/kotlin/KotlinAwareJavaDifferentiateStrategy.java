@@ -1,6 +1,7 @@
 // Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.jps.dependency.kotlin;
 
+import com.intellij.openapi.util.Pair;
 import com.intellij.util.SmartList;
 import com.intellij.util.containers.SmartHashSet;
 import kotlinx.metadata.*;
@@ -22,7 +23,7 @@ import static org.jetbrains.jps.javac.Iterators.*;
  * This strategy augments Java strategy with some Kotlin-specific rules. Should be used in projects containing both Java and Kotlin code.
  */
 public final class KotlinAwareJavaDifferentiateStrategy extends JvmDifferentiateStrategyImpl {
-
+  private static final TypeRepr.ClassType JVM_OVERLOADS_ANNOTATION = new TypeRepr.ClassType("kotlin/jvm/JvmOverloads");
   @Override
   public boolean processAddedClass(DifferentiateContext context, JvmClass addedClass, Utils future, Utils present) {
     for (JvmClass superClass : filter(future.allDirectSupertypes(addedClass), KotlinAwareJavaDifferentiateStrategy::isSealed)) {
@@ -32,10 +33,11 @@ public final class KotlinAwareJavaDifferentiateStrategy extends JvmDifferentiate
     if (!addedClass.isPrivate()) {
       // calls to newly added class' constructors may shadow calls to functions named similarly
       String ktName = getKotlinName(addedClass);
+      debug("Affecting lookup usages for added class ", ktName);
       affectLookupUsages(context, asIterable(new JvmNodeReferenceID(addedClass.getPackageName())), ktName != null? JvmClass.getShortName(ktName) : addedClass.getShortName(), future, null);
     }
 
-    return super.processAddedClass(context, addedClass, future, present);
+    return true;
   }
 
   @Override
@@ -43,7 +45,24 @@ public final class KotlinAwareJavaDifferentiateStrategy extends JvmDifferentiate
     for (JvmClass superClass : filter(future.allDirectSupertypes(removedClass), KotlinAwareJavaDifferentiateStrategy::isSealed)) {
       affectNodeSources(context, superClass.getReferenceID(), "Subclass of a sealed class was removed, affecting ");
     }
-    return super.processRemovedClass(context, removedClass, future, present);
+
+    if (!removedClass.isInnerClass()) {
+      // this will affect all imports of this class in kotlin sources
+      KmDeclarationContainer container = getDeclarationContainer(removedClass);
+      if (container == null /*is non-kotlin node*/ || container instanceof KmClass) {
+        String clsName = container != null? ((KmClass)container).getName() : removedClass.getName();
+        debug("Affecting lookup usages for removed class ", clsName);
+        affectLookupUsages(context, asIterable(new JvmNodeReferenceID(removedClass.getPackageName())), JvmClass.getShortName(clsName), present, null);
+      }
+    }
+
+    for (KmFunction kmFunction : allKmFunctions(removedClass)) {
+      if (Attributes.isInline(kmFunction)) {
+        debug("Function in a removed class was inlineable, affecting method usages ", kmFunction.getName());
+        affectMemberLookupUsages(context, removedClass, kmFunction.getName(), present);
+      }
+    }
+    return true;
   }
 
   @Override
@@ -109,13 +128,33 @@ public final class KotlinAwareJavaDifferentiateStrategy extends JvmDifferentiate
       KotlinMeta.Diff metaDiff = metaChange.getDiff();
 
       for (Difference.Change<KmFunction, KotlinMeta.KmFunctionsDiff> funChange : metaDiff.functions().changed()) {
-        JvmMethod changedMethod = getJvmMethod(changedClass, JvmExtensionsKt.getSignature(funChange.getPast()));
-        if (changedMethod != null && !changedMethod.getFlags().isPrivate()) {
-          KotlinMeta.KmFunctionsDiff funDiff = funChange.getDiff();
-          if (funDiff.becameNullable() || funDiff.argsBecameNotNull()) {
-             debug("One of method's parameters or method's return value has become non-nullable; affecting method usages ", changedMethod);
-             affectMemberUsages(context, changedClass.getReferenceID(), changedMethod, future.collectSubclassesWithoutMethod(changedClass.getReferenceID(), changedMethod));
+        KmFunction changedKmFunction = funChange.getPast();
+        Visibility visibility = Attributes.getVisibility(changedKmFunction);
+        if (visibility == Visibility.PRIVATE || visibility == Visibility.PRIVATE_TO_THIS) {
+          continue;
+        }
+        KotlinMeta.KmFunctionsDiff funDiff = funChange.getDiff();
+        if (funDiff.becameNullable() || funDiff.argsBecameNotNull()) {
+          debug("One of method's parameters or method's return value has become non-nullable ", changedKmFunction.getName());
+          JvmMethod jvmMethod = getJvmMethod(changedClass, JvmExtensionsKt.getSignature(changedKmFunction));
+          if (jvmMethod != null) {
+            // this will affect all usages from both java and kotlin code
+            for (JvmMethod method : withJvmOverloads(changedClass, jvmMethod)) {
+              for (Pair<JvmClass, JvmMethod> pair : future.getOverridingMethods(changedClass, method, method::isSameByJavaRules)) {
+                affectNodeSources(context, pair.getFirst().getReferenceID(), "Affect class where the function is overridden: ");
+              }
+              affectMemberUsages(context, changedClass.getReferenceID(), method, future.collectSubclassesWithoutMethod(changedClass.getReferenceID(), method));
+            }
           }
+          if (isDeclaresDefaultValue(changedKmFunction)) {
+            // additionally: functions with default parameters produce several methods in bytecode, so need to affect by lookup usage
+            debug("One of method's parameters or method's return value has become non-nullable; or function's receiver parameter changed: ", changedKmFunction.getName());
+            affectMemberLookupUsages(context, changedClass, changedKmFunction.getName(), future);
+          }
+        }
+        if (funDiff.receiverParameterChanged()) {
+          debug("Function's receiver parameter changed: ", changedKmFunction.getName());
+          affectMemberLookupUsages(context, changedClass, changedKmFunction.getName(), future);
         }
       }
 
@@ -171,15 +210,61 @@ public final class KotlinAwareJavaDifferentiateStrategy extends JvmDifferentiate
   public boolean processChangedMethod(DifferentiateContext context, Difference.Change<JvmClass, JvmClass.Diff> clsChange, Difference.Change<JvmMethod, JvmMethod.Diff> methodChange, Utils future, Utils present) {
     JvmClass changedClass = clsChange.getPast();
     JvmMethod changedMethod = methodChange.getPast();
-    JvmNodeReferenceID clsId = changedClass.getReferenceID();
 
     if (methodChange.getDiff().valueChanged()) {
-      KmFunction kmFunction = getKmFunction(changedClass, changedMethod);
-      if (kmFunction != null) {
-        debug("Method was inlineable, or has become inlineable or a body of inline method has changed; affecting method usages ", changedMethod);
-        affectLookupUsages(context, flat(asIterable(clsId), future.collectSubclassesWithoutMethod(clsId, changedMethod)), kmFunction.getName(), future, null);
+      String name = getMethodKotlinName(changedClass, changedMethod);
+      debug("Function was inlineable, or has become inlineable or a body of inline method has changed; affecting method usages ", name);
+      affectMemberLookupUsages(context, changedClass, name, future);
+    }
+    return true;
+  }
+
+  @Override
+  public boolean processRemovedMethod(DifferentiateContext context, Difference.Change<JvmClass, JvmClass.Diff> change, JvmMethod removedMethod, Utils future, Utils present) {
+    JvmClass changedClass = change.getPast();
+    KmFunction kmFunction = getKmFunction(changedClass, removedMethod);
+    if (kmFunction != null && Attributes.isInline(kmFunction)) {
+      debug("Function was inlineable, affecting method usages ", kmFunction.getName());
+      affectMemberLookupUsages(context, changedClass, kmFunction.getName(), present);
+    }
+    return true;
+  }
+
+  @Override
+  public boolean processRemovedField(DifferentiateContext context, Difference.Change<JvmClass, JvmClass.Diff> change, JvmField removedField, Utils future, Utils present) {
+    if (!removedField.isPrivate() && removedField.isInlinable() && removedField.getValue() != null) {
+      debug("Field had value and was (non-private) final; affecting usages in Kotlin sources ");
+      JvmClass changedClass = change.getPast();
+      affectLookupUsages(
+        context,
+        flat(asIterable(changedClass.getReferenceID()), present.collectSubclassesWithoutField(changedClass.getReferenceID(), removedField)),
+        removedField.getName(),
+        present,
+        null
+      );
+    }
+
+    return true;
+  }
+
+  @Override
+  public boolean processChangedField(DifferentiateContext context, Difference.Change<JvmClass, JvmClass.Diff> clsChange, Difference.Change<JvmField, JvmField.Diff> fieldChange, Utils future, Utils present) {
+    JvmClass changedClass = clsChange.getPast();
+    JvmField changedField = fieldChange.getPast();
+    if (!changedField.isPrivate() && changedField.isInlinable() && changedField.getValue() != null) { // if the field was a compile-time constant
+      JvmField.Diff diff = fieldChange.getDiff();
+      if (diff.valueChanged() || diff.accessRestricted() || find(List.of(diff.getAddedFlags(), diff.getRemovedFlags()), f -> f.isStatic() || f.isFinal()) != null) {
+        debug("Potentially inlined field changed its access or value; affecting usages in Kotlin sources ");
+        affectLookupUsages(
+          context,
+          flat(asIterable(changedClass.getReferenceID()), present.collectSubclassesWithoutField(changedClass.getReferenceID(), changedField)),
+          changedField.getName(),
+          present,
+          null
+        );
       }
     }
+
     return true;
   }
 
@@ -265,8 +350,19 @@ public final class KotlinAwareJavaDifferentiateStrategy extends JvmDifferentiate
     return !iterator.hasNext();
   }
 
+  private void affectMemberLookupUsages(DifferentiateContext context, JvmClass cls, String name, Utils utils) {
+    affectLookupUsages(context, filter(map(utils.withAllSubclasses(cls.getReferenceID()), id -> id instanceof JvmNodeReferenceID? ((JvmNodeReferenceID)id) : null), Objects::nonNull), name, utils, null);
+  }
+
   private void affectLookupUsages(DifferentiateContext context, Iterable<JvmNodeReferenceID> symbolOwners, String symbolName, Utils utils, @Nullable Predicate<Node<?, ?>> constraint) {
-    affectUsages(context, "lookup '" + symbolName + "'" , symbolOwners, id -> {
+    // since '$' is both a valid bytecode name symbol and inner class name separator, for every class name containing '$' use additional classname with '/'
+    Iterable<JvmNodeReferenceID> owners = filter(flat(symbolOwners, map(symbolOwners, o -> {
+      String original = o.getNodeName();
+      String normalized = original.replace('$', '/'); // inner class names on Kotlin lookups level use '/' separators instead of '$'
+      return normalized.equals(original)? null : new JvmNodeReferenceID(normalized);
+    })), Objects::nonNull);
+
+    affectUsages(context, "lookup '" + symbolName + "'" , owners, id -> {
       String kotlinName = getKotlinName(id, utils);
       return new LookupNameUsage(kotlinName != null ? new JvmNodeReferenceID(kotlinName) : id, symbolName);
     }, constraint);
@@ -280,10 +376,21 @@ public final class KotlinAwareJavaDifferentiateStrategy extends JvmDifferentiate
   private static @Nullable JvmMethod getJvmMethod(JvmClass cls, JvmMethodSignature sig) {
     return sig != null? find(cls.getMethods(), m -> Objects.equals(m.getName(), sig.getName()) && Objects.equals(m.getDescriptor(), sig.getDescriptor())) : null;
   }
+  private static Iterable<JvmMethod> withJvmOverloads(JvmClass cls, JvmMethod method) {
+    return unique(flat(
+      asIterable(method),
+      filter(cls.getMethods(), m -> Objects.equals(m.getName(), method.getName()) && Objects.equals(m.getType(), method.getType()) && find(m.getAnnotations(), a -> JVM_OVERLOADS_ANNOTATION.equals(a.getAnnotationClass())) != null)
+    ));
+  }
 
   private static Iterable<KmFunction> allKmFunctions(Node<?, ?> node) {
     KotlinMeta meta = getKotlinMeta(node);
     return meta != null? meta.getKmFunctions() : Collections.emptyList();
+  }
+
+  private static Iterable<KmProperty> allKmProperties(Node<?, ?> node) {
+    KotlinMeta meta = getKotlinMeta(node);
+    return meta != null? meta.getKmProperties() : Collections.emptyList();
   }
 
   @Nullable
@@ -304,8 +411,29 @@ public final class KotlinAwareJavaDifferentiateStrategy extends JvmDifferentiate
   }
 
   private static String getMethodKotlinName(JvmClass cls, JvmMethod method) {
-    KmFunction kmFunction = getKmFunction(cls, method);
-    return kmFunction != null? kmFunction.getName() : method.getName();
+    JvmMethodSignature sig = new JvmMethodSignature(method.getName(), method.getDescriptor());
+    for (KmFunction f : allKmFunctions(cls)) {
+      if (sig.equals(JvmExtensionsKt.getSignature(f))) {
+        return f.getName();
+      }
+    }
+    for (KmProperty p : allKmProperties(cls)) {
+      JvmMethodSignature getterSig = JvmExtensionsKt.getGetterSignature(p);
+      if (sig.equals(getterSig)) {
+        return getterSig.getName();
+      }
+      if (p.getSetter() != null) {
+        JvmMethodSignature setterSig = JvmExtensionsKt.getSetterSignature(p);
+        if (sig.equals(setterSig)) {
+          return setterSig.getName();
+        }
+      }
+    }
+    return method.getName();
+  }
+
+  private static boolean isDeclaresDefaultValue(KmFunction f) {
+    return find(f.getValueParameters(), Attributes::getDeclaresDefaultValue) != null;
   }
 
   private static KmDeclarationContainer getDeclarationContainer(Node<?, ?> node) {
