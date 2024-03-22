@@ -89,7 +89,7 @@ internal class DocumentationPopupUI(
     gearActions.addAll(primaryActions)
 
     val corner = toolbarComponent(DefaultActionGroup(editSourceAction, gearActions), editorPane).apply {
-      border = JBUI.Borders.empty(0, 0, contentOuterPadding - 3, contentOuterPadding - 3)
+      border = JBUI.Borders.empty(0, 0, contentOuterPadding - 3, 0)
     }
     ui.trackDocumentationBackgroundChange(this) {
       corner.background = it
@@ -193,7 +193,7 @@ internal class DocumentationPopupUI(
     override fun actionPerformed(e: AnActionEvent) {
       val documentationUI = detachUI()
       myPopup.cancel()
-      DocumentationToolWindowManager.instance(project).showInToolWindow(documentationUI)
+      DocumentationToolWindowManager.getInstance(project).showInToolWindow(documentationUI)
     }
   }
 

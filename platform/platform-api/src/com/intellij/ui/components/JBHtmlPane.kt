@@ -1,15 +1,10 @@
 // Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.ui.components
 
-import com.intellij.ide.ui.text.ShortcutsRenderingUtil
 import com.intellij.openapi.Disposable
-import com.intellij.openapi.actionSystem.ActionManager
-import com.intellij.openapi.editor.impl.EditorCssFontResolver
-import com.intellij.openapi.util.text.StringUtil
-import com.intellij.ui.components.JBHtmlPaneStyleSheetRulesProvider.CODE_BLOCK_PREFIX
-import com.intellij.ui.components.JBHtmlPaneStyleSheetRulesProvider.CODE_BLOCK_SUFFIX
-import com.intellij.ui.components.JBHtmlPaneStyleSheetRulesProvider.getStyleSheet
-import com.intellij.util.containers.CollectionFactory
+import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.components.service
+import com.intellij.openapi.editor.colors.EditorColorsScheme
 import com.intellij.util.containers.addAllIfNotNull
 import com.intellij.util.ui.*
 import com.intellij.util.ui.ExtendableHTMLViewFactory.Extensions.icons
@@ -19,6 +14,8 @@ import com.intellij.util.ui.html.cssPadding
 import com.intellij.util.ui.html.width
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import org.jetbrains.annotations.ApiStatus
+import org.jetbrains.annotations.ApiStatus.Experimental
 import org.jetbrains.annotations.Nls
 import java.awt.AWTEvent
 import java.awt.Color
@@ -76,14 +73,15 @@ import javax.swing.text.html.StyleSheet
  * - `<wbr>` - provides optional word breaking location
  * - `<samp>` - show a piece of text in editor font. Similar to `<code>`,
  *     but without any special formatting except for the font.
+ * - `<hr>` - a horizontal line, no shade, with support for colors
  *
  * ### CSS Support
  *
  * Additionally, to CSS properties supported by AWT HTML toolkit, [JBHtmlPane] supports:
- * - `border-radius` through `caption-side` property, e.g.:
+ * - `border-radius`, e.g.:
  *     ```CSS
  *     code {
- *        caption-side /* border-radius */: 8px
+ *        border-radius: 8px
  *     }
  *     ```
  * - `line-height` (`px`, `%`, number), e.g.:
@@ -101,14 +99,21 @@ import javax.swing.text.html.StyleSheet
  *        margin: 0px 2px 1px 2px;
  *     }
  *     ```
+ * - elements with class `editor-color-*` are styled according to the attributes from
+ *   current editor color scheme, e.g.:
+ *     ```HTML
+ *     <span class='editor-color-DEFAULT_CONSTANT'>constant</span>
+ *     ```
  *
  */
+@Experimental
 @Suppress("LeakingThis")
-open class JBHtmlPane(private val myStyleConfiguration: JBHtmlPaneStyleConfiguration,
-                      private val myPaneConfiguration: JBHtmlPaneConfiguration
+open class JBHtmlPane(
+  private val myStyleConfiguration: JBHtmlPaneStyleConfiguration,
+  private val myPaneConfiguration: JBHtmlPaneConfiguration
 ) : JEditorPane(), Disposable {
 
-
+  private val service: ImplService = ApplicationManager.getApplication().service()
   private var myText: @Nls String = "" // getText() surprisingly crashes…, let's cache the text
   private var myCurrentDefaultStyleSheet: StyleSheet? = null
   private val mutableBackgroundFlow: MutableStateFlow<Color>
@@ -137,13 +142,13 @@ open class JBHtmlPane(private val myStyleConfiguration: JBHtmlPaneStyleConfigura
       ExtendableHTMLViewFactory.Extensions.WBR_SUPPORT,
       ExtendableHTMLViewFactory.Extensions.HIDPI_IMAGES.takeIf {
         !myPaneConfiguration.extensions.contains(ExtendableHTMLViewFactory.Extensions.FIT_TO_WIDTH_IMAGES)
-      }
+      },
+      ExtendableHTMLViewFactory.Extensions.BLOCK_HR_SUPPORT
     )
 
     val editorKit = HTMLEditorKitBuilder()
       .replaceViewFactoryExtensions(*extensions.toTypedArray())
-      .withViewFactoryExtensions()
-      .withFontResolver(myPaneConfiguration.fontResolver ?: EditorCssFontResolver.getGlobalInstance())
+      .withFontResolver(myPaneConfiguration.fontResolver ?: service.defaultEditorCssFontResolver())
       .build()
     updateDocumentationPaneDefaultCssRules(editorKit)
 
@@ -168,7 +173,7 @@ open class JBHtmlPane(private val myStyleConfiguration: JBHtmlPaneStyleConfigura
   }
 
   override fun setText(t: @Nls String?) {
-    myText = t?.let { HtmlEditorPaneInputTranspiler(it).process() } ?: ""
+    myText = t?.let { service.transpileHtmlPaneInput(it) } ?: ""
     super.setText(myText)
   }
 
@@ -186,9 +191,10 @@ open class JBHtmlPane(private val myStyleConfiguration: JBHtmlPaneStyleConfigura
     val newStyleSheet = StyleSheet()
       .also { myCurrentDefaultStyleSheet = it }
     val background = background
-    newStyleSheet.addStyleSheet(getStyleSheet(background, myStyleConfiguration))
-    for (styleSheet in myPaneConfiguration.additionalStyleSheetProvider(background)) {
-      newStyleSheet.addStyleSheet(styleSheet)
+    newStyleSheet.addStyleSheet(service.getDefaultStyleSheet(background, myStyleConfiguration))
+    newStyleSheet.addStyleSheet(service.getEditorColorsSchemeStyleSheet(myStyleConfiguration.colorScheme))
+    myPaneConfiguration.customStyleSheetProviders.forEach {
+      newStyleSheet.addStyleSheet(it(background))
     }
     editorStyleSheet.addStyleSheet(newStyleSheet)
   }
@@ -244,355 +250,17 @@ open class JBHtmlPane(private val myStyleConfiguration: JBHtmlPaneStyleConfigura
     return null
   }
 
-  /**
-   * Transpiler performs some simple lexing to understand where are tags, attributes and text.
-   *
-   * For performance reasons, all the following actions are applied in a single run:
-   * - Add `<wbr>` after `.` if surrounded by letters
-   * - Add `<wbr>` after `]`, `)` or `/` followed by a char or digit
-   * - Remove empty <p> before some tags - workaround for Swing html renderer not removing empty paragraphs before non-inline tags
-   * - Replace `<blockquote>\\s*<pre>` with [JBHtmlPaneStyleSheetRulesProvider.CODE_BLOCK_PREFIX]
-   * - Replace `</pre>\\s*</blockquote>` with [JBHtmlPaneStyleSheetRulesProvider.CODE_BLOCK_SUFFIX]
-   * - Replace `<pre><code>` with [JBHtmlPaneStyleSheetRulesProvider.CODE_BLOCK_PREFIX]
-   * - Replace `</code></pre>` with [JBHtmlPaneStyleSheetRulesProvider.CODE_BLOCK_SUFFIX]
-   * - Expand `<shortcut raw|actionId="*"/>` tag into a sequence of `<kbd>` tags
-   */
-  private class HtmlEditorPaneInputTranspiler(@Nls text: String) {
-    private val codePoints = text.codePoints().iterator()
-    private val result = StringBuilder(text.length + 50)
-    private var codePoint = codePoints.nextInt()
-    private var openingTag = false
-    private val tagStart = StringBuilder()
-    private val tagName = StringBuilder()
-    private val tagBuffer = StringBuilder()
+  @ApiStatus.Internal
+  interface ImplService {
 
-    @Nls
-    fun process(): String {
-      if (!codePoints.hasNext()) return ""
+    fun transpileHtmlPaneInput(text: @Nls String): @Nls String
 
+    fun defaultEditorCssFontResolver(): CSSFontResolver
 
-      while (codePoint >= 0) {
-        when {
-          // break after dot if surrounded by letters
-          Character.isLetter(codePoint) -> {
-            next()
-            if (codePoint == '.'.code) {
-              next()
-              if (Character.isLetter(codePoint)) {
-                result.append("<wbr>")
-              }
-            }
-          }
-          // break after ], ) or / followed by a char or digit
-          codePoint == ')'.code || codePoint == ']'.code || codePoint == '/'.code -> {
-            next()
-            if (Character.isLetterOrDigit(codePoint)) {
-              result.append("<wbr>")
-            }
-          }
-          // process tags
-          codePoint == '<'.code -> {
-            readTagStart()
-            if (tagName.isEmpty()) {
-              result.append(tagStart)
-              continue
-            }
-            if (tagName.contentEquals("style", true)
-                || tagName.contentEquals("title", true)
-                || tagName.contentEquals("script", true)
-                || tagName.contentEquals("textarea", true)) {
-              result.append(tagStart)
-              skipUntilTagClose(tagName.toString(), result)
-            }
-            else
-              handleTag()
-          }
-          else -> next()
-        }
-      }
+    fun getDefaultStyleSheet(paneBackgroundColor: Color, configuration: JBHtmlPaneStyleConfiguration): StyleSheet
 
-      @Suppress("HardCodedStringLiteral")
-      return result.toString()
-    }
-
-    private fun next(builder: StringBuilder = result) {
-      builder.appendCodePoint(codePoint)
-      codePoint = if (codePoints.hasNext())
-        codePoints.nextInt()
-      else
-        -1
-    }
-
-    private fun skipUntilTagClose(curTag: String, builder: StringBuilder) {
-      do {
-        if (codePoint == '<'.code) {
-          readTagStart()
-          builder.append(tagStart)
-          if (tagName.contentEquals(curTag, true) && !openingTag) {
-            skipUntil(">", builder)
-            break
-          }
-        }
-        else next(builder)
-      }
-      while (codePoint >= 0)
-    }
-
-    private fun readTagStart() {
-      assert(codePoint == '<'.code)
-      tagStart.clear()
-      tagName.clear()
-      next(tagStart)
-      if (codePoint == '/'.code) {
-        openingTag = false
-        next(tagStart)
-      }
-      else if (codePoint == '!'.code) {
-        next(tagStart)
-        if (consume("--", tagStart)) {
-          skipUntil("->", tagStart)
-        }
-      }
-      else {
-        openingTag = true
-      }
-      if (!Character.isLetter(codePoint))
-        return
-      while (Character.isLetterOrDigit(codePoint) || codePoint == '-'.code) {
-        next(tagName)
-      }
-      tagStart.append(tagName)
-    }
-
-    private fun consume(text: String, builder: StringBuilder): Boolean {
-      for (c in text) {
-        if (codePoint != c.code) return false
-        next(builder)
-      }
-      return true
-    }
-
-    private fun skipUntil(text: String, builder: StringBuilder) {
-      loop@ while (codePoint >= 0) {
-        for (i in text.indices) {
-          val c = text[i]
-          if (codePoint != c.code) {
-            if (i == 0) next(builder)
-            continue@loop
-          }
-          next(builder)
-        }
-        return
-      }
-    }
-
-    private fun skipToTagEnd(builder: StringBuilder) {
-      while (codePoint >= 0) {
-        when (codePoint) {
-          '/'.code -> {
-            openingTag = false
-            next(builder)
-          }
-          '>'.code -> {
-            next(builder)
-            break
-          }
-          '\''.code, '"'.code -> {
-            val quoteStyle = codePoint
-            next(builder)
-            while (codePoint >= 0) {
-              when (codePoint) {
-                '\\'.code -> {
-                  next(builder)
-                  if (codePoint >= 0)
-                    next(builder)
-                }
-                quoteStyle -> {
-                  next(builder)
-                  break
-                }
-                else -> next(builder)
-              }
-            }
-          }
-          else -> next(builder)
-        }
-      }
-    }
-
-    private fun readAttributes(builder: StringBuilder): Map<String, String> {
-      val result = mutableMapOf<String, String>()
-      var attributeName: String? = null
-      var nextIsValue = false
-      val text = StringBuilder()
-      while (codePoint >= 0) {
-        when (codePoint) {
-          '/'.code -> {
-            openingTag = false
-            next(builder)
-          }
-          '>'.code -> {
-            if (text.isNotEmpty()) {
-              builder.append(text)
-              result[text.toString()] = text.toString()
-            }
-            else if (attributeName != null) {
-              result[attributeName] = attributeName
-            }
-            next(builder)
-            break
-          }
-          '\''.code, '"'.code -> {
-            val quoteStyle = codePoint
-            next(builder)
-            while (codePoint >= 0) {
-              when (codePoint) {
-                '\\'.code -> {
-                  next(text)
-                  if (codePoint >= 0)
-                    next(text)
-                }
-                quoteStyle -> {
-                  builder.append(text)
-                  next(builder)
-                  break
-                }
-                else -> next(text)
-              }
-            }
-            if (nextIsValue) {
-              result[attributeName!!] = text.toString()
-              attributeName = null
-              nextIsValue = false
-            }
-            text.clear()
-          }
-          else -> if (codePoint == '='.code || Character.isWhitespace(codePoint)) {
-            if (text.isNotEmpty()) {
-              if (codePoint != '='.code && nextIsValue) {
-                result[attributeName!!] = text.toString()
-                attributeName = null
-              }
-              else {
-                attributeName = StringUtil.toLowerCase(text.toString())
-              }
-              builder.append(text)
-              text.clear()
-            }
-            nextIsValue = codePoint == '='.code && !attributeName.isNullOrEmpty()
-            next(builder)
-          }
-          else
-            next(text)
-        }
-      }
-      return result
-    }
-
-    private fun handleTag() {
-      val isOpeningTag = openingTag
-      if (isOpeningTag && tagName.contentEquals("shortcut", true)) {
-        handleShortcutTag()
-        return
-      }
-      val isP = tagName.contentEquals("p", true)
-      val isPre = tagName.contentEquals("pre", true)
-      val isCode = tagName.contentEquals("code", true)
-      val isBlockquote = tagName.contentEquals("blockquote", true)
-      if (!isP && !isPre && !(isCode && !isOpeningTag) && !(isBlockquote && isOpeningTag)) {
-        result.append(tagStart)
-        skipToTagEnd(result)
-        return
-      }
-
-      tagBuffer.clear()
-      tagBuffer.append(tagStart)
-      skipToTagEnd(tagBuffer)
-      if (isP || isBlockquote || (isPre && !isOpeningTag)) {
-        // Skip whitespace
-        while (codePoint >= 0 && Character.isWhitespace(codePoint)) {
-          next(tagBuffer)
-        }
-      }
-      if (codePoint == '<'.code) {
-        readTagStart()
-        if (isP) {
-          // Remove empty <p> before some tags - workaround for Swing html renderer not removing empty paragraphs before non-inline tags
-          if (tagName !in dropPrecedingEmptyParagraphTags) {
-            result.append(tagBuffer)
-          }
-          handleTag()
-        }
-        else {
-          // Replace <blockquote>\\s*<pre> with JBHtmlPaneStyleSheetRulesProvider.CODE_BLOCK_PREFIX
-          // Replace </pre>\\s*</blockquote> with JBHtmlPaneStyleSheetRulesProvider.CODE_BLOCK_SUFFIX
-          // Replace <pre><code> with JBHtmlPaneStyleSheetRulesProvider.CODE_BLOCK_PREFIX
-          // Replace </code></pre> with JBHtmlPaneStyleSheetRulesProvider.CODE_BLOCK_SUFFIX
-          val nextTag = if (isPre) {
-            if (isOpeningTag) "code" else "blockquote"
-          }
-          else "pre"
-          if (tagName.contentEquals(nextTag, true) && (isOpeningTag == openingTag)) {
-            skipToTagEnd(tagBuffer)
-            if (isCode || (isPre && !isOpeningTag)) {
-              // trim trailing whitespace
-              result.setLength(result.indexOfLast { !Character.isWhitespace(it) } + 1)
-            }
-            result.append(if (isOpeningTag) CODE_BLOCK_PREFIX else CODE_BLOCK_SUFFIX)
-          }
-          else {
-            result.append(tagBuffer)
-            handleTag()
-          }
-        }
-      }
-      else {
-        result.append(tagBuffer)
-      }
-    }
-
-    private fun handleShortcutTag() {
-      tagBuffer.clear()
-      tagBuffer.append(tagStart)
-      val attributes = readAttributes(tagBuffer)
-      val actionId = attributes["actionid"]
-      val raw = attributes["raw"]
-
-      if (openingTag)
-        skipUntilTagClose("shortcut", tagBuffer)
-
-      if (actionId != null || raw != null) {
-        val shortcutData =
-          if (actionId != null)
-            ShortcutsRenderingUtil.getShortcutByActionId(actionId)
-              ?.let { ShortcutsRenderingUtil.getKeyboardShortcutData(it) }?.first
-            ?: ShortcutsRenderingUtil.getGotoActionData(actionId, false)
-              .takeIf { ActionManager.getInstance().getAction(actionId) != null }
-              ?.first
-          else
-            KeyStroke.getKeyStroke(raw)
-              ?.let { ShortcutsRenderingUtil.getKeyStrokeData(it) }
-              ?.first
-        if (shortcutData != null) {
-          shortcutData
-            .splitToSequence(ShortcutsRenderingUtil.SHORTCUT_PART_SEPARATOR)
-            .joinToString(StringUtil.NON_BREAK_SPACE) { "<kbd>$it</kbd>" }
-            .let(result::append)
-        }
-        else {
-          result.append("<kbd>${actionId ?: raw}</kbd>")
-        }
-      }
-      else {
-        result.append(tagBuffer)
-      }
-    }
+    fun getEditorColorsSchemeStyleSheet(editorColorsScheme: EditorColorsScheme): StyleSheet
 
   }
 
-  companion object {
-    private val dropPrecedingEmptyParagraphTags = CollectionFactory.createCharSequenceSet(false).also {
-      it.addAll(listOf("ul", "ol", "h1", "h2", "h3", "h4", "h5", "h6", "p", "tr", "td"))
-    }
-  }
 }

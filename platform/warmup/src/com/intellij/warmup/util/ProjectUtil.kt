@@ -22,15 +22,24 @@ import com.intellij.openapi.roots.ProjectRootManager
 import com.intellij.openapi.util.registry.Registry
 import com.intellij.openapi.vfs.VfsUtil
 import com.intellij.openapi.vfs.VirtualFileManager
-import com.intellij.platform.backend.observation.Observation
 import com.intellij.platform.util.progress.reportProgress
 import com.intellij.util.asSafely
+import com.intellij.util.awaitCompleteProjectConfiguration
 import com.intellij.util.indexing.FileBasedIndex
 import com.intellij.util.indexing.FileBasedIndexImpl
 import com.intellij.warmup.impl.WarmupConfiguratorOfCLIConfigurator
 import com.intellij.warmup.impl.getCommandLineReporter
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.job
+import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.withContext
 import java.nio.file.Path
 import java.util.*
@@ -60,6 +69,47 @@ private suspend fun importOrOpenProjectImpl0(args: OpenProjectArgs): Project {
     return importOrOpenProjectImpl(args)
   } finally {
     WarmupStatus.statusChanged(ApplicationManager.getApplication(), currentStatus)
+  }
+}
+
+val abortFlow : MutableStateFlow<String?> = MutableStateFlow(null)
+
+fun CoroutineScope.getFailureDeferred() : Deferred<String> {
+  return async {
+    while (coroutineContext.job.isActive) {
+      val message = abortFlow.value
+      if (message != null) {
+        return@async message
+      }
+      delay(500)
+    }
+    error("unreachable")
+  }
+}
+
+fun CoroutineScope.getConfigurationDeferred(project : Project) : Deferred<Unit> {
+  return async(start = CoroutineStart.UNDISPATCHED) {
+    withLoggingProgressReporter {
+      project.awaitCompleteProjectConfiguration(WarmupLogger::logInfo)
+    }
+  }
+}
+
+fun CoroutineScope.awaitProjectConfigurationOrFail(project : Project) : Deferred<String?> {
+  val abortDeferred = getFailureDeferred()
+  val deferredConfiguration = getConfigurationDeferred(project)
+
+  return async {
+    select<String?> {
+      deferredConfiguration.onAwait {
+        abortDeferred.cancel()
+        null
+      }
+      abortDeferred.onAwait { it ->
+        deferredConfiguration.cancel()
+        it
+      }
+    }
   }
 }
 
@@ -98,16 +148,17 @@ private suspend fun importOrOpenProjectImpl(args: OpenProjectArgs): Project {
   }
 
   if (isPredicateBasedWarmup()) {
-    runTaskAndLogTime("awaiting completion predicates") {
-      withLoggingProgressReporter {
-        Observation.awaitConfiguration(project, WarmupLogger::logInfo)
-      }
+    val configurationError = runTaskAndLogTime("awaiting completion predicates") {
+      val configurationError = awaitProjectConfigurationOrFail(project).await()
       dumpThreadsAfterConfiguration()
+      configurationError
+    }
+    if (configurationError != null) {
+      WarmupLogger.logError("Project configuration has failed: $configurationError")
+      throw RuntimeException(configurationError)
     }
   }
 
-
-  yieldAndWaitForDumbModeEnd(project)
 
   if (!isPredicateBasedWarmup()) {
     callProjectConfigurators(args) {

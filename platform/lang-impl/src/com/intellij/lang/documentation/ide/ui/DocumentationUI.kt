@@ -93,13 +93,15 @@ internal class DocumentationUI(
       iconTextGap = 6
       border = JBUI.Borders.empty(
         DocumentationHtmlUtil.spaceBeforeParagraph,
-        2 + DocumentationHtmlUtil.contentOuterPadding + DocumentationHtmlUtil.contentInnerPadding,
+        DocumentationHtmlUtil.contentOuterPadding + DocumentationHtmlUtil.contentInnerPadding,
         2 + DocumentationHtmlUtil.contentOuterPadding, DocumentationHtmlUtil.contentOuterPadding)
       putClientProperty(SwingTextTrimmer.KEY, textTrimmer)
     }
     scrollPane.setViewportView(editorPane, locationLabel)
     trackDocumentationBackgroundChange(this) {
-      scrollPane.viewport.background = it
+      // Force update of the background color for scroll pane
+      @Suppress("UseJBColor")
+      scrollPane.viewport.background = Color(it.rgb)
       locationLabel.background = it
       switcherToolbarComponent.background = it
     }
@@ -197,7 +199,9 @@ internal class DocumentationUI(
   fun updateSwitcherVisibility() {
     val visible = switcher.elements.count() > 1
     switcherToolbarComponent.isVisible = visible
-    scrollPane.border = JBUI.Borders.emptyTop(if (visible) 0 else DocumentationHtmlUtil.contentOuterPadding - DocumentationHtmlUtil.spaceBeforeParagraph)
+    editorPane.border = JBUI.Borders.emptyTop(
+      if (visible) 0 else DocumentationHtmlUtil.contentOuterPadding - DocumentationHtmlUtil.spaceBeforeParagraph
+    )
   }
 
   private suspend fun handleContent(presentation: TargetPresentation, pageContent: DocumentationPageContent?) {

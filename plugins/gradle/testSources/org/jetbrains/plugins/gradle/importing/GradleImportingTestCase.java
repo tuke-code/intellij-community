@@ -1,4 +1,4 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.plugins.gradle.importing;
 
 import com.intellij.compiler.CompilerTestUtil;
@@ -107,7 +107,7 @@ public abstract class GradleImportingTestCase extends JavaExternalSystemImportin
   private int deprecationTextLineCount = 0;
 
   @Override
-  public void setUp() throws Exception {
+  protected void setUp() throws Exception {
     assumeThat(gradleVersion, versionMatcherRule.getMatcher());
     myProjectSettings = new GradleProjectSettings().withQualifiedModuleNames();
 
@@ -380,8 +380,9 @@ public abstract class GradleImportingTestCase extends JavaExternalSystemImportin
 
   @Override
   protected void printOutput(@NotNull String text, boolean stdOut) {
-    if (text.contains("This is scheduled to be removed in Gradle")) {
-      deprecationTextLineCount = 15;
+    if (text.contains("This is scheduled to be removed in Gradle")
+    || text.contains("Deprecated Gradle features were used in this build")) {
+      deprecationTextLineCount = 30;
     }
     if (deprecationTextLineCount > 0) {
       deprecationTextBuilder.append(text);
@@ -474,6 +475,20 @@ public abstract class GradleImportingTestCase extends JavaExternalSystemImportin
     return createProjectSubFile("settings.gradle", content);
   }
 
+  /**
+   * Produces settings content and creates necessary directories.
+   * @param projects list of sub-project to create
+   * @return a block of `include 'project-name'` lines for settings.gradle
+   */
+  protected String including(@NonNls String... projects) {
+    return including(myProjectRoot, projects);
+  }
+
+  protected String including(VirtualFile root, @NonNls String... projects) {
+    return new TestGradleSettingsScriptHelper(root.toNioPath(), projects).build();
+  }
+
+
   private PathAssembler.LocalDistribution configureWrapper() {
 
     myProjectSettings.setDistributionType(DistributionType.DEFAULT_WRAPPED);
@@ -516,26 +531,8 @@ public abstract class GradleImportingTestCase extends JavaExternalSystemImportin
     return GradleVersionUtil.isGradleOlderThan(getCurrentGradleBaseVersion(), ver);
   }
 
-  /**
-   * @deprecated See {@link GradleVersionUtil#isCurrentGradleNewerThan} for details
-   */
-  @Deprecated
-  @SuppressWarnings("DeprecatedIsStillUsed")
-  protected boolean isGradleOlderOrSameAs(@NotNull String ver) {
-    return GradleVersionUtil.isGradleOlderOrSameAs(getCurrentGradleBaseVersion(), ver);
-  }
-
   protected boolean isGradleAtLeast(@NotNull String ver) {
     return GradleVersionUtil.isGradleAtLeast(getCurrentGradleBaseVersion(), ver);
-  }
-
-  /**
-   * @deprecated See {@link GradleVersionUtil#isCurrentGradleNewerThan} for details
-   */
-  @Deprecated
-  @SuppressWarnings("DeprecatedIsStillUsed")
-  protected boolean isGradleNewerThan(@NotNull String ver) {
-    return GradleVersionUtil.isGradleNewerThan(getCurrentGradleBaseVersion(), ver);
   }
 
   protected void enableGradleDebugWithSuspend() {

@@ -491,6 +491,10 @@ fun <T : CommandChain> T.renameFile(path: String, oldFileName: String, newFileNa
   addCommand("${CMD_PREFIX}renameFile ${path}, ${oldFileName}, ${newFileName}")
 }
 
+fun <T : CommandChain> T.requestHeavyScanningOnNextStart(): T = apply {
+  addCommand("${CMD_PREFIX}requestHeavyScanningOnNextStart")
+}
+
 fun <T : CommandChain> T.call(method: KFunction<String?>, vararg args: String): T = apply {
   val javaMethod = method.javaMethod ?: error("Failed to resolve Java Method from the declaration")
   require(Modifier.isStatic(javaMethod.modifiers)) { "Method $method must be static" }
@@ -564,6 +568,10 @@ fun <T : CommandChain> T.setModuleJdk(moduleName: String, jdk: SdkObject): T {
   return this
 }
 
+fun <T : CommandChain> T.addModuleContentRoot(moduleName: String, contentRootPath: String): T = apply {
+  addCommand("${CMD_PREFIX}addContentRootToModule $moduleName,$contentRootPath")
+}
+
 fun <T : CommandChain> T.toggleMavenProfiles(profileIds: Set<String>, enable: Boolean = true): T = apply {
   addCommand("${CMD_PREFIX}toggleMavenProfiles ${profileIds.joinToString(",")} $enable")
 }
@@ -574,6 +582,10 @@ fun <T : CommandChain> T.linkMavenProject(projectPath: Path): T = apply {
 
 fun <T : CommandChain> T.linkGradleProject(projectPath: Path): T = apply {
   addCommand("${CMD_PREFIX}linkGradleProject ${projectPath}")
+}
+
+fun <T : CommandChain> T.refreshProject(): T = apply {
+  addCommand("${CMD_PREFIX}refreshProject")
 }
 
 fun <T : CommandChain> T.setGradleDelegatedBuildCommand(delegatedBuild: Boolean = true,
@@ -600,6 +612,11 @@ fun <T : CommandChain> T.downloadMavenArtifacts(sources: Boolean = true, docs: B
 fun <T : CommandChain> T.createMavenProject(newMavenProjectDto: NewMavenProjectDto): T = apply {
   val options = objectMapper.writeValueAsString(newMavenProjectDto)
   addCommand("${CMD_PREFIX}createMavenProject $options")
+}
+
+fun <T : CommandChain> T.createGradleProject(newGradleProjectDto: NewGradleProjectDto): T = apply {
+  val options = objectMapper.writeValueAsString(newGradleProjectDto)
+  addCommand("${CMD_PREFIX}createGradleProject $options")
 }
 
 fun <T : CommandChain> T.updateMavenGoal(settings: MavenGoalConfigurationDto): T = apply {
@@ -655,6 +672,12 @@ fun <T : CommandChain> T.assertOpenedFileInRoot(path: String): T = apply {
 
 fun <T : CommandChain> T.importGradleProject(): T = apply {
   addCommand("${CMD_PREFIX}importGradleProject")
+}
+
+fun <T : CommandChain> T.executeGradleTask(taskInfo: GradleTaskInfoDto): T {
+  val options = objectMapper.writeValueAsString(taskInfo)
+  addCommand("${CMD_PREFIX}executeGradleTask $options")
+  return this
 }
 
 fun <T : CommandChain> T.setBuildToolsAutoReloadType(type: BuildToolsAutoReloadType): T = apply {
@@ -997,4 +1020,8 @@ fun <T : CommandChain> T.repeatCommand(times: Int, commandChain: (CommandChain) 
 fun <T : CommandChain> T.createScratchFile(filename: String, content: String): T = apply {
   val modifiedContent = content.replace("\n", "\\n").replace(" ", "_")
   addCommand("${CMD_PREFIX}createScratchFile $filename $modifiedContent")
+}
+
+fun <T : CommandChain> T.disableKotlinNotification(): T = apply {
+  addCommand("${CMD_PREFIX}disableKotlinNotification")
 }

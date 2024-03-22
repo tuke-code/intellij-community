@@ -1,10 +1,8 @@
-// Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.ide.navbar.ui
 
 import com.intellij.icons.AllIcons
 import com.intellij.icons.ExpUiIcons
-import com.intellij.ide.navbar.NavBarItemPresentation
-import com.intellij.ide.navbar.vm.NavBarItemVm
 import com.intellij.ide.navigationToolbar.ui.AbstractNavBarUI
 import com.intellij.ide.navigationToolbar.ui.AbstractNavBarUI.getDecorationOffset
 import com.intellij.ide.navigationToolbar.ui.AbstractNavBarUI.getFirstElementLeftOffset
@@ -16,6 +14,8 @@ import com.intellij.openapi.application.EDT
 import com.intellij.openapi.util.SystemInfo
 import com.intellij.openapi.util.registry.Registry
 import com.intellij.openapi.wm.IdeFocusManager
+import com.intellij.platform.navbar.NavBarItemPresentation
+import com.intellij.platform.navbar.vm.NavBarItemVm
 import com.intellij.ui.*
 import com.intellij.ui.scale.JBUIScale
 import com.intellij.ui.scale.ScaleContext
@@ -42,10 +42,14 @@ import javax.swing.Icon
 import javax.swing.JComponent
 import javax.swing.UIManager
 
+/**
+ * @param installPopupHandler Disables popup which appears on right click containing nav bar actions
+ */
 internal class NavBarItemComponent(
   cs: CoroutineScope,
   private val vm: NavBarItemVm,
   private val panel: NewNavBarPanel,
+  installPopupHandler: Boolean = true
 ) : SimpleColoredComponent() {
 
   init {
@@ -78,7 +82,10 @@ internal class NavBarItemComponent(
       }
     }
 
-    addMouseListener(ItemPopupHandler())
+    if (installPopupHandler) {
+      addMouseListener(ItemPopupHandler())
+    }
+
     addMouseListener(ItemMouseListener())
   }
 

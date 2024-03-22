@@ -1545,7 +1545,7 @@ public class CodeInsightTestFixtureImpl extends BaseFixture implements CodeInsig
   public VirtualFile createFile(@NotNull String fileName, @NotNull String text) {
     assertInitialized();
     try {
-      return WriteCommandAction.writeCommandAction(getProject()).compute(() -> {
+      VirtualFile createdFile = WriteCommandAction.writeCommandAction(getProject()).compute(() -> {
         VirtualFile file;
         if (myTempDirFixture instanceof LightTempDirTestFixtureImpl) {
           VirtualFile root = LightPlatformTestCase.getSourceRoot();
@@ -1574,6 +1574,9 @@ public class CodeInsightTestFixtureImpl extends BaseFixture implements CodeInsig
         VfsUtil.saveText(file, text);
         return file;
       });
+
+      IndexingTestUtil.waitUntilIndexesAreReady(getProject());
+      return createdFile;
     }
     catch (IOException e) {
       throw new RuntimeException(e);
@@ -1654,6 +1657,7 @@ public class CodeInsightTestFixtureImpl extends BaseFixture implements CodeInsig
       }
       PsiDocumentManager.getInstance(getProject()).commitAllDocuments();
 
+      IndexingTestUtil.waitUntilIndexesAreReady(getProject());
       if (caresAboutInjection) {
         setupEditorForInjectedLanguage();
       }
@@ -1663,8 +1667,6 @@ public class CodeInsightTestFixtureImpl extends BaseFixture implements CodeInsig
         policy.testFileConfigured(getFile());
       }
     });
-
-    IndexingTestUtil.waitUntilIndexesAreReady(getProject());
 
     return getFile();
   }

@@ -9,6 +9,11 @@
                     beanClass="com.intellij.lang.LanguageExtensionPoint">
       <with attribute="implementationClass" implements="com.intellij.codeInspection.sourceToSink.SourceToSinkProvider"/>
     </extensionPoint>
+    <extensionPoint qualifiedName="com.intellij.codeInspection.customLoggingStatementNotGuardedByLogFix"
+                    dynamic="true"
+                    beanClass="com.intellij.lang.LanguageExtensionPoint">
+      <with attribute="implementationClass" implements="com.intellij.codeInspection.logging.LoggingStatementNotGuardedByLogCustomFix"/>
+    </extensionPoint>
   </extensionPoints>
   <extensions defaultExtensionNs="com.intellij">
     <!--Test frameworks-->
@@ -51,6 +56,11 @@
                      implementationClass="com.intellij.codeInspection.test.TestInProductSourceInspection"/>
     <inspectionElementsMerger implementation="com.intellij.codeInspection.test.TestInProductSourceInspectionMerger"/>
 
+    <!--deadCode-->
+    <implicitUsageProvider implementation="com.intellij.codeInspection.deadCode.AssertJImplicitUsageProvider"/>
+    <implicitUsageProvider implementation="com.intellij.codeInspection.deadCode.MockitoImplicitUsageProvider"/>
+    <implicitUsageProvider implementation="com.intellij.codeInspection.deadCode.EasyMockImplicitUsageProvider"/>
+
     <!--logging-->
     <localInspection language="UAST" enabledByDefault="true" level="WARNING" shortName="LoggingStringTemplateAsArgument"
                      groupBundle="messages.JvmAnalysisBundle" bundle="messages.JvmAnalysisBundle"
@@ -76,6 +86,18 @@
                      implementationClass="com.intellij.codeInspection.logging.LoggingSimilarMessageInspection"
                      runForWholeFile="true"
     />
+    <localInspection language="UAST" enabledByDefault="true" level="INFORMATION" shortName="LogStatementNotGuardedByLogCondition"
+                     groupBundle="messages.JvmAnalysisBundle" bundle="messages.JvmAnalysisBundle"
+                     groupPathKey="jvm.inspections.group.name" groupKey="jvm.inspections.logging.frameworks.group.name"
+                     key="jvm.inspection.log.statement.not.guarded.display.name"
+                     implementationClass="com.intellij.codeInspection.logging.LoggingStatementNotGuardedByLogConditionInspection"/>
+    <inspectionElementsMerger implementation="com.intellij.codeInspection.logging.LoggingStatementNotGuardedByLogConditionInspectionMerger"/>
+
+    <localInspection language="UAST" enabledByDefault="true" level="INFORMATION"
+                     groupBundle="messages.JvmAnalysisBundle" bundle="messages.JvmAnalysisBundle"
+                     groupPathKey="jvm.inspections.group.name" groupKey="jvm.inspections.logging.frameworks.group.name"
+                     key="jvm.inspection.log.guarded.display.name"
+                     implementationClass="com.intellij.codeInspection.logging.LoggingGuardedByConditionInspection"/>
 
     <!-- Performance -->
     <localInspection language="UAST" enabledByDefault="true" level="WARNING" shortName="UrlHashCode"
@@ -164,6 +186,15 @@
 
     <inspectionCustomComponent implementation="com.intellij.codeInsight.options.JavaInspectionButtons"/>
 
+    <psi.symbolReferenceProvider
+      hostElementClass="com.intellij.model.psi.PsiExternalReferenceHost"
+      hostLanguage="UAST"
+      implementationClass="com.intellij.analysis.logging.resolve.JvmLoggerSymbolReferenceProvider"
+      targetClass="com.intellij.analysis.logging.resolve.LoggingArgumentSymbol"/>
+
+    <searcher forClass="com.intellij.find.usages.api.UsageSearchParameters"
+              implementationClass="com.intellij.analysis.logging.resolve.LoggingArgumentUsageSearcher"/>
+
     <!--console filter-->
     <colorSettingsPage implementation="com.intellij.analysis.customization.console.ClassFinderConsoleColorsPage"/>
     <consoleFilterProvider implementation="com.intellij.analysis.customization.console.ClassLoggingConsoleFilterProvider"/>
@@ -175,6 +206,9 @@
   </extensions>
   <extensions defaultExtensionNs="com.intellij.codeInspection">
     <sourceToSinkProvider language="JAVA" implementationClass="com.intellij.codeInspection.sourceToSink.JavaSourceToSinkProvider"/>
+  </extensions>
+  <extensions defaultExtensionNs="com.intellij.codeInspection">
+    <customLoggingStatementNotGuardedByLogFix language="JAVA" implementationClass="com.intellij.codeInspection.logging.JavaLoggingStatementNotGuardedByLogCustomFix"/>
   </extensions>
   <actions>
     <group id="UastInternal" text="UAST" internal="true" popup="true">

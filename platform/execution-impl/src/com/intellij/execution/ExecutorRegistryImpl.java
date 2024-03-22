@@ -1,4 +1,4 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.execution;
 
 import com.intellij.execution.actions.*;
@@ -34,6 +34,7 @@ import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.project.DumbAware;
 import com.intellij.openapi.project.DumbService;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.startup.StartupManager;
 import com.intellij.openapi.ui.popup.IPopupChooserBuilder;
 import com.intellij.openapi.ui.popup.JBPopupFactory;
 import com.intellij.openapi.util.Key;
@@ -74,6 +75,7 @@ public final class ExecutorRegistryImpl extends ExecutorRegistry {
   public static final String RUNNERS_GROUP = "RunnerActions";
   public static final String RUN_CONTEXT_GROUP = "RunContextGroupInner";
   public static final String RUN_CONTEXT_GROUP_MORE = "RunContextGroupMore";
+  public static final String RUN_CONTEXT_EXECUTORS_GROUP = "RunContextExecutorsGroup";
 
   private static final Key<SpinningProgressIcon> spinningIconKey = Key.create("spinning-icon-key");
 
@@ -121,7 +123,11 @@ public final class ExecutorRegistryImpl extends ExecutorRegistry {
     AnAction runContextAction;
     AnAction runNonExistingContextAction;
     if (executor instanceof ExecutorGroup<?> executorGroup) {
-      ActionGroup toolbarActionGroup = new SplitButtonAction(new ExecutorGroupActionGroup(executorGroup, ExecutorAction::new));
+      String delegateId = executor.getId() + "_delegate";
+      ExecutorGroupActionGroup actionGroup = new ExecutorGroupActionGroup(executorGroup, ExecutorAction::new);
+      registerAction(actionRegistrar, delegateId, actionGroup, idToAction);
+
+      ActionGroup toolbarActionGroup = new SplitButtonAction(actionGroup);
       Presentation presentation = toolbarActionGroup.getTemplatePresentation();
       presentation.setIconSupplier(executor::getIcon);
       presentation.setText(executor.getStartActionText());
@@ -136,14 +142,12 @@ public final class ExecutorRegistryImpl extends ExecutorRegistry {
       runNonExistingContextAction = new RunNewConfigurationContextAction(executor);
     }
 
-    Executor.ActionWrapper customizer = executor.runnerActionsGroupExecutorActionCustomizer();
-    registerActionInGroup(actionRegistrar, executor.getId(), customizer == null ? toolbarAction : customizer.wrap(toolbarAction), RUNNERS_GROUP,
-                          idToAction);
+    registerActionInGroup(actionRegistrar, executor.getId(), toolbarAction, RUNNERS_GROUP, idToAction);
 
     AnAction action = registerAction(actionRegistrar, executor.getContextActionId(), runContextAction, contextActionIdToAction);
     if (isExecutorInMainGroup(executor)) {
-      DefaultActionGroup group = Objects.requireNonNull((DefaultActionGroup)actionRegistrar.getActionOrStub(RUN_CONTEXT_GROUP));
-      actionRegistrar.addToGroup(group, action, new Constraints(Anchor.BEFORE, RUN_CONTEXT_GROUP_MORE));
+      DefaultActionGroup group = Objects.requireNonNull((DefaultActionGroup)actionRegistrar.getActionOrStub(RUN_CONTEXT_EXECUTORS_GROUP));
+      actionRegistrar.addToGroup(group, action, Constraints.LAST);
     }
     else {
       DefaultActionGroup group = Objects.requireNonNull((DefaultActionGroup)actionRegistrar.getActionOrStub(RUN_CONTEXT_GROUP_MORE));
@@ -242,8 +246,11 @@ public final class ExecutorRegistryImpl extends ExecutorRegistry {
 
     ActionManager actionManager = ActionManager.getInstance();
     unregisterAction(executor.getId(), RUNNERS_GROUP, idToAction, actionManager);
+    if (executor instanceof ExecutorGroup<?>) {
+      unregisterAction(executor.getId() + "_delegate", RUNNERS_GROUP, idToAction, actionManager);
+    }
     if (isExecutorInMainGroup(executor)) {
-      unregisterAction(executor.getContextActionId(), RUN_CONTEXT_GROUP, contextActionIdToAction, actionManager);
+      unregisterAction(executor.getContextActionId(), RUN_CONTEXT_EXECUTORS_GROUP, contextActionIdToAction, actionManager);
     }
     else {
       unregisterAction(executor.getContextActionId(), RUN_CONTEXT_GROUP_MORE, contextActionIdToAction, actionManager);
@@ -338,6 +345,12 @@ public final class ExecutorRegistryImpl extends ExecutorRegistry {
         return;
       }
 
+      RunManager runManager = RunManager.getInstanceIfCreated(project);
+      if (runManager == null) {
+        presentation.setEnabled(false);
+        return;
+      }
+
       RunnerAndConfigurationSettings selectedSettings = getSelectedConfiguration(e);
       boolean enabled = false;
       ExecutorActionStatus actionStatus = null;
@@ -377,6 +390,12 @@ public final class ExecutorRegistryImpl extends ExecutorRegistry {
       }
       else {
         if (RunConfigurationsComboBoxAction.hasRunCurrentFileItem(project)) {
+          // don't compute current file to run if editors are not yet loaded
+          if (!project.isDefault() && !StartupManager.getInstance(project).postStartupActivityPassed()) {
+            presentation.setEnabled(false);
+            return;
+          }
+
           RunCurrentFileActionStatus status = getRunCurrentFileActionStatus(e, false);
           for (RunnerAndConfigurationSettings config : status.myRunConfigs) {
             actionStatus = setupActionStatus(e, project, config, presentation);

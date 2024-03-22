@@ -1,4 +1,4 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 @file:Suppress("ReplaceGetOrSet", "ReplaceNegatedIsEmptyWithIsNotEmpty", "PrivatePropertyName", "ReplacePutWithAssignment")
 
 package com.intellij.openapi.fileEditor.impl
@@ -29,6 +29,7 @@ import com.intellij.openapi.fileEditor.impl.text.FileDropHandler
 import com.intellij.openapi.keymap.Keymap
 import com.intellij.openapi.keymap.KeymapManagerListener
 import com.intellij.openapi.keymap.KeymapUtil
+import com.intellij.openapi.progress.blockingContext
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Divider
 import com.intellij.openapi.ui.OnePixelDivider
@@ -321,6 +322,11 @@ open class EditorsSplitters internal constructor(
     currentCompositeFlow.value = window?.selectedComposite
   }
 
+  @Deprecated("Use openFilesAsync(Boolean) instead", ReplaceWith("openFilesAsync(true)"))
+  fun openFilesAsync(): Job {
+    return openFilesAsync(true)
+  }
+
   fun openFilesAsync(requestFocus: Boolean): Job {
     return coroutineScope.launch {
       restoreEditors(state = state.getAndSet(null) ?: return@launch,
@@ -425,9 +431,7 @@ open class EditorsSplitters internal constructor(
         window.getComposites().filter { updatedFile == null || it.file.nameSequence.contentEquals(updatedFile.nameSequence) }.toList()
       }
       for (composite in composites) {
-        val title = readAction {
-          EditorTabPresentationUtil.getEditorTabTitle(manager.project, composite.file)
-        }
+        val title = EditorTabPresentationUtil.getEditorTabTitle(manager.project, composite.file)
         withContext(Dispatchers.EDT) {
           val index = window.findCompositeIndex(composite)
           if (index != -1) {
@@ -927,9 +931,16 @@ private class UiBuilder(private val splitters: EditorsSplitters) {
         span("opening editor") {
           val file = resolveFileOrLogError(virtualFileManager, fileEntry) ?: return@span
           file.putUserData(AsyncEditorLoader.OPENED_IN_BULK, true)
+          // preload filetype
+          splitters.coroutineScope.launch {
+            blockingContext {
+              file.fileType
+            }
+          }
+
           if (isFirstInBulk) {
-            // add selected tab on EditorTabs without waiting for the rest tabs on startup.
-            // this allows painting the first editor as soon as it is ready IJPL-687
+            // Add the selected tab to EditorTabs without waiting for the other tabs to load on startup.
+            // This enables painting the first editor as soon as it's ready (IJPL-687).
             file.putUserData(AsyncEditorLoader.FIRST_IN_BULK, true)
             isFirstInBulk = false
           }

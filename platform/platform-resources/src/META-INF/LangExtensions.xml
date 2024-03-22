@@ -10,6 +10,7 @@
                         overrides="true"/>
 
     <projectServiceContainerInitializedListener
+      id="moduleBridgeLoaderService"
       implementation="com.intellij.workspaceModel.ide.impl.legacyBridge.module.ModuleBridgeLoaderService" order="first"/>
     <projectService serviceInterface="com.intellij.openapi.module.AutomaticModuleUnloader"
                     serviceImplementation="com.intellij.openapi.module.impl.AutomaticModuleUnloaderImpl" overrides="true"/>
@@ -120,6 +121,8 @@
                  description="Pause dumb queue (including indexing) while scanning is in progress."/>
     <registryKey defaultValue="true" key="scanning.trust.indexing.flag" restartRequired="true"
                  description="Use previously stored 'indexed flag' while scanning. To store 'indexing flag' please set registry option 'indexing.disable.virtual.file.system.entry.is.file.indexed=false'."/>
+    <registryKey defaultValue="false" key="full.scanning.on.startup.can.be.skipped" restartRequired="false"
+                 description="Full scanning on startup will be skipped when possible."/>
     <registryKey defaultValue="true" key="indexing.over.fast.attributes" restartRequired="true"
                  description="Store indexing data (including IndexingStamps) in regular (false) or fast (true) attributes storage"/>
     <registryKey defaultValue="true" key="vfs.refresh.should.pause.dumb.queue" restartRequired="true"
@@ -130,6 +133,8 @@
                  description="Cache null values for pushed properties to avoid reading nulls from disk every time."/>
     <projectService serviceInterface="com.intellij.util.indexing.IndexableFilesIndex"
                     serviceImplementation="com.intellij.util.indexing.roots.IndexableFilesIndexImpl"/>
+    <postStartupActivity implementation="com.intellij.util.indexing.projectFilter.ProjectIndexableFilesFilterHealthCheckStarter"/>
+    <projectService serviceImplementation="com.intellij.util.indexing.projectFilter.ProjectIndexableFilesFilterHealthCheck"/>
 
     <applicationService serviceImplementation="com.intellij.packageDependencies.DependencyUISettings"/>
 
@@ -159,7 +164,8 @@
 
     <applicationService serviceImplementation="com.intellij.codeInsight.documentation.DocumentationManagerUtil"/>
 
-    <applicationService serviceImplementation="com.intellij.codeInsight.template.impl.TemplateSettings"/>
+    <!-- TemplateSettings is requested in the highlighting pass - preload it -->
+    <applicationService serviceImplementation="com.intellij.codeInsight.template.impl.TemplateSettings" preload="notHeadless"/>
     <applicationService serviceImplementation="com.intellij.execution.ui.layout.impl.RunnerLayoutSettings"/>
 
     <applicationService serviceImplementation="com.intellij.codeEditor.printing.PrintSettings"/>
@@ -699,6 +705,12 @@
                  implementationClass="com.intellij.ide.navbar.actions.DefaultNavBarItemDataRule"
                  type="context"
                  order="last"/>
+    <getDataRule key="cutProvider" type="fast" implementationClass="com.intellij.ide.navbar.ide.CutProviderDataRule"/>
+    <getDataRule key="copyProvider" type="fast" implementationClass="com.intellij.ide.navbar.ide.CopyProviderDataRule"/>
+    <getDataRule key="pasteProvider" type="fast" implementationClass="com.intellij.ide.navbar.ide.PasteProviderDataRule"/>
+    <getDataRule key="bgtDataProvider"
+                 implementationClass="com.intellij.ide.navbar.actions.BgtDataRule"
+                 type="provider"/>
 
     <statistician key="completion" implementationClass="com.intellij.codeInsight.completion.DefaultCompletionStatistician" order="last"/>
 
@@ -1179,7 +1191,7 @@
 
     <statistics.counterUsagesCollector implementationClass="com.intellij.internal.statistic.service.fus.collectors.TooltipActionsLogger"/>
     <statistics.counterUsagesCollector implementationClass="com.intellij.refactoring.rename.RenameInplacePopupUsagesCollector"/>
-    <statistics.counterUsagesCollector implementationClass="com.intellij.refactoring.rename.RenameCodeVisionCollector"/>
+    <statistics.counterUsagesCollector implementationClass="com.intellij.refactoring.RefactoringCodeVisionCollector"/>
     <statistics.counterUsagesCollector implementationClass="com.intellij.refactoring.move.MoveUsagesCollector"/>
     <statistics.counterUsagesCollector implementationClass="com.intellij.webcore.packaging.PackageManagementUsageCollector"/>
     <statistics.counterUsagesCollector implementationClass="com.intellij.codeInsight.lookup.impl.LookupUsageTracker"/>
@@ -1744,7 +1756,6 @@
     <recoveryAction implementation="com.intellij.util.indexing.ReindexAction"/>
     <recoveryAction implementation="com.intellij.util.indexing.RefreshIndexableFilesAction"/>
 
-    <postStartupActivity implementation="com.intellij.lang.documentation.ide.impl.DocumentationAutoPopup"/>
     <postStartupActivity implementation="com.intellij.codeInsight.documentation.DocumentationSettingsListener"/>
     <projectService serviceInterface="com.intellij.lang.documentation.ide.IdeDocumentationTargetProvider"
                     serviceImplementation="com.intellij.lang.documentation.ide.impl.IdeDocumentationTargetProviderImpl"/>
@@ -1791,6 +1802,8 @@
     <listener class="com.intellij.codeInsight.inline.completion.InlineCompletionLookupManagerListener"
               topic="com.intellij.codeInsight.lookup.LookupManagerListener"/>
     <listener class="com.intellij.codeInsight.inline.completion.TabEnterUsageDetector"
+              topic="com.intellij.codeInsight.lookup.LookupManagerListener"/>
+    <listener class="com.intellij.lang.documentation.ide.impl.DocumentationAutoPopupListener"
               topic="com.intellij.codeInsight.lookup.LookupManagerListener"/>
     <listener class="com.intellij.psi.impl.file.impl.PsiVFSListener$MyModuleRootListener"
               topic="com.intellij.openapi.roots.ModuleRootListener"/>

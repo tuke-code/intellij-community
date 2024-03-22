@@ -38,12 +38,6 @@ open class LibraryPropertiesEntityImpl(private val dataSource: LibraryProperties
   override val library: LibraryEntity
     get() = snapshot.extractOneToOneParent(LIBRARY_CONNECTION_ID, this)!!
 
-  override val libraryType: String
-    get() {
-      readField("libraryType")
-      return dataSource.libraryType
-    }
-
   override val propertiesXmlTag: String?
     get() {
       readField("propertiesXmlTag")
@@ -103,9 +97,6 @@ open class LibraryPropertiesEntityImpl(private val dataSource: LibraryProperties
           error("Field LibraryPropertiesEntity#library should be initialized")
         }
       }
-      if (!getEntityData().isLibraryTypeInitialized()) {
-        error("Field LibraryPropertiesEntity#libraryType should be initialized")
-      }
     }
 
     override fun connectionIdList(): List<ConnectionId> {
@@ -116,7 +107,6 @@ open class LibraryPropertiesEntityImpl(private val dataSource: LibraryProperties
     override fun relabel(dataSource: WorkspaceEntity, parents: Set<WorkspaceEntity>?) {
       dataSource as LibraryPropertiesEntity
       if (this.entitySource != dataSource.entitySource) this.entitySource = dataSource.entitySource
-      if (this.libraryType != dataSource.libraryType) this.libraryType = dataSource.libraryType
       if (this.propertiesXmlTag != dataSource?.propertiesXmlTag) this.propertiesXmlTag = dataSource.propertiesXmlTag
       updateChildToParentReferences(parents)
     }
@@ -150,7 +140,7 @@ open class LibraryPropertiesEntityImpl(private val dataSource: LibraryProperties
             value.entityLinks[EntityLink(true, LIBRARY_CONNECTION_ID)] = this
           }
           // else you're attaching a new entity to an existing entity that is not modifiable
-          _diff.addEntity(value)
+          _diff.addEntity(value as ModifiableWorkspaceEntityBase<WorkspaceEntity, *>)
         }
         if (_diff != null && (value !is ModifiableWorkspaceEntityBase<*, *> || value.diff != null)) {
           _diff.updateOneToOneParentOfChild(LIBRARY_CONNECTION_ID, this, value)
@@ -166,14 +156,6 @@ open class LibraryPropertiesEntityImpl(private val dataSource: LibraryProperties
         changedProperty.add("library")
       }
 
-    override var libraryType: String
-      get() = getEntityData().libraryType
-      set(value) {
-        checkModificationAllowed()
-        getEntityData(true).libraryType = value
-        changedProperty.add("libraryType")
-      }
-
     override var propertiesXmlTag: String?
       get() = getEntityData().propertiesXmlTag
       set(value) {
@@ -187,10 +169,8 @@ open class LibraryPropertiesEntityImpl(private val dataSource: LibraryProperties
 }
 
 class LibraryPropertiesEntityData : WorkspaceEntityData<LibraryPropertiesEntity>() {
-  lateinit var libraryType: String
   var propertiesXmlTag: String? = null
 
-  internal fun isLibraryTypeInitialized(): Boolean = ::libraryType.isInitialized
 
   override fun wrapAsModifiable(diff: MutableEntityStorage): WorkspaceEntity.Builder<LibraryPropertiesEntity> {
     val modifiable = LibraryPropertiesEntityImpl.Builder(null)
@@ -226,7 +206,7 @@ class LibraryPropertiesEntityData : WorkspaceEntityData<LibraryPropertiesEntity>
   }
 
   override fun createDetachedEntity(parents: List<WorkspaceEntity>): WorkspaceEntity {
-    return LibraryPropertiesEntity(libraryType, entitySource) {
+    return LibraryPropertiesEntity(entitySource) {
       this.propertiesXmlTag = this@LibraryPropertiesEntityData.propertiesXmlTag
       parents.filterIsInstance<LibraryEntity>().singleOrNull()?.let { this.library = it }
     }
@@ -245,7 +225,6 @@ class LibraryPropertiesEntityData : WorkspaceEntityData<LibraryPropertiesEntity>
     other as LibraryPropertiesEntityData
 
     if (this.entitySource != other.entitySource) return false
-    if (this.libraryType != other.libraryType) return false
     if (this.propertiesXmlTag != other.propertiesXmlTag) return false
     return true
   }
@@ -256,21 +235,18 @@ class LibraryPropertiesEntityData : WorkspaceEntityData<LibraryPropertiesEntity>
 
     other as LibraryPropertiesEntityData
 
-    if (this.libraryType != other.libraryType) return false
     if (this.propertiesXmlTag != other.propertiesXmlTag) return false
     return true
   }
 
   override fun hashCode(): Int {
     var result = entitySource.hashCode()
-    result = 31 * result + libraryType.hashCode()
     result = 31 * result + propertiesXmlTag.hashCode()
     return result
   }
 
   override fun hashCodeIgnoringEntitySource(): Int {
     var result = javaClass.hashCode()
-    result = 31 * result + libraryType.hashCode()
     result = 31 * result + propertiesXmlTag.hashCode()
     return result
   }

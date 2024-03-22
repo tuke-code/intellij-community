@@ -10,6 +10,7 @@ import com.intellij.codeInsight.daemon.impl.quickfix.ReplaceWithUnnamedPatternFi
 import com.intellij.codeInsight.intention.IntentionAction;
 import com.intellij.codeInsight.intention.QuickFixFactory;
 import com.intellij.codeInsight.intention.impl.PriorityIntentionActionWrapper;
+import com.intellij.codeInspection.ExternalSourceProblemGroup;
 import com.intellij.codeInspection.InspectionProfile;
 import com.intellij.codeInspection.SuppressionUtil;
 import com.intellij.codeInspection.deadCode.UnusedDeclarationInspectionBase;
@@ -17,15 +18,15 @@ import com.intellij.codeInspection.ex.InspectionProfileImpl;
 import com.intellij.codeInspection.ex.InspectionProfileWrapper;
 import com.intellij.codeInspection.unusedImport.MissortedImportsInspection;
 import com.intellij.codeInspection.unusedImport.UnusedImportInspection;
-import com.intellij.codeInspection.unusedSymbol.UnusedSymbolLocalInspectionBase;
+import com.intellij.codeInspection.unusedSymbol.UnusedSymbolLocalInspection;
 import com.intellij.codeInspection.util.SpecialAnnotationsUtilBase;
 import com.intellij.java.analysis.JavaAnalysisBundle;
 import com.intellij.lang.annotation.HighlightSeverity;
+import com.intellij.lang.annotation.ProblemGroup;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.colors.TextAttributesKey;
 import com.intellij.openapi.progress.ProcessCanceledException;
-import com.intellij.openapi.progress.ProgressIndicatorProvider;
 import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.NlsContexts;
@@ -55,25 +56,25 @@ import java.util.Set;
 import java.util.function.Function;
 
 class PostHighlightingVisitor extends JavaElementVisitor {
-  private final RefCountHolder myRefCountHolder;
+  private final LocalRefUseInfo myRefCountHolder;
   @NotNull private final Project myProject;
   private final PsiFile myFile;
   @NotNull private final Document myDocument;
   private final GlobalUsageHelper myGlobalUsageHelper;
   private IntentionAction myOptimizeImportsFix; // when not null, there are not-optimized imports in the file
   private int myCurrentEntryIndex = -1;
-  private final UnusedSymbolLocalInspectionBase myUnusedSymbolInspection;
+  private final UnusedSymbolLocalInspection myUnusedSymbolInspection;
   private final HighlightDisplayKey myDeadCodeKey;
   private final HighlightInfoType myDeadCodeInfoType;
   private boolean errorFound;
 
-  PostHighlightingVisitor(@NotNull PsiFile file, @NotNull Document document, @NotNull RefCountHolder refCountHolder) throws ProcessCanceledException {
+  PostHighlightingVisitor(@NotNull PsiFile file, @NotNull Document document) throws ProcessCanceledException {
     ApplicationManager.getApplication().assertIsNonDispatchThread();
     ApplicationManager.getApplication().assertReadAccessAllowed();
     myProject = file.getProject();
     myFile = file;
     myDocument = document;
-    myRefCountHolder = refCountHolder;
+    myRefCountHolder = LocalRefUseInfo.forFile(file);
     InspectionProfileImpl profile = InspectionProjectProfileManager.getInstance(myProject).getCurrentProfile();
     myDeadCodeKey = HighlightDisplayKey.find(UnusedDeclarationInspectionBase.SHORT_NAME);
     UnusedDeclarationInspectionBase deadCodeInspection = (UnusedDeclarationInspectionBase)profile.getUnwrappedTool(UnusedDeclarationInspectionBase.SHORT_NAME, myFile);
@@ -176,10 +177,11 @@ class PostHighlightingVisitor extends JavaElementVisitor {
     return custom != null ? custom.apply(currentProfile).getInspectionProfile() : currentProfile;
   }
 
-  private String message;
+  @NlsContexts.DetailedDescription private String message;
   private final List<IntentionAction> quickFixes = new ArrayList<>();
   private final List<IntentionAction> quickFixOptions = new ArrayList<>();
 
+  @Override
   public void visitLocalVariable(@NotNull PsiLocalVariable variable) {
     if (myUnusedSymbolInspection.LOCAL_VARIABLE) {
       processLocalVariable(variable);
@@ -234,7 +236,7 @@ class PostHighlightingVisitor extends JavaElementVisitor {
     PsiElement parent = identifier.getParent();
     if (parent == null) return;
     if ((parent instanceof PsiVariable || parent instanceof PsiMember) && SuppressionUtil.inspectionResultSuppressed(identifier, myUnusedSymbolInspection)) return;
-    if (parent instanceof PsiParameter && SuppressionUtil.isSuppressed(identifier, UnusedSymbolLocalInspectionBase.UNUSED_PARAMETERS_SHORT_NAME)) return;
+    if (parent instanceof PsiParameter && SuppressionUtil.isSuppressed(identifier, UnusedSymbolLocalInspection.UNUSED_PARAMETERS_SHORT_NAME)) return;
 
     parent.accept(this);
     if (message != null) {
@@ -330,7 +332,7 @@ class PostHighlightingVisitor extends JavaElementVisitor {
           quickFixes.add(QuickFixFactory.getInstance().createAddToImplicitlyWrittenFieldsFix(project, annoName)));
       }
     }
-    else if (!UnusedSymbolUtil.isFieldUsed(myProject, myFile, field, ProgressManager.getGlobalProgressIndicator(), myGlobalUsageHelper)) {
+    else if (!UnusedSymbolUtil.isFieldUsed(myProject, myFile, field, myGlobalUsageHelper)) {
       if (UnusedSymbolUtil.isImplicitWrite(myProject, field)) {
         message = getNotUsedForReadingMessage(field);
         quickFixes.add(QuickFixFactory.getInstance().createSafeDeleteFix(field));
@@ -468,7 +470,7 @@ class PostHighlightingVisitor extends JavaElementVisitor {
   }
 
   private void processMethod(@NotNull Project project, @NotNull PsiMethod method) {
-    if (UnusedSymbolUtil.isMethodUsed(myProject, myFile, method, ProgressIndicatorProvider.getGlobalProgressIndicator(), myGlobalUsageHelper)) {
+    if (UnusedSymbolUtil.isMethodUsed(myProject, myFile, method, myGlobalUsageHelper)) {
       return;
     }
     String key;
@@ -481,13 +483,17 @@ class PostHighlightingVisitor extends JavaElementVisitor {
     int options = PsiFormatUtilBase.SHOW_TYPE | PsiFormatUtilBase.SHOW_FQ_CLASS_NAMES;
     String symbolName = HighlightMessageUtil.getSymbolName(method, PsiSubstitutor.EMPTY, options);
     message = JavaErrorBundle.message(key, symbolName);
-    quickFixes.add(QuickFixFactory.getInstance().createSafeDeleteFix(method));
+    QuickFixFactory factory = QuickFixFactory.getInstance();
+    quickFixes.add(factory.createSafeDeleteFix(method));
+    if (ApplicationManager.getApplication().isHeadlessEnvironment() && method.hasModifierProperty(PsiModifier.PRIVATE)) {
+      quickFixes.add(factory.createDeletePrivateMethodFix(method).asIntention());
+    }
     SpecialAnnotationsUtilBase.processUnknownAnnotations(method, annoName ->
-      quickFixes.add(QuickFixFactory.getInstance().createAddToDependencyInjectionAnnotationsFix(project, annoName)));
+      quickFixes.add(factory.createAddToDependencyInjectionAnnotationsFix(project, annoName)));
   }
 
   private void processClass(@NotNull Project project, @NotNull PsiClass aClass) {
-    if (UnusedSymbolUtil.isClassUsed(project, myFile, aClass, ProgressIndicatorProvider.getGlobalProgressIndicator(), myGlobalUsageHelper)) {
+    if (UnusedSymbolUtil.isClassUsed(project, myFile, aClass, myGlobalUsageHelper)) {
       return;
     }
 
@@ -579,10 +585,23 @@ class PostHighlightingVisitor extends JavaElementVisitor {
     HighlightInfoType.HighlightInfoTypeImpl configHighlightType =
       new HighlightInfoType.HighlightInfoTypeImpl(profile.getErrorLevel(unusedImportKey, myFile).getSeverity(), key);
 
+    ProblemGroup problemGroup = new ExternalSourceProblemGroup() {
+      @Override
+      public String getExternalCheckName() {
+        return UnusedImportInspection.SHORT_NAME;
+      }
+
+      @Override
+      public @Nullable String getProblemName() {
+        return null;
+      }
+    };
+
     HighlightInfo.Builder builder = HighlightInfo.newHighlightInfo(configHighlightType)
         .range(importStatement)
         .descriptionAndTooltip(description)
-        .group(GeneralHighlightingPass.POST_UPDATE_ALL);
+        .group(GeneralHighlightingPass.POST_UPDATE_ALL)
+        .problemGroup(problemGroup);
 
     builder.registerFix(new RemoveAllUnusedImportsFix(), null, HighlightDisplayKey.getDisplayNameByKey(unusedImportKey), null, unusedImportKey);
 

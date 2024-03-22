@@ -11,24 +11,20 @@ import javax.swing.text.html.BlockView
 import javax.swing.text.html.HTML
 
 /**
- * Supports rounded corners (through `caption-side` CSS property).
+ * Supports rounded corners through `border-radius` property.
  */
-class BlockViewEx(elem: Element, axis: Int) : BlockView(elem, axis) {
+open class BlockViewEx(elem: Element, axis: Int) : BlockView(elem, axis) {
 
   // With private fields Java clone doesn't work well
-  @Suppress("ProtectedInFinal")
   @JvmField
   protected var borderRadius: Float = -1f
 
-  @Suppress("ProtectedInFinal")
   @JvmField
   protected var borderWidths: Insets? = null
 
-  @Suppress("ProtectedInFinal")
   @JvmField
   protected var borderColors: BorderColors? = null
 
-  @Suppress("ProtectedInFinal")
   @JvmField
   protected var margin: Insets? = null
 
@@ -56,7 +52,7 @@ class BlockViewEx(elem: Element, axis: Int) : BlockView(elem, axis) {
     painter.bg = bg
   }
 
-  override fun getToolTipText(x: Float, y: Float, allocation: Shape?): String =
+  override fun getToolTipText(x: Float, y: Float, allocation: Shape?): String? =
     element.attributes.getAttribute(HTML.Attribute.TITLE)
       ?.asSafely<String>()
       ?.takeIf { it.isNotEmpty() }

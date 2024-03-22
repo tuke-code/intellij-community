@@ -13,7 +13,9 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.NlsSafe
 import com.intellij.psi.PsiElement
 import com.intellij.ui.components.JBHtmlPaneStyleConfiguration
-import com.intellij.ui.components.JBHtmlPaneStyleConfiguration.*
+import com.intellij.ui.components.JBHtmlPaneStyleConfiguration.ElementKind
+import com.intellij.ui.components.JBHtmlPaneStyleConfiguration.ElementProperty
+import com.intellij.util.applyIf
 import com.intellij.util.concurrency.annotations.RequiresReadLock
 import com.intellij.xml.util.XmlStringUtil
 import org.jetbrains.annotations.ApiStatus.Internal
@@ -55,7 +57,8 @@ object QuickDocHighlightingHelper {
   @RequiresReadLock
   fun StringBuilder.appendStyledCodeBlock(project: Project, language: Language?, code: @NlsSafe CharSequence): @NlsSafe StringBuilder =
     append(CODE_BLOCK_PREFIX)
-      .appendHighlightedCode(project, language, DocumentationSettings.isHighlightingOfCodeBlocksEnabled(), code, true)
+      .appendHighlightedCode(project, language, DocumentationSettings.isHighlightingOfCodeBlocksEnabled(), code,
+                             isForRenderedDoc = true, trim = true)
       .append(CODE_BLOCK_SUFFIX)
 
   /**
@@ -87,7 +90,7 @@ object QuickDocHighlightingHelper {
     append(INLINE_CODE_PREFIX)
       .appendHighlightedCode(
         project, language, DocumentationSettings.getInlineCodeHighlightingMode() == InlineCodeHighlightingMode.SEMANTIC_HIGHLIGHTING, code,
-        true)
+        isForRenderedDoc = true, trim = false)
       .append(INLINE_CODE_SUFFIX)
 
   /**
@@ -110,7 +113,7 @@ object QuickDocHighlightingHelper {
   @JvmStatic
   @RequiresReadLock
   fun StringBuilder.appendStyledCodeFragment(project: Project, language: Language, @NlsSafe code: String): StringBuilder =
-    appendHighlightedCode(project, language, true, code, false)
+    appendHighlightedCode(project, language, true, code, isForRenderedDoc = false, trim = false)
 
   /**
    * This method should be used when generating links to PsiElements.
@@ -181,7 +184,8 @@ object QuickDocHighlightingHelper {
   @JvmStatic
   @RequiresReadLock
   fun StringBuilder.appendStyledSignatureFragment(project: Project, language: Language?, code: String): StringBuilder =
-    appendHighlightedCode(project, language, DocumentationSettings.isHighlightingOfQuickDocSignaturesEnabled(), code, false)
+    appendHighlightedCode(project, language, DocumentationSettings.isHighlightingOfQuickDocSignaturesEnabled(), code,
+                          isForRenderedDoc = false, trim = false)
 
   /**
    * Returns an HTML fragment containing [contents] colored according to [textAttributes].
@@ -269,38 +273,34 @@ object QuickDocHighlightingHelper {
   @Internal
   @JvmStatic
   fun getDefaultDocStyleOptions(colorScheme: EditorColorsScheme, editorInlineContext: Boolean): JBHtmlPaneStyleConfiguration =
-    JBHtmlPaneStyleConfiguration(
-      colorScheme = colorScheme,
-      editorInlineContext = editorInlineContext,
-      inlineCodeParentSelectors = listOf(".$CLASS_CONTENT", ".$CLASS_CONTENT_SEPARATED", ".$CLASS_CONTENT div:not(.$CLASS_BOTTOM)",
-                                         ".$CLASS_CONTENT div:not(.$CLASS_TOP)", ".$CLASS_SECTIONS"),
-      largeCodeFontSizeSelectors = listOf(".$CLASS_DEFINITION code", ".$CLASS_DEFINITION pre", ".$CLASS_DEFINITION_SEPARATED code",
-                                          ".$CLASS_DEFINITION_SEPARATED pre", ".$CLASS_BOTTOM code", ".$CLASS_TOP code"),
-      enableInlineCodeBackground = DocumentationSettings.isCodeBackgroundEnabled()
-                                   && DocumentationSettings.getInlineCodeHighlightingMode() !== InlineCodeHighlightingMode.NO_HIGHLIGHTING,
+    JBHtmlPaneStyleConfiguration {
+      this.colorScheme = colorScheme
+      this.editorInlineContext = editorInlineContext
+      inlineCodeParentSelectors(".$CLASS_CONTENT", ".$CLASS_CONTENT div:not(.$CLASS_BOTTOM)",
+                                ".$CLASS_CONTENT div:not(.$CLASS_TOP)", ".$CLASS_SECTIONS")
+      largeCodeFontSizeSelectors(".$CLASS_DEFINITION code", ".$CLASS_DEFINITION pre", ".$CLASS_BOTTOM code", ".$CLASS_TOP code")
+      enableInlineCodeBackground = (DocumentationSettings.isCodeBackgroundEnabled()
+                                    && DocumentationSettings.getInlineCodeHighlightingMode() !== InlineCodeHighlightingMode.NO_HIGHLIGHTING)
       enableCodeBlocksBackground = DocumentationSettings.isCodeBackgroundEnabled()
-                                   && DocumentationSettings.isHighlightingOfCodeBlocksEnabled(),
-      useFontLigaturesInCode = false,
-      controlStyleOverrides = if (editorInlineContext)
-        ControlStyleOverrides(
-          controlKindSuffix = "EditorPane",
-          overrides = mapOf(
-            ControlKind.CodeBlock to listOf(ControlProperty.BackgroundColor, ControlProperty.BackgroundOpacity, ControlProperty.BorderColor)
-          )
-        )
-      else null
-    )
+                                   && DocumentationSettings.isHighlightingOfCodeBlocksEnabled()
+      if (editorInlineContext)
+        overrideElementStyle {
+          elementKindThemePropertySuffix = "EditorPane"
+          overrideThemeProperties(ElementKind.CodeBlock, ElementProperty.BackgroundColor, ElementProperty.BackgroundOpacity, ElementProperty.BorderColor)
+        }
+    }
 
   private fun StringBuilder.appendHighlightedCode(project: Project, language: Language?, doHighlighting: Boolean,
-                                                  code: CharSequence, isForRenderedDoc: Boolean): StringBuilder {
-    val processedCode = code.toString().trim('\n', '\r').replace(' ', ' ').trimEnd()
+                                                  code: CharSequence, isForRenderedDoc: Boolean, trim: Boolean): StringBuilder {
+    val processedCode = code.toString().trim('\n', '\r').replace(' ', ' ')
+      .applyIf(trim) { trimEnd() }
     if (language != null && doHighlighting) {
       HtmlSyntaxInfoUtil.appendHighlightedByLexerAndEncodedAsHtmlCodeSnippet(
         this, project, language, processedCode,
-        DocumentationSettings.getHighlightingSaturation(isForRenderedDoc))
+        trim, DocumentationSettings.getHighlightingSaturation(isForRenderedDoc))
     }
     else {
-      append(XmlStringUtil.escapeString(processedCode.trimIndent()))
+      append(XmlStringUtil.escapeString(processedCode.applyIf(trim) { trimIndent() }))
     }
     return this
   }

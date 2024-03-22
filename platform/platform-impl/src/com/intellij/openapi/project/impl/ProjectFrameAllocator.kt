@@ -133,7 +133,6 @@ private class FrameAllocatorProjectInitObserver(
       }
 
       launch {
-        rawProjectDeferred.join()
         span("project frame assigning") {
           frameHelper.setProject(project)
         }
@@ -174,13 +173,13 @@ internal class ProjectUiFrameAllocator(@JvmField val options: OpenProjectTask,
       val projectInitObserver = FrameAllocatorProjectInitObserver(coroutineScope = loadingScope,
                                                                   deferredProjectFrameHelper = deferredProjectFrameHelper)
 
-      val rawProjectDeferred = projectInitObserver.rawProjectDeferred
       async(CoroutineName("project frame creating")) {
         createFrameManager(loadingScope = loadingScope, deferredProjectFrameHelper = deferredProjectFrameHelper)
       }
 
       val startOfWaitingForReadyFrame = AtomicLong(-1)
 
+      val rawProjectDeferred = projectInitObserver.rawProjectDeferred
       val reopeningEditorJob = outOfLoadingScope.launch {
         val project = rawProjectDeferred.await()
         span("restoreEditors") {
@@ -420,14 +419,14 @@ private suspend fun postOpenEditors(deferredProjectFrameHelper: Deferred<Project
 
 private suspend fun focusSelectedEditor(editorComponent: EditorsSplitters) {
   val composite = editorComponent.currentWindow?.selectedComposite ?: return
-  val editor = (composite.selectedEditor as? TextEditor)?.editor
-  if (editor == null) {
+  val textEditor = composite.selectedEditor as? TextEditor
+  if (textEditor == null) {
     FUSProjectHotStartUpMeasurer.firstOpenedUnknownEditor(composite.file, System.nanoTime())
     composite.preferredFocusedComponent?.requestFocusInWindow()
   }
   else {
     blockingContext {
-      AsyncEditorLoader.performWhenLoaded(editor) {
+      AsyncEditorLoader.performWhenLoaded(textEditor) {
         FUSProjectHotStartUpMeasurer.firstOpenedEditor(composite.file)
         composite.preferredFocusedComponent?.requestFocusInWindow()
       }

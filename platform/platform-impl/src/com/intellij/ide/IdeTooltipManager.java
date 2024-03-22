@@ -29,7 +29,6 @@ import com.intellij.ui.components.JBHtmlPane;
 import com.intellij.ui.components.JBHtmlPaneConfiguration;
 import com.intellij.ui.components.JBHtmlPaneStyleConfiguration;
 import com.intellij.ui.components.panels.Wrapper;
-import com.intellij.ui.scale.JBUIScale;
 import com.intellij.util.Alarm;
 import com.intellij.util.messages.SimpleMessageBusConnection;
 import com.intellij.util.ui.*;
@@ -39,15 +38,9 @@ import org.jetbrains.annotations.*;
 
 import javax.swing.*;
 import javax.swing.border.Border;
-import javax.swing.text.AbstractDocument;
-import javax.swing.text.AttributeSet;
-import javax.swing.text.StyleConstants;
-import javax.swing.text.html.HTML;
 import javax.swing.tree.TreePath;
 import java.awt.*;
 import java.awt.event.MouseEvent;
-import java.lang.reflect.Field;
-import java.util.Collections;
 
 // Android team doesn't want to use new mockito for now, so, class cannot be final
 public class IdeTooltipManager implements Disposable {
@@ -719,26 +712,9 @@ public class IdeTooltipManager implements Disposable {
                                      boolean limitWidthToScreen) {
 
     JBHtmlPaneStyleConfiguration styleConfiguration = new JBHtmlPaneStyleConfiguration();
-    JBHtmlPaneConfiguration paneConfiguration = new JBHtmlPaneConfiguration(
-      Collections.emptyMap(), url -> null, icon -> null,
-      color -> Collections.singletonList(
-        StyleSheetUtil.loadStyleSheet("pre {white-space: pre-wrap;} code, pre {overflow-wrap: anywhere;}")),
-      null, Collections.singletonList(
-      (elem, view) -> {
-        AttributeSet attrs = elem.getAttributes();
-        if (attrs.getAttribute(AbstractDocument.ElementNameAttribute) == null &&
-            attrs.getAttribute(StyleConstants.NameAttribute) == HTML.Tag.HR) {
-          try {
-            Field field = view.getClass().getDeclaredField("size");
-            field.setAccessible(true);
-            field.set(view, JBUIScale.scale(1));
-          }
-          catch (Exception ignored) {
-          }
-        }
-        return view;
-      }
-    ));
+    JBHtmlPaneConfiguration paneConfiguration = JBHtmlPaneConfiguration.builder()
+      .customStyleSheet("pre {white-space: pre-wrap;} code, pre {overflow-wrap: anywhere;}")
+      .build();
 
 
     Ref<Boolean> prefSizeWasComputed = new Ref<>(false);
