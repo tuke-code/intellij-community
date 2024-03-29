@@ -1212,6 +1212,15 @@ public class AbstractPopup implements JBPopup, ScreenAreaConsumer, AlignedPopup 
       popupOwner = root.getRootPane();
       LOG.debug("popup owner fixed for JDK cache");
     }
+    if (StartupUiUtil.isWaylandToolkit()) {
+      // targetBounds are "screen" coordinates, which in Wayland means that they
+      // are relative to the nearest toplevel (Window).
+      // But popups in Wayland are expected to be relative to popup's "owner";
+      // let's re-set the owner to be that window.
+      popupOwner = popupOwner instanceof Window
+                   ? popupOwner
+                   : SwingUtilities.getWindowAncestor(popupOwner);
+    }
     if (LOG.isDebugEnabled()) {
       LOG.debug("expected preferred size: " + myContent.getPreferredSize());
     }
@@ -2575,6 +2584,14 @@ public class AbstractPopup implements JBPopup, ScreenAreaConsumer, AlignedPopup 
   public final boolean dispatchInputMethodEvent(InputMethodEvent event) {
     if (anyModalWindowsKeepPopupOpen()) {
       return false;
+    }
+
+    if (myComponent != null) {
+      var prop = myComponent.getClientProperty(UIUtil.ENABLE_IME_FORWARDING_IN_POPUP);
+      if (prop != null && (Boolean)prop) {
+        // Don't handle the event, so that it can be forwarded to the popup
+        return event.isConsumed();
+      }
     }
 
     // Try forwarding the input method event to various possible speed search handlers

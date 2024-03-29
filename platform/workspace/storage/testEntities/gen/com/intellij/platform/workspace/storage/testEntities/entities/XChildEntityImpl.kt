@@ -4,6 +4,7 @@ package com.intellij.platform.workspace.storage.testEntities.entities
 import com.intellij.platform.workspace.storage.*
 import com.intellij.platform.workspace.storage.EntityInformation
 import com.intellij.platform.workspace.storage.EntitySource
+import com.intellij.platform.workspace.storage.EntityType
 import com.intellij.platform.workspace.storage.GeneratedCodeApiVersion
 import com.intellij.platform.workspace.storage.GeneratedCodeImplVersion
 import com.intellij.platform.workspace.storage.MutableEntityStorage
@@ -20,10 +21,11 @@ import com.intellij.platform.workspace.storage.impl.updateOneToManyChildrenOfPar
 import com.intellij.platform.workspace.storage.impl.updateOneToManyParentOfChild
 import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentation
 import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentationApi
+import com.intellij.platform.workspace.storage.instrumentation.MutableEntityStorageInstrumentation
 import com.intellij.platform.workspace.storage.metadata.model.EntityMetadata
 
-@GeneratedCodeApiVersion(2)
-@GeneratedCodeImplVersion(3)
+@GeneratedCodeApiVersion(3)
+@GeneratedCodeImplVersion(5)
 open class XChildEntityImpl(private val dataSource: XChildEntityData) : XChildEntity, WorkspaceEntityBase(dataSource) {
 
   private companion object {
@@ -83,7 +85,6 @@ open class XChildEntityImpl(private val dataSource: XChildEntityData) : XChildEn
       }
 
       this.diff = builder
-      this.snapshot = builder
       addToBuilder()
       this.id = getEntityData().createEntityId()
       // After adding entity data to the builder, we need to unbind it and move the control over entity data to builder
@@ -166,15 +167,16 @@ open class XChildEntityImpl(private val dataSource: XChildEntityData) : XChildEn
 
       }
 
-    override var parentEntity: XParentEntity
+    override var parentEntity: XParentEntity.Builder
       get() {
         val _diff = diff
         return if (_diff != null) {
-          _diff.extractOneToManyParent(PARENTENTITY_CONNECTION_ID, this) ?: this.entityLinks[EntityLink(false,
-                                                                                                        PARENTENTITY_CONNECTION_ID)]!! as XParentEntity
+          @OptIn(EntityStorageInstrumentationApi::class)
+          ((_diff as MutableEntityStorageInstrumentation).getParentBuilder(PARENTENTITY_CONNECTION_ID, this) as? XParentEntity.Builder)
+          ?: (this.entityLinks[EntityLink(false, PARENTENTITY_CONNECTION_ID)]!! as XParentEntity.Builder)
         }
         else {
-          this.entityLinks[EntityLink(false, PARENTENTITY_CONNECTION_ID)]!! as XParentEntity
+          this.entityLinks[EntityLink(false, PARENTENTITY_CONNECTION_ID)]!! as XParentEntity.Builder
         }
       }
       set(value) {
@@ -207,17 +209,18 @@ open class XChildEntityImpl(private val dataSource: XChildEntityData) : XChildEn
 
     // List of non-abstract referenced types
     var _childChild: List<XChildChildEntity>? = emptyList()
-    override var childChild: List<XChildChildEntity>
+    override var childChild: List<XChildChildEntity.Builder>
       get() {
         // Getter of the list of non-abstract referenced types
         val _diff = diff
         return if (_diff != null) {
-          _diff.extractOneToManyChildren<XChildChildEntity>(CHILDCHILD_CONNECTION_ID, this)!!.toList() + (this.entityLinks[EntityLink(true,
-                                                                                                                                      CHILDCHILD_CONNECTION_ID)] as? List<XChildChildEntity>
-                                                                                                          ?: emptyList())
+          @OptIn(EntityStorageInstrumentationApi::class)
+          ((_diff as MutableEntityStorageInstrumentation).getManyChildrenBuilders(CHILDCHILD_CONNECTION_ID,
+                                                                                  this)!!.toList() as List<XChildChildEntity.Builder>) +
+          (this.entityLinks[EntityLink(true, CHILDCHILD_CONNECTION_ID)] as? List<XChildChildEntity.Builder> ?: emptyList())
         }
         else {
-          this.entityLinks[EntityLink(true, CHILDCHILD_CONNECTION_ID)] as? List<XChildChildEntity> ?: emptyList()
+          this.entityLinks[EntityLink(true, CHILDCHILD_CONNECTION_ID)] as? List<XChildChildEntity.Builder> ?: emptyList()
         }
       }
       set(value) {
@@ -264,7 +267,6 @@ class XChildEntityData : WorkspaceEntityData<XChildEntity>() {
   override fun wrapAsModifiable(diff: MutableEntityStorage): WorkspaceEntity.Builder<XChildEntity> {
     val modifiable = XChildEntityImpl.Builder(null)
     modifiable.diff = diff
-    modifiable.snapshot = diff
     modifiable.id = createEntityId()
     return modifiable
   }
@@ -295,10 +297,10 @@ class XChildEntityData : WorkspaceEntityData<XChildEntity>() {
   override fun deserialize(de: EntityInformation.Deserializer) {
   }
 
-  override fun createDetachedEntity(parents: List<WorkspaceEntity>): WorkspaceEntity {
+  override fun createDetachedEntity(parents: List<WorkspaceEntity.Builder<*>>): WorkspaceEntity.Builder<*> {
     return XChildEntity(childProperty, entitySource) {
       this.dataClass = this@XChildEntityData.dataClass
-      parents.filterIsInstance<XParentEntity>().singleOrNull()?.let { this.parentEntity = it }
+      parents.filterIsInstance<XParentEntity.Builder>().singleOrNull()?.let { this.parentEntity = it }
     }
   }
 

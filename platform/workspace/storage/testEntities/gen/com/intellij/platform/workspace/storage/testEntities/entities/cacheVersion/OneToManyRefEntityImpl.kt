@@ -4,6 +4,7 @@ package com.intellij.platform.workspace.storage.testEntities.entities.cacheVersi
 import com.intellij.platform.workspace.storage.*
 import com.intellij.platform.workspace.storage.EntityInformation
 import com.intellij.platform.workspace.storage.EntitySource
+import com.intellij.platform.workspace.storage.EntityType
 import com.intellij.platform.workspace.storage.GeneratedCodeApiVersion
 import com.intellij.platform.workspace.storage.GeneratedCodeImplVersion
 import com.intellij.platform.workspace.storage.MutableEntityStorage
@@ -18,10 +19,11 @@ import com.intellij.platform.workspace.storage.impl.extractOneToManyChildren
 import com.intellij.platform.workspace.storage.impl.updateOneToManyChildrenOfParent
 import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentation
 import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentationApi
+import com.intellij.platform.workspace.storage.instrumentation.MutableEntityStorageInstrumentation
 import com.intellij.platform.workspace.storage.metadata.model.EntityMetadata
 
-@GeneratedCodeApiVersion(2)
-@GeneratedCodeImplVersion(3)
+@GeneratedCodeApiVersion(3)
+@GeneratedCodeImplVersion(5)
 open class OneToManyRefEntityImpl(private val dataSource: OneToManyRefEntityData) : OneToManyRefEntity, WorkspaceEntityBase(dataSource) {
 
   private companion object {
@@ -71,7 +73,6 @@ open class OneToManyRefEntityImpl(private val dataSource: OneToManyRefEntityData
       }
 
       this.diff = builder
-      this.snapshot = builder
       addToBuilder()
       this.id = getEntityData().createEntityId()
       // After adding entity data to the builder, we need to unbind it and move the control over entity data to builder
@@ -137,18 +138,18 @@ open class OneToManyRefEntityImpl(private val dataSource: OneToManyRefEntityData
 
     // List of non-abstract referenced types
     var _anotherEntity: List<AnotherOneToManyRefEntity>? = emptyList()
-    override var anotherEntity: List<AnotherOneToManyRefEntity>
+    override var anotherEntity: List<AnotherOneToManyRefEntity.Builder>
       get() {
         // Getter of the list of non-abstract referenced types
         val _diff = diff
         return if (_diff != null) {
-          _diff.extractOneToManyChildren<AnotherOneToManyRefEntity>(ANOTHERENTITY_CONNECTION_ID,
-                                                                    this)!!.toList() + (this.entityLinks[EntityLink(true,
-                                                                                                                    ANOTHERENTITY_CONNECTION_ID)] as? List<AnotherOneToManyRefEntity>
-                                                                                        ?: emptyList())
+          @OptIn(EntityStorageInstrumentationApi::class)
+          ((_diff as MutableEntityStorageInstrumentation).getManyChildrenBuilders(ANOTHERENTITY_CONNECTION_ID,
+                                                                                  this)!!.toList() as List<AnotherOneToManyRefEntity.Builder>) +
+          (this.entityLinks[EntityLink(true, ANOTHERENTITY_CONNECTION_ID)] as? List<AnotherOneToManyRefEntity.Builder> ?: emptyList())
         }
         else {
-          this.entityLinks[EntityLink(true, ANOTHERENTITY_CONNECTION_ID)] as? List<AnotherOneToManyRefEntity> ?: emptyList()
+          this.entityLinks[EntityLink(true, ANOTHERENTITY_CONNECTION_ID)] as? List<AnotherOneToManyRefEntity.Builder> ?: emptyList()
         }
       }
       set(value) {
@@ -194,7 +195,6 @@ class OneToManyRefEntityData : WorkspaceEntityData<OneToManyRefEntity>() {
   override fun wrapAsModifiable(diff: MutableEntityStorage): WorkspaceEntity.Builder<OneToManyRefEntity> {
     val modifiable = OneToManyRefEntityImpl.Builder(null)
     modifiable.diff = diff
-    modifiable.snapshot = diff
     modifiable.id = createEntityId()
     return modifiable
   }
@@ -225,7 +225,7 @@ class OneToManyRefEntityData : WorkspaceEntityData<OneToManyRefEntity>() {
   override fun deserialize(de: EntityInformation.Deserializer) {
   }
 
-  override fun createDetachedEntity(parents: List<WorkspaceEntity>): WorkspaceEntity {
+  override fun createDetachedEntity(parents: List<WorkspaceEntity.Builder<*>>): WorkspaceEntity.Builder<*> {
     return OneToManyRefEntity(someData, entitySource) {
     }
   }

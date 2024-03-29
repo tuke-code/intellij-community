@@ -4,6 +4,7 @@ package com.intellij.platform.workspace.storage.testEntities.entities
 import com.intellij.platform.workspace.storage.*
 import com.intellij.platform.workspace.storage.EntityInformation
 import com.intellij.platform.workspace.storage.EntitySource
+import com.intellij.platform.workspace.storage.EntityType
 import com.intellij.platform.workspace.storage.GeneratedCodeApiVersion
 import com.intellij.platform.workspace.storage.GeneratedCodeImplVersion
 import com.intellij.platform.workspace.storage.MutableEntityStorage
@@ -18,10 +19,11 @@ import com.intellij.platform.workspace.storage.impl.extractOneToOneParent
 import com.intellij.platform.workspace.storage.impl.updateOneToOneParentOfChild
 import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentation
 import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentationApi
+import com.intellij.platform.workspace.storage.instrumentation.MutableEntityStorageInstrumentation
 import com.intellij.platform.workspace.storage.metadata.model.EntityMetadata
 
-@GeneratedCodeApiVersion(2)
-@GeneratedCodeImplVersion(3)
+@GeneratedCodeApiVersion(3)
+@GeneratedCodeImplVersion(5)
 open class AttachedEntityImpl(private val dataSource: AttachedEntityData) : AttachedEntity, WorkspaceEntityBase(dataSource) {
 
   private companion object {
@@ -70,7 +72,6 @@ open class AttachedEntityImpl(private val dataSource: AttachedEntityData) : Atta
       }
 
       this.diff = builder
-      this.snapshot = builder
       addToBuilder()
       this.id = getEntityData().createEntityId()
       // After adding entity data to the builder, we need to unbind it and move the control over entity data to builder
@@ -124,14 +125,16 @@ open class AttachedEntityImpl(private val dataSource: AttachedEntityData) : Atta
 
       }
 
-    override var ref: MainEntity
+    override var ref: MainEntity.Builder
       get() {
         val _diff = diff
         return if (_diff != null) {
-          _diff.extractOneToOneParent(REF_CONNECTION_ID, this) ?: this.entityLinks[EntityLink(false, REF_CONNECTION_ID)]!! as MainEntity
+          @OptIn(EntityStorageInstrumentationApi::class)
+          ((_diff as MutableEntityStorageInstrumentation).getParentBuilder(REF_CONNECTION_ID, this) as? MainEntity.Builder)
+          ?: (this.entityLinks[EntityLink(false, REF_CONNECTION_ID)]!! as MainEntity.Builder)
         }
         else {
-          this.entityLinks[EntityLink(false, REF_CONNECTION_ID)]!! as MainEntity
+          this.entityLinks[EntityLink(false, REF_CONNECTION_ID)]!! as MainEntity.Builder
         }
       }
       set(value) {
@@ -178,7 +181,6 @@ class AttachedEntityData : WorkspaceEntityData<AttachedEntity>() {
   override fun wrapAsModifiable(diff: MutableEntityStorage): WorkspaceEntity.Builder<AttachedEntity> {
     val modifiable = AttachedEntityImpl.Builder(null)
     modifiable.diff = diff
-    modifiable.snapshot = diff
     modifiable.id = createEntityId()
     return modifiable
   }
@@ -209,9 +211,9 @@ class AttachedEntityData : WorkspaceEntityData<AttachedEntity>() {
   override fun deserialize(de: EntityInformation.Deserializer) {
   }
 
-  override fun createDetachedEntity(parents: List<WorkspaceEntity>): WorkspaceEntity {
+  override fun createDetachedEntity(parents: List<WorkspaceEntity.Builder<*>>): WorkspaceEntity.Builder<*> {
     return AttachedEntity(data, entitySource) {
-      parents.filterIsInstance<MainEntity>().singleOrNull()?.let { this.ref = it }
+      parents.filterIsInstance<MainEntity.Builder>().singleOrNull()?.let { this.ref = it }
     }
   }
 

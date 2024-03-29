@@ -4,6 +4,7 @@ package com.intellij.platform.workspace.storage.testEntities.entities
 import com.intellij.platform.workspace.storage.*
 import com.intellij.platform.workspace.storage.EntityInformation
 import com.intellij.platform.workspace.storage.EntitySource
+import com.intellij.platform.workspace.storage.EntityType
 import com.intellij.platform.workspace.storage.GeneratedCodeApiVersion
 import com.intellij.platform.workspace.storage.GeneratedCodeImplVersion
 import com.intellij.platform.workspace.storage.MutableEntityStorage
@@ -22,10 +23,11 @@ import com.intellij.platform.workspace.storage.impl.updateOneToOneChildOfParent
 import com.intellij.platform.workspace.storage.impl.updateOneToOneParentOfChild
 import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentation
 import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentationApi
+import com.intellij.platform.workspace.storage.instrumentation.MutableEntityStorageInstrumentation
 import com.intellij.platform.workspace.storage.metadata.model.EntityMetadata
 
-@GeneratedCodeApiVersion(2)
-@GeneratedCodeImplVersion(3)
+@GeneratedCodeApiVersion(3)
+@GeneratedCodeImplVersion(5)
 open class ChainedEntityImpl(private val dataSource: ChainedEntityData) : ChainedEntity, WorkspaceEntityBase(dataSource) {
 
   private companion object {
@@ -86,7 +88,6 @@ open class ChainedEntityImpl(private val dataSource: ChainedEntityData) : Chaine
       }
 
       this.diff = builder
-      this.snapshot = builder
       addToBuilder()
       this.id = getEntityData().createEntityId()
       // After adding entity data to the builder, we need to unbind it and move the control over entity data to builder
@@ -138,15 +139,16 @@ open class ChainedEntityImpl(private val dataSource: ChainedEntityData) : Chaine
         changedProperty.add("data")
       }
 
-    override var parent: ChainedEntity?
+    override var parent: ChainedEntity.Builder?
       get() {
         val _diff = diff
         return if (_diff != null) {
-          _diff.extractOneToOneParent(PARENT_CONNECTION_ID, this) ?: this.entityLinks[EntityLink(false,
-                                                                                                 PARENT_CONNECTION_ID)] as? ChainedEntity
+          @OptIn(EntityStorageInstrumentationApi::class)
+          ((_diff as MutableEntityStorageInstrumentation).getParentBuilder(PARENT_CONNECTION_ID, this) as? ChainedEntity.Builder)
+          ?: (this.entityLinks[EntityLink(false, PARENT_CONNECTION_ID)] as? ChainedEntity.Builder)
         }
         else {
-          this.entityLinks[EntityLink(false, PARENT_CONNECTION_ID)] as? ChainedEntity
+          this.entityLinks[EntityLink(false, PARENT_CONNECTION_ID)] as? ChainedEntity.Builder
         }
       }
       set(value) {
@@ -173,14 +175,16 @@ open class ChainedEntityImpl(private val dataSource: ChainedEntityData) : Chaine
         changedProperty.add("parent")
       }
 
-    override var child: ChainedEntity?
+    override var child: ChainedEntity.Builder?
       get() {
         val _diff = diff
         return if (_diff != null) {
-          _diff.extractOneToOneChild(CHILD_CONNECTION_ID, this) ?: this.entityLinks[EntityLink(true, CHILD_CONNECTION_ID)] as? ChainedEntity
+          @OptIn(EntityStorageInstrumentationApi::class)
+          ((_diff as MutableEntityStorageInstrumentation).getOneChildBuilder(CHILD_CONNECTION_ID, this) as? ChainedEntity.Builder)
+          ?: (this.entityLinks[EntityLink(true, CHILD_CONNECTION_ID)] as? ChainedEntity.Builder)
         }
         else {
-          this.entityLinks[EntityLink(true, CHILD_CONNECTION_ID)] as? ChainedEntity
+          this.entityLinks[EntityLink(true, CHILD_CONNECTION_ID)] as? ChainedEntity.Builder
         }
       }
       set(value) {
@@ -207,15 +211,17 @@ open class ChainedEntityImpl(private val dataSource: ChainedEntityData) : Chaine
         changedProperty.add("child")
       }
 
-    override var generalParent: ChainedParentEntity?
+    override var generalParent: ChainedParentEntity.Builder?
       get() {
         val _diff = diff
         return if (_diff != null) {
-          _diff.extractOneToManyParent(GENERALPARENT_CONNECTION_ID, this) ?: this.entityLinks[EntityLink(false,
-                                                                                                         GENERALPARENT_CONNECTION_ID)] as? ChainedParentEntity
+          @OptIn(EntityStorageInstrumentationApi::class)
+          ((_diff as MutableEntityStorageInstrumentation).getParentBuilder(GENERALPARENT_CONNECTION_ID,
+                                                                           this) as? ChainedParentEntity.Builder)
+          ?: (this.entityLinks[EntityLink(false, GENERALPARENT_CONNECTION_ID)] as? ChainedParentEntity.Builder)
         }
         else {
-          this.entityLinks[EntityLink(false, GENERALPARENT_CONNECTION_ID)] as? ChainedParentEntity
+          this.entityLinks[EntityLink(false, GENERALPARENT_CONNECTION_ID)] as? ChainedParentEntity.Builder
         }
       }
       set(value) {
@@ -258,7 +264,6 @@ class ChainedEntityData : WorkspaceEntityData<ChainedEntity>() {
   override fun wrapAsModifiable(diff: MutableEntityStorage): WorkspaceEntity.Builder<ChainedEntity> {
     val modifiable = ChainedEntityImpl.Builder(null)
     modifiable.diff = diff
-    modifiable.snapshot = diff
     modifiable.id = createEntityId()
     return modifiable
   }
@@ -289,10 +294,10 @@ class ChainedEntityData : WorkspaceEntityData<ChainedEntity>() {
   override fun deserialize(de: EntityInformation.Deserializer) {
   }
 
-  override fun createDetachedEntity(parents: List<WorkspaceEntity>): WorkspaceEntity {
+  override fun createDetachedEntity(parents: List<WorkspaceEntity.Builder<*>>): WorkspaceEntity.Builder<*> {
     return ChainedEntity(data, entitySource) {
-      this.parent = parents.filterIsInstance<ChainedEntity>().singleOrNull()
-      this.generalParent = parents.filterIsInstance<ChainedParentEntity>().singleOrNull()
+      this.parent = parents.filterIsInstance<ChainedEntity.Builder>().singleOrNull()
+      this.generalParent = parents.filterIsInstance<ChainedParentEntity.Builder>().singleOrNull()
     }
   }
 

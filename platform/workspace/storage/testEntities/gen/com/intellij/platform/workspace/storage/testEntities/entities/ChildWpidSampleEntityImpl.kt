@@ -4,6 +4,7 @@ package com.intellij.platform.workspace.storage.testEntities.entities
 import com.intellij.platform.workspace.storage.*
 import com.intellij.platform.workspace.storage.EntityInformation
 import com.intellij.platform.workspace.storage.EntitySource
+import com.intellij.platform.workspace.storage.EntityType
 import com.intellij.platform.workspace.storage.GeneratedCodeApiVersion
 import com.intellij.platform.workspace.storage.GeneratedCodeImplVersion
 import com.intellij.platform.workspace.storage.MutableEntityStorage
@@ -19,11 +20,12 @@ import com.intellij.platform.workspace.storage.impl.extractOneToManyParent
 import com.intellij.platform.workspace.storage.impl.updateOneToManyParentOfChild
 import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentation
 import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentationApi
+import com.intellij.platform.workspace.storage.instrumentation.MutableEntityStorageInstrumentation
 import com.intellij.platform.workspace.storage.metadata.model.EntityMetadata
 import com.intellij.platform.workspace.storage.url.VirtualFileUrl
 
-@GeneratedCodeApiVersion(2)
-@GeneratedCodeImplVersion(3)
+@GeneratedCodeApiVersion(3)
+@GeneratedCodeImplVersion(5)
 open class ChildWpidSampleEntityImpl(private val dataSource: ChildWpidSampleEntityData) : ChildWpidSampleEntity, WorkspaceEntityBase(
   dataSource) {
 
@@ -74,7 +76,6 @@ open class ChildWpidSampleEntityImpl(private val dataSource: ChildWpidSampleEnti
       }
 
       this.diff = builder
-      this.snapshot = builder
       addToBuilder()
       this.id = getEntityData().createEntityId()
       // After adding entity data to the builder, we need to unbind it and move the control over entity data to builder
@@ -126,15 +127,17 @@ open class ChildWpidSampleEntityImpl(private val dataSource: ChildWpidSampleEnti
         changedProperty.add("data")
       }
 
-    override var parentEntity: SampleWithSymbolicIdEntity?
+    override var parentEntity: SampleWithSymbolicIdEntity.Builder?
       get() {
         val _diff = diff
         return if (_diff != null) {
-          _diff.extractOneToManyParent(PARENTENTITY_CONNECTION_ID, this) ?: this.entityLinks[EntityLink(false,
-                                                                                                        PARENTENTITY_CONNECTION_ID)] as? SampleWithSymbolicIdEntity
+          @OptIn(EntityStorageInstrumentationApi::class)
+          ((_diff as MutableEntityStorageInstrumentation).getParentBuilder(PARENTENTITY_CONNECTION_ID,
+                                                                           this) as? SampleWithSymbolicIdEntity.Builder)
+          ?: (this.entityLinks[EntityLink(false, PARENTENTITY_CONNECTION_ID)] as? SampleWithSymbolicIdEntity.Builder)
         }
         else {
-          this.entityLinks[EntityLink(false, PARENTENTITY_CONNECTION_ID)] as? SampleWithSymbolicIdEntity
+          this.entityLinks[EntityLink(false, PARENTENTITY_CONNECTION_ID)] as? SampleWithSymbolicIdEntity.Builder
         }
       }
       set(value) {
@@ -177,7 +180,6 @@ class ChildWpidSampleEntityData : WorkspaceEntityData<ChildWpidSampleEntity>() {
   override fun wrapAsModifiable(diff: MutableEntityStorage): WorkspaceEntity.Builder<ChildWpidSampleEntity> {
     val modifiable = ChildWpidSampleEntityImpl.Builder(null)
     modifiable.diff = diff
-    modifiable.snapshot = diff
     modifiable.id = createEntityId()
     return modifiable
   }
@@ -208,9 +210,9 @@ class ChildWpidSampleEntityData : WorkspaceEntityData<ChildWpidSampleEntity>() {
   override fun deserialize(de: EntityInformation.Deserializer) {
   }
 
-  override fun createDetachedEntity(parents: List<WorkspaceEntity>): WorkspaceEntity {
+  override fun createDetachedEntity(parents: List<WorkspaceEntity.Builder<*>>): WorkspaceEntity.Builder<*> {
     return ChildWpidSampleEntity(data, entitySource) {
-      this.parentEntity = parents.filterIsInstance<SampleWithSymbolicIdEntity>().singleOrNull()
+      this.parentEntity = parents.filterIsInstance<SampleWithSymbolicIdEntity.Builder>().singleOrNull()
     }
   }
 

@@ -4,6 +4,7 @@ package com.intellij.platform.workspace.storage.testEntities.entities
 import com.intellij.platform.workspace.storage.*
 import com.intellij.platform.workspace.storage.EntityInformation
 import com.intellij.platform.workspace.storage.EntitySource
+import com.intellij.platform.workspace.storage.EntityType
 import com.intellij.platform.workspace.storage.GeneratedCodeApiVersion
 import com.intellij.platform.workspace.storage.GeneratedCodeImplVersion
 import com.intellij.platform.workspace.storage.MutableEntityStorage
@@ -18,10 +19,11 @@ import com.intellij.platform.workspace.storage.impl.extractOneToManyParent
 import com.intellij.platform.workspace.storage.impl.updateOneToManyParentOfChild
 import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentation
 import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentationApi
+import com.intellij.platform.workspace.storage.instrumentation.MutableEntityStorageInstrumentation
 import com.intellij.platform.workspace.storage.metadata.model.EntityMetadata
 
-@GeneratedCodeApiVersion(2)
-@GeneratedCodeImplVersion(3)
+@GeneratedCodeApiVersion(3)
+@GeneratedCodeImplVersion(5)
 open class KeyChildImpl(private val dataSource: KeyChildData) : KeyChild, WorkspaceEntityBase(dataSource) {
 
   private companion object {
@@ -69,7 +71,6 @@ open class KeyChildImpl(private val dataSource: KeyChildData) : KeyChild, Worksp
       }
 
       this.diff = builder
-      this.snapshot = builder
       addToBuilder()
       this.id = getEntityData().createEntityId()
       // After adding entity data to the builder, we need to unbind it and move the control over entity data to builder
@@ -131,15 +132,16 @@ open class KeyChildImpl(private val dataSource: KeyChildData) : KeyChild, Worksp
         changedProperty.add("data")
       }
 
-    override var parentEntity: KeyParent
+    override var parentEntity: KeyParent.Builder
       get() {
         val _diff = diff
         return if (_diff != null) {
-          _diff.extractOneToManyParent(PARENTENTITY_CONNECTION_ID, this) ?: this.entityLinks[EntityLink(false,
-                                                                                                        PARENTENTITY_CONNECTION_ID)]!! as KeyParent
+          @OptIn(EntityStorageInstrumentationApi::class)
+          ((_diff as MutableEntityStorageInstrumentation).getParentBuilder(PARENTENTITY_CONNECTION_ID, this) as? KeyParent.Builder)
+          ?: (this.entityLinks[EntityLink(false, PARENTENTITY_CONNECTION_ID)]!! as KeyParent.Builder)
         }
         else {
-          this.entityLinks[EntityLink(false, PARENTENTITY_CONNECTION_ID)]!! as KeyParent
+          this.entityLinks[EntityLink(false, PARENTENTITY_CONNECTION_ID)]!! as KeyParent.Builder
         }
       }
       set(value) {
@@ -182,7 +184,6 @@ class KeyChildData : WorkspaceEntityData<KeyChild>() {
   override fun wrapAsModifiable(diff: MutableEntityStorage): WorkspaceEntity.Builder<KeyChild> {
     val modifiable = KeyChildImpl.Builder(null)
     modifiable.diff = diff
-    modifiable.snapshot = diff
     modifiable.id = createEntityId()
     return modifiable
   }
@@ -213,9 +214,9 @@ class KeyChildData : WorkspaceEntityData<KeyChild>() {
   override fun deserialize(de: EntityInformation.Deserializer) {
   }
 
-  override fun createDetachedEntity(parents: List<WorkspaceEntity>): WorkspaceEntity {
+  override fun createDetachedEntity(parents: List<WorkspaceEntity.Builder<*>>): WorkspaceEntity.Builder<*> {
     return KeyChild(data, entitySource) {
-      parents.filterIsInstance<KeyParent>().singleOrNull()?.let { this.parentEntity = it }
+      parents.filterIsInstance<KeyParent.Builder>().singleOrNull()?.let { this.parentEntity = it }
     }
   }
 

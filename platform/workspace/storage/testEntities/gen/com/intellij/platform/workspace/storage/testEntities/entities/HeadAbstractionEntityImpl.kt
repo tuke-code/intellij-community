@@ -20,10 +20,11 @@ import com.intellij.platform.workspace.storage.impl.extractOneToAbstractOneChild
 import com.intellij.platform.workspace.storage.impl.updateOneToAbstractOneChildOfParent
 import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentation
 import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentationApi
+import com.intellij.platform.workspace.storage.instrumentation.MutableEntityStorageInstrumentation
 import com.intellij.platform.workspace.storage.metadata.model.EntityMetadata
 
-@GeneratedCodeApiVersion(2)
-@GeneratedCodeImplVersion(3)
+@GeneratedCodeApiVersion(3)
+@GeneratedCodeImplVersion(5)
 open class HeadAbstractionEntityImpl(private val dataSource: HeadAbstractionEntityData) : HeadAbstractionEntity, WorkspaceEntityBase(
   dataSource) {
 
@@ -73,7 +74,6 @@ open class HeadAbstractionEntityImpl(private val dataSource: HeadAbstractionEnti
       }
 
       this.diff = builder
-      this.snapshot = builder
       addToBuilder()
       this.id = getEntityData().createEntityId()
       // After adding entity data to the builder, we need to unbind it and move the control over entity data to builder
@@ -125,15 +125,17 @@ open class HeadAbstractionEntityImpl(private val dataSource: HeadAbstractionEnti
         changedProperty.add("data")
       }
 
-    override var child: CompositeBaseEntity?
+    override var child: CompositeBaseEntity.Builder<out CompositeBaseEntity>?
       get() {
         val _diff = diff
         return if (_diff != null) {
-          _diff.extractOneToAbstractOneChild(CHILD_CONNECTION_ID, this) ?: this.entityLinks[EntityLink(true,
-                                                                                                       CHILD_CONNECTION_ID)] as? CompositeBaseEntity
+          @OptIn(EntityStorageInstrumentationApi::class)
+          ((_diff as MutableEntityStorageInstrumentation).getOneChildBuilder(CHILD_CONNECTION_ID,
+                                                                             this) as? CompositeBaseEntity.Builder<out CompositeBaseEntity>)
+          ?: (this.entityLinks[EntityLink(true, CHILD_CONNECTION_ID)] as? CompositeBaseEntity.Builder<out CompositeBaseEntity>)
         }
         else {
-          this.entityLinks[EntityLink(true, CHILD_CONNECTION_ID)] as? CompositeBaseEntity
+          this.entityLinks[EntityLink(true, CHILD_CONNECTION_ID)] as? CompositeBaseEntity.Builder<out CompositeBaseEntity>
         }
       }
       set(value) {
@@ -172,7 +174,6 @@ class HeadAbstractionEntityData : WorkspaceEntityData.WithCalculableSymbolicId<H
   override fun wrapAsModifiable(diff: MutableEntityStorage): WorkspaceEntity.Builder<HeadAbstractionEntity> {
     val modifiable = HeadAbstractionEntityImpl.Builder(null)
     modifiable.diff = diff
-    modifiable.snapshot = diff
     modifiable.id = createEntityId()
     return modifiable
   }
@@ -207,7 +208,7 @@ class HeadAbstractionEntityData : WorkspaceEntityData.WithCalculableSymbolicId<H
   override fun deserialize(de: EntityInformation.Deserializer) {
   }
 
-  override fun createDetachedEntity(parents: List<WorkspaceEntity>): WorkspaceEntity {
+  override fun createDetachedEntity(parents: List<WorkspaceEntity.Builder<*>>): WorkspaceEntity.Builder<*> {
     return HeadAbstractionEntity(data, entitySource) {
     }
   }

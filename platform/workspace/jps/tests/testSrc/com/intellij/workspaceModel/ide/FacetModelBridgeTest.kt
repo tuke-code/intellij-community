@@ -1,4 +1,4 @@
-// Copyright 2000-2020 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
+// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.workspaceModel.ide
 
 import com.intellij.facet.FacetManager
@@ -13,7 +13,9 @@ import com.intellij.openapi.util.JDOMUtil
 import com.intellij.platform.backend.workspace.WorkspaceModel
 import com.intellij.platform.workspace.jps.JpsProjectFileEntitySource
 import com.intellij.platform.workspace.jps.entities.FacetEntity
+import com.intellij.platform.workspace.jps.entities.FacetEntityTypeId
 import com.intellij.platform.workspace.jps.entities.ModuleEntity
+import com.intellij.platform.workspace.jps.entities.ModuleId
 import com.intellij.platform.workspace.jps.entities.modifyEntity
 import com.intellij.platform.workspace.storage.MutableEntityStorage
 import com.intellij.platform.workspace.storage.entities
@@ -37,6 +39,8 @@ import org.junit.ClassRule
 import org.junit.Rule
 import org.junit.Test
 import org.junit.jupiter.api.assertDoesNotThrow
+
+internal val MOCK_FACET_TYPE_ID = FacetEntityTypeId("MockFacetId")
 
 class FacetModelBridgeTest {
   companion object {
@@ -99,11 +103,12 @@ class FacetModelBridgeTest {
     val configLocation = toConfigLocation(iprFile, virtualFileManager)
     val source = JpsProjectFileEntitySource.FileInDirectory(configLocation.baseDirectoryUrl, configLocation)
 
-    val moduleEntity = builder addEntity ModuleEntity(name = "test", dependencies = emptyList(), entitySource = source)
-
-    builder addEntity FacetEntity("MyFacet", moduleEntity.symbolicId, "MockFacetId", source) {
-      configurationXmlTag = """<configuration data="foo" />"""
-      module = moduleEntity
+    builder addEntity ModuleEntity(name = "test", dependencies = emptyList(), entitySource = source) {
+      this.facets = listOf(
+        FacetEntity("MyFacet", ModuleId("test"), MOCK_FACET_TYPE_ID, source) {
+          configurationXmlTag = """<configuration data="foo" />"""
+        }
+      )
     }
 
     WorkspaceModelInitialTestContent.withInitialContent(builder.toSnapshot()) {
@@ -130,9 +135,9 @@ class FacetModelBridgeTest {
     val configLocation = toConfigLocation(iprFile, virtualFileManager)
     val source = JpsProjectFileEntitySource.FileInDirectory(configLocation.baseDirectoryUrl, configLocation)
 
-    val moduleEntity = builder addEntity ModuleEntity(name = "test", dependencies = emptyList(), entitySource = source)
+    val moduleEntity = ModuleEntity(name = "test", dependencies = emptyList(), entitySource = source)
 
-    builder addEntity FacetEntity("AnotherMockFacet", moduleEntity.symbolicId, "AnotherMockFacetId", source) {
+    builder addEntity FacetEntity("AnotherMockFacet", ModuleId("test"), FacetEntityTypeId("AnotherMockFacetId"), source) {
       configurationXmlTag = """
         <AnotherFacetConfigProperties>
           <firstElement>
@@ -200,10 +205,12 @@ class FacetModelBridgeTest {
     runWriteActionAndWait {
       WorkspaceModel.getInstance(projectModel.project).updateProjectModel { builder ->
         val moduleEntity = builder.entities<ModuleEntity>().first()
-        builder addEntity FacetEntity("myName", moduleEntity.symbolicId, "MockFacetId", moduleEntity.entitySource) {
-          this.module = moduleEntity
-          underlyingFacet = FacetEntity("anotherName", moduleEntity.symbolicId, "MockFacetId", moduleEntity.entitySource) {
-            this.module = moduleEntity
+        builder.modifyEntity(moduleEntity) module@{
+          builder addEntity FacetEntity("myName", moduleEntity.symbolicId, MOCK_FACET_TYPE_ID, moduleEntity.entitySource) {
+            this.module = this@module
+            underlyingFacet = FacetEntity("anotherName", moduleEntity.symbolicId, MOCK_FACET_TYPE_ID, moduleEntity.entitySource) {
+              this.module = this@module
+            }
           }
         }
       }

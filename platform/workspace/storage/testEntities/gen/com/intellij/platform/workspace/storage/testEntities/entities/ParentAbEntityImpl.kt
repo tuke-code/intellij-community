@@ -4,6 +4,7 @@ package com.intellij.platform.workspace.storage.testEntities.entities
 import com.intellij.platform.workspace.storage.*
 import com.intellij.platform.workspace.storage.EntityInformation
 import com.intellij.platform.workspace.storage.EntitySource
+import com.intellij.platform.workspace.storage.EntityType
 import com.intellij.platform.workspace.storage.GeneratedCodeApiVersion
 import com.intellij.platform.workspace.storage.GeneratedCodeImplVersion
 import com.intellij.platform.workspace.storage.MutableEntityStorage
@@ -20,10 +21,11 @@ import com.intellij.platform.workspace.storage.impl.extractOneToManyChildren
 import com.intellij.platform.workspace.storage.impl.updateOneToAbstractManyChildrenOfParent
 import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentation
 import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentationApi
+import com.intellij.platform.workspace.storage.instrumentation.MutableEntityStorageInstrumentation
 import com.intellij.platform.workspace.storage.metadata.model.EntityMetadata
 
-@GeneratedCodeApiVersion(2)
-@GeneratedCodeImplVersion(3)
+@GeneratedCodeApiVersion(3)
+@GeneratedCodeImplVersion(5)
 open class ParentAbEntityImpl(private val dataSource: ParentAbEntityData) : ParentAbEntity, WorkspaceEntityBase(dataSource) {
 
   private companion object {
@@ -66,7 +68,6 @@ open class ParentAbEntityImpl(private val dataSource: ParentAbEntityData) : Pare
       }
 
       this.diff = builder
-      this.snapshot = builder
       addToBuilder()
       this.id = getEntityData().createEntityId()
       // After adding entity data to the builder, we need to unbind it and move the control over entity data to builder
@@ -117,17 +118,19 @@ open class ParentAbEntityImpl(private val dataSource: ParentAbEntityData) : Pare
 
       }
 
-    override var children: List<ChildAbstractBaseEntity>
+    override var children: List<ChildAbstractBaseEntity.Builder<out ChildAbstractBaseEntity>>
       get() {
         val _diff = diff
         return if (_diff != null) {
-          _diff.extractOneToAbstractManyChildren<ChildAbstractBaseEntity>(CHILDREN_CONNECTION_ID,
-                                                                          this)!!.toList() + (this.entityLinks[EntityLink(true,
-                                                                                                                          CHILDREN_CONNECTION_ID)] as? List<ChildAbstractBaseEntity>
-                                                                                              ?: emptyList())
+          @OptIn(EntityStorageInstrumentationApi::class)
+          ((_diff as MutableEntityStorageInstrumentation).getManyChildrenBuilders(CHILDREN_CONNECTION_ID,
+                                                                                  this)!!.toList() as List<ChildAbstractBaseEntity.Builder<out ChildAbstractBaseEntity>>) +
+          (this.entityLinks[EntityLink(true, CHILDREN_CONNECTION_ID)] as? List<ChildAbstractBaseEntity.Builder<out ChildAbstractBaseEntity>>
+           ?: emptyList())
         }
         else {
-          this.entityLinks[EntityLink(true, CHILDREN_CONNECTION_ID)] as List<ChildAbstractBaseEntity> ?: emptyList()
+          this.entityLinks[EntityLink(true, CHILDREN_CONNECTION_ID)] as List<ChildAbstractBaseEntity.Builder<out ChildAbstractBaseEntity>>
+          ?: emptyList()
         }
       }
       set(value) {
@@ -170,7 +173,6 @@ class ParentAbEntityData : WorkspaceEntityData<ParentAbEntity>() {
   override fun wrapAsModifiable(diff: MutableEntityStorage): WorkspaceEntity.Builder<ParentAbEntity> {
     val modifiable = ParentAbEntityImpl.Builder(null)
     modifiable.diff = diff
-    modifiable.snapshot = diff
     modifiable.id = createEntityId()
     return modifiable
   }
@@ -201,7 +203,7 @@ class ParentAbEntityData : WorkspaceEntityData<ParentAbEntity>() {
   override fun deserialize(de: EntityInformation.Deserializer) {
   }
 
-  override fun createDetachedEntity(parents: List<WorkspaceEntity>): WorkspaceEntity {
+  override fun createDetachedEntity(parents: List<WorkspaceEntity.Builder<*>>): WorkspaceEntity.Builder<*> {
     return ParentAbEntity(entitySource) {
     }
   }

@@ -7,22 +7,21 @@ import com.intellij.openapi.components.Storage
 import com.intellij.python.community.impl.huggingFace.HuggingFaceConstants
 import com.intellij.python.community.impl.huggingFace.api.HuggingFaceEntityBasicApiData
 import com.intellij.util.xmlb.XmlSerializerUtil
+import org.jetbrains.annotations.ApiStatus
 
 
-@State(
-  name = "HuggingFaceCache",
-  storages = [Storage("HuggingFaceCache.xml")]
-)
+@ApiStatus.Internal
 abstract class HuggingFaceCache(private val maxSize: Int) : PersistentStateComponent<HuggingFaceCache> {
+  private var nameSet: MutableSet<String> = mutableSetOf()
+  private val hotCacheMaxSize = 32
+
   private var cacheMap: LinkedHashMap<String, HuggingFaceEntityBasicApiData> =
     object : LinkedHashMap<String, HuggingFaceEntityBasicApiData>(maxSize, 0.75f, true) {
       override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, HuggingFaceEntityBasicApiData>?): Boolean {
       return size > maxSize
       }
     }
-  private var nameSet: MutableSet<String> = mutableSetOf()
 
-  private val hotCacheMaxSize = 50  // smaller cache for IDs met on practice
   private val hotCache: LinkedHashMap<String, HuggingFaceEntityBasicApiData> =
     object : LinkedHashMap<String, HuggingFaceEntityBasicApiData>(16, 0.75f, true) {
       override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, HuggingFaceEntityBasicApiData>?): Boolean {
@@ -30,6 +29,7 @@ abstract class HuggingFaceCache(private val maxSize: Int) : PersistentStateCompo
       }
     }
 
+  @Synchronized
   fun saveEntities(entitiesMap: Map<String, HuggingFaceEntityBasicApiData>) {
     cacheMap.putAll(entitiesMap)
     entitiesMap.keys.forEach { key ->
@@ -37,6 +37,13 @@ abstract class HuggingFaceCache(private val maxSize: Int) : PersistentStateCompo
     }
   }
 
+  @Synchronized
+  fun saveEntity(entityData: HuggingFaceEntityBasicApiData) {
+    cacheMap[entityData.itemId] = entityData
+    nameSet.add(entityData.itemId)
+  }
+
+  @Synchronized
   fun isInCache(entityId: String): Boolean {
     if (hotCache.containsKey(entityId)) return true
 
@@ -46,16 +53,18 @@ abstract class HuggingFaceCache(private val maxSize: Int) : PersistentStateCompo
     } else false
   }
 
+  @Synchronized
   fun getBasicData(entityId: String): HuggingFaceEntityBasicApiData? = cacheMap[entityId]
 
+  @Synchronized
   fun getPipelineTagForEntity(entityId: String): String? {
     hotCache[entityId]?.let { return it.pipelineTag }
     return cacheMap[entityId]?.pipelineTag
   }
 
-  override fun getState(): HuggingFaceCache = this
-
+  @Synchronized
   fun getCacheSize() = cacheMap.size
+  override fun getState(): HuggingFaceCache = this
 
   override fun loadState(state: HuggingFaceCache) {
     XmlSerializerUtil.copyBean(state, this)
@@ -63,7 +72,6 @@ abstract class HuggingFaceCache(private val maxSize: Int) : PersistentStateCompo
     nameSet = state.nameSet
   }
 }
-
 
 @State(
   name = "HuggingFaceModelsCache",

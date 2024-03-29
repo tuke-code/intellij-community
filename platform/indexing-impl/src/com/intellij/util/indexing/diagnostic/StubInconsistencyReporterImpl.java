@@ -10,17 +10,41 @@ import org.jetbrains.annotations.Nullable;
 @ApiStatus.Internal
 public class StubInconsistencyReporterImpl implements StubInconsistencyReporter {
   @Override
+  public void reportStubInconsistency(@NotNull Project project,
+                                      @Nullable SourceOfCheck reason,
+                                      @NotNull InconsistencyType type) {
+    StubInconsistencyReportUtil.reportStubInconsistency(project, reason, type);
+  }
+
+  @Override
   public void reportEnforcedStubInconsistency(@NotNull Project project,
                                               @NotNull StubInconsistencyReporter.SourceOfCheck reason,
-                                              @NotNull EnforcedInconsistencyType enforcedInconsistencyType) {
-    IndexStatisticGroup.reportEnforcedStubInconsistency(project, reason, enforcedInconsistencyType);
+                                              @SuppressWarnings("deprecation") @NotNull EnforcedInconsistencyType enforcedInconsistencyType) {
+    //ignore
   }
 
   @Override
   public void reportStubInconsistency(@NotNull Project project,
                                       @NotNull StubInconsistencyReporter.SourceOfCheck reason,
                                       @NotNull InconsistencyType type,
-                                      @Nullable EnforcedInconsistencyType enforcedInconsistencyType) {
-    IndexStatisticGroup.reportStubInconsistency(project, reason, type, enforcedInconsistencyType);
+                                      @SuppressWarnings("deprecation") @Nullable EnforcedInconsistencyType enforcedInconsistencyType) {
+    //ignore
+  }
+
+  @Override
+  public void reportKotlinDescriptorNotFound(@Nullable Project project) {
+    StubInconsistencyReportUtil.reportKotlinDescriptorNotFound(project);
+  }
+
+  @Override
+  public void reportKotlinMissingClassName(@NotNull Project project,
+                                           boolean foundInKotlinFullClassNameIndex,
+                                           boolean foundInEverythingScope) {
+    StubInconsistencyReportUtil.reportKotlinMissingClassName(project, foundInKotlinFullClassNameIndex, foundInEverythingScope);
+  }
+
+  @Override
+  public void reportStubTreeAndIndexDoNotMatch(@NotNull Project project, @NotNull StubTreeAndIndexDoNotMatchSource source) {
+    StubInconsistencyReportUtil.reportStubTreeAndIndexDoNotMatch(project, source);
   }
 }

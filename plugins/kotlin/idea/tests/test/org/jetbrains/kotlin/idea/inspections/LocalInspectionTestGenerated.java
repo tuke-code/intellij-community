@@ -10716,6 +10716,59 @@ public abstract class LocalInspectionTestGenerated extends AbstractLocalInspecti
     }
 
     @RunWith(JUnit3RunnerWithInners.class)
+    @TestMetadata("testData/inspectionsLocal/redundantUnitReturnType")
+    public static class RedundantUnitReturnType extends AbstractLocalInspectionTest {
+        private void runTest(String testDataFilePath) throws Exception {
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+        }
+
+        @TestMetadata("aliasedNullableUnit.kt")
+        public void testAliasedNullableUnit() throws Exception {
+            runTest("testData/inspectionsLocal/redundantUnitReturnType/aliasedNullableUnit.kt");
+        }
+
+        @TestMetadata("aliasedUnit.kt")
+        public void testAliasedUnit() throws Exception {
+            runTest("testData/inspectionsLocal/redundantUnitReturnType/aliasedUnit.kt");
+        }
+
+        @TestMetadata("explicitReturn.kt")
+        public void testExplicitReturn() throws Exception {
+            runTest("testData/inspectionsLocal/redundantUnitReturnType/explicitReturn.kt");
+        }
+
+        @TestMetadata("explicitUnitReturn.kt")
+        public void testExplicitUnitReturn() throws Exception {
+            runTest("testData/inspectionsLocal/redundantUnitReturnType/explicitUnitReturn.kt");
+        }
+
+        @TestMetadata("expressionBodyThrow.kt")
+        public void testExpressionBodyThrow() throws Exception {
+            runTest("testData/inspectionsLocal/redundantUnitReturnType/expressionBodyThrow.kt");
+        }
+
+        @TestMetadata("expressionBodyUnitType.kt")
+        public void testExpressionBodyUnitType() throws Exception {
+            runTest("testData/inspectionsLocal/redundantUnitReturnType/expressionBodyUnitType.kt");
+        }
+
+        @TestMetadata("nullableUnit.kt")
+        public void testNullableUnit() throws Exception {
+            runTest("testData/inspectionsLocal/redundantUnitReturnType/nullableUnit.kt");
+        }
+
+        @TestMetadata("simple.kt")
+        public void testSimple() throws Exception {
+            runTest("testData/inspectionsLocal/redundantUnitReturnType/simple.kt");
+        }
+
+        @TestMetadata("throw.kt")
+        public void testThrow() throws Exception {
+            runTest("testData/inspectionsLocal/redundantUnitReturnType/throw.kt");
+        }
+    }
+
+    @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("testData/inspectionsLocal/redundantVisibilityModifier")
     public static class RedundantVisibilityModifier extends AbstractLocalInspectionTest {
         private void runTest(String testDataFilePath) throws Exception {
@@ -17798,6 +17851,11 @@ public abstract class LocalInspectionTestGenerated extends AbstractLocalInspecti
                 @TestMetadata("assignment.kt")
                 public void testAssignment() throws Exception {
                     runTest("testData/inspectionsLocal/useExpressionBody/convertToExpressionBody/assignment.kt");
+                }
+
+                @TestMetadata("block.kt")
+                public void testBlock() throws Exception {
+                    runTest("testData/inspectionsLocal/useExpressionBody/convertToExpressionBody/block.kt");
                 }
 
                 @TestMetadata("constructorWithEmptyBody.kt")

@@ -24,7 +24,9 @@ import com.intellij.platform.diagnostic.telemetry.TelemetryManager
 import com.intellij.platform.diagnostic.telemetry.helpers.MillisecondsMeasurer
 import com.intellij.platform.workspace.jps.JpsImportedEntitySource
 import com.intellij.platform.workspace.storage.*
+import com.intellij.platform.workspace.storage.impl.ModifiableWorkspaceEntityBase
 import com.intellij.platform.workspace.storage.impl.VersionedEntityStorageOnBuilder
+import com.intellij.platform.workspace.storage.impl.WorkspaceEntityBase
 import com.intellij.util.EventDispatcher
 import com.intellij.workspaceModel.ide.toExternalSource
 import io.opentelemetry.api.metrics.Meter
@@ -195,7 +197,7 @@ open class ArtifactBridge(
 
   override fun setRootElement(root: CompositePackagingElement<*>) {
     val entity = diff.get(artifactId)
-    val rootEntity = root.getOrAddEntity(diff, entity.entitySource, project) as CompositePackagingElementEntity
+    val rootEntity = root.getOrAddEntityBuilder(diff, entity.entitySource, project) as CompositePackagingElementEntity.Builder<out CompositePackagingElementEntity>
 
     root.forThisAndFullTree {
       it.setStorage(this.entityStorage, this.project, elementsWithDiff, PackagingElementInitializer)
@@ -204,7 +206,7 @@ open class ArtifactBridge(
       }
     }
     val oldRootElement = entity.rootElement!!
-    if (oldRootElement != rootEntity) {
+    if ((oldRootElement as WorkspaceEntityBase).id != (rootEntity as ModifiableWorkspaceEntityBase<*, *>).id) {
       // As we replace old root element with the new one, we should kick builder from old root element
       if (originalArtifact != null) {
         diff.elements.getDataByEntity(oldRootElement)?.let { oldRootBridge ->
@@ -223,11 +225,8 @@ open class ArtifactBridge(
   override fun setProperties(provider: ArtifactPropertiesProvider, properties: ArtifactProperties<*>?) {
     if (properties == null) {
       val entity = diff.get(artifactId)
-      val (toBeRemoved, filtered) = entity.customProperties.partition { it.providerType == provider.id }
+      val (toBeRemoved, _) = entity.customProperties.partition { it.providerType == provider.id }
       if (toBeRemoved.isNotEmpty()) {
-        diff.modifyEntity(entity) {
-          this.customProperties = filtered
-        }
         toBeRemoved.forEach { diff.removeEntity(it) }
       }
     }
@@ -239,9 +238,10 @@ open class ArtifactBridge(
       val existingProperty = entity.customProperties.find { it.providerType == provider.id }
 
       if (existingProperty == null) {
-        diff addEntity ArtifactPropertiesEntity(provider.id, entity.entitySource) {
-          artifact = entity
-          propertiesXmlTag = tag
+        diff.modifyEntity(entity) {
+          this.customProperties += ArtifactPropertiesEntity(provider.id, entity.entitySource) {
+            this.propertiesXmlTag = tag
+          }
         }
       }
       else {

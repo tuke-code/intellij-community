@@ -6,8 +6,9 @@ import com.intellij.lang.jvm.actions.CreateMethodRequest
 import com.intellij.lang.jvm.actions.ExpectedType
 import com.intellij.lang.jvm.types.JvmReferenceType
 import com.intellij.openapi.util.NlsSafe
-import org.jetbrains.kotlin.analysis.api.KtAnalysisSession
+import com.intellij.psi.PsiElement
 import org.jetbrains.kotlin.analysis.api.analyze
+import org.jetbrains.kotlin.analysis.api.symbols.KtClassLikeSymbol
 import org.jetbrains.kotlin.analysis.api.types.KtType
 import org.jetbrains.kotlin.psi.KtCallExpression
 import org.jetbrains.kotlin.psi.KtExpression
@@ -17,27 +18,32 @@ import org.jetbrains.kotlin.psi.KtSimpleNameExpression
  * A request to create Kotlin callable from the usage in Kotlin.
  */
 internal class CreateMethodFromKotlinUsageRequest (
-    private val functionCall: KtCallExpression,
+    functionCall: KtCallExpression,
     modifiers: Collection<JvmModifier>,
     val receiverExpression: KtExpression?,
     val receiverType: KtType?, // (in case receiverExpression is null) it can be notnull when there's implicit receiver: `blah { unknownFunc() }`
     val isExtension: Boolean,
     val isAbstractClassOrInterface: Boolean,
-    val isForCompanion: Boolean
+    val isForCompanion: Boolean,
 ) : CreateExecutableFromKotlinUsageRequest<KtCallExpression>(functionCall, modifiers), CreateMethodRequest {
-    private val returnType = mutableListOf<ExpectedType>()
+    internal val targetClass: PsiElement? = initializeTargetClass(receiverExpression, functionCall)
 
-    init {
-      analyze(functionCall) {
-          initializeReturnType()
-      }
+    private fun initializeTargetClass(receiverExpression: KtExpression?, functionCall: KtCallExpression): PsiElement? {
+        return analyze(functionCall) {
+            (receiverExpression?.resolveExpression() as? KtClassLikeSymbol)?.psi
+        }
     }
 
-    context (KtAnalysisSession)
-    private fun initializeReturnType() {
-        val returnJvmType = functionCall.getExpectedKotlinType() ?: return
-        (returnJvmType.theType as? JvmReferenceType)?.let { if (it.resolve() == null) return }
-        returnType.add(returnJvmType)
+    private val returnType:List<ExpectedType> = initializeReturnType(functionCall)
+
+    private fun initializeReturnType(functionCall: KtCallExpression): List<ExpectedType> {
+        return analyze(functionCall) {
+            val returnJvmType = functionCall.getExpectedKotlinType() ?: return emptyList()
+            if (returnJvmType !is ExpectedKotlinType) {
+                (returnJvmType.theType as? JvmReferenceType)?.let { if (it.resolve() == null) return emptyList() }
+            }
+            listOf(returnJvmType)
+        }
     }
 
     override fun isValid(): Boolean = super.isValid() && getReferenceName() != null

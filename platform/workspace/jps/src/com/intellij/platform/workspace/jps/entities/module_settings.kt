@@ -15,11 +15,11 @@ interface ModuleSettingsBase : WorkspaceEntityWithSymbolicId {
   val moduleId: ModuleId
 
   //region generated code
-  @GeneratedCodeApiVersion(2)
-  interface Builder<T : ModuleSettingsBase> : ModuleSettingsBase, WorkspaceEntity.Builder<T> {
+  @GeneratedCodeApiVersion(3)
+  interface Builder<T : ModuleSettingsBase> : WorkspaceEntity.Builder<T> {
     override var entitySource: EntitySource
-    override var name: String
-    override var moduleId: ModuleId
+    var name: String
+    var moduleId: ModuleId
   }
 
   companion object : EntityType<ModuleSettingsBase, Builder<ModuleSettingsBase>>() {
@@ -31,7 +31,7 @@ interface ModuleSettingsBase : WorkspaceEntityWithSymbolicId {
       moduleId: ModuleId,
       entitySource: EntitySource,
       init: (Builder<ModuleSettingsBase>.() -> Unit)? = null,
-    ): ModuleSettingsBase {
+    ): Builder<ModuleSettingsBase> {
       val builder = builder()
       builder.name = name
       builder.moduleId = moduleId

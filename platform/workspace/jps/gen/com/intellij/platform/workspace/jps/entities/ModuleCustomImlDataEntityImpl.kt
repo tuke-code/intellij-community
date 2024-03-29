@@ -21,12 +21,14 @@ import com.intellij.platform.workspace.storage.impl.extractOneToOneParent
 import com.intellij.platform.workspace.storage.impl.updateOneToOneParentOfChild
 import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentation
 import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentationApi
+import com.intellij.platform.workspace.storage.instrumentation.MutableEntityStorageInstrumentation
 import com.intellij.platform.workspace.storage.metadata.model.EntityMetadata
 import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.NonNls
 
-@GeneratedCodeApiVersion(2)
-@GeneratedCodeImplVersion(3)
+@ApiStatus.Internal // Just insert this manually. This is needed for correct api surface
+@GeneratedCodeApiVersion(3)
+@GeneratedCodeImplVersion(5)
 open class ModuleCustomImlDataEntityImpl(private val dataSource: ModuleCustomImlDataEntityData) : ModuleCustomImlDataEntity, WorkspaceEntityBase(
   dataSource) {
 
@@ -82,7 +84,6 @@ open class ModuleCustomImlDataEntityImpl(private val dataSource: ModuleCustomIml
       }
 
       this.diff = builder
-      this.snapshot = builder
       addToBuilder()
       this.id = getEntityData().createEntityId()
       // After adding entity data to the builder, we need to unbind it and move the control over entity data to builder
@@ -137,15 +138,16 @@ open class ModuleCustomImlDataEntityImpl(private val dataSource: ModuleCustomIml
 
       }
 
-    override var module: ModuleEntity
+    override var module: ModuleEntity.Builder
       get() {
         val _diff = diff
         return if (_diff != null) {
-          _diff.extractOneToOneParent(MODULE_CONNECTION_ID, this) ?: this.entityLinks[EntityLink(false,
-                                                                                                 MODULE_CONNECTION_ID)]!! as ModuleEntity
+          @OptIn(EntityStorageInstrumentationApi::class)
+          ((_diff as MutableEntityStorageInstrumentation).getParentBuilder(MODULE_CONNECTION_ID, this) as? ModuleEntity.Builder)
+          ?: (this.entityLinks[EntityLink(false, MODULE_CONNECTION_ID)]!! as ModuleEntity.Builder)
         }
         else {
-          this.entityLinks[EntityLink(false, MODULE_CONNECTION_ID)]!! as ModuleEntity
+          this.entityLinks[EntityLink(false, MODULE_CONNECTION_ID)]!! as ModuleEntity.Builder
         }
       }
       set(value) {
@@ -201,7 +203,6 @@ class ModuleCustomImlDataEntityData : WorkspaceEntityData<ModuleCustomImlDataEnt
   override fun wrapAsModifiable(diff: MutableEntityStorage): WorkspaceEntity.Builder<ModuleCustomImlDataEntity> {
     val modifiable = ModuleCustomImlDataEntityImpl.Builder(null)
     modifiable.diff = diff
-    modifiable.snapshot = diff
     modifiable.id = createEntityId()
     return modifiable
   }
@@ -232,10 +233,10 @@ class ModuleCustomImlDataEntityData : WorkspaceEntityData<ModuleCustomImlDataEnt
   override fun deserialize(de: EntityInformation.Deserializer) {
   }
 
-  override fun createDetachedEntity(parents: List<WorkspaceEntity>): WorkspaceEntity {
+  override fun createDetachedEntity(parents: List<WorkspaceEntity.Builder<*>>): WorkspaceEntity.Builder<*> {
     return ModuleCustomImlDataEntity(customModuleOptions, entitySource) {
       this.rootManagerTagCustomData = this@ModuleCustomImlDataEntityData.rootManagerTagCustomData
-      parents.filterIsInstance<ModuleEntity>().singleOrNull()?.let { this.module = it }
+      parents.filterIsInstance<ModuleEntity.Builder>().singleOrNull()?.let { this.module = it }
     }
   }
 

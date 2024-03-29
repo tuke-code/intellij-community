@@ -17,12 +17,12 @@ interface KeyPropEntity: WorkspaceEntity {
   val url: VirtualFileUrl
 
   //region generated code
-  @GeneratedCodeApiVersion(2)
-  interface Builder : KeyPropEntity, WorkspaceEntity.Builder<KeyPropEntity> {
+  @GeneratedCodeApiVersion(3)
+  interface Builder : WorkspaceEntity.Builder<KeyPropEntity> {
     override var entitySource: EntitySource
-    override var someInt: Int
-    override var text: String
-    override var url: VirtualFileUrl
+    var someInt: Int
+    var text: String
+    var url: VirtualFileUrl
   }
 
   companion object : EntityType<KeyPropEntity, Builder>() {
@@ -35,7 +35,7 @@ interface KeyPropEntity: WorkspaceEntity {
       url: VirtualFileUrl,
       entitySource: EntitySource,
       init: (Builder.() -> Unit)? = null,
-    ): KeyPropEntity {
+    ): Builder {
       val builder = builder()
       builder.someInt = someInt
       builder.text = text

@@ -19,8 +19,8 @@ import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInst
 import com.intellij.platform.workspace.storage.metadata.model.EntityMetadata
 import com.intellij.platform.workspace.storage.url.VirtualFileUrl
 
-@GeneratedCodeApiVersion(2)
-@GeneratedCodeImplVersion(3)
+@GeneratedCodeApiVersion(3)
+@GeneratedCodeImplVersion(5)
 open class ScratchRootsEntityImpl(private val dataSource: ScratchRootsEntityData) : ScratchRootsEntity, WorkspaceEntityBase(dataSource) {
 
   private companion object {
@@ -64,7 +64,6 @@ open class ScratchRootsEntityImpl(private val dataSource: ScratchRootsEntityData
       }
 
       this.diff = builder
-      this.snapshot = builder
       addToBuilder()
       this.id = getEntityData().createEntityId()
       // After adding entity data to the builder, we need to unbind it and move the control over entity data to builder
@@ -151,7 +150,6 @@ class ScratchRootsEntityData : WorkspaceEntityData<ScratchRootsEntity>() {
   override fun wrapAsModifiable(diff: MutableEntityStorage): WorkspaceEntity.Builder<ScratchRootsEntity> {
     val modifiable = ScratchRootsEntityImpl.Builder(null)
     modifiable.diff = diff
-    modifiable.snapshot = diff
     modifiable.id = createEntityId()
     return modifiable
   }
@@ -188,7 +186,7 @@ class ScratchRootsEntityData : WorkspaceEntityData<ScratchRootsEntity>() {
   override fun deserialize(de: EntityInformation.Deserializer) {
   }
 
-  override fun createDetachedEntity(parents: List<WorkspaceEntity>): WorkspaceEntity {
+  override fun createDetachedEntity(parents: List<WorkspaceEntity.Builder<*>>): WorkspaceEntity.Builder<*> {
     return ScratchRootsEntity(roots, entitySource) {
     }
   }

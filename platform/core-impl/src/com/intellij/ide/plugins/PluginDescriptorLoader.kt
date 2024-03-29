@@ -113,7 +113,7 @@ fun loadDescriptorFromDir(
       useCoreClassLoader = useCoreClassLoader,
     )
     context.debugData?.recordDescriptorPath(descriptor = descriptor, rawPluginDescriptor = raw, path = descriptorRelativePath)
-    descriptor.readExternal(raw = raw, pathResolver = pathResolver, context = context, isSub = false, dataLoader = dataLoader)
+    descriptor.readExternal(raw = raw, pathResolver = pathResolver, context = context, dataLoader = dataLoader)
     descriptor.jarFiles = Collections.singletonList(dir)
     return descriptor
   }
@@ -171,7 +171,7 @@ fun loadDescriptorFromJar(
       useCoreClassLoader = useCoreClassLoader,
     )
     parentContext.debugData?.recordDescriptorPath(descriptor, raw, descriptorRelativePath)
-    descriptor.readExternal(raw = raw, pathResolver = pathResolver, context = parentContext, isSub = false, dataLoader = dataLoader)
+    descriptor.readExternal(raw = raw, pathResolver = pathResolver, context = parentContext, dataLoader = dataLoader)
     descriptor.jarFiles = Collections.singletonList(descriptor.pluginPath)
     return descriptor
   }
@@ -674,20 +674,24 @@ private fun loadCoreProductPlugin(
     override fun toString() = "product classpath"
   }
 
-  val raw = readModuleDescriptor(reader,
-                                 readContext = context,
-                                 pathResolver = pathResolver,
-                                 dataLoader = dataLoader,
-                                 includeBase = null,
-                                 readInto = null)
-  val descriptor = IdeaPluginDescriptorImpl(raw = raw,
-                                            path = Paths.get(PathManager.getLibPath()),
-                                            isBundled = true,
-                                            id = null,
-                                            moduleName = null,
-                                            useCoreClassLoader = useCoreClassLoader)
+  val raw = readModuleDescriptor(
+    reader,
+    readContext = context,
+    pathResolver = pathResolver,
+    dataLoader = dataLoader,
+    includeBase = null,
+    readInto = null,
+  )
+  val descriptor = IdeaPluginDescriptorImpl(
+    raw = raw,
+    path = Paths.get(PathManager.getLibPath()),
+    isBundled = true,
+    id = null,
+    moduleName = null,
+    useCoreClassLoader = useCoreClassLoader,
+  )
   context.debugData?.recordDescriptorPath(descriptor, raw, path)
-  descriptor.readExternal(raw = raw, pathResolver = pathResolver, context = context, isSub = false, dataLoader = dataLoader)
+  descriptor.readExternal(raw = raw, pathResolver = pathResolver, context = context, dataLoader = dataLoader)
   return descriptor
 }
 
@@ -928,7 +932,7 @@ private fun loadDescriptorFromResource(
       useCoreClassLoader = useCoreClassLoader,
     )
     context.debugData?.recordDescriptorPath(descriptor, raw, filename)
-    descriptor.readExternal(raw = raw, pathResolver = pathResolver, context = context, isSub = false, dataLoader = dataLoader)
+    descriptor.readExternal(raw = raw, pathResolver = pathResolver, context = context, dataLoader = dataLoader)
     // do not set jarFiles by intention - doesn't make sense
     return descriptor
   }

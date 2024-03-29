@@ -185,7 +185,7 @@ internal class MutableEntityStorageImpl(
 
   override fun <E : WorkspaceEntity> entities(entityClass: Class<E>): Sequence<E> = getEntitiesTimeMs.addMeasuredTime {
     @Suppress("UNCHECKED_CAST")
-    entitiesByType[entityClass.toClassId()]?.all()?.map { it.wrapAsModifiable(this) } as? Sequence<E> ?: emptySequence()
+    entitiesByType[entityClass.toClassId()]?.all()?.map { it.createEntity(this) } as? Sequence<E> ?: emptySequence()
   }
 
   override fun <E : WorkspaceEntityWithSymbolicId, R : WorkspaceEntity> referrers(
@@ -197,7 +197,7 @@ internal class MutableEntityStorageImpl(
     @Suppress("UNCHECKED_CAST")
     indexes.softLinks.getIdsByEntry(id).asSequence()
       .filter { it.clazz == classId }
-      .map { entityDataByIdOrDie(it).wrapAsModifiable(this) as R }
+      .map { entityDataByIdOrDie(it).createEntity(this) as R }
   }
 
   @Suppress("UNCHECKED_CAST")
@@ -205,7 +205,7 @@ internal class MutableEntityStorageImpl(
     val entityIds = indexes.symbolicIdIndex.getIdsByEntry(id) ?: return@addMeasuredTime null
     val entityData: WorkspaceEntityData<WorkspaceEntity> = entityDataById(entityIds) as? WorkspaceEntityData<WorkspaceEntity>
                                                            ?: return@addMeasuredTime null
-    return@addMeasuredTime entityData.wrapAsModifiable(this) as E?
+    return@addMeasuredTime entityData.createEntity(this) as E?
   }
 
   override fun entitiesBySource(sourceFilter: (EntitySource) -> Boolean): Sequence<WorkspaceEntity> {
@@ -218,8 +218,23 @@ internal class MutableEntityStorageImpl(
         .asSequence()
         .flatMap { source ->
           val entityIds = index.getIdsByEntry(source) ?: error("Entity source $source expected to be in the index")
-          entityIds.asSequence().map { this.entityDataByIdOrDie(it).wrapAsModifiable(this) }
+          entityIds.asSequence().map { this.entityDataByIdOrDie(it).createEntity(this) }
         }
+    }
+  }
+
+  override fun <M : WorkspaceEntity.Builder<T>, T : WorkspaceEntity> addEntity(entity: M): T = addEntityTimeMs.addMeasuredTime {
+    try {
+      lockWrite()
+      val entityToAdd = entity as ModifiableWorkspaceEntityBase<*, *>
+
+      entityToAdd.applyToBuilder(this)
+      entityToAdd.changedProperty.clear()
+
+      return@addMeasuredTime this.entityDataByIdOrDie(entityToAdd.id).createEntity(this) as T
+    }
+    finally {
+      unlockWrite()
     }
   }
 
@@ -255,9 +270,11 @@ internal class MutableEntityStorageImpl(
       lockWrite()
 
       val newEntityData = entity.getEntityData()
+      val immutableEntity = newEntityData.createEntity(this)
+      val symbolicId = (immutableEntity as? WorkspaceEntityWithSymbolicId)?.symbolicId
 
       // Check for persistent id uniqueness
-      assertUniqueSymbolicId(newEntityData)
+      assertUniqueSymbolicId(newEntityData, symbolicId)
 
       entitiesByType.add(newEntityData, entity.getEntityClass().toClassId())
 
@@ -265,24 +282,24 @@ internal class MutableEntityStorageImpl(
       changeLog.addAddEvent(newEntityData.createEntityId(), newEntityData)
 
       // Update indexes
-      indexes.entityAdded(newEntityData)
+      indexes.entityAdded(newEntityData, symbolicId)
     }
     finally {
       unlockWrite()
     }
   }
 
-  private fun <T : WorkspaceEntity> assertUniqueSymbolicId(pEntityData: WorkspaceEntityData<T>) {
-    pEntityData.symbolicId()?.let { symbolicId ->
-      val ids = indexes.symbolicIdIndex.getIdsByEntry(symbolicId)
-      if (ids != null) {
-        // Oh, oh. This symbolic id exists already
-        // Fallback strategy: remove existing entity with all it's references
-        val existingEntityData = entityDataByIdOrDie(ids)
-        val existingEntity = existingEntityData.createEntity(this)
-        removeEntity(existingEntity)
-        LOG.error(
-          """
+  private fun <T : WorkspaceEntity> assertUniqueSymbolicId(pEntityData: WorkspaceEntityData<T>, symbolicId: SymbolicEntityId<*>?) {
+    if (symbolicId == null) return
+    val ids = indexes.symbolicIdIndex.getIdsByEntry(symbolicId)
+    if (ids != null) {
+      // Oh, oh. This symbolic id exists already
+      // Fallback strategy: remove existing entity with all it's references
+      val existingEntityData = entityDataByIdOrDie(ids)
+      val existingEntity = existingEntityData.createEntity(this)
+      removeEntity(existingEntity)
+      LOG.error(
+        """
               addEntity: symbolic id already exists. Replacing entity with the new one.
               Symbolic id: $symbolicId
               
@@ -291,8 +308,7 @@ internal class MutableEntityStorageImpl(
               
               Broken consistency: $brokenConsistency
             """.trimIndent(), SymbolicIdAlreadyExistsException(symbolicId)
-        )
-      }
+      )
     }
   }
 
@@ -324,7 +340,8 @@ internal class MutableEntityStorageImpl(
 
       // Check for persistent id uniqueness
       if (beforeSymbolicId != null) {
-        val newSymbolicId = copiedData.symbolicId()
+        val immutableEntity = modifiableEntity.getEntityData().createEntity(this)
+        val newSymbolicId = if (immutableEntity is WorkspaceEntityWithSymbolicId) immutableEntity.symbolicId else null
         if (newSymbolicId != null) {
           val ids = indexes.symbolicIdIndex.getIdsByEntry(newSymbolicId)
           if (beforeSymbolicId != newSymbolicId && ids != null) {
@@ -532,7 +549,11 @@ internal class MutableEntityStorageImpl(
     return@addMeasuredTime snapshot
   }
 
-  override fun replaceChildren(connectionId: ConnectionId, parent: WorkspaceEntity, newChildren: List<WorkspaceEntity>) {
+  override fun replaceChildren(
+    connectionId: ConnectionId,
+    parent: WorkspaceEntity.Builder<out WorkspaceEntity>,
+    newChildren: List<WorkspaceEntity.Builder<out WorkspaceEntity>>
+  ) {
     when (connectionId.connectionType) {
       ConnectionId.ConnectionType.ONE_TO_ONE -> {
         val parentId = parent.asBase().id
@@ -594,16 +615,16 @@ internal class MutableEntityStorageImpl(
     }
   }
 
-  override fun addChild(connectionId: ConnectionId, parent: WorkspaceEntity?, child: WorkspaceEntity) {
+  override fun addChild(connectionId: ConnectionId, parent: WorkspaceEntity.Builder<out WorkspaceEntity>?, child: WorkspaceEntity.Builder<out WorkspaceEntity>) {
     when (connectionId.connectionType) {
       ConnectionId.ConnectionType.ONE_TO_ONE -> {
         val parentId = parent?.asBase()?.id?.asParent()
         val childId = child.asBase().id
         if (!connectionId.isParentNullable && parentId != null) {
           // If we replace a field in one-to-one connection, the previous entity is automatically removed.
-          val existingChild = getOneChild(connectionId, parent)
-          if (existingChild != null && existingChild != child) {
-            removeEntity(existingChild)
+          val existingChild = getOneChildData(connectionId, parent.asBase().id)
+          if (existingChild != null && existingChild.createEntityId() != child.asBase().id) {
+            removeEntityByEntityId(existingChild.createEntityId())
           }
         }
         if (parentId != null) {
@@ -650,9 +671,9 @@ internal class MutableEntityStorageImpl(
         val childId = child.asBase().id.asChild()
         if (!connectionId.isParentNullable && parentId != null) {
           // If we replace a field in one-to-one connection, the previous entity is automatically removed.
-          val existingChild = getOneChild(connectionId, parent)
-          if (existingChild != null && existingChild != child) {
-            removeEntity(existingChild)
+          val existingChild = getOneChildData(connectionId, parent.asBase().id)
+          if (existingChild != null && existingChild.createEntityId() != child.asBase().id) {
+            removeEntityByEntityId(existingChild.createEntityId())
           }
         }
         if (parentId != null) {

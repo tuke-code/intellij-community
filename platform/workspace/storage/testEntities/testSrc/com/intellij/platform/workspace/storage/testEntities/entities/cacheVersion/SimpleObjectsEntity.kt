@@ -13,10 +13,10 @@ interface SimpleObjectsEntity: WorkspaceEntity {
   val someData: com.intellij.platform.workspace.storage.testEntities.entities.cacheVersion.SimpleObjectsSealedClass
 
   //region generated code
-  @GeneratedCodeApiVersion(2)
-  interface Builder : SimpleObjectsEntity, WorkspaceEntity.Builder<SimpleObjectsEntity> {
+  @GeneratedCodeApiVersion(3)
+  interface Builder : WorkspaceEntity.Builder<SimpleObjectsEntity> {
     override var entitySource: EntitySource
-    override var someData: SimpleObjectsSealedClass
+    var someData: SimpleObjectsSealedClass
   }
 
   companion object : EntityType<SimpleObjectsEntity, Builder>() {
@@ -27,7 +27,7 @@ interface SimpleObjectsEntity: WorkspaceEntity {
       someData: SimpleObjectsSealedClass,
       entitySource: EntitySource,
       init: (Builder.() -> Unit)? = null,
-    ): SimpleObjectsEntity {
+    ): Builder {
       val builder = builder()
       builder.someData = someData
       builder.entitySource = entitySource

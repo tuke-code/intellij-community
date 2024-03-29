@@ -20,6 +20,7 @@ import com.intellij.platform.workspace.storage.impl.extractOneToManyChildren
 import com.intellij.platform.workspace.storage.impl.updateOneToManyChildrenOfParent
 import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentation
 import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentationApi
+import com.intellij.platform.workspace.storage.instrumentation.MutableEntityStorageInstrumentation
 import com.intellij.platform.workspace.storage.metadata.model.EntityMetadata
 import com.intellij.platform.workspace.storage.url.VirtualFileUrl
 import java.util.UUID
@@ -27,8 +28,8 @@ import kotlin.jvm.JvmName
 import kotlin.jvm.JvmOverloads
 import kotlin.jvm.JvmStatic
 
-@GeneratedCodeApiVersion(2)
-@GeneratedCodeImplVersion(3)
+@GeneratedCodeApiVersion(3)
+@GeneratedCodeImplVersion(5)
 open class SourceEntityImpl(private val dataSource: SourceEntityData) : SourceEntity, WorkspaceEntityBase(dataSource) {
 
   private companion object {
@@ -76,7 +77,6 @@ open class SourceEntityImpl(private val dataSource: SourceEntityData) : SourceEn
       }
 
       this.diff = builder
-      this.snapshot = builder
       addToBuilder()
       this.id = getEntityData().createEntityId()
       // After adding entity data to the builder, we need to unbind it and move the control over entity data to builder
@@ -141,17 +141,18 @@ open class SourceEntityImpl(private val dataSource: SourceEntityData) : SourceEn
 
     // List of non-abstract referenced types
     var _children: List<ChildSourceEntity>? = emptyList()
-    override var children: List<ChildSourceEntity>
+    override var children: List<ChildSourceEntity.Builder>
       get() {
         // Getter of the list of non-abstract referenced types
         val _diff = diff
         return if (_diff != null) {
-          _diff.extractOneToManyChildren<ChildSourceEntity>(CHILDREN_CONNECTION_ID, this)!!.toList() + (this.entityLinks[EntityLink(true,
-                                                                                                                                    CHILDREN_CONNECTION_ID)] as? List<ChildSourceEntity>
-                                                                                                        ?: emptyList())
+          @OptIn(EntityStorageInstrumentationApi::class)
+          ((_diff as MutableEntityStorageInstrumentation).getManyChildrenBuilders(CHILDREN_CONNECTION_ID,
+                                                                                  this)!!.toList() as List<ChildSourceEntity.Builder>) +
+          (this.entityLinks[EntityLink(true, CHILDREN_CONNECTION_ID)] as? List<ChildSourceEntity.Builder> ?: emptyList())
         }
         else {
-          this.entityLinks[EntityLink(true, CHILDREN_CONNECTION_ID)] as? List<ChildSourceEntity> ?: emptyList()
+          this.entityLinks[EntityLink(true, CHILDREN_CONNECTION_ID)] as? List<ChildSourceEntity.Builder> ?: emptyList()
         }
       }
       set(value) {
@@ -197,7 +198,6 @@ class SourceEntityData : WorkspaceEntityData<SourceEntity>() {
   override fun wrapAsModifiable(diff: MutableEntityStorage): WorkspaceEntity.Builder<SourceEntity> {
     val modifiable = SourceEntityImpl.Builder(null)
     modifiable.diff = diff
-    modifiable.snapshot = diff
     modifiable.id = createEntityId()
     return modifiable
   }
@@ -228,7 +228,7 @@ class SourceEntityData : WorkspaceEntityData<SourceEntity>() {
   override fun deserialize(de: EntityInformation.Deserializer) {
   }
 
-  override fun createDetachedEntity(parents: List<WorkspaceEntity>): WorkspaceEntity {
+  override fun createDetachedEntity(parents: List<WorkspaceEntity.Builder<*>>): WorkspaceEntity.Builder<*> {
     return SourceEntity(data, entitySource) {
     }
   }

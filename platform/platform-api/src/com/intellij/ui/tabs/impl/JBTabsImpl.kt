@@ -1,4 +1,4 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 @file:Suppress("ReplaceGetOrSet", "ReplacePutWithAssignment", "LeakingThis")
 
 package com.intellij.ui.tabs.impl
@@ -89,10 +89,12 @@ private const val ADJUST_BORDERS = true
 private const val LAYOUT_DONE: @NonNls String = "Layout.done"
 
 @DirtyUI
-open class JBTabsImpl(private var project: Project?,
-                      parentDisposable: Disposable) : JComponent(), JBTabsEx, PropertyChangeListener, TimerListener, DataProvider,
-                                                      PopupMenuListener, JBTabsPresentation, Queryable, UISettingsListener,
-                                                      QuickActionProvider, MorePopupAware, Accessible {
+open class JBTabsImpl(
+  private var project: Project?,
+  private val parentDisposable: Disposable,
+) : JComponent(), JBTabsEx, PropertyChangeListener, TimerListener, DataProvider,
+    PopupMenuListener, JBTabsPresentation, Queryable, UISettingsListener,
+    QuickActionProvider, MorePopupAware, Accessible {
   companion object {
     @JvmField
     val PINNED: Key<Boolean> = Key.create("pinned")
@@ -152,6 +154,9 @@ open class JBTabsImpl(private var project: Project?,
     }
   }
 
+  private val RELAYOUT_DELAY = 2000
+  private val relayoutAlarm = Alarm(parentDisposable)
+
   private val visibleInfos = ArrayList<TabInfo>()
   private val infoToPage = HashMap<TabInfo, AccessibleTabPage>()
   private val hiddenInfos = HashMap<TabInfo, Int>()
@@ -204,6 +209,8 @@ open class JBTabsImpl(private var project: Project?,
   private var hideTabs = false
   private var isRequestFocusOnLastFocusedComponent = false
   private var listenerAdded = false
+  var isRecentlyActive: Boolean = false
+    private set
 
   @JvmField
   internal val attractions: MutableSet<TabInfo> = HashSet()
@@ -380,7 +387,7 @@ open class JBTabsImpl(private var project: Project?,
       }
 
       override fun mouseMoved(component: Component, x: Int, y: Int) {
-        toggleScrollBar(isInsideTabsArea(x, y))
+        toggleScrollBar(isInsideTabsArea(x, y) || isScrollBarAdjusting())
       }
 
       override fun mouseExited(component: Component) {
@@ -391,9 +398,21 @@ open class JBTabsImpl(private var project: Project?,
     scrollBarChangeListener = ChangeListener { updateTabsOffsetFromScrollBar() }
   }
 
+  private fun setRecentlyActive() {
+    relayoutAlarm.cancelAllRequests()
+    isRecentlyActive = true
+    relayoutAlarm.addRequest({
+                               isRecentlyActive = false
+                               relayout(false, false)
+                             }, RELAYOUT_DELAY)
+
+  }
+
+  fun isScrollBarAdjusting(): Boolean = scrollBar.valueIsAdjusting
+
   private fun addMouseMotionAwtListener(parentDisposable: Disposable) {
     StartupUiUtil.addAwtListener(object : AWTEventListener {
-      val afterScroll = Alarm(parentDisposable)
+
 
       override fun eventDispatched(event: AWTEvent) {
         val tabRectangle = lastLayoutPass?.headerRectangle ?: return
@@ -411,13 +430,9 @@ open class JBTabsImpl(private var project: Project?,
         }
 
         isMouseInsideTabsArea = inside
-        afterScroll.cancelAllRequests()
+        relayoutAlarm.cancelAllRequests()
         if (!inside) {
-          afterScroll.addRequest({
-                                   if (!isMouseInsideTabsArea) {
-                                     relayout(false, false)
-                                   }
-                                 }, 500)
+          setRecentlyActive()
         }
       }
     }, AWTEvent.MOUSE_MOTION_EVENT_MASK, parentDisposable)
@@ -1833,6 +1848,10 @@ open class JBTabsImpl(private var project: Project?,
   }
 
   private fun updateTabsOffsetFromScrollBar() {
+    if (!isScrollBarAdjusting()) {
+      setRecentlyActive()
+      toggleScrollBar(isMouseInsideTabsArea)
+    }
     val currentUnitsOffset = effectiveLayout!!.scrollOffset
     val updatedOffset = scrollBarModel.value
     effectiveLayout!!.scroll(updatedOffset - currentUnitsOffset)
@@ -2500,7 +2519,10 @@ open class JBTabsImpl(private var project: Project?,
       forcedRelayout = forced
     }
     if (moreToolbar != null) {
-      moreToolbar.component.isVisible = !isHideTabs && effectiveLayout!!.isScrollable
+      moreToolbar.component.isVisible = !isHideTabs && visibleInfos.isNotEmpty() && effectiveLayout!!.isScrollable
+    }
+    if (entryPointToolbar != null) {
+      entryPointToolbar!!.component.isVisible = !isHideTabs && visibleInfos.isNotEmpty()
     }
     revalidateAndRepaint(layoutNow)
   }
@@ -2585,9 +2607,6 @@ open class JBTabsImpl(private var project: Project?,
     }
 
     this.hideTabs = hideTabs
-    if (entryPointToolbar != null) {
-      entryPointToolbar!!.component.isVisible = !this.hideTabs
-    }
     relayout(forced = true, layoutNow = false)
   }
 
@@ -2637,6 +2656,7 @@ open class JBTabsImpl(private var project: Project?,
     init {
       @Suppress("LeakingThis")
       shadowAction = ShadowAction(this, copyFromId, tabs, parentDisposable)
+      copySourceActionId = copyFromId
       isEnabledInModalContext = true
     }
 

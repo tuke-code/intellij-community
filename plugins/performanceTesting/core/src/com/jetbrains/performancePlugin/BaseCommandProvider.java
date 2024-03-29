@@ -81,6 +81,7 @@ public final class BaseCommandProvider implements CommandProvider {
       Map.entry(AssertCompletionCommand.PREFIX, AssertCompletionCommand::new),
       Map.entry(ChooseCompletionCommand.PREFIX, ChooseCompletionCommand::new),
       Map.entry(AssertFindUsagesCommand.PREFIX, AssertFindUsagesCommand::new),
+      Map.entry(AssertFindUsagesEntryCommand.PREFIX, AssertFindUsagesEntryCommand::new),
       Map.entry(SetBreakpointCommand.PREFIX, SetBreakpointCommand::new),
       Map.entry(DebugRunConfigurationCommand.PREFIX, DebugRunConfigurationCommand::new),
       Map.entry(DebugStepCommand.PREFIX, DebugStepCommand::new),
@@ -111,7 +112,9 @@ public final class BaseCommandProvider implements CommandProvider {
       Map.entry(StoreHighlightingResultsCommand.PREFIX, StoreHighlightingResultsCommand::new),
       Map.entry(AddContentRootToModule.PREFIX, AddContentRootToModule::new),
       Map.entry(DisableKotlinNotificationCommand.PREFIX, DisableKotlinNotificationCommand::new),
-      Map.entry(RequestHeavyScanningOnNextStartCommand.PREFIX, RequestHeavyScanningOnNextStartCommand::new)
+      Map.entry(RequestHeavyScanningOnNextStartCommand.PREFIX, RequestHeavyScanningOnNextStartCommand::new),
+      Map.entry(AssertCaretPositionCommand.PREFIX, AssertCaretPositionCommand::new),
+      Map.entry(AssertCurrentFileCommand.PREFIX, AssertCurrentFileCommand::new)
     );
   }
 }

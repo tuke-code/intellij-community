@@ -4,6 +4,7 @@ package com.intellij.platform.workspace.storage.testEntities.entities
 import com.intellij.platform.workspace.storage.*
 import com.intellij.platform.workspace.storage.EntityInformation
 import com.intellij.platform.workspace.storage.EntitySource
+import com.intellij.platform.workspace.storage.EntityType
 import com.intellij.platform.workspace.storage.GeneratedCodeApiVersion
 import com.intellij.platform.workspace.storage.GeneratedCodeImplVersion
 import com.intellij.platform.workspace.storage.MutableEntityStorage
@@ -19,8 +20,8 @@ import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInst
 import com.intellij.platform.workspace.storage.metadata.model.EntityMetadata
 import com.intellij.platform.workspace.storage.url.VirtualFileUrl
 
-@GeneratedCodeApiVersion(2)
-@GeneratedCodeImplVersion(3)
+@GeneratedCodeApiVersion(3)
+@GeneratedCodeImplVersion(5)
 open class VFUEntity2Impl(private val dataSource: VFUEntity2Data) : VFUEntity2, WorkspaceEntityBase(dataSource) {
 
   private companion object {
@@ -81,7 +82,6 @@ open class VFUEntity2Impl(private val dataSource: VFUEntity2Data) : VFUEntity2, 
       }
 
       this.diff = builder
-      this.snapshot = builder
       addToBuilder()
       this.id = getEntityData().createEntityId()
       // After adding entity data to the builder, we need to unbind it and move the control over entity data to builder
@@ -212,7 +212,6 @@ class VFUEntity2Data : WorkspaceEntityData<VFUEntity2>() {
   override fun wrapAsModifiable(diff: MutableEntityStorage): WorkspaceEntity.Builder<VFUEntity2> {
     val modifiable = VFUEntity2Impl.Builder(null)
     modifiable.diff = diff
-    modifiable.snapshot = diff
     modifiable.id = createEntityId()
     return modifiable
   }
@@ -250,7 +249,7 @@ class VFUEntity2Data : WorkspaceEntityData<VFUEntity2>() {
   override fun deserialize(de: EntityInformation.Deserializer) {
   }
 
-  override fun createDetachedEntity(parents: List<WorkspaceEntity>): WorkspaceEntity {
+  override fun createDetachedEntity(parents: List<WorkspaceEntity.Builder<*>>): WorkspaceEntity.Builder<*> {
     return VFUEntity2(data, directoryPath, notNullRoots, entitySource) {
       this.filePath = this@VFUEntity2Data.filePath
     }

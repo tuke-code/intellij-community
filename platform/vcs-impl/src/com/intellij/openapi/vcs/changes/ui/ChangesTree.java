@@ -644,7 +644,11 @@ public abstract class ChangesTree extends Tree implements DataProvider {
     myTreeExpander = expander;
   }
 
+  /**
+   * @deprecated Prefer using {@link IdeActions#ACTION_EXPAND_ALL}
+   */
   @NotNull
+  @Deprecated
   public AnAction createExpandAllAction(boolean headerAction) {
     if (headerAction) {
       return CommonActionsManager.getInstance().createExpandAllHeaderAction(myTreeExpander, this);
@@ -654,7 +658,11 @@ public abstract class ChangesTree extends Tree implements DataProvider {
     }
   }
 
+  /**
+   * @deprecated Prefer using {@link IdeActions#ACTION_COLLAPSE_ALL}
+   */
   @NotNull
+  @Deprecated
   public AnAction createCollapseAllAction(boolean headerAction) {
     if (headerAction) {
       return CommonActionsManager.getInstance().createCollapseAllHeaderAction(myTreeExpander, this);
@@ -806,6 +814,9 @@ public abstract class ChangesTree extends Tree implements DataProvider {
   @Nullable
   @Override
   public Object getData(@NotNull String dataId) {
+    if (CommonDataKeys.PROJECT.is(dataId)) {
+      return myProject;
+    }
     if (PlatformDataKeys.COPY_PROVIDER.is(dataId)) {
       return myTreeCopyProvider;
     }

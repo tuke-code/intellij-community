@@ -16,12 +16,12 @@ interface DefaultPropEntity: WorkspaceEntity {
   val constInt: Int // Change is here, property is not default
 
   //region generated code
-  @GeneratedCodeApiVersion(2)
-  interface Builder : DefaultPropEntity, WorkspaceEntity.Builder<DefaultPropEntity> {
+  @GeneratedCodeApiVersion(3)
+  interface Builder : WorkspaceEntity.Builder<DefaultPropEntity> {
     override var entitySource: EntitySource
-    override var someString: String
-    override var someList: MutableList<Int>
-    override var constInt: Int
+    var someString: String
+    var someList: MutableList<Int>
+    var constInt: Int
   }
 
   companion object : EntityType<DefaultPropEntity, Builder>() {
@@ -34,7 +34,7 @@ interface DefaultPropEntity: WorkspaceEntity {
       constInt: Int,
       entitySource: EntitySource,
       init: (Builder.() -> Unit)? = null,
-    ): DefaultPropEntity {
+    ): Builder {
       val builder = builder()
       builder.someString = someString
       builder.someList = someList.toMutableWorkspaceList()

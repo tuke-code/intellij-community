@@ -19,10 +19,11 @@ import com.intellij.platform.workspace.storage.impl.extractOneToAbstractManyPare
 import com.intellij.platform.workspace.storage.impl.updateOneToAbstractManyParentOfChild
 import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentation
 import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentationApi
+import com.intellij.platform.workspace.storage.instrumentation.MutableEntityStorageInstrumentation
 import com.intellij.platform.workspace.storage.metadata.model.EntityMetadata
 
-@GeneratedCodeApiVersion(2)
-@GeneratedCodeImplVersion(3)
+@GeneratedCodeApiVersion(3)
+@GeneratedCodeImplVersion(5)
 open class MiddleEntityImpl(private val dataSource: MiddleEntityData) : MiddleEntity, WorkspaceEntityBase(dataSource) {
 
   private companion object {
@@ -70,7 +71,6 @@ open class MiddleEntityImpl(private val dataSource: MiddleEntityData) : MiddleEn
       }
 
       this.diff = builder
-      this.snapshot = builder
       addToBuilder()
       this.id = getEntityData().createEntityId()
       // After adding entity data to the builder, we need to unbind it and move the control over entity data to builder
@@ -114,15 +114,17 @@ open class MiddleEntityImpl(private val dataSource: MiddleEntityData) : MiddleEn
 
       }
 
-    override var parentEntity: CompositeBaseEntity?
+    override var parentEntity: CompositeBaseEntity.Builder<out CompositeBaseEntity>?
       get() {
         val _diff = diff
         return if (_diff != null) {
-          _diff.extractOneToAbstractManyParent(PARENTENTITY_CONNECTION_ID, this) ?: this.entityLinks[EntityLink(false,
-                                                                                                                PARENTENTITY_CONNECTION_ID)] as? CompositeBaseEntity
+          @OptIn(EntityStorageInstrumentationApi::class)
+          ((_diff as MutableEntityStorageInstrumentation).getParentBuilder(PARENTENTITY_CONNECTION_ID,
+                                                                           this) as? CompositeBaseEntity.Builder<out CompositeBaseEntity>)
+          ?: (this.entityLinks[EntityLink(false, PARENTENTITY_CONNECTION_ID)] as? CompositeBaseEntity.Builder<out CompositeBaseEntity>)
         }
         else {
-          this.entityLinks[EntityLink(false, PARENTENTITY_CONNECTION_ID)] as? CompositeBaseEntity
+          this.entityLinks[EntityLink(false, PARENTENTITY_CONNECTION_ID)] as? CompositeBaseEntity.Builder<out CompositeBaseEntity>
         }
       }
       set(value) {
@@ -173,7 +175,6 @@ class MiddleEntityData : WorkspaceEntityData<MiddleEntity>() {
   override fun wrapAsModifiable(diff: MutableEntityStorage): WorkspaceEntity.Builder<MiddleEntity> {
     val modifiable = MiddleEntityImpl.Builder(null)
     modifiable.diff = diff
-    modifiable.snapshot = diff
     modifiable.id = createEntityId()
     return modifiable
   }
@@ -204,9 +205,9 @@ class MiddleEntityData : WorkspaceEntityData<MiddleEntity>() {
   override fun deserialize(de: EntityInformation.Deserializer) {
   }
 
-  override fun createDetachedEntity(parents: List<WorkspaceEntity>): WorkspaceEntity {
+  override fun createDetachedEntity(parents: List<WorkspaceEntity.Builder<*>>): WorkspaceEntity.Builder<*> {
     return MiddleEntity(property, entitySource) {
-      this.parentEntity = parents.filterIsInstance<CompositeBaseEntity>().singleOrNull()
+      this.parentEntity = parents.filterIsInstance<CompositeBaseEntity.Builder<out CompositeBaseEntity>>().singleOrNull()
     }
   }
 

@@ -16,6 +16,7 @@ import com.intellij.openapi.editor.ex.MarkupModelEx
 import com.intellij.openapi.editor.ex.RangeHighlighterEx
 import com.intellij.openapi.editor.impl.DocumentMarkupModel
 import com.intellij.openapi.editor.markup.*
+import com.intellij.openapi.progress.ProcessCanceledException
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.util.Key
@@ -59,10 +60,15 @@ abstract class LineStatusMarkerRenderer internal constructor(
     updateQueue.queue(DisposableUpdate.createDisposable(updateQueue, "update", Runnable { updateHighlighters() }))
   }
 
+  /**
+   * Recover from an evildoer destroying all the highlighters for the Editor/Project/IDE.
+   * IDEA-331139 IDEA-246614
+   */
   private fun scheduleValidateHighlighter() {
-    // IDEA-246614
     updateQueue.queue(DisposableUpdate.createDisposable(updateQueue, "validate highlighter", Runnable {
       if (disposed || gutterHighlighter.isValid()) return@Runnable
+
+      LOG.warn("Line marker highlighter was recovered. This incident will be reported.")
       disposeHighlighter(gutterHighlighter)
       gutterHighlighter = createGutterHighlighter()
       updateHighlighters()
@@ -93,8 +99,21 @@ abstract class LineStatusMarkerRenderer internal constructor(
   @RequiresEdt
   private fun updateHighlighters() {
     if (disposed) return
-    repaintGutter()
-    updateErrorStripeHighlighters()
+
+    if (!gutterHighlighter.isValid()) {
+      scheduleValidateHighlighter()
+    }
+
+    try {
+      repaintGutter()
+      updateErrorStripeHighlighters()
+    }
+    catch (e: ProcessCanceledException) {
+      throw e
+    }
+    catch (e: Throwable) {
+      throw RuntimeException("Error in $this", e)
+    }
   }
 
   private fun repaintGutter() {

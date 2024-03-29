@@ -13,7 +13,9 @@ fun Finder.popupMenu(@Language("xpath") xpath: String? = null) =
   x(xpath ?: "//div[@class='MyMenu']", PopupMenuUiComponent::class.java)
 
 class PopupMenuUiComponent(data: ComponentData) : UiComponent(data) {
-  private val menuItems = xx("//div[@class='ActionMenuItem' or @class='ActionMenu']", PopupItemUiComponent::class.java)
+
+  private val menuItems =
+    xx("//div[@class='ActionMenuItem' or @class='ActionMenu']", PopupItemUiComponent::class.java)
 
   fun findMenuItemByText(text: String) = menuItems.list().firstOrNull { it.getText() == text}
                                          ?: throw AssertionError("No item with text '$text' found in popup '${this.searchContext}'")
@@ -32,8 +34,12 @@ open class PopupUiComponent(data: ComponentData) : UiComponent(data)
 
 @Remote("com.intellij.openapi.actionSystem.impl.ActionMenuItem")
 interface PopupItemRef {
+
   fun isSelected(): Boolean
+
   fun getText(): String
+
+  fun getIcon(): Icon
 }
 
 class PopupItemUiComponent(data: ComponentData) : UiComponent(data) {
@@ -41,5 +47,9 @@ class PopupItemUiComponent(data: ComponentData) : UiComponent(data) {
   private val popupComponent by lazy { driver.cast(component, PopupItemRef::class) }
 
   fun getText() = popupComponent.getText()
+
   fun isSelected() = popupComponent.isSelected()
+
+  fun getIconPath() = "path=(.*),".toRegex().find(popupComponent.getIcon().toString())?.let { it.groups.last()?.value ?: "empty" }
+                      ?: "empty"
 }

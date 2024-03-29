@@ -10,7 +10,7 @@ import org.jetbrains.kotlin.analysis.api.types.KtUsualClassType
 import org.jetbrains.kotlin.builtins.StandardNames.FqNames.arrayClassFqNameToPrimitiveType
 import org.jetbrains.kotlin.idea.base.analysis.api.utils.shortenReferences
 import org.jetbrains.kotlin.idea.base.resources.KotlinBundle
-import org.jetbrains.kotlin.idea.codeinsight.api.applicable.intentions.KotlinModCommandAction
+import org.jetbrains.kotlin.idea.codeinsight.api.applicable.intentions.KotlinPsiUpdateModCommandAction
 import org.jetbrains.kotlin.idea.codeinsight.api.applicators.fixes.KotlinQuickFixFactory
 import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.psi.psiUtil.getParentOfType
@@ -27,18 +27,18 @@ object SurroundWithArrayOfWithSpreadOperatorInFunctionFixFactory {
     private class SurroundWithArrayModCommandAction(
         element: KtExpression,
         elementContext: ElementContext,
-    ) : KotlinModCommandAction.ElementBased<KtExpression, ElementContext>(element, elementContext) {
+    ) : KotlinPsiUpdateModCommandAction.ElementBased<KtExpression, ElementContext>(element, elementContext) {
 
         override fun getFamilyName(): String = KotlinBundle.message("surround.with.array.of")
 
         override fun getActionName(
-            context: ActionContext,
+            actionContext: ActionContext,
             element: KtExpression,
             elementContext: ElementContext,
         ): String = KotlinBundle.getMessage("surround.with.0", elementContext.shortArrayOfCall)
 
         override fun invoke(
-            context: ActionContext,
+            actionContext: ActionContext,
             element: KtExpression,
             elementContext: ElementContext,
             updater: ModPsiUpdater,

@@ -13,10 +13,10 @@ interface OptionalOneToOneParentEntity : WorkspaceEntity {
   val child: @Child OptionalOneToOneChildEntity?
 
   //region generated code
-  @GeneratedCodeApiVersion(2)
-  interface Builder : OptionalOneToOneParentEntity, WorkspaceEntity.Builder<OptionalOneToOneParentEntity> {
+  @GeneratedCodeApiVersion(3)
+  interface Builder : WorkspaceEntity.Builder<OptionalOneToOneParentEntity> {
     override var entitySource: EntitySource
-    override var child: OptionalOneToOneChildEntity?
+    var child: OptionalOneToOneChildEntity.Builder?
   }
 
   companion object : EntityType<OptionalOneToOneParentEntity, Builder>() {
@@ -26,7 +26,7 @@ interface OptionalOneToOneParentEntity : WorkspaceEntity {
     operator fun invoke(
       entitySource: EntitySource,
       init: (Builder.() -> Unit)? = null,
-    ): OptionalOneToOneParentEntity {
+    ): Builder {
       val builder = builder()
       builder.entitySource = entitySource
       init?.invoke(builder)
@@ -50,11 +50,11 @@ interface OptionalOneToOneChildEntity : WorkspaceEntity {
   val parent: OptionalOneToOneParentEntity?
 
   //region generated code
-  @GeneratedCodeApiVersion(2)
-  interface Builder : OptionalOneToOneChildEntity, WorkspaceEntity.Builder<OptionalOneToOneChildEntity> {
+  @GeneratedCodeApiVersion(3)
+  interface Builder : WorkspaceEntity.Builder<OptionalOneToOneChildEntity> {
     override var entitySource: EntitySource
-    override var data: String
-    override var parent: OptionalOneToOneParentEntity?
+    var data: String
+    var parent: OptionalOneToOneParentEntity.Builder?
   }
 
   companion object : EntityType<OptionalOneToOneChildEntity, Builder>() {
@@ -65,7 +65,7 @@ interface OptionalOneToOneChildEntity : WorkspaceEntity {
       data: String,
       entitySource: EntitySource,
       init: (Builder.() -> Unit)? = null,
-    ): OptionalOneToOneChildEntity {
+    ): Builder {
       val builder = builder()
       builder.data = data
       builder.entitySource = entitySource

@@ -4,6 +4,7 @@ package com.intellij.platform.workspace.storage.testEntities.entities
 import com.intellij.platform.workspace.storage.*
 import com.intellij.platform.workspace.storage.EntityInformation
 import com.intellij.platform.workspace.storage.EntitySource
+import com.intellij.platform.workspace.storage.EntityType
 import com.intellij.platform.workspace.storage.GeneratedCodeApiVersion
 import com.intellij.platform.workspace.storage.GeneratedCodeImplVersion
 import com.intellij.platform.workspace.storage.MutableEntityStorage
@@ -24,10 +25,11 @@ import com.intellij.platform.workspace.storage.impl.updateOneToAbstractManyParen
 import com.intellij.platform.workspace.storage.impl.updateOneToAbstractOneParentOfChild
 import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentation
 import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentationApi
+import com.intellij.platform.workspace.storage.instrumentation.MutableEntityStorageInstrumentation
 import com.intellij.platform.workspace.storage.metadata.model.EntityMetadata
 
-@GeneratedCodeApiVersion(2)
-@GeneratedCodeImplVersion(3)
+@GeneratedCodeApiVersion(3)
+@GeneratedCodeImplVersion(5)
 open class CompositeChildAbstractEntityImpl(private val dataSource: CompositeChildAbstractEntityData) : CompositeChildAbstractEntity, WorkspaceEntityBase(
   dataSource) {
 
@@ -86,7 +88,6 @@ open class CompositeChildAbstractEntityImpl(private val dataSource: CompositeChi
       }
 
       this.diff = builder
-      this.snapshot = builder
       addToBuilder()
       this.id = getEntityData().createEntityId()
       // After adding entity data to the builder, we need to unbind it and move the control over entity data to builder
@@ -137,15 +138,18 @@ open class CompositeChildAbstractEntityImpl(private val dataSource: CompositeChi
 
       }
 
-    override var parentInList: CompositeAbstractEntity?
+    override var parentInList: CompositeAbstractEntity.Builder<out CompositeAbstractEntity>?
       get() {
         val _diff = diff
         return if (_diff != null) {
-          _diff.extractOneToAbstractManyParent(PARENTINLIST_CONNECTION_ID, this) ?: this.entityLinks[EntityLink(false,
-                                                                                                                PARENTINLIST_CONNECTION_ID)] as? CompositeAbstractEntity
+          @OptIn(EntityStorageInstrumentationApi::class)
+          ((_diff as MutableEntityStorageInstrumentation).getParentBuilder(PARENTINLIST_CONNECTION_ID,
+                                                                           this) as? CompositeAbstractEntity.Builder<out CompositeAbstractEntity>)
+          ?: (this.entityLinks[EntityLink(false,
+                                          PARENTINLIST_CONNECTION_ID)] as? CompositeAbstractEntity.Builder<out CompositeAbstractEntity>)
         }
         else {
-          this.entityLinks[EntityLink(false, PARENTINLIST_CONNECTION_ID)] as? CompositeAbstractEntity
+          this.entityLinks[EntityLink(false, PARENTINLIST_CONNECTION_ID)] as? CompositeAbstractEntity.Builder<out CompositeAbstractEntity>
         }
       }
       set(value) {
@@ -176,17 +180,19 @@ open class CompositeChildAbstractEntityImpl(private val dataSource: CompositeChi
         changedProperty.add("parentInList")
       }
 
-    override var children: List<SimpleAbstractEntity>
+    override var children: List<SimpleAbstractEntity.Builder<out SimpleAbstractEntity>>
       get() {
         val _diff = diff
         return if (_diff != null) {
-          _diff.extractOneToAbstractManyChildren<SimpleAbstractEntity>(CHILDREN_CONNECTION_ID,
-                                                                       this)!!.toList() + (this.entityLinks[EntityLink(true,
-                                                                                                                       CHILDREN_CONNECTION_ID)] as? List<SimpleAbstractEntity>
-                                                                                           ?: emptyList())
+          @OptIn(EntityStorageInstrumentationApi::class)
+          ((_diff as MutableEntityStorageInstrumentation).getManyChildrenBuilders(CHILDREN_CONNECTION_ID,
+                                                                                  this)!!.toList() as List<SimpleAbstractEntity.Builder<out SimpleAbstractEntity>>) +
+          (this.entityLinks[EntityLink(true, CHILDREN_CONNECTION_ID)] as? List<SimpleAbstractEntity.Builder<out SimpleAbstractEntity>>
+           ?: emptyList())
         }
         else {
-          this.entityLinks[EntityLink(true, CHILDREN_CONNECTION_ID)] as List<SimpleAbstractEntity> ?: emptyList()
+          this.entityLinks[EntityLink(true, CHILDREN_CONNECTION_ID)] as List<SimpleAbstractEntity.Builder<out SimpleAbstractEntity>>
+          ?: emptyList()
         }
       }
       set(value) {
@@ -219,15 +225,16 @@ open class CompositeChildAbstractEntityImpl(private val dataSource: CompositeChi
         changedProperty.add("children")
       }
 
-    override var parentEntity: ParentChainEntity?
+    override var parentEntity: ParentChainEntity.Builder?
       get() {
         val _diff = diff
         return if (_diff != null) {
-          _diff.extractOneToAbstractOneParent(PARENTENTITY_CONNECTION_ID, this) ?: this.entityLinks[EntityLink(false,
-                                                                                                               PARENTENTITY_CONNECTION_ID)] as? ParentChainEntity
+          @OptIn(EntityStorageInstrumentationApi::class)
+          ((_diff as MutableEntityStorageInstrumentation).getParentBuilder(PARENTENTITY_CONNECTION_ID, this) as? ParentChainEntity.Builder)
+          ?: (this.entityLinks[EntityLink(false, PARENTENTITY_CONNECTION_ID)] as? ParentChainEntity.Builder)
         }
         else {
-          this.entityLinks[EntityLink(false, PARENTENTITY_CONNECTION_ID)] as? ParentChainEntity
+          this.entityLinks[EntityLink(false, PARENTENTITY_CONNECTION_ID)] as? ParentChainEntity.Builder
         }
       }
       set(value) {
@@ -264,7 +271,6 @@ class CompositeChildAbstractEntityData : WorkspaceEntityData<CompositeChildAbstr
   override fun wrapAsModifiable(diff: MutableEntityStorage): WorkspaceEntity.Builder<CompositeChildAbstractEntity> {
     val modifiable = CompositeChildAbstractEntityImpl.Builder(null)
     modifiable.diff = diff
-    modifiable.snapshot = diff
     modifiable.id = createEntityId()
     return modifiable
   }
@@ -295,10 +301,10 @@ class CompositeChildAbstractEntityData : WorkspaceEntityData<CompositeChildAbstr
   override fun deserialize(de: EntityInformation.Deserializer) {
   }
 
-  override fun createDetachedEntity(parents: List<WorkspaceEntity>): WorkspaceEntity {
+  override fun createDetachedEntity(parents: List<WorkspaceEntity.Builder<*>>): WorkspaceEntity.Builder<*> {
     return CompositeChildAbstractEntity(entitySource) {
-      this.parentInList = parents.filterIsInstance<CompositeAbstractEntity>().singleOrNull()
-      this.parentEntity = parents.filterIsInstance<ParentChainEntity>().singleOrNull()
+      this.parentInList = parents.filterIsInstance<CompositeAbstractEntity.Builder<out CompositeAbstractEntity>>().singleOrNull()
+      this.parentEntity = parents.filterIsInstance<ParentChainEntity.Builder>().singleOrNull()
     }
   }
 

@@ -2,9 +2,7 @@
 
 package org.jetbrains.kotlin.idea.refactoring.introduce.extractionEngine
 
-import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiNameIdentifierOwner
-import com.intellij.util.containers.MultiMap
 import org.jetbrains.kotlin.builtins.createFunctionType
 import org.jetbrains.kotlin.cfg.pseudocode.Pseudocode
 import org.jetbrains.kotlin.cfg.pseudocode.SingleType
@@ -15,8 +13,6 @@ import org.jetbrains.kotlin.descriptors.*
 import org.jetbrains.kotlin.descriptors.annotations.Annotations
 import org.jetbrains.kotlin.idea.base.codeInsight.KotlinNameSuggester
 import org.jetbrains.kotlin.idea.base.codeInsight.KotlinNameSuggestionProvider
-import org.jetbrains.kotlin.idea.base.fe10.codeInsight.newDeclaration.Fe10KotlinNameSuggester
-import org.jetbrains.kotlin.idea.base.fe10.codeInsight.newDeclaration.Fe10KotlinNewDeclarationNameValidator
 import org.jetbrains.kotlin.idea.base.projectStructure.languageVersionSettings
 import org.jetbrains.kotlin.idea.caches.resolve.getResolutionFacade
 import org.jetbrains.kotlin.idea.codeInsight.DescriptorToSourceUtilsIde
@@ -45,24 +41,14 @@ import org.jetbrains.kotlin.types.CommonSupertypes
 import org.jetbrains.kotlin.types.KotlinType
 import org.jetbrains.kotlin.types.expressions.OperatorConventions
 
-internal class ParametersInfo {
-    var errorMessage: AnalysisResult.ErrorMessage? = null
-    val originalRefToParameter = MultiMap.create<KtSimpleNameExpression, MutableParameter>()
-    val parameters = LinkedHashSet<MutableParameter>()
-    val typeParameters = HashSet<TypeParameter>()
-    val nonDenotableTypes = HashSet<KotlinType>()
-    val replacementMap = MultiMap.create<KtSimpleNameExpression, Replacement>()
-}
-
 internal fun ExtractionData.inferParametersInfo(
     virtualBlock: KtBlockExpression,
-    commonParent: PsiElement,
     pseudocode: Pseudocode,
     bindingContext: BindingContext,
     targetScope: LexicalScope,
     modifiedVarDescriptors: Set<VariableDescriptor>
-): ParametersInfo {
-    val info = ParametersInfo()
+): ParametersInfo<KotlinType, MutableParameter> {
+    val info = ParametersInfo<KotlinType, MutableParameter>()
 
     val extractedDescriptorToParameter = LinkedHashMap<DeclarationDescriptor, MutableParameter>()
 
@@ -91,25 +77,26 @@ internal fun ExtractionData.inferParametersInfo(
             && resolvedCall!!.extensionReceiver is ExpressionReceiver
             && DescriptorUtils.isObject(dispatchReceiverDescriptor)
         ) {
-            info.replacementMap.putValue(
-                refInfo.resolveResult.originalRefExpr,
-                WrapObjectInWithReplacement(dispatchReceiverDescriptor as ClassDescriptor)
-            )
+            val originalRefExpr = refInfo.resolveResult.originalRefExpr
+            if (originalRefExpr is KtSimpleNameExpression) {
+                info.replacementMap.putValue(
+                    originalRefExpr,
+                    WrapObjectInWithReplacement(dispatchReceiverDescriptor as ClassDescriptor)
+                )
+            }
             continue
         }
 
-        if (!refInfo.shouldSkipPrimaryReceiver) {
-            extractReceiver(
-                receiverToExtract,
-                info,
-                targetScope,
-                refInfo,
-                extractedDescriptorToParameter,
-                pseudocode,
-                bindingContext,
-                false
-            )
-        }
+        extractReceiver(
+            receiverToExtract,
+            info,
+            targetScope,
+            refInfo,
+            extractedDescriptorToParameter,
+            pseudocode,
+            bindingContext,
+            false
+        )
 
         if (options.canWrapInWith && twoReceivers) {
             extractReceiver(
@@ -125,7 +112,7 @@ internal fun ExtractionData.inferParametersInfo(
         }
     }
 
-    val varNameValidator = Fe10KotlinNewDeclarationNameValidator(
+    val varNameValidator = ExtractNameSuggester.createNameValidator(
         commonParent.getNonStrictParentOfType<KtExpression>()!!,
         physicalElements.firstOrNull(),
         KotlinNameSuggestionProvider.ValidatorTarget.PARAMETER
@@ -135,12 +122,12 @@ internal fun ExtractionData.inferParametersInfo(
     for ((descriptorToExtract, parameter) in extractedDescriptorToParameter) {
         if (!parameter
                 .parameterType
-                .processTypeIfExtractable(info.typeParameters, info.nonDenotableTypes, options, targetScope)
+                .processTypeIfExtractable(info.typeParameters, info.nonDenotableTypes, targetScope)
         ) continue
 
         with(parameter) {
             if (currentName == null) {
-                currentName = Fe10KotlinNameSuggester.suggestNamesByType(parameterType, varNameValidator, "p").first()
+                currentName = ExtractNameSuggester.suggestNamesByType(parameterType, commonParent, varNameValidator, "p").first()
             }
 
             require(currentName != null)
@@ -162,8 +149,8 @@ internal fun ExtractionData.inferParametersInfo(
         }
     }
 
-    for (typeToCheck in info.typeParameters.flatMapTo(HashSet()) { it.collectReferencedTypes(bindingContext) }) {
-        typeToCheck.processTypeIfExtractable(info.typeParameters, info.nonDenotableTypes, options, targetScope)
+    for (typeToCheck in info.typeParameters.flatMap { it.collectReferencedTypes() }.mapNotNull { bindingContext[BindingContext.TYPE, it] }) {
+        typeToCheck.processTypeIfExtractable(info.typeParameters, info.nonDenotableTypes, targetScope)
     }
 
 
@@ -172,9 +159,9 @@ internal fun ExtractionData.inferParametersInfo(
 
 private fun ExtractionData.extractReceiver(
     receiverToExtract: ReceiverValue?,
-    info: ParametersInfo,
+    info: ParametersInfo<KotlinType, MutableParameter>,
     targetScope: LexicalScope,
-    refInfo: ResolvedReferenceInfo,
+    refInfo: ResolvedReferenceInfo<DeclarationDescriptor, ResolvedCall<*>, KotlinType>,
     extractedDescriptorToParameter: HashMap<DeclarationDescriptor, MutableParameter>,
     pseudocode: Pseudocode,
     bindingContext: BindingContext,
@@ -211,18 +198,20 @@ private fun ExtractionData.extractReceiver(
 
     if (referencedClassifierDescriptor != null) {
         if (!referencedClassifierDescriptor.defaultType.processTypeIfExtractable(
-                info.typeParameters, info.nonDenotableTypes, options, targetScope, referencedClassifierDescriptor is TypeParameterDescriptor
+                info.typeParameters, info.nonDenotableTypes, targetScope, referencedClassifierDescriptor is TypeParameterDescriptor
             )
         ) return
 
-        if (options.canWrapInWith
-            && resolvedCall != null
-            && resolvedCall.hasBothReceivers()
-            && DescriptorUtils.isObject(referencedClassifierDescriptor)
-        ) {
-            info.replacementMap.putValue(originalRef, WrapObjectInWithReplacement(referencedClassifierDescriptor as ClassDescriptor))
-        } else if (referencedClassifierDescriptor is ClassDescriptor) {
-            info.replacementMap.putValue(originalRef, FqNameReplacement(originalDescriptor.getImportableDescriptor().fqNameSafe))
+        if (originalRef is KtSimpleNameExpression) {
+            if (options.canWrapInWith
+                && resolvedCall != null
+                && resolvedCall.hasBothReceivers()
+                && DescriptorUtils.isObject(referencedClassifierDescriptor)
+            ) {
+                info.replacementMap.putValue(originalRef, WrapObjectInWithReplacement(referencedClassifierDescriptor as ClassDescriptor))
+            } else if (referencedClassifierDescriptor is ClassDescriptor) {
+                info.replacementMap.putValue(originalRef, FqNameReplacement(originalDescriptor.getImportableDescriptor().fqNameSafe))
+            }
         }
     } else {
         val extractThis = (hasThisReceiver && refInfo.smartCast == null) || thisExpr != null
@@ -233,6 +222,7 @@ private fun ExtractionData.extractReceiver(
 
         val extractFunctionRef =
             options.captureLocalFunctions
+                    && originalRef is KtSimpleNameExpression
                     && originalRef.getReferencedName() == originalDescriptor.name.asString() // to forbid calls by convention
                     && originalDeclaration is KtNamedFunction && originalDeclaration.isLocal
                     && targetScope.findFunction(originalDescriptor.name, NoLookupLocation.FROM_IDE) { it == originalDescriptor } == null
@@ -303,7 +293,9 @@ private fun ExtractionData.extractReceiver(
             }
 
             parameter.refCount++
-            info.originalRefToParameter.putValue(originalRef, parameter)
+            if (originalRef is KtSimpleNameExpression) {
+                info.originalRefToParameter.putValue(originalRef, parameter)
+            }
 
             parameter.addDefaultType(parameterType)
 
@@ -328,12 +320,14 @@ private fun ExtractionData.extractReceiver(
                 }
             }
 
-            val replacement = when {
-                isMemberExtension -> WrapParameterInWithReplacement(parameter)
-                hasThisReceiver && extractThis -> AddPrefixReplacement(parameter)
-                else -> RenameReplacement(parameter)
+            if (originalRef is KtSimpleNameExpression) {
+                val replacement = when {
+                    isMemberExtension -> WrapParameterInWithReplacement(parameter)
+                    hasThisReceiver && extractThis -> AddPrefixReplacement(parameter)
+                    else -> RenameReplacement(parameter)
+                }
+                info.replacementMap.putValue(originalRef, replacement)
             }
-            info.replacementMap.putValue(originalRef, replacement)
         }
     }
 }

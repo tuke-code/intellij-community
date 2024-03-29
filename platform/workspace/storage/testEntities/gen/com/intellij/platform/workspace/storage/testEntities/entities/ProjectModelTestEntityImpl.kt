@@ -4,6 +4,7 @@ package com.intellij.platform.workspace.storage.testEntities.entities
 import com.intellij.platform.workspace.storage.*
 import com.intellij.platform.workspace.storage.EntityInformation
 import com.intellij.platform.workspace.storage.EntitySource
+import com.intellij.platform.workspace.storage.EntityType
 import com.intellij.platform.workspace.storage.GeneratedCodeApiVersion
 import com.intellij.platform.workspace.storage.GeneratedCodeImplVersion
 import com.intellij.platform.workspace.storage.MutableEntityStorage
@@ -22,10 +23,11 @@ import com.intellij.platform.workspace.storage.impl.updateOneToManyParentOfChild
 import com.intellij.platform.workspace.storage.impl.updateOneToOneChildOfParent
 import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentation
 import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentationApi
+import com.intellij.platform.workspace.storage.instrumentation.MutableEntityStorageInstrumentation
 import com.intellij.platform.workspace.storage.metadata.model.EntityMetadata
 
-@GeneratedCodeApiVersion(2)
-@GeneratedCodeImplVersion(3)
+@GeneratedCodeApiVersion(3)
+@GeneratedCodeImplVersion(5)
 open class ProjectModelTestEntityImpl(private val dataSource: ProjectModelTestEntityData) : ProjectModelTestEntity, WorkspaceEntityBase(
   dataSource) {
 
@@ -96,7 +98,6 @@ open class ProjectModelTestEntityImpl(private val dataSource: ProjectModelTestEn
       }
 
       this.diff = builder
-      this.snapshot = builder
       addToBuilder()
       this.id = getEntityData().createEntityId()
       // After adding entity data to the builder, we need to unbind it and move the control over entity data to builder
@@ -172,15 +173,17 @@ open class ProjectModelTestEntityImpl(private val dataSource: ProjectModelTestEn
 
       }
 
-    override var parentEntity: ProjectModelTestEntity?
+    override var parentEntity: ProjectModelTestEntity.Builder?
       get() {
         val _diff = diff
         return if (_diff != null) {
-          _diff.extractOneToManyParent(PARENTENTITY_CONNECTION_ID, this) ?: this.entityLinks[EntityLink(false,
-                                                                                                        PARENTENTITY_CONNECTION_ID)] as? ProjectModelTestEntity
+          @OptIn(EntityStorageInstrumentationApi::class)
+          ((_diff as MutableEntityStorageInstrumentation).getParentBuilder(PARENTENTITY_CONNECTION_ID,
+                                                                           this) as? ProjectModelTestEntity.Builder)
+          ?: (this.entityLinks[EntityLink(false, PARENTENTITY_CONNECTION_ID)] as? ProjectModelTestEntity.Builder)
         }
         else {
-          this.entityLinks[EntityLink(false, PARENTENTITY_CONNECTION_ID)] as? ProjectModelTestEntity
+          this.entityLinks[EntityLink(false, PARENTENTITY_CONNECTION_ID)] as? ProjectModelTestEntity.Builder
         }
       }
       set(value) {
@@ -213,18 +216,18 @@ open class ProjectModelTestEntityImpl(private val dataSource: ProjectModelTestEn
 
     // List of non-abstract referenced types
     var _childrenEntities: List<ProjectModelTestEntity>? = emptyList()
-    override var childrenEntities: List<ProjectModelTestEntity>
+    override var childrenEntities: List<ProjectModelTestEntity.Builder>
       get() {
         // Getter of the list of non-abstract referenced types
         val _diff = diff
         return if (_diff != null) {
-          _diff.extractOneToManyChildren<ProjectModelTestEntity>(CHILDRENENTITIES_CONNECTION_ID,
-                                                                 this)!!.toList() + (this.entityLinks[EntityLink(true,
-                                                                                                                 CHILDRENENTITIES_CONNECTION_ID)] as? List<ProjectModelTestEntity>
-                                                                                     ?: emptyList())
+          @OptIn(EntityStorageInstrumentationApi::class)
+          ((_diff as MutableEntityStorageInstrumentation).getManyChildrenBuilders(CHILDRENENTITIES_CONNECTION_ID,
+                                                                                  this)!!.toList() as List<ProjectModelTestEntity.Builder>) +
+          (this.entityLinks[EntityLink(true, CHILDRENENTITIES_CONNECTION_ID)] as? List<ProjectModelTestEntity.Builder> ?: emptyList())
         }
         else {
-          this.entityLinks[EntityLink(true, CHILDRENENTITIES_CONNECTION_ID)] as? List<ProjectModelTestEntity> ?: emptyList()
+          this.entityLinks[EntityLink(true, CHILDRENENTITIES_CONNECTION_ID)] as? List<ProjectModelTestEntity.Builder> ?: emptyList()
         }
       }
       set(value) {
@@ -258,15 +261,17 @@ open class ProjectModelTestEntityImpl(private val dataSource: ProjectModelTestEn
         changedProperty.add("childrenEntities")
       }
 
-    override var contentRoot: ContentRootTestEntity?
+    override var contentRoot: ContentRootTestEntity.Builder?
       get() {
         val _diff = diff
         return if (_diff != null) {
-          _diff.extractOneToOneChild(CONTENTROOT_CONNECTION_ID, this) ?: this.entityLinks[EntityLink(true,
-                                                                                                     CONTENTROOT_CONNECTION_ID)] as? ContentRootTestEntity
+          @OptIn(EntityStorageInstrumentationApi::class)
+          ((_diff as MutableEntityStorageInstrumentation).getOneChildBuilder(CONTENTROOT_CONNECTION_ID,
+                                                                             this) as? ContentRootTestEntity.Builder)
+          ?: (this.entityLinks[EntityLink(true, CONTENTROOT_CONNECTION_ID)] as? ContentRootTestEntity.Builder)
         }
         else {
-          this.entityLinks[EntityLink(true, CONTENTROOT_CONNECTION_ID)] as? ContentRootTestEntity
+          this.entityLinks[EntityLink(true, CONTENTROOT_CONNECTION_ID)] as? ContentRootTestEntity.Builder
         }
       }
       set(value) {
@@ -307,7 +312,6 @@ class ProjectModelTestEntityData : WorkspaceEntityData<ProjectModelTestEntity>()
   override fun wrapAsModifiable(diff: MutableEntityStorage): WorkspaceEntity.Builder<ProjectModelTestEntity> {
     val modifiable = ProjectModelTestEntityImpl.Builder(null)
     modifiable.diff = diff
-    modifiable.snapshot = diff
     modifiable.id = createEntityId()
     return modifiable
   }
@@ -338,9 +342,9 @@ class ProjectModelTestEntityData : WorkspaceEntityData<ProjectModelTestEntity>()
   override fun deserialize(de: EntityInformation.Deserializer) {
   }
 
-  override fun createDetachedEntity(parents: List<WorkspaceEntity>): WorkspaceEntity {
+  override fun createDetachedEntity(parents: List<WorkspaceEntity.Builder<*>>): WorkspaceEntity.Builder<*> {
     return ProjectModelTestEntity(info, descriptor, entitySource) {
-      this.parentEntity = parents.filterIsInstance<ProjectModelTestEntity>().singleOrNull()
+      this.parentEntity = parents.filterIsInstance<ProjectModelTestEntity.Builder>().singleOrNull()
     }
   }
 

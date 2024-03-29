@@ -3,14 +3,10 @@ package com.intellij.platform.workspace.jps.entities
 
 import com.intellij.openapi.util.NlsSafe
 import com.intellij.platform.workspace.storage.*
-import com.intellij.platform.workspace.storage.EntitySource
-import com.intellij.platform.workspace.storage.EntityType
-import com.intellij.platform.workspace.storage.GeneratedCodeApiVersion
-import com.intellij.platform.workspace.storage.MutableEntityStorage
-import com.intellij.platform.workspace.storage.WorkspaceEntity
 import com.intellij.platform.workspace.storage.annotations.Child
 import com.intellij.platform.workspace.storage.impl.containers.toMutableWorkspaceList
 import com.intellij.platform.workspace.storage.url.VirtualFileUrl
+import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.NonNls
 import java.io.Serializable
 
@@ -31,14 +27,14 @@ interface LibraryEntity : WorkspaceEntityWithSymbolicId {
         get() = LibraryId(name, tableId)
 
   //region generated code
-  @GeneratedCodeApiVersion(2)
-  interface Builder : LibraryEntity, WorkspaceEntity.Builder<LibraryEntity> {
+  @GeneratedCodeApiVersion(3)
+  interface Builder : WorkspaceEntity.Builder<LibraryEntity> {
     override var entitySource: EntitySource
-    override var name: String
-    override var tableId: LibraryTableId
-    override var typeId: LibraryTypeId?
-    override var roots: MutableList<LibraryRoot>
-    override var excludedRoots: List<ExcludeUrlEntity>
+    var name: String
+    var tableId: LibraryTableId
+    var typeId: LibraryTypeId?
+    var roots: MutableList<LibraryRoot>
+    var excludedRoots: List<ExcludeUrlEntity.Builder>
   }
 
   companion object : EntityType<LibraryEntity, Builder>() {
@@ -51,7 +47,7 @@ interface LibraryEntity : WorkspaceEntityWithSymbolicId {
       roots: List<LibraryRoot>,
       entitySource: EntitySource,
       init: (Builder.() -> Unit)? = null,
-    ): LibraryEntity {
+    ): Builder {
       val builder = builder()
       builder.name = name
       builder.tableId = tableId
@@ -73,8 +69,10 @@ fun MutableEntityStorage.modifyEntity(
   return modifyEntity(LibraryEntity.Builder::class.java, entity, modification)
 }
 
-var LibraryEntity.Builder.libraryProperties: @Child LibraryPropertiesEntity?
-  by WorkspaceEntity.extension()
+@get:ApiStatus.Internal
+@set:ApiStatus.Internal
+var LibraryEntity.Builder.libraryProperties: @Child LibraryPropertiesEntity.Builder?
+  by WorkspaceEntity.extensionBuilder(LibraryPropertiesEntity::class.java)
 //endregion
 
 val ExcludeUrlEntity.library: LibraryEntity? by WorkspaceEntity.extension()

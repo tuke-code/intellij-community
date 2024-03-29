@@ -18,16 +18,20 @@ import com.intellij.platform.workspace.storage.impl.extractOneToOneParent
 import com.intellij.platform.workspace.storage.impl.updateOneToOneParentOfChild
 import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentation
 import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentationApi
+import com.intellij.platform.workspace.storage.instrumentation.MutableEntityStorageInstrumentation
 import com.intellij.platform.workspace.storage.metadata.model.EntityMetadata
 import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.NonNls
 
-@GeneratedCodeApiVersion(2)
-@GeneratedCodeImplVersion(3)
-open class LibraryPropertiesEntityImpl(private val dataSource: LibraryPropertiesEntityData) : LibraryPropertiesEntity, WorkspaceEntityBase(dataSource) {
+@ApiStatus.Internal // Just insert this manually. This is needed for correct api surface
+@GeneratedCodeApiVersion(3)
+@GeneratedCodeImplVersion(5)
+open class LibraryPropertiesEntityImpl(private val dataSource: LibraryPropertiesEntityData) : LibraryPropertiesEntity, WorkspaceEntityBase(
+  dataSource) {
 
   private companion object {
-    internal val LIBRARY_CONNECTION_ID: ConnectionId = ConnectionId.create(LibraryEntity::class.java, LibraryPropertiesEntity::class.java, ConnectionId.ConnectionType.ONE_TO_ONE, false)
+    internal val LIBRARY_CONNECTION_ID: ConnectionId = ConnectionId.create(LibraryEntity::class.java, LibraryPropertiesEntity::class.java,
+                                                                           ConnectionId.ConnectionType.ONE_TO_ONE, false)
 
     private val connections = listOf<ConnectionId>(
       LIBRARY_CONNECTION_ID,
@@ -55,7 +59,8 @@ open class LibraryPropertiesEntityImpl(private val dataSource: LibraryProperties
   }
 
 
-  class Builder(result: LibraryPropertiesEntityData?) : ModifiableWorkspaceEntityBase<LibraryPropertiesEntity, LibraryPropertiesEntityData>(result), LibraryPropertiesEntity.Builder {
+  class Builder(result: LibraryPropertiesEntityData?) : ModifiableWorkspaceEntityBase<LibraryPropertiesEntity, LibraryPropertiesEntityData>(
+    result), LibraryPropertiesEntity.Builder {
     constructor() : this(LibraryPropertiesEntityData())
 
     override fun applyToBuilder(builder: MutableEntityStorage) {
@@ -70,7 +75,6 @@ open class LibraryPropertiesEntityImpl(private val dataSource: LibraryProperties
       }
 
       this.diff = builder
-      this.snapshot = builder
       addToBuilder()
       this.id = getEntityData().createEntityId()
       // After adding entity data to the builder, we need to unbind it and move the control over entity data to builder
@@ -121,15 +125,17 @@ open class LibraryPropertiesEntityImpl(private val dataSource: LibraryProperties
 
       }
 
-    override var library: LibraryEntity
+    override var library: LibraryEntity.Builder
       get() {
         val _diff = diff
         return if (_diff != null) {
-          _diff.extractOneToOneParent(LIBRARY_CONNECTION_ID, this)
-          ?: this.entityLinks[EntityLink(false, LIBRARY_CONNECTION_ID)]!! as LibraryEntity
+          @OptIn(EntityStorageInstrumentationApi::class)
+          ((_diff as MutableEntityStorageInstrumentation).getParentBuilder(LIBRARY_CONNECTION_ID, this) as? LibraryEntity.Builder)
+          ?: (this.entityLinks[EntityLink(false,
+                                                                                                  LIBRARY_CONNECTION_ID)]!! as LibraryEntity.Builder)
         }
         else {
-          this.entityLinks[EntityLink(false, LIBRARY_CONNECTION_ID)]!! as LibraryEntity
+          this.entityLinks[EntityLink(false, LIBRARY_CONNECTION_ID)]!! as LibraryEntity.Builder
         }
       }
       set(value) {
@@ -175,7 +181,6 @@ class LibraryPropertiesEntityData : WorkspaceEntityData<LibraryPropertiesEntity>
   override fun wrapAsModifiable(diff: MutableEntityStorage): WorkspaceEntity.Builder<LibraryPropertiesEntity> {
     val modifiable = LibraryPropertiesEntityImpl.Builder(null)
     modifiable.diff = diff
-    modifiable.snapshot = diff
     modifiable.id = createEntityId()
     return modifiable
   }
@@ -192,7 +197,8 @@ class LibraryPropertiesEntityData : WorkspaceEntityData<LibraryPropertiesEntity>
   }
 
   override fun getMetadata(): EntityMetadata {
-    return MetadataStorageImpl.getMetadataByTypeFqn("com.intellij.platform.workspace.jps.entities.LibraryPropertiesEntity") as EntityMetadata
+    return MetadataStorageImpl.getMetadataByTypeFqn(
+      "com.intellij.platform.workspace.jps.entities.LibraryPropertiesEntity") as EntityMetadata
   }
 
   override fun getEntityInterface(): Class<out WorkspaceEntity> {
@@ -205,10 +211,10 @@ class LibraryPropertiesEntityData : WorkspaceEntityData<LibraryPropertiesEntity>
   override fun deserialize(de: EntityInformation.Deserializer) {
   }
 
-  override fun createDetachedEntity(parents: List<WorkspaceEntity>): WorkspaceEntity {
+  override fun createDetachedEntity(parents: List<WorkspaceEntity.Builder<*>>): WorkspaceEntity.Builder<*> {
     return LibraryPropertiesEntity(entitySource) {
       this.propertiesXmlTag = this@LibraryPropertiesEntityData.propertiesXmlTag
-      parents.filterIsInstance<LibraryEntity>().singleOrNull()?.let { this.library = it }
+      parents.filterIsInstance<LibraryEntity.Builder>().singleOrNull()?.let { this.library = it }
     }
   }
 

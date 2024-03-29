@@ -20,7 +20,7 @@ import kotlin.coroutines.cancellation.CancellationException
 
 @ApiStatus.Internal
 object InlineCompletionUsageTracker : CounterUsagesCollector() {
-  private val GROUP = EventLogGroup("inline.completion", 29)
+  private val GROUP = EventLogGroup("inline.completion", 31)
 
   const val INVOKED_EVENT_ID = "invoked"
   const val SHOWN_EVENT_ID = "shown"
@@ -42,25 +42,6 @@ object InlineCompletionUsageTracker : CounterUsagesCollector() {
     }
 
     val ADDITIONAL: ObjectEventField = createAdditionalDataField(GROUP.id, INVOKED_EVENT_ID)
-    val CONTEXT_FEATURES = ObjectEventField(
-      "context_features",
-      InlineContextFeatures.LINE_NUMBER,
-      InlineContextFeatures.COLUMN_NUMBER,
-      InlineContextFeatures.SYMBOLS_IN_LINE_BEFORE_CARET,
-      InlineContextFeatures.SYMBOLS_IN_LINE_AFTER_CARET,
-      InlineContextFeatures.IS_WHITE_SPACE_BEFORE_CARET,
-      InlineContextFeatures.IS_WHITE_SPACE_AFTER_CARET,
-      InlineContextFeatures.NON_SPACE_SYMBOL_BEFORE_CARET,
-      InlineContextFeatures.NON_SPACE_SYMBOL_AFTER_CARET,
-      InlineContextFeatures.PREVIOUS_EMPTY_LINES_COUNT,
-      InlineContextFeatures.PREVIOUS_NON_EMPTY_LINE_LENGTH,
-      InlineContextFeatures.FOLLOWING_EMPTY_LINES_COUNT,
-      InlineContextFeatures.FOLLOWING_NON_EMPTY_LINE_LENGTH,
-      InlineContextFeatures.TIME_SINCE_LAST_TYPING,
-      *InlineContextFeatures.PARENT_FEATURES,
-      *TypingSpeedTracker.getEventFields(),
-    )
-    val CONTEXT_FEATURES_COMPUTATION_TIME = EventFields.Long("context_features_computation_time")
   }
 
   internal val INVOKED_EVENT: VarargEventId = GROUP.registerVarargEvent(
@@ -73,8 +54,6 @@ object InlineCompletionUsageTracker : CounterUsagesCollector() {
     InvokedEvents.TIME_TO_COMPUTE,
     InvokedEvents.OUTCOME,
     InvokedEvents.ADDITIONAL,
-    InvokedEvents.CONTEXT_FEATURES,
-    InvokedEvents.CONTEXT_FEATURES_COMPUTATION_TIME,
   )
 
   @ApiStatus.Internal

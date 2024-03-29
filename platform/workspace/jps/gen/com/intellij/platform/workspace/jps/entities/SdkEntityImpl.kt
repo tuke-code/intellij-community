@@ -23,8 +23,8 @@ import com.intellij.platform.workspace.storage.url.VirtualFileUrl
 import java.io.Serializable
 import org.jetbrains.annotations.NonNls
 
-@GeneratedCodeApiVersion(2)
-@GeneratedCodeImplVersion(3)
+@GeneratedCodeApiVersion(3)
+@GeneratedCodeImplVersion(5)
 open class SdkEntityImpl(private val dataSource: SdkEntityData) : SdkEntity, WorkspaceEntityBase(dataSource) {
 
   private companion object {
@@ -97,7 +97,6 @@ open class SdkEntityImpl(private val dataSource: SdkEntityData) : SdkEntity, Wor
       }
 
       this.diff = builder
-      this.snapshot = builder
       addToBuilder()
       this.id = getEntityData().createEntityId()
       // After adding entity data to the builder, we need to unbind it and move the control over entity data to builder
@@ -258,7 +257,6 @@ class SdkEntityData : WorkspaceEntityData.WithCalculableSymbolicId<SdkEntity>() 
   override fun wrapAsModifiable(diff: MutableEntityStorage): WorkspaceEntity.Builder<SdkEntity> {
     val modifiable = SdkEntityImpl.Builder(null)
     modifiable.diff = diff
-    modifiable.snapshot = diff
     modifiable.id = createEntityId()
     return modifiable
   }
@@ -299,7 +297,7 @@ class SdkEntityData : WorkspaceEntityData.WithCalculableSymbolicId<SdkEntity>() 
   override fun deserialize(de: EntityInformation.Deserializer) {
   }
 
-  override fun createDetachedEntity(parents: List<WorkspaceEntity>): WorkspaceEntity {
+  override fun createDetachedEntity(parents: List<WorkspaceEntity.Builder<*>>): WorkspaceEntity.Builder<*> {
     return SdkEntity(name, type, roots, additionalData, entitySource) {
       this.version = this@SdkEntityData.version
       this.homePath = this@SdkEntityData.homePath

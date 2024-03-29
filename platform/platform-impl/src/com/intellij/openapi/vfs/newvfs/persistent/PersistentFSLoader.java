@@ -27,6 +27,7 @@ import com.intellij.util.io.*;
 import com.intellij.util.io.blobstorage.SpaceAllocationStrategy;
 import com.intellij.util.io.blobstorage.SpaceAllocationStrategy.DataLengthPlusFixedPercentStrategy;
 import com.intellij.util.io.blobstorage.StreamlinedBlobStorage;
+import com.intellij.util.io.dev.StorageFactory;
 import com.intellij.util.io.dev.mmapped.MMappedFileStorageFactory;
 import com.intellij.util.io.pagecache.impl.PageContentLockingStrategy;
 import com.intellij.util.io.storage.*;
@@ -86,7 +87,7 @@ public final class PersistentFSLoader {
       })
       .filter(e -> e instanceof IOException)
       .findFirst().orElse(null);
-    
+
     if (mainIoException != null && !mainIoException.getMessage().isEmpty()) {
       for (Throwable exception : exceptions) {
         if (exception != mainIoException) {
@@ -425,8 +426,8 @@ public final class PersistentFSLoader {
     //So the tradeoff: we use few heuristics to quickly check for the most likely signs of corruption,
     // and if we find any such sign -- switch to more vigilant checking:
 
-    if (recordsStorage.getConnectionStatus() != PersistentFSHeaders.SAFELY_CLOSED_MAGIC) {
-      addProblem(NOT_CLOSED_PROPERLY, "VFS wasn't safely shut down: records.connectionStatus != SAFELY_CLOSED");
+    if (!recordsStorage.wasClosedProperly()) {
+      addProblem(NOT_CLOSED_PROPERLY, "VFS wasn't safely shut down: records.wasClosedProperly is false");
     }
     int errorsAccumulated = recordsStorage.getErrorsAccumulated();
     if (errorsAccumulated > 0) {
@@ -776,15 +777,21 @@ public final class PersistentFSLoader {
   }
 
   public @NotNull PersistentFSRecordsStorage createRecordsStorage(@NotNull Path recordsFile) throws IOException {
-    PersistentFSRecordsStorage storage = PersistentFSRecordsStorageFactory.createStorage(recordsFile);
-    if (vfsLog != null) {
-      var recordsInterceptors = vfsLog.getConnectionInterceptors().stream()
-        .filter(RecordsInterceptor.class::isInstance)
-        .map(RecordsInterceptor.class::cast)
-        .toList();
-      storage = InterceptorInjection.INSTANCE.injectInRecords(storage, recordsInterceptors);
-    }
-    return storage;
+    StorageFactory<PersistentFSRecordsStorage> recordsStorageFactory = PersistentFSRecordsStorageFactory.storageImplementation();
+
+    LOG.info("VFS uses " + recordsStorageFactory + " storage for main file records table");
+    return recordsStorageFactory.wrapStorageSafely(recordsFile, records -> {
+      if (vfsLog != null) {
+        var recordsInterceptors = vfsLog.getConnectionInterceptors().stream()
+          .filter(RecordsInterceptor.class::isInstance)
+          .map(RecordsInterceptor.class::cast)
+          .toList();
+        return InterceptorInjection.INSTANCE.injectInRecords(records, recordsInterceptors);
+      }
+      else {
+        return records;
+      }
+    });
   }
 
   /** @return common version of all 3 storages, or -1, if their versions are different (i.e. inconsistent) */
@@ -812,7 +819,6 @@ public final class PersistentFSLoader {
     records.setVersion(version);
     attributes.setVersion(version);
     contents.setVersion(version);
-    records.setConnectionStatus(PersistentFSHeaders.SAFELY_CLOSED_MAGIC);
   }
 
   private static void makeBestEffortToCleanStorage(@Nullable Object storage,
@@ -823,7 +829,7 @@ public final class PersistentFSLoader {
       }
       catch (Throwable t) {
         LOG.info(storage.getClass().getSimpleName() + ".closeAndClean() fails: " +
-                 ExceptionUtil.getNonEmptyMessage(t, t.getClass().getSimpleName() + "(<no error message given>)"));
+                 t.getClass().getSimpleName() + "(" + ExceptionUtil.getNonEmptyMessage(t, "<no error message given>") + ")");
       }
     }
     else {

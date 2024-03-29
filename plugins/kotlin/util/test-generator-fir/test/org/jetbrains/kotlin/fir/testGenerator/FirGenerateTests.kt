@@ -4,6 +4,8 @@ package org.jetbrains.kotlin.fir.testGenerator
 
 import org.jetbrains.fir.uast.test.*
 import org.jetbrains.kotlin.fir.testGenerator.codeinsight.generateK2CodeInsightTests
+import org.jetbrains.kotlin.idea.fir.AbstractK2JsBasicCompletionLegacyStdlibTest
+import org.jetbrains.kotlin.idea.fir.AbstractK2JsBasicCompletionTest
 import org.jetbrains.kotlin.idea.fir.actions.AbstractK2AddImportActionTest
 import org.jetbrains.kotlin.idea.fir.actions.AbstractK2BytecodeToolWindowTest
 import org.jetbrains.kotlin.idea.fir.analysis.providers.AbstractIdeKotlinAnnotationsResolverTest
@@ -18,6 +20,7 @@ import org.jetbrains.kotlin.idea.fir.completion.test.handlers.*
 import org.jetbrains.kotlin.idea.fir.completion.wheigher.AbstractHighLevelWeigherTest
 import org.jetbrains.kotlin.idea.fir.copyPaste.AbstractFirLiteralKotlinToKotlinCopyPasteTest
 import org.jetbrains.kotlin.idea.fir.copyPaste.AbstractFirLiteralTextToKotlinCopyPasteTest
+import org.jetbrains.kotlin.idea.fir.documentation.AbstractFirQuickDocMultiplatformTest
 import org.jetbrains.kotlin.idea.fir.documentation.AbstractFirQuickDocTest
 import org.jetbrains.kotlin.idea.fir.externalAnnotations.AbstractK2ExternalAnnotationTest
 import org.jetbrains.kotlin.idea.fir.findUsages.*
@@ -243,6 +246,16 @@ private fun assembleWorkspace(): TWorkspace = workspace {
             model("kdoc", pattern = KT_WITHOUT_FIR_PREFIX)
         }
 
+        testClass<AbstractK2JsBasicCompletionTest> {
+            model("basic/common", pattern = KT_WITHOUT_FIR_PREFIX)
+            model("../../idea-fir/testData/completion/basic/common", testClassName = "CommonFir")
+        }
+
+        testClass<AbstractK2JsBasicCompletionLegacyStdlibTest> {
+            model("basic/common", pattern = KT_WITHOUT_FIR_PREFIX)
+            model("../../idea-fir/testData/completion/basic/common", testClassName = "CommonFir")
+        }
+
         testClass<AbstractHighLevelBasicCompletionHandlerTest> {
             model("handlers/basic", pattern = KT_WITHOUT_DOT_AND_FIR_PREFIX)
             model("handlers", pattern = KT_WITHOUT_DOT_AND_FIR_PREFIX, isRecursive = false)
@@ -362,7 +375,10 @@ private fun assembleWorkspace(): TWorkspace = workspace {
 
     testGroup("fir/tests") {
         testClass<AbstractFirQuickDocTest> {
-            model("../../../idea/tests/testData/editor/quickDoc", pattern = Patterns.forRegex("""^([^_]+)\.(kt|java)$"""))
+            model("../../../idea/tests/testData/editor/quickDoc", pattern = Patterns.forRegex("""^([^_]+)\.(kt|java)$"""), isRecursive = false)
+        }
+        testClass<AbstractFirQuickDocMultiplatformTest> {
+            model("../../../idea/tests/testData/editor/quickDoc/multiplatform", pattern = Patterns.forRegex("""^([^_]+)\.(kt|java)$"""))
         }
     }
 

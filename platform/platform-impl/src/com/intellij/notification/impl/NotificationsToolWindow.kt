@@ -597,8 +597,6 @@ private class NotificationGroupComponent(private val myMainContent: Notification
     }
   }
 
-  private var myScrollValue = 0
-
   private val myEventHandler = ComponentEventHandler()
 
   private val myTimeComponents = ArrayList<JLabel>()
@@ -643,19 +641,8 @@ private class NotificationGroupComponent(private val myMainContent: Notification
     myList.background = NotificationComponent.BG_COLOR
     myList.border = JBUI.Borders.emptyRight(10)
 
-    myScrollPane.border = null
+    ScrollableContentBorder.setup(myScrollPane, Side.TOP)
     mainPanel.add(myScrollPane)
-
-    myScrollPane.verticalScrollBar.addAdjustmentListener {
-      val value = it.value
-      if (myScrollValue == 0 && value > 0 || myScrollValue > 0 && value == 0) {
-        myScrollValue = value
-        repaint()
-      }
-      else {
-        myScrollValue = value
-      }
-    }
 
     myEventHandler.add(this)
   }
@@ -663,15 +650,6 @@ private class NotificationGroupComponent(private val myMainContent: Notification
   fun updateLaf() {
     updateComponents()
     iterateComponents { it.updateLaf() }
-  }
-
-  override fun paintComponent(g: Graphics) {
-    super.paintComponent(g)
-    if (myScrollValue > 0) {
-      g.color = JBColor.border()
-      val y = myScrollPane.y - 1
-      g.drawLine(0, y, width, y)
-    }
   }
 
   fun add(notification: Notification, singleSelectionHandler: SingleTextSelectionHandler) {
@@ -1195,6 +1173,7 @@ private class NotificationComponent(val project: Project,
 
     val presentation = Presentation()
     presentation.description = IdeBundle.message("tooltip.turn.notification.off")
+    presentation.isPopupGroup = true
     presentation.icon = AllIcons.Actions.More
     presentation.putClientProperty(ActionButton.HIDE_DROPDOWN_ICON, true)
 

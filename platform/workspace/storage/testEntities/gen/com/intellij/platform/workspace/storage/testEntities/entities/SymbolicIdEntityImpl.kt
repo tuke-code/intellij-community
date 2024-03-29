@@ -25,8 +25,8 @@ import kotlin.jvm.JvmName
 import kotlin.jvm.JvmOverloads
 import kotlin.jvm.JvmStatic
 
-@GeneratedCodeApiVersion(2)
-@GeneratedCodeImplVersion(3)
+@GeneratedCodeApiVersion(3)
+@GeneratedCodeImplVersion(5)
 open class SymbolicIdEntityImpl(private val dataSource: SymbolicIdEntityData) : SymbolicIdEntity, WorkspaceEntityBase(dataSource) {
 
   private companion object {
@@ -70,7 +70,6 @@ open class SymbolicIdEntityImpl(private val dataSource: SymbolicIdEntityData) : 
       }
 
       this.diff = builder
-      this.snapshot = builder
       addToBuilder()
       this.id = getEntityData().createEntityId()
       // After adding entity data to the builder, we need to unbind it and move the control over entity data to builder
@@ -134,7 +133,6 @@ class SymbolicIdEntityData : WorkspaceEntityData.WithCalculableSymbolicId<Symbol
   override fun wrapAsModifiable(diff: MutableEntityStorage): WorkspaceEntity.Builder<SymbolicIdEntity> {
     val modifiable = SymbolicIdEntityImpl.Builder(null)
     modifiable.diff = diff
-    modifiable.snapshot = diff
     modifiable.id = createEntityId()
     return modifiable
   }
@@ -169,7 +167,7 @@ class SymbolicIdEntityData : WorkspaceEntityData.WithCalculableSymbolicId<Symbol
   override fun deserialize(de: EntityInformation.Deserializer) {
   }
 
-  override fun createDetachedEntity(parents: List<WorkspaceEntity>): WorkspaceEntity {
+  override fun createDetachedEntity(parents: List<WorkspaceEntity.Builder<*>>): WorkspaceEntity.Builder<*> {
     return SymbolicIdEntity(data, entitySource) {
     }
   }

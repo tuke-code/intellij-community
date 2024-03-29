@@ -7,6 +7,7 @@ import com.intellij.platform.workspace.jps.entities.ModuleId
 import com.intellij.platform.workspace.storage.*
 import com.intellij.platform.workspace.storage.EntityInformation
 import com.intellij.platform.workspace.storage.EntitySource
+import com.intellij.platform.workspace.storage.EntityType
 import com.intellij.platform.workspace.storage.GeneratedCodeApiVersion
 import com.intellij.platform.workspace.storage.GeneratedCodeImplVersion
 import com.intellij.platform.workspace.storage.MutableEntityStorage
@@ -26,12 +27,13 @@ import com.intellij.platform.workspace.storage.impl.indices.WorkspaceMutableInde
 import com.intellij.platform.workspace.storage.impl.updateOneToAbstractManyParentOfChild
 import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentation
 import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentationApi
+import com.intellij.platform.workspace.storage.instrumentation.MutableEntityStorageInstrumentation
 import com.intellij.platform.workspace.storage.metadata.model.EntityMetadata
 import com.intellij.platform.workspace.storage.url.VirtualFileUrl
 import org.jetbrains.annotations.NonNls
 
-@GeneratedCodeApiVersion(2)
-@GeneratedCodeImplVersion(3)
+@GeneratedCodeApiVersion(3)
+@GeneratedCodeImplVersion(5)
 open class ArtifactOutputPackagingElementEntityImpl(private val dataSource: ArtifactOutputPackagingElementEntityData) : ArtifactOutputPackagingElementEntity, WorkspaceEntityBase(
   dataSource) {
 
@@ -82,7 +84,6 @@ open class ArtifactOutputPackagingElementEntityImpl(private val dataSource: Arti
       }
 
       this.diff = builder
-      this.snapshot = builder
       addToBuilder()
       this.id = getEntityData().createEntityId()
       // After adding entity data to the builder, we need to unbind it and move the control over entity data to builder
@@ -123,15 +124,19 @@ open class ArtifactOutputPackagingElementEntityImpl(private val dataSource: Arti
 
       }
 
-    override var parentEntity: CompositePackagingElementEntity?
+    override var parentEntity: CompositePackagingElementEntity.Builder<out CompositePackagingElementEntity>?
       get() {
         val _diff = diff
         return if (_diff != null) {
-          _diff.extractOneToAbstractManyParent(PARENTENTITY_CONNECTION_ID, this) ?: this.entityLinks[EntityLink(false,
-                                                                                                                PARENTENTITY_CONNECTION_ID)] as? CompositePackagingElementEntity
+          @OptIn(EntityStorageInstrumentationApi::class)
+          ((_diff as MutableEntityStorageInstrumentation).getParentBuilder(PARENTENTITY_CONNECTION_ID,
+                                                                           this) as? CompositePackagingElementEntity.Builder<out CompositePackagingElementEntity>)
+          ?: (this.entityLinks[EntityLink(false,
+                                          PARENTENTITY_CONNECTION_ID)] as? CompositePackagingElementEntity.Builder<out CompositePackagingElementEntity>)
         }
         else {
-          this.entityLinks[EntityLink(false, PARENTENTITY_CONNECTION_ID)] as? CompositePackagingElementEntity
+          this.entityLinks[EntityLink(false,
+                                      PARENTENTITY_CONNECTION_ID)] as? CompositePackagingElementEntity.Builder<out CompositePackagingElementEntity>
         }
       }
       set(value) {
@@ -234,7 +239,6 @@ class ArtifactOutputPackagingElementEntityData : WorkspaceEntityData<ArtifactOut
   override fun wrapAsModifiable(diff: MutableEntityStorage): WorkspaceEntity.Builder<ArtifactOutputPackagingElementEntity> {
     val modifiable = ArtifactOutputPackagingElementEntityImpl.Builder(null)
     modifiable.diff = diff
-    modifiable.snapshot = diff
     modifiable.id = createEntityId()
     return modifiable
   }
@@ -265,10 +269,10 @@ class ArtifactOutputPackagingElementEntityData : WorkspaceEntityData<ArtifactOut
   override fun deserialize(de: EntityInformation.Deserializer) {
   }
 
-  override fun createDetachedEntity(parents: List<WorkspaceEntity>): WorkspaceEntity {
+  override fun createDetachedEntity(parents: List<WorkspaceEntity.Builder<*>>): WorkspaceEntity.Builder<*> {
     return ArtifactOutputPackagingElementEntity(entitySource) {
       this.artifact = this@ArtifactOutputPackagingElementEntityData.artifact
-      this.parentEntity = parents.filterIsInstance<CompositePackagingElementEntity>().singleOrNull()
+      this.parentEntity = parents.filterIsInstance<CompositePackagingElementEntity.Builder<out CompositePackagingElementEntity>>().singleOrNull()
     }
   }
 

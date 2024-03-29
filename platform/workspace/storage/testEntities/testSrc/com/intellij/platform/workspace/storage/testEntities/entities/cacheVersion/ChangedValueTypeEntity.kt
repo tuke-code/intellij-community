@@ -15,12 +15,12 @@ interface ChangedValueTypeEntity: WorkspaceEntity {
   val text: List<String>
 
   //region generated code
-  @GeneratedCodeApiVersion(2)
-  interface Builder : ChangedValueTypeEntity, WorkspaceEntity.Builder<ChangedValueTypeEntity> {
+  @GeneratedCodeApiVersion(3)
+  interface Builder : WorkspaceEntity.Builder<ChangedValueTypeEntity> {
     override var entitySource: EntitySource
-    override var type: String
-    override var someKey: Int
-    override var text: MutableList<String>
+    var type: String
+    var someKey: Int
+    var text: MutableList<String>
   }
 
   companion object : EntityType<ChangedValueTypeEntity, Builder>() {
@@ -33,7 +33,7 @@ interface ChangedValueTypeEntity: WorkspaceEntity {
       text: List<String>,
       entitySource: EntitySource,
       init: (Builder.() -> Unit)? = null,
-    ): ChangedValueTypeEntity {
+    ): Builder {
       val builder = builder()
       builder.type = type
       builder.someKey = someKey

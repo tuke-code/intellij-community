@@ -19,11 +19,11 @@ interface LibraryPropertiesEntity : WorkspaceEntity {
   val propertiesXmlTag: @NonNls String?
 
   //region generated code
-  @GeneratedCodeApiVersion(2)
-  interface Builder : LibraryPropertiesEntity, WorkspaceEntity.Builder<LibraryPropertiesEntity> {
+  @GeneratedCodeApiVersion(3)
+  interface Builder : WorkspaceEntity.Builder<LibraryPropertiesEntity> {
     override var entitySource: EntitySource
-    override var library: LibraryEntity
-    override var propertiesXmlTag: String?
+    var library: LibraryEntity.Builder
+    var propertiesXmlTag: String?
   }
 
   companion object : EntityType<LibraryPropertiesEntity, Builder>() {
@@ -33,7 +33,7 @@ interface LibraryPropertiesEntity : WorkspaceEntity {
     operator fun invoke(
       entitySource: EntitySource,
       init: (Builder.() -> Unit)? = null,
-    ): LibraryPropertiesEntity {
+    ): Builder {
       val builder = builder()
       builder.entitySource = entitySource
       init?.invoke(builder)

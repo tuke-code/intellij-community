@@ -4,6 +4,7 @@ package com.intellij.platform.workspace.storage.testEntities.entities
 import com.intellij.platform.workspace.storage.*
 import com.intellij.platform.workspace.storage.EntityInformation
 import com.intellij.platform.workspace.storage.EntitySource
+import com.intellij.platform.workspace.storage.EntityType
 import com.intellij.platform.workspace.storage.GeneratedCodeApiVersion
 import com.intellij.platform.workspace.storage.GeneratedCodeImplVersion
 import com.intellij.platform.workspace.storage.MutableEntityStorage
@@ -18,10 +19,11 @@ import com.intellij.platform.workspace.storage.impl.extractOneToManyParent
 import com.intellij.platform.workspace.storage.impl.updateOneToManyParentOfChild
 import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentation
 import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentationApi
+import com.intellij.platform.workspace.storage.instrumentation.MutableEntityStorageInstrumentation
 import com.intellij.platform.workspace.storage.metadata.model.EntityMetadata
 
-@GeneratedCodeApiVersion(2)
-@GeneratedCodeImplVersion(3)
+@GeneratedCodeApiVersion(3)
+@GeneratedCodeImplVersion(5)
 open class SourceRootTestEntityImpl(private val dataSource: SourceRootTestEntityData) : SourceRootTestEntity, WorkspaceEntityBase(
   dataSource) {
 
@@ -72,7 +74,6 @@ open class SourceRootTestEntityImpl(private val dataSource: SourceRootTestEntity
       }
 
       this.diff = builder
-      this.snapshot = builder
       addToBuilder()
       this.id = getEntityData().createEntityId()
       // After adding entity data to the builder, we need to unbind it and move the control over entity data to builder
@@ -134,15 +135,17 @@ open class SourceRootTestEntityImpl(private val dataSource: SourceRootTestEntity
         changedProperty.add("data")
       }
 
-    override var contentRoot: ContentRootTestEntity
+    override var contentRoot: ContentRootTestEntity.Builder
       get() {
         val _diff = diff
         return if (_diff != null) {
-          _diff.extractOneToManyParent(CONTENTROOT_CONNECTION_ID, this) ?: this.entityLinks[EntityLink(false,
-                                                                                                       CONTENTROOT_CONNECTION_ID)]!! as ContentRootTestEntity
+          @OptIn(EntityStorageInstrumentationApi::class)
+          ((_diff as MutableEntityStorageInstrumentation).getParentBuilder(CONTENTROOT_CONNECTION_ID,
+                                                                           this) as? ContentRootTestEntity.Builder)
+          ?: (this.entityLinks[EntityLink(false, CONTENTROOT_CONNECTION_ID)]!! as ContentRootTestEntity.Builder)
         }
         else {
-          this.entityLinks[EntityLink(false, CONTENTROOT_CONNECTION_ID)]!! as ContentRootTestEntity
+          this.entityLinks[EntityLink(false, CONTENTROOT_CONNECTION_ID)]!! as ContentRootTestEntity.Builder
         }
       }
       set(value) {
@@ -185,7 +188,6 @@ class SourceRootTestEntityData : WorkspaceEntityData<SourceRootTestEntity>() {
   override fun wrapAsModifiable(diff: MutableEntityStorage): WorkspaceEntity.Builder<SourceRootTestEntity> {
     val modifiable = SourceRootTestEntityImpl.Builder(null)
     modifiable.diff = diff
-    modifiable.snapshot = diff
     modifiable.id = createEntityId()
     return modifiable
   }
@@ -216,9 +218,9 @@ class SourceRootTestEntityData : WorkspaceEntityData<SourceRootTestEntity>() {
   override fun deserialize(de: EntityInformation.Deserializer) {
   }
 
-  override fun createDetachedEntity(parents: List<WorkspaceEntity>): WorkspaceEntity {
+  override fun createDetachedEntity(parents: List<WorkspaceEntity.Builder<*>>): WorkspaceEntity.Builder<*> {
     return SourceRootTestEntity(data, entitySource) {
-      parents.filterIsInstance<ContentRootTestEntity>().singleOrNull()?.let { this.contentRoot = it }
+      parents.filterIsInstance<ContentRootTestEntity.Builder>().singleOrNull()?.let { this.contentRoot = it }
     }
   }
 

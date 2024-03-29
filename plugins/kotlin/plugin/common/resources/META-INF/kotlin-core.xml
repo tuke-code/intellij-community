@@ -193,7 +193,6 @@
     <search.topHitProvider implementation="org.jetbrains.kotlin.idea.editor.KotlinEditorOptionsTopHitProvider"/>
 
     <psi.classFileDecompiler implementation="org.jetbrains.kotlin.analysis.decompiler.psi.KotlinClassFileDecompiler"/>
-    <psi.classFileDecompiler implementation="org.jetbrains.kotlin.analysis.decompiler.js.KotlinJavaScriptMetaFileDecompiler"/>
     <psi.classFileDecompiler implementation="org.jetbrains.kotlin.analysis.decompiler.psi.KotlinBuiltInDecompiler"/>
 
     <moduleConfigurationEditorProvider implementation="org.jetbrains.kotlin.idea.roots.ui.NonJvmKotlinModuleEditorsProvider"/>
@@ -302,8 +301,6 @@
 
     <listener class="org.jetbrains.kotlin.idea.macros.KotlinBundledUsageDetector$ModelChangeListener"
               topic="com.intellij.platform.backend.workspace.WorkspaceModelChangeListener"/>
-    <listener topic="com.intellij.openapi.fileEditor.FileEditorManagerListener"
-              class="org.jetbrains.kotlin.idea.configuration.notifications.KotlinCodeStyleChangedFileListener"/>
   </projectListeners>
 
   <applicationListeners>
@@ -509,6 +506,7 @@
 
   <!-- Declaration search and Find Usages -->
   <extensions defaultExtensionNs="com.intellij">
+    <actionConfigurationCustomizer implementation="org.jetbrains.kotlin.idea.actions.KotlinActionsManager"/>
     <searchEverywhereResultsEqualityProvider implementation="org.jetbrains.kotlin.idea.searcheverywhere.KtSearchEverywhereEqualityProvider"/>
     <referencesSearch implementation="org.jetbrains.kotlin.idea.search.ideaExtensions.KotlinReferencesSearcher"/>
     <referencesSearch implementation="org.jetbrains.kotlin.idea.search.ideaExtensions.KotlinAliasedImportedElementSearcher"/>
@@ -532,7 +530,6 @@
             implementationClass="org.jetbrains.kotlin.idea.refactoring.safeDelete.KotlinJavaSafeDeleteDelegate"/>
     <safeDelete.importSearcher implementation="org.jetbrains.kotlin.idea.refactoring.safeDelete.KotlinImportSearcher"/>
 
-
     <usageToPsiElementProvider implementation="org.jetbrains.kotlin.idea.codeInsight.KotlinUsageToPsiElementProvider"/>
 
     <usageFeaturesProvider implementation="org.jetbrains.kotlin.idea.findUsages.similarity.KotlinUsageSimilarityFeaturesProvider"/>
@@ -540,6 +537,8 @@
     <readWriteAccessDetector implementation="org.jetbrains.kotlin.idea.search.ideaExtensions.KotlinReadWriteAccessDetector" id="kotlin"/>
 
     <projectFileScanner implementation="org.jetbrains.kotlin.idea.base.platforms.LibraryEffectiveKindProvider$LibraryKindScanner"/>
+
+    <editorNotificationProvider implementation="org.jetbrains.kotlin.idea.inspections.JavaOutsideModuleDetector"/>
   </extensions>
 
   <extensions defaultExtensionNs="com.intellij.jvm">

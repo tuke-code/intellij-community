@@ -21,11 +21,11 @@ interface ParentSubEntity : WorkspaceEntity {
   val child: ChildSubEntity?
 
   //region generated code
-  @GeneratedCodeApiVersion(2)
-  interface Builder : ParentSubEntity, WorkspaceEntity.Builder<ParentSubEntity> {
+  @GeneratedCodeApiVersion(3)
+  interface Builder : WorkspaceEntity.Builder<ParentSubEntity> {
     override var entitySource: EntitySource
-    override var parentData: String
-    override var child: ChildSubEntity?
+    var parentData: String
+    var child: ChildSubEntity.Builder?
   }
 
   companion object : EntityType<ParentSubEntity, Builder>() {
@@ -36,7 +36,7 @@ interface ParentSubEntity : WorkspaceEntity {
       parentData: String,
       entitySource: EntitySource,
       init: (Builder.() -> Unit)? = null,
-    ): ParentSubEntity {
+    ): Builder {
       val builder = builder()
       builder.parentData = parentData
       builder.entitySource = entitySource
@@ -64,11 +64,11 @@ interface ChildSubEntity : WorkspaceEntity {
   val child: ChildSubSubEntity?
 
   //region generated code
-  @GeneratedCodeApiVersion(2)
-  interface Builder : ChildSubEntity, WorkspaceEntity.Builder<ChildSubEntity> {
+  @GeneratedCodeApiVersion(3)
+  interface Builder : WorkspaceEntity.Builder<ChildSubEntity> {
     override var entitySource: EntitySource
-    override var parentEntity: ParentSubEntity
-    override var child: ChildSubSubEntity?
+    var parentEntity: ParentSubEntity.Builder
+    var child: ChildSubSubEntity.Builder?
   }
 
   companion object : EntityType<ChildSubEntity, Builder>() {
@@ -78,7 +78,7 @@ interface ChildSubEntity : WorkspaceEntity {
     operator fun invoke(
       entitySource: EntitySource,
       init: (Builder.() -> Unit)? = null,
-    ): ChildSubEntity {
+    ): Builder {
       val builder = builder()
       builder.entitySource = entitySource
       init?.invoke(builder)
@@ -104,11 +104,11 @@ interface ChildSubSubEntity : WorkspaceEntity {
   val childData: String
 
   //region generated code
-  @GeneratedCodeApiVersion(2)
-  interface Builder : ChildSubSubEntity, WorkspaceEntity.Builder<ChildSubSubEntity> {
+  @GeneratedCodeApiVersion(3)
+  interface Builder : WorkspaceEntity.Builder<ChildSubSubEntity> {
     override var entitySource: EntitySource
-    override var parentEntity: ChildSubEntity
-    override var childData: String
+    var parentEntity: ChildSubEntity.Builder
+    var childData: String
   }
 
   companion object : EntityType<ChildSubSubEntity, Builder>() {
@@ -119,7 +119,7 @@ interface ChildSubSubEntity : WorkspaceEntity {
       childData: String,
       entitySource: EntitySource,
       init: (Builder.() -> Unit)? = null,
-    ): ChildSubSubEntity {
+    ): Builder {
       val builder = builder()
       builder.childData = childData
       builder.entitySource = entitySource

@@ -3,6 +3,7 @@ package com.intellij.openapi.editor.impl;
 
 import com.intellij.application.options.EditorFontsConstants;
 import com.intellij.codeWithMe.ClientId;
+import com.intellij.concurrency.ContextAwareRunnable;
 import com.intellij.diagnostic.Dumpable;
 import com.intellij.ide.*;
 import com.intellij.ide.dnd.DnDManager;
@@ -1074,8 +1075,8 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
   }
 
   // EditorFactory.releaseEditor should be used to release editor
+  @RequiresEdt
   void release() {
-    assertIsDispatchThread();
     executeNonCancelableBlock(() -> {
       if (isReleased) {
         throwDisposalError("Double release of editor:");
@@ -2955,7 +2956,7 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
     myCurrentDragIsSubstantial = true;
   }
 
-  private static final class RepaintCursorCommand implements Runnable {
+  private static final class RepaintCursorCommand implements ContextAwareRunnable {
     private long mySleepTime = 500;
     private boolean myIsBlinkCaret = true;
     private @Nullable EditorImpl myEditor;
@@ -4893,7 +4894,10 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
 
     @Override
     public void setAttributes(@NotNull TextAttributesKey key, TextAttributes attributes) {
-      myOwnAttributes.put(key, attributes);
+      if (TextAttributesKey.isTemp(key))
+        getDelegate().setAttributes(key, attributes);
+      else
+        myOwnAttributes.put(key, attributes);
     }
 
     @Override

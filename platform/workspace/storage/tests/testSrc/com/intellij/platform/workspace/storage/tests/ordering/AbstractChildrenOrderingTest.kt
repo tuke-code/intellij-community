@@ -4,6 +4,7 @@ package com.intellij.platform.workspace.storage.tests.ordering
 import com.intellij.platform.workspace.storage.MutableEntityStorage
 import com.intellij.platform.workspace.storage.entities
 import com.intellij.platform.workspace.storage.testEntities.entities.*
+import com.intellij.platform.workspace.storage.tests.builderFrom
 import com.intellij.platform.workspace.storage.tests.from
 import com.intellij.platform.workspace.storage.toBuilder
 import com.intellij.util.asSafely
@@ -55,7 +56,7 @@ class AbstractChildrenOrderingTest {
     val builder2 = builder.toSnapshot().toBuilder()
 
     builder2 addEntity NamedChildEntity("Four", MySource) {
-      this.parentEntity = entity
+      this.parentEntity = entity.builderFrom(builder2)
     }
 
     val newEntity = when (enState) {
@@ -100,9 +101,9 @@ class AbstractChildrenOrderingTest {
       )
     }
 
-    assertEquals("One", entity.children[0].asSafely<MiddleEntity>()!!.property)
-    assertEquals("Two", entity.children[1].asSafely<MiddleEntity>()!!.property)
-    assertEquals("Three", entity.children[2].asSafely<MiddleEntity>()!!.property)
+    assertEquals("One", entity.children[0].asSafely<MiddleEntity.Builder>()!!.property)
+    assertEquals("Two", entity.children[1].asSafely<MiddleEntity.Builder>()!!.property)
+    assertEquals("Three", entity.children[2].asSafely<MiddleEntity.Builder>()!!.property)
   }
 
   @ParameterizedTest
@@ -134,17 +135,16 @@ class AbstractChildrenOrderingTest {
   @EnumSource(EntityState::class)
   fun `removing abstract first and adding last has proper ordering`(enState: EntityState) {
     val builder = MutableEntityStorage.create()
-    val firstChild = MiddleEntity("One", MySource)
     val entity = builder addEntity LeftEntity(MySource) {
       this.children = listOf(
-        firstChild,
+        MiddleEntity("One", MySource),
         MiddleEntity("Two", MySource),
         MiddleEntity("Three", MySource),
       )
     }
     val builder2 = builder.toSnapshot().toBuilder()
 
-    builder2.removeEntity(firstChild.from(builder2))
+    builder2.removeEntity(entity.children.first().from(builder2))
     builder2.modifyEntity(entity.from(builder2)) {
       this.children += MiddleEntity("Four", MySource)
     }
@@ -163,17 +163,16 @@ class AbstractChildrenOrderingTest {
   @EnumSource(EntityState::class)
   fun `removing abstract second entity keeps proper ordering`(enState: EntityState) {
     val builder = MutableEntityStorage.create()
-    val secondChild = MiddleEntity("Two", MySource)
-    builder addEntity LeftEntity(MySource) {
+    val root = builder addEntity LeftEntity(MySource) {
       this.children = listOf(
         MiddleEntity("One", MySource),
-        secondChild,
+        MiddleEntity("Two", MySource),
         MiddleEntity("Three", MySource),
       )
     }
     val builder2 = builder.toSnapshot().toBuilder()
 
-    builder2.removeEntity(secondChild.from(builder2))
+    builder2.removeEntity(root.children[1].from(builder2))
 
     val newEntity = when (enState) {
       EntityState.FROM_IMMUTABLE -> builder2.toSnapshot().entities<LeftEntity>().single()
@@ -226,7 +225,7 @@ class AbstractChildrenOrderingTest {
     val builder2 = builder.toSnapshot().toBuilder()
 
     builder2 addEntity MiddleEntity("Four", MySource) {
-      this.parentEntity = entity
+      this.parentEntity = entity.builderFrom(builder2)
     }
 
     val newEntity = when (enState) {

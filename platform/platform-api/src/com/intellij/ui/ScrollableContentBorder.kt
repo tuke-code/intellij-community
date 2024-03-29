@@ -1,12 +1,16 @@
 // Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.ui
 
-import com.intellij.util.containers.map2Array
+import com.intellij.openapi.util.Key
 import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.UIUtil
 import org.jetbrains.annotations.ApiStatus
 import java.awt.Color
-import java.awt.event.AdjustmentListener
+import java.awt.Component
+import java.awt.Graphics
+import java.beans.PropertyChangeEvent
+import java.beans.PropertyChangeListener
+import java.lang.ref.WeakReference
 import javax.swing.JComponent
 import javax.swing.JScrollPane
 import javax.swing.border.Border
@@ -29,7 +33,33 @@ class ScrollableContentBorder private constructor(
 
   fun isVisible(): Boolean = lineColor != UIUtil.TRANSPARENT_COLOR
 
+  override fun paintBorder(c: Component, g: Graphics, x: Int, y: Int, width: Int, height: Int) {
+    val alreadyHasBorder = when (mySideMask) {
+      TOP -> ClientProperty.isTrue(c, HEADER_WITH_BORDER_ABOVE) || ClientProperty.isTrue(c, TOOLBAR_WITH_BORDER_ABOVE)
+      LEFT -> ClientProperty.isTrue(c, TOOLBAR_WITH_BORDER_LEFT)
+      else -> false
+    }
+    if (!alreadyHasBorder) {
+      super.paintBorder(c, g, x, y, width, height)
+    }
+  }
+
   companion object {
+
+    @ApiStatus.Internal
+    @JvmField
+    val HEADER_WITH_BORDER_ABOVE: Key<Boolean> = Key.create("HEADER_WITH_BORDER_ABOVE")
+
+    @ApiStatus.Internal
+    @JvmField
+    val TOOLBAR_WITH_BORDER_ABOVE: Key<Boolean> = Key.create("TOOLBAR_WITH_BORDER_ABOVE")
+
+    @ApiStatus.Internal
+    @JvmField
+    val TOOLBAR_WITH_BORDER_LEFT: Key<Boolean> = Key.create("TOOLBAR_WITH_BORDER_LEFT")
+
+    private val TARGET_COMPONENT: Key<WeakReference<JComponent>> = Key.create("ScrollableContentBorder.TARGET_COMPONENT")
+
     @JvmStatic
     @JvmOverloads
     fun setup(scrollPane: JScrollPane,
@@ -44,27 +74,22 @@ class ScrollableContentBorder private constructor(
               sides: Set<Side>,
               targetComponent: JComponent = scrollPane) {
 
-      val borders = sides.map2Array { side ->
-        val border = ScrollableContentBorder(side.toMask())
-        when (side) {
-          Side.TOP -> createTopOrLeftListener(targetComponent, border).also {
-            scrollPane.verticalScrollBar?.addAdjustmentListener(it)
-          }
-          Side.BOTTOM -> createBottomOrRightListener(targetComponent, border).also {
-            scrollPane.verticalScrollBar?.addAdjustmentListener(it)
-          }
-          Side.LEFT -> createTopOrLeftListener(targetComponent, border).also {
-            scrollPane.horizontalScrollBar?.addAdjustmentListener(it)
-          }
-          Side.RIGHT -> createBottomOrRightListener(targetComponent, border).also {
-            scrollPane.horizontalScrollBar?.addAdjustmentListener(it)
-          }
-        }
-        border
+      ClientProperty.put(scrollPane, TARGET_COMPONENT, WeakReference(targetComponent))
+
+      val borders = sides.associateWith { side -> ScrollableContentBorder(side.toMask()) }
+
+      val tracker = ScrollPaneScrolledStateTracker(scrollPane) { state ->
+        updateBorderVisibility(targetComponent, borders, state)
       }
 
-
-      targetComponent.border = if (borders.size == 1) borders[0] else JBUI.Borders.compound(*borders)
+      targetComponent.border = if (borders.size == 1) borders.values.single() else JBUI.Borders.compound(*borders.values.toTypedArray())
+      targetComponent.addPropertyChangeListener("border", object : PropertyChangeListener {
+        override fun propertyChange(evt: PropertyChangeEvent?) {
+          targetComponent.removePropertyChangeListener("border", this)
+          tracker.detach()
+          ClientProperty.put(scrollPane, TARGET_COMPONENT, null)
+        }
+      })
     }
 
     private fun isOneSideBorder(sideBorder: Border): Boolean {
@@ -74,25 +99,33 @@ class ScrollableContentBorder private constructor(
         sequenceOf(top, bottom, right, left).filter { it != 0 }.count() == 1
       }
     }
+
+    @JvmStatic
+    fun getTargetComponent(scrollPane: JScrollPane): JComponent? = ClientProperty.get(scrollPane, TARGET_COMPONENT)?.get()
   }
 }
 
-private fun createTopOrLeftListener(targetComponent: JComponent,
-                                    border: ScrollableContentBorder): AdjustmentListener = AdjustmentListener {
-  val visible = border.isVisible()
-  border.setVisible(it.adjustable.value != 0 || !ExperimentalUI.isNewUI())
-  if (visible != border.isVisible()) {
-    targetComponent.repaint()
+private fun updateBorderVisibility(
+  targetComponent: JComponent,
+  borders: Map<Side, ScrollableContentBorder>,
+  state: ScrollPaneScrolledState,
+) {
+  var changed = false
+  for ((side, border) in borders) {
+    val scrolled = !when (side) {
+      Side.TOP -> state.isVerticalAtStart
+      Side.BOTTOM -> state.isVerticalAtEnd
+      Side.LEFT -> state.isHorizontalAtStart
+      Side.RIGHT -> state.isHorizontalAtEnd
+    }
+    val visible = scrolled || !ExperimentalUI.isNewUI()
+    val wasVisible = border.isVisible()
+    border.setVisible(visible)
+    if (visible != wasVisible) {
+      changed = true
+    }
   }
-}
-
-private fun createBottomOrRightListener(targetComponent: JComponent,
-                                        border: ScrollableContentBorder): AdjustmentListener = AdjustmentListener {
-  val visible = border.isVisible()
-  with(it.adjustable) {
-    border.setVisible(value != maximum - visibleAmount || !ExperimentalUI.isNewUI())
-  }
-  if (visible != border.isVisible()) {
+  if (changed) {
     targetComponent.repaint()
   }
 }

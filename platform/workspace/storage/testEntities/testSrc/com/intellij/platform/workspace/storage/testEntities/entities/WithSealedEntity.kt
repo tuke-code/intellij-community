@@ -14,11 +14,11 @@ interface WithSealedEntity : WorkspaceEntity {
   val interfaces: List<MySealedInterface>
 
   //region generated code
-  @GeneratedCodeApiVersion(2)
-  interface Builder : WithSealedEntity, WorkspaceEntity.Builder<WithSealedEntity> {
+  @GeneratedCodeApiVersion(3)
+  interface Builder : WorkspaceEntity.Builder<WithSealedEntity> {
     override var entitySource: EntitySource
-    override var classes: MutableList<MySealedClass>
-    override var interfaces: MutableList<MySealedInterface>
+    var classes: MutableList<MySealedClass>
+    var interfaces: MutableList<MySealedInterface>
   }
 
   companion object : EntityType<WithSealedEntity, Builder>() {
@@ -30,7 +30,7 @@ interface WithSealedEntity : WorkspaceEntity {
       interfaces: List<MySealedInterface>,
       entitySource: EntitySource,
       init: (Builder.() -> Unit)? = null,
-    ): WithSealedEntity {
+    ): Builder {
       val builder = builder()
       builder.classes = classes.toMutableWorkspaceList()
       builder.interfaces = interfaces.toMutableWorkspaceList()

@@ -34,7 +34,6 @@ import com.intellij.vcs.log.visible.VisiblePack
 import com.intellij.vcs.log.visible.filters.VcsLogFilterObject
 import com.intellij.xml.util.XmlStringUtil
 import java.awt.Dimension
-import java.awt.event.ActionEvent
 import java.util.function.Consumer
 import java.util.function.Supplier
 import javax.swing.Icon
@@ -197,8 +196,8 @@ open class VcsLogClassicFilterUi(private val logData: VcsLogData,
     init {
       text = textFilterModel.text
       textEditor.emptyText.setText(VcsLogBundle.message("vcs.log.filter.text.hash.empty.text"))
-      TextComponentEmptyText.setupPlaceholderVisibility(textEditor);
-      textEditor.addActionListener { e: ActionEvent? -> applyFilter(true) }
+      TextComponentEmptyText.setupPlaceholderVisibility(textEditor)
+      textEditor.addActionListener { applyFilter(true) }
       addDocumentListener(object : DocumentAdapter() {
         override fun textChanged(e: DocumentEvent) {
           if (isFilterOnTheFlyEnabled) applyFilter(false)
@@ -275,7 +274,7 @@ open class VcsLogClassicFilterUi(private val logData: VcsLogData,
       }
 
       toolbar.setCustomButtonLook(FieldInplaceActionButtonLook())
-      toolbar.setReservePlaceAutoPopupIcon(false)
+      toolbar.isReservePlaceAutoPopupIcon = false
       toolbar.targetComponent = editor
       toolbar.updateActionsImmediately()
       return toolbar

@@ -593,6 +593,10 @@ fun <T : CommandChain> T.setGradleDelegatedBuildCommand(delegatedBuild: Boolean 
   addCommand("${CMD_PREFIX}setGradleDelegatedBuildCommand $delegatedBuild $gradleTestRunner")
 }
 
+fun <T : CommandChain> T.setMavenDelegatedBuild(delegatedBuild: Boolean = false): T = apply {
+  addCommand("${CMD_PREFIX}setMavenDelegatedBuild $delegatedBuild")
+}
+
 fun <T : CommandChain> T.unlinkGradleProject(projectPath: Path): T = apply {
   addCommand("${CMD_PREFIX}unlinkGradleProject ${projectPath}")
 }
@@ -617,6 +621,11 @@ fun <T : CommandChain> T.createMavenProject(newMavenProjectDto: NewMavenProjectD
 fun <T : CommandChain> T.createGradleProject(newGradleProjectDto: NewGradleProjectDto): T = apply {
   val options = objectMapper.writeValueAsString(newGradleProjectDto)
   addCommand("${CMD_PREFIX}createGradleProject $options")
+}
+
+fun <T : CommandChain> T.createSpringProject(newMavenProjectDto: NewSpringProjectDto): T = apply {
+  val options = objectMapper.writeValueAsString(newMavenProjectDto)
+  addCommand("${CMD_PREFIX}createSpringProject $options")
 }
 
 fun <T : CommandChain> T.updateMavenGoal(settings: MavenGoalConfigurationDto): T = apply {
@@ -1024,4 +1033,20 @@ fun <T : CommandChain> T.createScratchFile(filename: String, content: String): T
 
 fun <T : CommandChain> T.disableKotlinNotification(): T = apply {
   addCommand("${CMD_PREFIX}disableKotlinNotification")
+}
+
+
+/**
+ * Assert that the caret is located at the specified position.
+ * Lines and columns are counted from 1.
+ */
+fun <T : CommandChain> T.assertCaretPosition(line: Int, column: Int): T = apply {
+  addCommand("${CMD_PREFIX}assertCaretPosition $line $column")
+}
+
+/**
+ * Assert the current file in editor.
+ */
+fun <T : CommandChain> T.assertCurrentFile(name: String): T = apply {
+  addCommand("${CMD_PREFIX}assertCurrentFile $name")
 }

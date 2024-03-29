@@ -14,10 +14,10 @@ interface SelfLinkedEntity : WorkspaceEntity {
   val parentEntity: SelfLinkedEntity?
 
   //region generated code
-  @GeneratedCodeApiVersion(2)
-  interface Builder : SelfLinkedEntity, WorkspaceEntity.Builder<SelfLinkedEntity> {
+  @GeneratedCodeApiVersion(3)
+  interface Builder : WorkspaceEntity.Builder<SelfLinkedEntity> {
     override var entitySource: EntitySource
-    override var parentEntity: SelfLinkedEntity?
+    var parentEntity: SelfLinkedEntity.Builder?
   }
 
   companion object : EntityType<SelfLinkedEntity, Builder>() {
@@ -27,7 +27,7 @@ interface SelfLinkedEntity : WorkspaceEntity {
     operator fun invoke(
       entitySource: EntitySource,
       init: (Builder.() -> Unit)? = null,
-    ): SelfLinkedEntity {
+    ): Builder {
       val builder = builder()
       builder.entitySource = entitySource
       init?.invoke(builder)
@@ -46,8 +46,8 @@ fun MutableEntityStorage.modifyEntity(
   return modifyEntity(SelfLinkedEntity.Builder::class.java, entity, modification)
 }
 
-var SelfLinkedEntity.Builder.children: @Child List<SelfLinkedEntity>
-  by WorkspaceEntity.extension()
+var SelfLinkedEntity.Builder.children: @Child List<SelfLinkedEntity.Builder>
+  by WorkspaceEntity.extensionBuilder(SelfLinkedEntity::class.java)
 //endregion
 
 val SelfLinkedEntity.children: List<@Child SelfLinkedEntity>

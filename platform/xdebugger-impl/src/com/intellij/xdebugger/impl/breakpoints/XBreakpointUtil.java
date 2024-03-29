@@ -33,6 +33,7 @@ import org.jetbrains.concurrency.Promise;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 
 import static org.jetbrains.concurrency.Promises.rejectedPromise;
@@ -149,26 +150,45 @@ public final class XBreakpointUtil {
    * Toggle line breakpoint with editor support:
    * - unfolds folded block on the line
    * - if folded, checks if line breakpoints could be toggled inside folded text
+   *
+   * @deprecated use {@link #toggleLineBreakpoint(Project, XSourcePosition, boolean, Editor, boolean, boolean, boolean)}
+   */
+  @Deprecated
+  @NotNull
+  public static Promise<@Nullable XLineBreakpoint> toggleLineBreakpoint(@NotNull Project project,
+                                                                        @NotNull XSourcePosition position,
+                                                                        @Nullable Editor editor,
+                                                                        boolean temporary,
+                                                                        boolean moveCaret,
+                                                                        boolean canRemove) {
+    return toggleLineBreakpoint(project, position, true, editor, temporary, moveCaret, canRemove);
+  }
+
+  /**
+   * Toggle line breakpoint with editor support:
+   * - unfolds folded block on the line
+   * - if folded, checks if line breakpoints could be toggled inside folded text
    */
   @NotNull
   public static Promise<@Nullable XLineBreakpoint> toggleLineBreakpoint(@NotNull Project project,
-                                                              @NotNull XSourcePosition position,
-                                                              @Nullable Editor editor,
-                                                              boolean temporary,
-                                                              boolean moveCaret,
-                                                              boolean canRemove) {
-    Pair<List<XLineBreakpointType>, Integer> info = getAvailableLineBreakpointInfo(project, position, editor);
+                                                                        @NotNull XSourcePosition position,
+                                                                        boolean selectVariantByPositionColumn,
+                                                                        @Nullable Editor editor,
+                                                                        boolean temporary,
+                                                                        boolean moveCaret,
+                                                                        boolean canRemove) {
+    Pair<List<XLineBreakpointType>, Integer> info = getAvailableLineBreakpointInfo(project, position, selectVariantByPositionColumn, editor);
     List<XLineBreakpointType> typeWinner = info.first;
     int lineWinner = info.second;
-    int lineStart = position.getLine();
 
     if (typeWinner.isEmpty()) {
       return rejectedPromise(new RuntimeException("Cannot find appropriate type"));
     }
 
+    int lineStart = position.getLine();
     XSourcePosition winPosition = (lineStart == lineWinner) ? position : XSourcePositionImpl.create(position.getFile(), lineWinner);
     Promise<XLineBreakpoint> res =
-      XDebuggerUtilImpl.toggleAndReturnLineBreakpoint(project, typeWinner, winPosition, temporary, editor, canRemove);
+      XDebuggerUtilImpl.toggleAndReturnLineBreakpoint(project, typeWinner, winPosition, selectVariantByPositionColumn, temporary, editor, canRemove);
 
     if (editor != null && lineStart != lineWinner) {
       int offset = editor.getDocument().getLineStartOffset(lineWinner);
@@ -181,13 +201,21 @@ public final class XBreakpointUtil {
   }
 
   public static List<XLineBreakpointType> getAvailableLineBreakpointTypes(@NotNull Project project,
-                                                                          @NotNull XSourcePosition position,
+                                                                          @NotNull XSourcePosition linePosition,
                                                                           @Nullable Editor editor) {
-    return getAvailableLineBreakpointInfo(project, position, editor).first;
+    return getAvailableLineBreakpointTypes(project, linePosition, false, editor);
+  }
+
+  public static List<XLineBreakpointType> getAvailableLineBreakpointTypes(@NotNull Project project,
+                                                                          @NotNull XSourcePosition position,
+                                                                          boolean selectTypeByPositionColumn,
+                                                                          @Nullable Editor editor) {
+    return getAvailableLineBreakpointInfo(project, position, selectTypeByPositionColumn, editor).first;
   }
 
   private static Pair<List<XLineBreakpointType>, Integer> getAvailableLineBreakpointInfo(@NotNull Project project,
                                                                                          @NotNull XSourcePosition position,
+                                                                                         boolean selectTypeByPositionColumn,
                                                                                          @Nullable Editor editor) {
     int lineStart = position.getLine();
     VirtualFile file = position.getFile();
@@ -196,9 +224,10 @@ public final class XBreakpointUtil {
       return Pair.create(Collections.emptyList(), -1);
     }
 
-    // for folded text check each line and find out type with the biggest priority
+    // for folded text check each line and find out type with the biggest priority,
+    // do it unless we were asked to select type strictly by caret position
     int linesEnd = lineStart;
-    if (editor != null) {
+    if (editor != null && !selectTypeByPositionColumn) {
       FoldRegion region = FoldingUtil.findFoldRegionStartingAtLine(editor, lineStart);
       if (region != null && !region.isExpanded()) {
         linesEnd = region.getDocument().getLineNumber(region.getEndOffset());
@@ -236,6 +265,8 @@ public final class XBreakpointUtil {
           lineWinner = lineStart;
         }
       }
+      // First type is the most important one.
+      typeWinner.sort(Comparator.comparingInt(type -> -type.getPriority()));
     }
     return Pair.create(typeWinner, lineWinner);
   }

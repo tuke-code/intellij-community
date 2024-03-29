@@ -55,6 +55,11 @@ public abstract class KotlinFirInlineTestGenerated extends AbstractKotlinFirInli
             runTest("../../idea/tests/testData/refactoring/inline/inlineVariableOrProperty/companionWithSuperType.kt");
         }
 
+        @TestMetadata("functionalPropertyWithReceiver.kt")
+        public void testFunctionalPropertyWithReceiver() throws Exception {
+            runTest("../../idea/tests/testData/refactoring/inline/inlineVariableOrProperty/functionalPropertyWithReceiver.kt");
+        }
+
         @TestMetadata("ifInQualifiedExpression.kt")
         public void testIfInQualifiedExpression() throws Exception {
             runTest("../../idea/tests/testData/refactoring/inline/inlineVariableOrProperty/ifInQualifiedExpression.kt");
@@ -611,6 +616,11 @@ public abstract class KotlinFirInlineTestGenerated extends AbstractKotlinFirInli
             @TestMetadata("returnNull.kt")
             public void testReturnNull() throws Exception {
                 runTest("../../idea/tests/testData/refactoring/inline/inlineVariableOrProperty/property/returnNull.kt");
+            }
+
+            @TestMetadata("when.kt")
+            public void testWhen() throws Exception {
+                runTest("../../idea/tests/testData/refactoring/inline/inlineVariableOrProperty/property/when.kt");
             }
         }
     }

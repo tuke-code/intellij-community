@@ -4,6 +4,7 @@ package com.intellij.platform.workspace.storage.testEntities.entities
 import com.intellij.platform.workspace.storage.*
 import com.intellij.platform.workspace.storage.EntityInformation
 import com.intellij.platform.workspace.storage.EntitySource
+import com.intellij.platform.workspace.storage.EntityType
 import com.intellij.platform.workspace.storage.GeneratedCodeApiVersion
 import com.intellij.platform.workspace.storage.GeneratedCodeImplVersion
 import com.intellij.platform.workspace.storage.MutableEntityStorage
@@ -24,10 +25,11 @@ import com.intellij.platform.workspace.storage.impl.indices.WorkspaceMutableInde
 import com.intellij.platform.workspace.storage.impl.updateOneToManyChildrenOfParent
 import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentation
 import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentationApi
+import com.intellij.platform.workspace.storage.instrumentation.MutableEntityStorageInstrumentation
 import com.intellij.platform.workspace.storage.metadata.model.EntityMetadata
 
-@GeneratedCodeApiVersion(2)
-@GeneratedCodeImplVersion(3)
+@GeneratedCodeApiVersion(3)
+@GeneratedCodeImplVersion(5)
 open class EntityWithSoftLinksImpl(private val dataSource: EntityWithSoftLinksData) : EntityWithSoftLinks, WorkspaceEntityBase(dataSource) {
 
   private companion object {
@@ -149,7 +151,6 @@ open class EntityWithSoftLinksImpl(private val dataSource: EntityWithSoftLinksDa
       }
 
       this.diff = builder
-      this.snapshot = builder
       addToBuilder()
       this.id = getEntityData().createEntityId()
       // After adding entity data to the builder, we need to unbind it and move the control over entity data to builder
@@ -448,16 +449,18 @@ open class EntityWithSoftLinksImpl(private val dataSource: EntityWithSoftLinksDa
 
     // List of non-abstract referenced types
     var _children: List<SoftLinkReferencedChild>? = emptyList()
-    override var children: List<SoftLinkReferencedChild>
+    override var children: List<SoftLinkReferencedChild.Builder>
       get() {
         // Getter of the list of non-abstract referenced types
         val _diff = diff
         return if (_diff != null) {
-          _diff.extractOneToManyChildren<SoftLinkReferencedChild>(CHILDREN_CONNECTION_ID, this)!!.toList() + (this.entityLinks[EntityLink(
-            true, CHILDREN_CONNECTION_ID)] as? List<SoftLinkReferencedChild> ?: emptyList())
+          @OptIn(EntityStorageInstrumentationApi::class)
+          ((_diff as MutableEntityStorageInstrumentation).getManyChildrenBuilders(CHILDREN_CONNECTION_ID,
+                                                                                  this)!!.toList() as List<SoftLinkReferencedChild.Builder>) +
+          (this.entityLinks[EntityLink(true, CHILDREN_CONNECTION_ID)] as? List<SoftLinkReferencedChild.Builder> ?: emptyList())
         }
         else {
-          this.entityLinks[EntityLink(true, CHILDREN_CONNECTION_ID)] as? List<SoftLinkReferencedChild> ?: emptyList()
+          this.entityLinks[EntityLink(true, CHILDREN_CONNECTION_ID)] as? List<SoftLinkReferencedChild.Builder> ?: emptyList()
         }
       }
       set(value) {
@@ -1137,7 +1140,6 @@ class EntityWithSoftLinksData : WorkspaceEntityData<EntityWithSoftLinks>(), Soft
   override fun wrapAsModifiable(diff: MutableEntityStorage): WorkspaceEntity.Builder<EntityWithSoftLinks> {
     val modifiable = EntityWithSoftLinksImpl.Builder(null)
     modifiable.diff = diff
-    modifiable.snapshot = diff
     modifiable.id = createEntityId()
     return modifiable
   }
@@ -1179,7 +1181,7 @@ class EntityWithSoftLinksData : WorkspaceEntityData<EntityWithSoftLinks>(), Soft
   override fun deserialize(de: EntityInformation.Deserializer) {
   }
 
-  override fun createDetachedEntity(parents: List<WorkspaceEntity>): WorkspaceEntity {
+  override fun createDetachedEntity(parents: List<WorkspaceEntity.Builder<*>>): WorkspaceEntity.Builder<*> {
     return EntityWithSoftLinks(link, manyLinks, inContainer, inContainerList, deepContainer, sealedContainer, listSealedContainer,
                                justProperty, justListProperty, deepSealedClass, entitySource) {
       this.optionalLink = this@EntityWithSoftLinksData.optionalLink

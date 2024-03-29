@@ -72,6 +72,9 @@ public class DarculaComboBoxUI extends BasicComboBoxUI implements Border, ErrorB
     myPaintArrowButton = paintArrowButton;
   }
 
+  /**
+   * @deprecated Parameter {@code c} is not used. Please use {@link #DarculaComboBoxUI()} constructor instead
+   */
   @SuppressWarnings("unused")
   @Deprecated
   public DarculaComboBoxUI(JComboBox c) {
@@ -92,8 +95,8 @@ public class DarculaComboBoxUI extends BasicComboBoxUI implements Border, ErrorB
    * <li>Remove Border and ErrorBorderCapable implementations from DarculaComboBoxUI.
    * Extract border functionality from {@link DarculaComboBoxUI} into a separate class like OldDarculaComboBoxBorder, add it into base themes
    * <li>Remove isNewBorderSupported method
+   * <li>Use {@link DarculaComboBoxBorder} or its descendants
    * </ol>
-   * and use {@link DarculaComboBoxBorder} or its descendants instead.
    *
    * @return true if this DarculaComboBoxUI has no specific customization for Border, so {@link DarculaComboBoxBorder} can use own rendering
    */
@@ -272,15 +275,23 @@ public class DarculaComboBoxUI extends BasicComboBoxUI implements Border, ErrorB
     }
   }
 
+  /**
+   * @deprecated The method is not used anymore
+   */
   @SuppressWarnings("unused")
   @Deprecated(forRemoval = true)
   protected Color getArrowButtonFillColor(Color defaultColor) {
     return JBUI.CurrentTheme.Arrow.backgroundColor(comboBox.isEnabled(), comboBox.isEditable());
   }
 
+  private static Dimension getMinimumSize(@NotNull JComboBox<?> comboBox) {
+    Dimension result = JBUI.CurrentTheme.ComboBox.minimumSize();
+    return isBorderless(comboBox) ? new Dimension(result.width, result.height - JBUIScale.scale(4)) : result;
+  }
+
   private static @NotNull Dimension getArrowButtonPreferredSize(@NotNull JComboBox<?> comboBox) {
     Insets i = comboBox.getInsets();
-    int height = (isCompact(comboBox) ? COMPACT_HEIGHT.get() : JBUI.CurrentTheme.ComboBox.minimumSize().height) + i.top + i.bottom;
+    int height = (isCompact(comboBox) ? COMPACT_HEIGHT.get() : getMinimumSize(comboBox).height) + i.top + i.bottom;
     return new Dimension(JBUI.CurrentTheme.Component.ARROW_AREA_WIDTH.get() + i.right, height);
   }
 
@@ -317,14 +328,14 @@ public class DarculaComboBoxUI extends BasicComboBoxUI implements Border, ErrorB
     }
 
     Graphics2D g2 = (Graphics2D)g.create();
-    Rectangle r = new Rectangle(c.getSize());
-    JBInsets.removeFrom(r, myBorderCompensation);
 
     if (comboBox.getBorder() instanceof DarculaComboBoxBorder comboBoxBorder && isNewBorderSupported(comboBox)) {
       comboBoxBorder.paintComboBoxBackground(g2, comboBox, getBackgroundColor());
     }
     else {
       try {
+        Rectangle r = new Rectangle(c.getSize());
+        JBInsets.removeFrom(r, myBorderCompensation);
         g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         g2.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL, RenderingHints.VALUE_STROKE_NORMALIZE);
         g2.translate(r.x, r.y);
@@ -599,7 +610,7 @@ public class DarculaComboBoxUI extends BasicComboBoxUI implements Border, ErrorB
   }
 
   @ApiStatus.Internal
-  static boolean hasComboBoxFocus(JComboBox<?> comboBox) {
+  public static boolean hasComboBoxFocus(JComboBox<?> comboBox) {
     if (!comboBox.isEnabled()) {
       return false;
     }
@@ -644,7 +655,7 @@ public class DarculaComboBoxUI extends BasicComboBoxUI implements Border, ErrorB
       JBInsets.removeFrom(size, padding); // don't count paddings in compact mode
     }
 
-    Dimension minSize = JBUI.CurrentTheme.ComboBox.minimumSize();
+    Dimension minSize = getMinimumSize(comboBox);
     int editorHeight = editorSize != null ? editorSize.height + i.top + i.bottom : 0;
     int editorWidth = editorSize != null ? editorSize.width + i.left + padding.left + padding.right : 0;
     editorWidth = Math.max(editorWidth, minSize.width + i.left);
@@ -668,7 +679,7 @@ public class DarculaComboBoxUI extends BasicComboBoxUI implements Border, ErrorB
   public Dimension getMinimumSize(JComponent c) {
     Dimension minSize = super.getMinimumSize(c);
     Insets i = c.getInsets();
-    minSize.width = JBUI.CurrentTheme.ComboBox.minimumSize().width + JBUI.CurrentTheme.Component.ARROW_AREA_WIDTH.get() + i.left + i.right;
+    minSize.width = getMinimumSize(comboBox).width + JBUI.CurrentTheme.Component.ARROW_AREA_WIDTH.get() + i.left + i.right;
     return getSizeWithButton(minSize, editor != null ? editor.getMinimumSize() : null);
   }
 

@@ -4,6 +4,7 @@ package com.intellij.platform.workspace.storage.testEntities.entities
 import com.intellij.platform.workspace.storage.*
 import com.intellij.platform.workspace.storage.EntityInformation
 import com.intellij.platform.workspace.storage.EntitySource
+import com.intellij.platform.workspace.storage.EntityType
 import com.intellij.platform.workspace.storage.GeneratedCodeApiVersion
 import com.intellij.platform.workspace.storage.GeneratedCodeImplVersion
 import com.intellij.platform.workspace.storage.MutableEntityStorage
@@ -18,10 +19,11 @@ import com.intellij.platform.workspace.storage.impl.extractOneToManyParent
 import com.intellij.platform.workspace.storage.impl.updateOneToManyParentOfChild
 import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentation
 import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentationApi
+import com.intellij.platform.workspace.storage.instrumentation.MutableEntityStorageInstrumentation
 import com.intellij.platform.workspace.storage.metadata.model.EntityMetadata
 
-@GeneratedCodeApiVersion(2)
-@GeneratedCodeImplVersion(3)
+@GeneratedCodeApiVersion(3)
+@GeneratedCodeImplVersion(5)
 open class SelfLinkedEntityImpl(private val dataSource: SelfLinkedEntityData) : SelfLinkedEntity, WorkspaceEntityBase(dataSource) {
 
   private companion object {
@@ -64,7 +66,6 @@ open class SelfLinkedEntityImpl(private val dataSource: SelfLinkedEntityData) : 
       }
 
       this.diff = builder
-      this.snapshot = builder
       addToBuilder()
       this.id = getEntityData().createEntityId()
       // After adding entity data to the builder, we need to unbind it and move the control over entity data to builder
@@ -104,15 +105,16 @@ open class SelfLinkedEntityImpl(private val dataSource: SelfLinkedEntityData) : 
 
       }
 
-    override var parentEntity: SelfLinkedEntity?
+    override var parentEntity: SelfLinkedEntity.Builder?
       get() {
         val _diff = diff
         return if (_diff != null) {
-          _diff.extractOneToManyParent(PARENTENTITY_CONNECTION_ID, this) ?: this.entityLinks[EntityLink(false,
-                                                                                                        PARENTENTITY_CONNECTION_ID)] as? SelfLinkedEntity
+          @OptIn(EntityStorageInstrumentationApi::class)
+          ((_diff as MutableEntityStorageInstrumentation).getParentBuilder(PARENTENTITY_CONNECTION_ID, this) as? SelfLinkedEntity.Builder)
+          ?: (this.entityLinks[EntityLink(false, PARENTENTITY_CONNECTION_ID)] as? SelfLinkedEntity.Builder)
         }
         else {
-          this.entityLinks[EntityLink(false, PARENTENTITY_CONNECTION_ID)] as? SelfLinkedEntity
+          this.entityLinks[EntityLink(false, PARENTENTITY_CONNECTION_ID)] as? SelfLinkedEntity.Builder
         }
       }
       set(value) {
@@ -153,7 +155,6 @@ class SelfLinkedEntityData : WorkspaceEntityData<SelfLinkedEntity>() {
   override fun wrapAsModifiable(diff: MutableEntityStorage): WorkspaceEntity.Builder<SelfLinkedEntity> {
     val modifiable = SelfLinkedEntityImpl.Builder(null)
     modifiable.diff = diff
-    modifiable.snapshot = diff
     modifiable.id = createEntityId()
     return modifiable
   }
@@ -184,9 +185,9 @@ class SelfLinkedEntityData : WorkspaceEntityData<SelfLinkedEntity>() {
   override fun deserialize(de: EntityInformation.Deserializer) {
   }
 
-  override fun createDetachedEntity(parents: List<WorkspaceEntity>): WorkspaceEntity {
+  override fun createDetachedEntity(parents: List<WorkspaceEntity.Builder<*>>): WorkspaceEntity.Builder<*> {
     return SelfLinkedEntity(entitySource) {
-      this.parentEntity = parents.filterIsInstance<SelfLinkedEntity>().singleOrNull()
+      this.parentEntity = parents.filterIsInstance<SelfLinkedEntity.Builder>().singleOrNull()
     }
   }
 

@@ -2657,6 +2657,11 @@ public abstract class K2LocalInspectionTestGenerated extends AbstractK2LocalInsp
                     runTest("../../../idea/tests/testData/inspectionsLocal/useExpressionBody/convertToExpressionBody/assignment.kt");
                 }
 
+                @TestMetadata("block.kt")
+                public void testBlock() throws Exception {
+                    runTest("../../../idea/tests/testData/inspectionsLocal/useExpressionBody/convertToExpressionBody/block.kt");
+                }
+
                 @TestMetadata("constructorWithEmptyBody.kt")
                 public void testConstructorWithEmptyBody() throws Exception {
                     runTest("../../../idea/tests/testData/inspectionsLocal/useExpressionBody/convertToExpressionBody/constructorWithEmptyBody.kt");
@@ -4883,6 +4888,59 @@ public abstract class K2LocalInspectionTestGenerated extends AbstractK2LocalInsp
                     runTest("../../../idea/tests/testData/inspectionsLocal/usePropertyAccessSyntax/reportNonTrivialAccessors/true/nonVoidSet.kt");
                 }
             }
+        }
+    }
+
+    @RunWith(JUnit3RunnerWithInners.class)
+    @TestMetadata("../../../idea/tests/testData/inspectionsLocal/redundantUnitReturnType")
+    public static class RedundantUnitReturnType extends AbstractK2LocalInspectionTest {
+        private void runTest(String testDataFilePath) throws Exception {
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+        }
+
+        @TestMetadata("aliasedNullableUnit.kt")
+        public void testAliasedNullableUnit() throws Exception {
+            runTest("../../../idea/tests/testData/inspectionsLocal/redundantUnitReturnType/aliasedNullableUnit.kt");
+        }
+
+        @TestMetadata("aliasedUnit.kt")
+        public void testAliasedUnit() throws Exception {
+            runTest("../../../idea/tests/testData/inspectionsLocal/redundantUnitReturnType/aliasedUnit.kt");
+        }
+
+        @TestMetadata("explicitReturn.kt")
+        public void testExplicitReturn() throws Exception {
+            runTest("../../../idea/tests/testData/inspectionsLocal/redundantUnitReturnType/explicitReturn.kt");
+        }
+
+        @TestMetadata("explicitUnitReturn.kt")
+        public void testExplicitUnitReturn() throws Exception {
+            runTest("../../../idea/tests/testData/inspectionsLocal/redundantUnitReturnType/explicitUnitReturn.kt");
+        }
+
+        @TestMetadata("expressionBodyThrow.kt")
+        public void testExpressionBodyThrow() throws Exception {
+            runTest("../../../idea/tests/testData/inspectionsLocal/redundantUnitReturnType/expressionBodyThrow.kt");
+        }
+
+        @TestMetadata("expressionBodyUnitType.kt")
+        public void testExpressionBodyUnitType() throws Exception {
+            runTest("../../../idea/tests/testData/inspectionsLocal/redundantUnitReturnType/expressionBodyUnitType.kt");
+        }
+
+        @TestMetadata("nullableUnit.kt")
+        public void testNullableUnit() throws Exception {
+            runTest("../../../idea/tests/testData/inspectionsLocal/redundantUnitReturnType/nullableUnit.kt");
+        }
+
+        @TestMetadata("simple.kt")
+        public void testSimple() throws Exception {
+            runTest("../../../idea/tests/testData/inspectionsLocal/redundantUnitReturnType/simple.kt");
+        }
+
+        @TestMetadata("throw.kt")
+        public void testThrow() throws Exception {
+            runTest("../../../idea/tests/testData/inspectionsLocal/redundantUnitReturnType/throw.kt");
         }
     }
 

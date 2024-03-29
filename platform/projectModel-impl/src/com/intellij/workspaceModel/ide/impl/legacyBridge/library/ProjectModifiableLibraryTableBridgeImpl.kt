@@ -65,15 +65,18 @@ internal class ProjectModifiableLibraryTableBridgeImpl(
       LOG.error("Project library with name '$name' already exists.")
     }
 
-    val libraryEntity = diff addEntity LibraryEntity(name, libraryTableId, emptyList(), LegacyBridgeJpsEntitySourceFactory.createEntitySourceForProjectLibrary(project, externalSource)) {
+    val libraryEntity = LibraryEntity(name, libraryTableId, emptyList(), LegacyBridgeJpsEntitySourceFactory.createEntitySourceForProjectLibrary(project, externalSource)) {
       this.typeId = type?.kindId?.let { LibraryTypeId(it) }
     }
 
-    if (type != null) {
-      diff addEntity LibraryPropertiesEntity( libraryEntity.entitySource) {
-        library = libraryEntity
+    val addedEntity = if (type != null) {
+      libraryEntity.libraryProperties = LibraryPropertiesEntity(libraryEntity.entitySource) {
         propertiesXmlTag = serializeComponentAsString(JpsLibraryTableSerializer.PROPERTIES_TAG, type.createDefaultProperties())
       }
+      diff addEntity libraryEntity
+    }
+    else {
+      diff addEntity libraryEntity
     }
 
     val library = LibraryBridgeImpl(
@@ -84,7 +87,7 @@ internal class ProjectModifiableLibraryTableBridgeImpl(
       targetBuilder = this.diff
     )
     myAddedLibraries.add(library)
-    diff.mutableLibraryMap.addMapping(libraryEntity, library)
+    diff.mutableLibraryMap.addMapping(addedEntity, library)
     return library
   }
 

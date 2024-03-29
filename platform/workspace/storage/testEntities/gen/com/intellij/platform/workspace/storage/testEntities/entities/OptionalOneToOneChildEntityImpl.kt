@@ -4,6 +4,7 @@ package com.intellij.platform.workspace.storage.testEntities.entities
 import com.intellij.platform.workspace.storage.*
 import com.intellij.platform.workspace.storage.EntityInformation
 import com.intellij.platform.workspace.storage.EntitySource
+import com.intellij.platform.workspace.storage.EntityType
 import com.intellij.platform.workspace.storage.GeneratedCodeApiVersion
 import com.intellij.platform.workspace.storage.GeneratedCodeImplVersion
 import com.intellij.platform.workspace.storage.MutableEntityStorage
@@ -18,10 +19,11 @@ import com.intellij.platform.workspace.storage.impl.extractOneToOneParent
 import com.intellij.platform.workspace.storage.impl.updateOneToOneParentOfChild
 import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentation
 import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentationApi
+import com.intellij.platform.workspace.storage.instrumentation.MutableEntityStorageInstrumentation
 import com.intellij.platform.workspace.storage.metadata.model.EntityMetadata
 
-@GeneratedCodeApiVersion(2)
-@GeneratedCodeImplVersion(3)
+@GeneratedCodeApiVersion(3)
+@GeneratedCodeImplVersion(5)
 open class OptionalOneToOneChildEntityImpl(private val dataSource: OptionalOneToOneChildEntityData) : OptionalOneToOneChildEntity, WorkspaceEntityBase(
   dataSource) {
 
@@ -72,7 +74,6 @@ open class OptionalOneToOneChildEntityImpl(private val dataSource: OptionalOneTo
       }
 
       this.diff = builder
-      this.snapshot = builder
       addToBuilder()
       this.id = getEntityData().createEntityId()
       // After adding entity data to the builder, we need to unbind it and move the control over entity data to builder
@@ -124,15 +125,17 @@ open class OptionalOneToOneChildEntityImpl(private val dataSource: OptionalOneTo
         changedProperty.add("data")
       }
 
-    override var parent: OptionalOneToOneParentEntity?
+    override var parent: OptionalOneToOneParentEntity.Builder?
       get() {
         val _diff = diff
         return if (_diff != null) {
-          _diff.extractOneToOneParent(PARENT_CONNECTION_ID, this) ?: this.entityLinks[EntityLink(false,
-                                                                                                 PARENT_CONNECTION_ID)] as? OptionalOneToOneParentEntity
+          @OptIn(EntityStorageInstrumentationApi::class)
+          ((_diff as MutableEntityStorageInstrumentation).getParentBuilder(PARENT_CONNECTION_ID,
+                                                                           this) as? OptionalOneToOneParentEntity.Builder)
+          ?: (this.entityLinks[EntityLink(false, PARENT_CONNECTION_ID)] as? OptionalOneToOneParentEntity.Builder)
         }
         else {
-          this.entityLinks[EntityLink(false, PARENT_CONNECTION_ID)] as? OptionalOneToOneParentEntity
+          this.entityLinks[EntityLink(false, PARENT_CONNECTION_ID)] as? OptionalOneToOneParentEntity.Builder
         }
       }
       set(value) {
@@ -171,7 +174,6 @@ class OptionalOneToOneChildEntityData : WorkspaceEntityData<OptionalOneToOneChil
   override fun wrapAsModifiable(diff: MutableEntityStorage): WorkspaceEntity.Builder<OptionalOneToOneChildEntity> {
     val modifiable = OptionalOneToOneChildEntityImpl.Builder(null)
     modifiable.diff = diff
-    modifiable.snapshot = diff
     modifiable.id = createEntityId()
     return modifiable
   }
@@ -202,9 +204,9 @@ class OptionalOneToOneChildEntityData : WorkspaceEntityData<OptionalOneToOneChil
   override fun deserialize(de: EntityInformation.Deserializer) {
   }
 
-  override fun createDetachedEntity(parents: List<WorkspaceEntity>): WorkspaceEntity {
+  override fun createDetachedEntity(parents: List<WorkspaceEntity.Builder<*>>): WorkspaceEntity.Builder<*> {
     return OptionalOneToOneChildEntity(data, entitySource) {
-      this.parent = parents.filterIsInstance<OptionalOneToOneParentEntity>().singleOrNull()
+      this.parent = parents.filterIsInstance<OptionalOneToOneParentEntity.Builder>().singleOrNull()
     }
   }
 

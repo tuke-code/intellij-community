@@ -19,8 +19,8 @@ import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInst
 import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentationApi
 import com.intellij.platform.workspace.storage.metadata.model.EntityMetadata
 
-@GeneratedCodeApiVersion(2)
-@GeneratedCodeImplVersion(3)
+@GeneratedCodeApiVersion(3)
+@GeneratedCodeImplVersion(5)
 open class MavenProjectsTreeSettingsEntityImpl(private val dataSource: MavenProjectsTreeSettingsEntityData) : MavenProjectsTreeSettingsEntity, WorkspaceEntityBase(
   dataSource) {
 
@@ -65,7 +65,6 @@ open class MavenProjectsTreeSettingsEntityImpl(private val dataSource: MavenProj
       }
 
       this.diff = builder
-      this.snapshot = builder
       addToBuilder()
       this.id = getEntityData().createEntityId()
       // After adding entity data to the builder, we need to unbind it and move the control over entity data to builder
@@ -150,7 +149,6 @@ class MavenProjectsTreeSettingsEntityData : WorkspaceEntityData<MavenProjectsTre
   override fun wrapAsModifiable(diff: MutableEntityStorage): WorkspaceEntity.Builder<MavenProjectsTreeSettingsEntity> {
     val modifiable = MavenProjectsTreeSettingsEntityImpl.Builder(null)
     modifiable.diff = diff
-    modifiable.snapshot = diff
     modifiable.id = createEntityId()
     return modifiable
   }
@@ -188,7 +186,7 @@ class MavenProjectsTreeSettingsEntityData : WorkspaceEntityData<MavenProjectsTre
   override fun deserialize(de: EntityInformation.Deserializer) {
   }
 
-  override fun createDetachedEntity(parents: List<WorkspaceEntity>): WorkspaceEntity {
+  override fun createDetachedEntity(parents: List<WorkspaceEntity.Builder<*>>): WorkspaceEntity.Builder<*> {
     return MavenProjectsTreeSettingsEntity(importedFilePaths, entitySource) {
     }
   }

@@ -6,7 +6,6 @@ import com.intellij.diff.DiffManager;
 import com.intellij.diff.chains.DiffRequestChain;
 import com.intellij.diff.util.DiffUserDataKeys;
 import com.intellij.diff.util.DiffUtil;
-import com.intellij.ide.actions.NewActionGroup;
 import com.intellij.openapi.ListSelection;
 import com.intellij.openapi.actionSystem.*;
 import com.intellij.openapi.actionSystem.ex.ActionUtil;
@@ -35,7 +34,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
-import java.util.function.Predicate;
 
 /**
  * Consider using {@link AsyncChangesBrowserBase} to avoid potentially-expensive tree building operations on EDT.
@@ -66,7 +64,7 @@ public abstract class ChangesBrowserBase extends JPanel implements DataProvider 
     myViewer = createTreeList(project, showCheckboxes, highlightProblems);
 
     myToolbar = ActionManager.getInstance().createActionToolbar("ChangesBrowser", myToolBarGroup, true);
-    myToolbar.setTargetComponent(this);
+    myToolbar.setTargetComponent(myViewer);
     myToolbarAnchor = getToolbarAnchor();
     myToolbar.setOrientation(isVerticalToolbar() ? SwingConstants.VERTICAL : SwingConstants.HORIZONTAL);
 
@@ -107,23 +105,8 @@ public abstract class ChangesBrowserBase extends JPanel implements DataProvider 
     add(createCenterPanel(), BorderLayout.CENTER);
 
     myToolBarGroup.addAll(createToolbarActions());
+    myToolBarGroup.addAll(createLastToolbarActions());
     myPopupMenuGroup.addAll(createPopupMenuActions());
-
-    AnAction groupByAction = ActionManager.getInstance().getAction(ChangesTree.GROUP_BY_ACTION_GROUP);
-    if (!NewActionGroup.anyActionFromGroupMatches(myToolBarGroup, true, Predicate.isEqual(groupByAction))) {
-      myToolBarGroup.addSeparator();
-      myToolBarGroup.add(groupByAction);
-    }
-
-    if (isVerticalToolbar()) {
-      List<AnAction> treeActions = TreeActionsToolbarPanel.createTreeActions(myViewer);
-      boolean hasTreeActions = ContainerUtil.exists(
-        treeActions, action -> NewActionGroup.anyActionFromGroupMatches(myToolBarGroup, true, Predicate.isEqual(action)));
-      if (!hasTreeActions) {
-        myToolBarGroup.addSeparator();
-        myToolBarGroup.addAll(treeActions);
-      }
-    }
 
     myShowDiffAction.registerCustomShortcutSet(this, null);
     DiffUtil.recursiveRegisterShortcutSet(myToolBarGroup, this, null);
@@ -190,6 +173,18 @@ public abstract class ChangesBrowserBase extends JPanel implements DataProvider 
   @NotNull
   protected List<AnAction> createToolbarActions() {
     return Collections.singletonList(myShowDiffAction);
+  }
+
+  @NotNull
+  protected List<AnAction> createLastToolbarActions() {
+    List<AnAction> result = new ArrayList<>();
+    result.add(Separator.getInstance());
+    result.add(ActionManager.getInstance().getAction(ChangesTree.GROUP_BY_ACTION_GROUP));
+    if (isVerticalToolbar()) {
+      result.add(Separator.getInstance());
+      result.addAll(TreeActionsToolbarPanel.createTreeActions());
+    }
+    return result;
   }
 
   @NotNull

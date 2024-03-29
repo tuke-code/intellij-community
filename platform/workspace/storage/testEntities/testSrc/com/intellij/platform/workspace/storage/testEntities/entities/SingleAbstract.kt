@@ -15,10 +15,10 @@ interface ParentSingleAbEntity : WorkspaceEntity {
   val child: @Child ChildSingleAbstractBaseEntity?
 
   //region generated code
-  @GeneratedCodeApiVersion(2)
-  interface Builder : ParentSingleAbEntity, WorkspaceEntity.Builder<ParentSingleAbEntity> {
+  @GeneratedCodeApiVersion(3)
+  interface Builder : WorkspaceEntity.Builder<ParentSingleAbEntity> {
     override var entitySource: EntitySource
-    override var child: ChildSingleAbstractBaseEntity?
+    var child: ChildSingleAbstractBaseEntity.Builder<out ChildSingleAbstractBaseEntity>?
   }
 
   companion object : EntityType<ParentSingleAbEntity, Builder>() {
@@ -28,7 +28,7 @@ interface ParentSingleAbEntity : WorkspaceEntity {
     operator fun invoke(
       entitySource: EntitySource,
       init: (Builder.() -> Unit)? = null,
-    ): ParentSingleAbEntity {
+    ): Builder {
       val builder = builder()
       builder.entitySource = entitySource
       init?.invoke(builder)
@@ -55,11 +55,11 @@ interface ChildSingleAbstractBaseEntity : WorkspaceEntity {
   val parentEntity: ParentSingleAbEntity
 
   //region generated code
-  @GeneratedCodeApiVersion(2)
-  interface Builder<T : ChildSingleAbstractBaseEntity> : ChildSingleAbstractBaseEntity, WorkspaceEntity.Builder<T> {
+  @GeneratedCodeApiVersion(3)
+  interface Builder<T : ChildSingleAbstractBaseEntity> : WorkspaceEntity.Builder<T> {
     override var entitySource: EntitySource
-    override var commonData: String
-    override var parentEntity: ParentSingleAbEntity
+    var commonData: String
+    var parentEntity: ParentSingleAbEntity.Builder
   }
 
   companion object : EntityType<ChildSingleAbstractBaseEntity, Builder<ChildSingleAbstractBaseEntity>>() {
@@ -70,7 +70,7 @@ interface ChildSingleAbstractBaseEntity : WorkspaceEntity {
       commonData: String,
       entitySource: EntitySource,
       init: (Builder<ChildSingleAbstractBaseEntity>.() -> Unit)? = null,
-    ): ChildSingleAbstractBaseEntity {
+    ): Builder<ChildSingleAbstractBaseEntity> {
       val builder = builder()
       builder.commonData = commonData
       builder.entitySource = entitySource
@@ -86,12 +86,12 @@ interface ChildSingleFirstEntity : ChildSingleAbstractBaseEntity {
   val firstData: String
 
   //region generated code
-  @GeneratedCodeApiVersion(2)
-  interface Builder : ChildSingleFirstEntity, ChildSingleAbstractBaseEntity.Builder<ChildSingleFirstEntity>, WorkspaceEntity.Builder<ChildSingleFirstEntity> {
+  @GeneratedCodeApiVersion(3)
+  interface Builder : WorkspaceEntity.Builder<ChildSingleFirstEntity>, ChildSingleAbstractBaseEntity.Builder<ChildSingleFirstEntity> {
     override var entitySource: EntitySource
     override var commonData: String
-    override var parentEntity: ParentSingleAbEntity
-    override var firstData: String
+    override var parentEntity: ParentSingleAbEntity.Builder
+    var firstData: String
   }
 
   companion object : EntityType<ChildSingleFirstEntity, Builder>(ChildSingleAbstractBaseEntity) {
@@ -103,7 +103,7 @@ interface ChildSingleFirstEntity : ChildSingleAbstractBaseEntity {
       firstData: String,
       entitySource: EntitySource,
       init: (Builder.() -> Unit)? = null,
-    ): ChildSingleFirstEntity {
+    ): Builder {
       val builder = builder()
       builder.commonData = commonData
       builder.firstData = firstData
@@ -129,12 +129,12 @@ interface ChildSingleSecondEntity : ChildSingleAbstractBaseEntity {
   val secondData: String
 
   //region generated code
-  @GeneratedCodeApiVersion(2)
-  interface Builder : ChildSingleSecondEntity, ChildSingleAbstractBaseEntity.Builder<ChildSingleSecondEntity>, WorkspaceEntity.Builder<ChildSingleSecondEntity> {
+  @GeneratedCodeApiVersion(3)
+  interface Builder : WorkspaceEntity.Builder<ChildSingleSecondEntity>, ChildSingleAbstractBaseEntity.Builder<ChildSingleSecondEntity> {
     override var entitySource: EntitySource
     override var commonData: String
-    override var parentEntity: ParentSingleAbEntity
-    override var secondData: String
+    override var parentEntity: ParentSingleAbEntity.Builder
+    var secondData: String
   }
 
   companion object : EntityType<ChildSingleSecondEntity, Builder>(ChildSingleAbstractBaseEntity) {
@@ -146,7 +146,7 @@ interface ChildSingleSecondEntity : ChildSingleAbstractBaseEntity {
       secondData: String,
       entitySource: EntitySource,
       init: (Builder.() -> Unit)? = null,
-    ): ChildSingleSecondEntity {
+    ): Builder {
       val builder = builder()
       builder.commonData = commonData
       builder.secondData = secondData

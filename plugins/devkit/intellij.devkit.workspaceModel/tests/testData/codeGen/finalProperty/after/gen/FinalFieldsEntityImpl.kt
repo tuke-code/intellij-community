@@ -16,8 +16,8 @@ import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInst
 import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentationApi
 import com.intellij.platform.workspace.storage.metadata.model.EntityMetadata
 
-@GeneratedCodeApiVersion(2)
-@GeneratedCodeImplVersion(3)
+@GeneratedCodeApiVersion(3)
+@GeneratedCodeImplVersion(5)
 open class FinalFieldsEntityImpl(private val dataSource: FinalFieldsEntityData) : FinalFieldsEntity, WorkspaceEntityBase(dataSource) {
 
   private companion object {
@@ -61,7 +61,6 @@ open class FinalFieldsEntityImpl(private val dataSource: FinalFieldsEntityData) 
       }
 
       this.diff = builder
-      this.snapshot = builder
       addToBuilder()
       this.id = getEntityData().createEntityId()
       // After adding entity data to the builder, we need to unbind it and move the control over entity data to builder
@@ -126,7 +125,6 @@ class FinalFieldsEntityData : WorkspaceEntityData<FinalFieldsEntity>() {
   override fun wrapAsModifiable(diff: MutableEntityStorage): WorkspaceEntity.Builder<FinalFieldsEntity> {
     val modifiable = FinalFieldsEntityImpl.Builder(null)
     modifiable.diff = diff
-    modifiable.snapshot = diff
     modifiable.id = createEntityId()
     return modifiable
   }
@@ -156,7 +154,7 @@ class FinalFieldsEntityData : WorkspaceEntityData<FinalFieldsEntity>() {
   override fun deserialize(de: EntityInformation.Deserializer) {
   }
 
-  override fun createDetachedEntity(parents: List<WorkspaceEntity>): WorkspaceEntity {
+  override fun createDetachedEntity(parents: List<WorkspaceEntity.Builder<*>>): WorkspaceEntity.Builder<*> {
     return FinalFieldsEntity(descriptor, entitySource) {
     }
   }

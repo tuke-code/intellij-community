@@ -17,10 +17,10 @@ interface ChildWithExtensionParent : WorkspaceEntity {
   val data: String
 
   //region generated code
-  @GeneratedCodeApiVersion(2)
-  interface Builder : ChildWithExtensionParent, WorkspaceEntity.Builder<ChildWithExtensionParent> {
+  @GeneratedCodeApiVersion(3)
+  interface Builder : WorkspaceEntity.Builder<ChildWithExtensionParent> {
     override var entitySource: EntitySource
-    override var data: String
+    var data: String
   }
 
   companion object : EntityType<ChildWithExtensionParent, Builder>() {
@@ -31,7 +31,7 @@ interface ChildWithExtensionParent : WorkspaceEntity {
       data: String,
       entitySource: EntitySource,
       init: (Builder.() -> Unit)? = null,
-    ): ChildWithExtensionParent {
+    ): Builder {
       val builder = builder()
       builder.data = data
       builder.entitySource = entitySource
@@ -50,8 +50,8 @@ fun MutableEntityStorage.modifyEntity(
   return modifyEntity(ChildWithExtensionParent.Builder::class.java, entity, modification)
 }
 
-var ChildWithExtensionParent.Builder.parent: AbstractParentEntity?
-  by WorkspaceEntity.extension()
+var ChildWithExtensionParent.Builder.parent: AbstractParentEntity.Builder<out AbstractParentEntity>?
+  by WorkspaceEntity.extensionBuilder(AbstractParentEntity::class.java)
 //endregion
 
 @Abstract
@@ -60,11 +60,11 @@ interface AbstractParentEntity : WorkspaceEntity {
   val child: @Child ChildWithExtensionParent?
 
   //region generated code
-  @GeneratedCodeApiVersion(2)
-  interface Builder<T : AbstractParentEntity> : AbstractParentEntity, WorkspaceEntity.Builder<T> {
+  @GeneratedCodeApiVersion(3)
+  interface Builder<T : AbstractParentEntity> : WorkspaceEntity.Builder<T> {
     override var entitySource: EntitySource
-    override var data: String
-    override var child: ChildWithExtensionParent?
+    var data: String
+    var child: ChildWithExtensionParent.Builder?
   }
 
   companion object : EntityType<AbstractParentEntity, Builder<AbstractParentEntity>>() {
@@ -75,7 +75,7 @@ interface AbstractParentEntity : WorkspaceEntity {
       data: String,
       entitySource: EntitySource,
       init: (Builder<AbstractParentEntity>.() -> Unit)? = null,
-    ): AbstractParentEntity {
+    ): Builder<AbstractParentEntity> {
       val builder = builder()
       builder.data = data
       builder.entitySource = entitySource
@@ -88,11 +88,11 @@ interface AbstractParentEntity : WorkspaceEntity {
 
 interface SpecificParent : AbstractParentEntity {
   //region generated code
-  @GeneratedCodeApiVersion(2)
-  interface Builder : SpecificParent, AbstractParentEntity.Builder<SpecificParent>, WorkspaceEntity.Builder<SpecificParent> {
+  @GeneratedCodeApiVersion(3)
+  interface Builder : WorkspaceEntity.Builder<SpecificParent>, AbstractParentEntity.Builder<SpecificParent> {
     override var entitySource: EntitySource
     override var data: String
-    override var child: ChildWithExtensionParent?
+    override var child: ChildWithExtensionParent.Builder?
   }
 
   companion object : EntityType<SpecificParent, Builder>(AbstractParentEntity) {
@@ -103,7 +103,7 @@ interface SpecificParent : AbstractParentEntity {
       data: String,
       entitySource: EntitySource,
       init: (Builder.() -> Unit)? = null,
-    ): SpecificParent {
+    ): Builder {
       val builder = builder()
       builder.data = data
       builder.entitySource = entitySource

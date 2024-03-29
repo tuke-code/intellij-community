@@ -773,6 +773,11 @@ public abstract class InlineTestGenerated extends AbstractInlineTest {
                 public void testReturnNull() throws Exception {
                     runTest("testData/refactoring/inline/inlineVariableOrProperty/property/returnNull.kt");
                 }
+
+                @TestMetadata("when.kt")
+                public void testWhen() throws Exception {
+                    runTest("testData/refactoring/inline/inlineVariableOrProperty/property/when.kt");
+                }
             }
         }
 
@@ -859,6 +864,11 @@ public abstract class InlineTestGenerated extends AbstractInlineTest {
             @TestMetadata("companionWithSuperType.kt")
             public void testCompanionWithSuperType() throws Exception {
                 runTest("testData/refactoring/inline/inlineVariableOrProperty/companionWithSuperType.kt");
+            }
+
+            @TestMetadata("functionalPropertyWithReceiver.kt")
+            public void testFunctionalPropertyWithReceiver() throws Exception {
+                runTest("testData/refactoring/inline/inlineVariableOrProperty/functionalPropertyWithReceiver.kt");
             }
 
             @TestMetadata("ifInQualifiedExpression.kt")

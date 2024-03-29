@@ -25,11 +25,11 @@ interface SourceRootOrderEntity : WorkspaceEntity {
   val orderOfSourceRoots: List<VirtualFileUrl>
 
   //region generated code
-  @GeneratedCodeApiVersion(2)
-  interface Builder : SourceRootOrderEntity, WorkspaceEntity.Builder<SourceRootOrderEntity> {
+  @GeneratedCodeApiVersion(3)
+  interface Builder : WorkspaceEntity.Builder<SourceRootOrderEntity> {
     override var entitySource: EntitySource
-    override var contentRootEntity: ContentRootEntity
-    override var orderOfSourceRoots: MutableList<VirtualFileUrl>
+    var contentRootEntity: ContentRootEntity.Builder
+    var orderOfSourceRoots: MutableList<VirtualFileUrl>
   }
 
   companion object : EntityType<SourceRootOrderEntity, Builder>() {
@@ -40,7 +40,7 @@ interface SourceRootOrderEntity : WorkspaceEntity {
       orderOfSourceRoots: List<VirtualFileUrl>,
       entitySource: EntitySource,
       init: (Builder.() -> Unit)? = null,
-    ): SourceRootOrderEntity {
+    ): Builder {
       val builder = builder()
       builder.orderOfSourceRoots = orderOfSourceRoots.toMutableWorkspaceList()
       builder.entitySource = entitySource
@@ -76,11 +76,11 @@ interface CustomSourceRootPropertiesEntity: WorkspaceEntity {
   val propertiesXmlTag: @NonNls String
 
   //region generated code
-  @GeneratedCodeApiVersion(2)
-  interface Builder : CustomSourceRootPropertiesEntity, WorkspaceEntity.Builder<CustomSourceRootPropertiesEntity> {
+  @GeneratedCodeApiVersion(3)
+  interface Builder : WorkspaceEntity.Builder<CustomSourceRootPropertiesEntity> {
     override var entitySource: EntitySource
-    override var sourceRoot: SourceRootEntity
-    override var propertiesXmlTag: String
+    var sourceRoot: SourceRootEntity.Builder
+    var propertiesXmlTag: String
   }
 
   companion object : EntityType<CustomSourceRootPropertiesEntity, Builder>() {
@@ -91,7 +91,7 @@ interface CustomSourceRootPropertiesEntity: WorkspaceEntity {
       propertiesXmlTag: String,
       entitySource: EntitySource,
       init: (Builder.() -> Unit)? = null,
-    ): CustomSourceRootPropertiesEntity {
+    ): Builder {
       val builder = builder()
       builder.propertiesXmlTag = propertiesXmlTag
       builder.entitySource = entitySource
@@ -127,11 +127,11 @@ interface ExcludeUrlOrderEntity : WorkspaceEntity {
   val contentRoot: ContentRootEntity
 
   //region generated code
-  @GeneratedCodeApiVersion(2)
-  interface Builder : ExcludeUrlOrderEntity, WorkspaceEntity.Builder<ExcludeUrlOrderEntity> {
+  @GeneratedCodeApiVersion(3)
+  interface Builder : WorkspaceEntity.Builder<ExcludeUrlOrderEntity> {
     override var entitySource: EntitySource
-    override var order: MutableList<VirtualFileUrl>
-    override var contentRoot: ContentRootEntity
+    var order: MutableList<VirtualFileUrl>
+    var contentRoot: ContentRootEntity.Builder
   }
 
   companion object : EntityType<ExcludeUrlOrderEntity, Builder>() {
@@ -142,7 +142,7 @@ interface ExcludeUrlOrderEntity : WorkspaceEntity {
       order: List<VirtualFileUrl>,
       entitySource: EntitySource,
       init: (Builder.() -> Unit)? = null,
-    ): ExcludeUrlOrderEntity {
+    ): Builder {
       val builder = builder()
       builder.order = order.toMutableWorkspaceList()
       builder.entitySource = entitySource

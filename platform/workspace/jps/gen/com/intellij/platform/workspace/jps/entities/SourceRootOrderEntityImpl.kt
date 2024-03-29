@@ -22,13 +22,15 @@ import com.intellij.platform.workspace.storage.impl.extractOneToOneParent
 import com.intellij.platform.workspace.storage.impl.updateOneToOneParentOfChild
 import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentation
 import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentationApi
+import com.intellij.platform.workspace.storage.instrumentation.MutableEntityStorageInstrumentation
 import com.intellij.platform.workspace.storage.metadata.model.EntityMetadata
 import com.intellij.platform.workspace.storage.url.VirtualFileUrl
 import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.NonNls
 
-@GeneratedCodeApiVersion(2)
-@GeneratedCodeImplVersion(3)
+@ApiStatus.Internal // Just insert this manually. This is needed for correct api surface
+@GeneratedCodeApiVersion(3)
+@GeneratedCodeImplVersion(5)
 open class SourceRootOrderEntityImpl(private val dataSource: SourceRootOrderEntityData) : SourceRootOrderEntity, WorkspaceEntityBase(
   dataSource) {
 
@@ -79,7 +81,6 @@ open class SourceRootOrderEntityImpl(private val dataSource: SourceRootOrderEnti
       }
 
       this.diff = builder
-      this.snapshot = builder
       addToBuilder()
       this.id = getEntityData().createEntityId()
       // After adding entity data to the builder, we need to unbind it and move the control over entity data to builder
@@ -141,15 +142,17 @@ open class SourceRootOrderEntityImpl(private val dataSource: SourceRootOrderEnti
 
       }
 
-    override var contentRootEntity: ContentRootEntity
+    override var contentRootEntity: ContentRootEntity.Builder
       get() {
         val _diff = diff
         return if (_diff != null) {
-          _diff.extractOneToOneParent(CONTENTROOTENTITY_CONNECTION_ID, this) ?: this.entityLinks[EntityLink(false,
-                                                                                                            CONTENTROOTENTITY_CONNECTION_ID)]!! as ContentRootEntity
+          @OptIn(EntityStorageInstrumentationApi::class)
+          ((_diff as MutableEntityStorageInstrumentation).getParentBuilder(CONTENTROOTENTITY_CONNECTION_ID,
+                                                                           this) as? ContentRootEntity.Builder)
+          ?: (this.entityLinks[EntityLink(false, CONTENTROOTENTITY_CONNECTION_ID)]!! as ContentRootEntity.Builder)
         }
         else {
-          this.entityLinks[EntityLink(false, CONTENTROOTENTITY_CONNECTION_ID)]!! as ContentRootEntity
+          this.entityLinks[EntityLink(false, CONTENTROOTENTITY_CONNECTION_ID)]!! as ContentRootEntity.Builder
         }
       }
       set(value) {
@@ -211,7 +214,6 @@ class SourceRootOrderEntityData : WorkspaceEntityData<SourceRootOrderEntity>() {
   override fun wrapAsModifiable(diff: MutableEntityStorage): WorkspaceEntity.Builder<SourceRootOrderEntity> {
     val modifiable = SourceRootOrderEntityImpl.Builder(null)
     modifiable.diff = diff
-    modifiable.snapshot = diff
     modifiable.id = createEntityId()
     return modifiable
   }
@@ -248,9 +250,9 @@ class SourceRootOrderEntityData : WorkspaceEntityData<SourceRootOrderEntity>() {
   override fun deserialize(de: EntityInformation.Deserializer) {
   }
 
-  override fun createDetachedEntity(parents: List<WorkspaceEntity>): WorkspaceEntity {
+  override fun createDetachedEntity(parents: List<WorkspaceEntity.Builder<*>>): WorkspaceEntity.Builder<*> {
     return SourceRootOrderEntity(orderOfSourceRoots, entitySource) {
-      parents.filterIsInstance<ContentRootEntity>().singleOrNull()?.let { this.contentRootEntity = it }
+      parents.filterIsInstance<ContentRootEntity.Builder>().singleOrNull()?.let { this.contentRootEntity = it }
     }
   }
 

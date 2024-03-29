@@ -3,14 +3,10 @@ package com.intellij.platform.workspace.jps.entities
 
 import com.intellij.openapi.util.NlsSafe
 import com.intellij.platform.workspace.storage.*
-import com.intellij.platform.workspace.storage.EntitySource
-import com.intellij.platform.workspace.storage.EntityType
-import com.intellij.platform.workspace.storage.GeneratedCodeApiVersion
-import com.intellij.platform.workspace.storage.MutableEntityStorage
-import com.intellij.platform.workspace.storage.WorkspaceEntity
 import com.intellij.platform.workspace.storage.annotations.Child
 import com.intellij.platform.workspace.storage.impl.containers.toMutableWorkspaceList
 import com.intellij.platform.workspace.storage.url.VirtualFileUrl
+import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.NonNls
 
 /**
@@ -28,14 +24,14 @@ interface ContentRootEntity : WorkspaceEntity {
     val excludedUrls: List<@Child ExcludeUrlEntity>
 
   //region generated code
-  @GeneratedCodeApiVersion(2)
-  interface Builder : ContentRootEntity, WorkspaceEntity.Builder<ContentRootEntity> {
+  @GeneratedCodeApiVersion(3)
+  interface Builder : WorkspaceEntity.Builder<ContentRootEntity> {
     override var entitySource: EntitySource
-    override var module: ModuleEntity
-    override var url: VirtualFileUrl
-    override var excludedPatterns: MutableList<String>
-    override var sourceRoots: List<SourceRootEntity>
-    override var excludedUrls: List<ExcludeUrlEntity>
+    var module: ModuleEntity.Builder
+    var url: VirtualFileUrl
+    var excludedPatterns: MutableList<String>
+    var sourceRoots: List<SourceRootEntity.Builder>
+    var excludedUrls: List<ExcludeUrlEntity.Builder>
   }
 
   companion object : EntityType<ContentRootEntity, Builder>() {
@@ -47,7 +43,7 @@ interface ContentRootEntity : WorkspaceEntity {
       excludedPatterns: List<String>,
       entitySource: EntitySource,
       init: (Builder.() -> Unit)? = null,
-    ): ContentRootEntity {
+    ): Builder {
       val builder = builder()
       builder.url = url
       builder.excludedPatterns = excludedPatterns.toMutableWorkspaceList()
@@ -68,10 +64,14 @@ fun MutableEntityStorage.modifyEntity(
   return modifyEntity(ContentRootEntity.Builder::class.java, entity, modification)
 }
 
-var ContentRootEntity.Builder.excludeUrlOrder: @Child ExcludeUrlOrderEntity?
-  by WorkspaceEntity.extension()
-var ContentRootEntity.Builder.sourceRootOrder: @Child SourceRootOrderEntity?
-  by WorkspaceEntity.extension()
+@get:ApiStatus.Internal
+@set:ApiStatus.Internal
+var ContentRootEntity.Builder.excludeUrlOrder: @Child ExcludeUrlOrderEntity.Builder?
+  by WorkspaceEntity.extensionBuilder(ExcludeUrlOrderEntity::class.java)
+@get:ApiStatus.Internal
+@set:ApiStatus.Internal
+var ContentRootEntity.Builder.sourceRootOrder: @Child SourceRootOrderEntity.Builder?
+  by WorkspaceEntity.extensionBuilder(SourceRootOrderEntity::class.java)
 //endregion
 
 val ExcludeUrlEntity.contentRoot: ContentRootEntity? by WorkspaceEntity.extension()
@@ -90,12 +90,12 @@ interface SourceRootEntity : WorkspaceEntity {
     val rootTypeId: SourceRootTypeId
 
   //region generated code
-  @GeneratedCodeApiVersion(2)
-  interface Builder : SourceRootEntity, WorkspaceEntity.Builder<SourceRootEntity> {
+  @GeneratedCodeApiVersion(3)
+  interface Builder : WorkspaceEntity.Builder<SourceRootEntity> {
     override var entitySource: EntitySource
-    override var contentRoot: ContentRootEntity
-    override var url: VirtualFileUrl
-    override var rootTypeId: SourceRootTypeId
+    var contentRoot: ContentRootEntity.Builder
+    var url: VirtualFileUrl
+    var rootTypeId: SourceRootTypeId
   }
 
   companion object : EntityType<SourceRootEntity, Builder>() {
@@ -107,7 +107,7 @@ interface SourceRootEntity : WorkspaceEntity {
       rootTypeId: SourceRootTypeId,
       entitySource: EntitySource,
       init: (Builder.() -> Unit)? = null,
-    ): SourceRootEntity {
+    ): Builder {
       val builder = builder()
       builder.url = url
       builder.rootTypeId = rootTypeId
@@ -128,6 +128,8 @@ fun MutableEntityStorage.modifyEntity(
   return modifyEntity(SourceRootEntity.Builder::class.java, entity, modification)
 }
 
-var SourceRootEntity.Builder.customSourceRootProperties: @Child CustomSourceRootPropertiesEntity?
-  by WorkspaceEntity.extension()
+@get:ApiStatus.Internal
+@set:ApiStatus.Internal
+var SourceRootEntity.Builder.customSourceRootProperties: @Child CustomSourceRootPropertiesEntity.Builder?
+  by WorkspaceEntity.extensionBuilder(CustomSourceRootPropertiesEntity::class.java)
 //endregion

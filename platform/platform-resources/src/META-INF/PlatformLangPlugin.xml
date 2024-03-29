@@ -9,6 +9,8 @@
 
   <!-- should be here, otherwise not loaded in tests (in unit test mode, the platform prefix is `PlatformLangXml) -->
   <content>
+    <module name="intellij.platform.navbar.compatibility.backend"/>
+    <module name="intellij.platform.navbar.compatibility.monolith"/>
     <module name="intellij.platform.settings.local"/>
   </content>
 
@@ -198,4 +200,5 @@
     <xi:fallback/>
   </xi:include>
   <xi:include href="intellij.platform.navbar.backend.xml"/>
+  <xi:include href="intellij.platform.navbar.ide.xml"/>
 </idea-plugin>

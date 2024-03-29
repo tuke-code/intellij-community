@@ -25,13 +25,14 @@ import com.intellij.platform.workspace.storage.impl.indices.WorkspaceMutableInde
 import com.intellij.platform.workspace.storage.impl.updateOneToManyChildrenOfParent
 import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentation
 import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentationApi
+import com.intellij.platform.workspace.storage.instrumentation.MutableEntityStorageInstrumentation
 import com.intellij.platform.workspace.storage.metadata.model.EntityMetadata
 import com.intellij.platform.workspace.storage.url.VirtualFileUrl
 import java.io.Serializable
 import org.jetbrains.annotations.NonNls
 
-@GeneratedCodeApiVersion(2)
-@GeneratedCodeImplVersion(3)
+@GeneratedCodeApiVersion(3)
+@GeneratedCodeImplVersion(5)
 open class LibraryEntityImpl(private val dataSource: LibraryEntityData) : LibraryEntity, WorkspaceEntityBase(dataSource) {
 
   private companion object {
@@ -98,7 +99,6 @@ open class LibraryEntityImpl(private val dataSource: LibraryEntityData) : Librar
       }
 
       this.diff = builder
-      this.snapshot = builder
       addToBuilder()
       this.id = getEntityData().createEntityId()
       // After adding entity data to the builder, we need to unbind it and move the control over entity data to builder
@@ -237,16 +237,18 @@ open class LibraryEntityImpl(private val dataSource: LibraryEntityData) : Librar
 
     // List of non-abstract referenced types
     var _excludedRoots: List<ExcludeUrlEntity>? = emptyList()
-    override var excludedRoots: List<ExcludeUrlEntity>
+    override var excludedRoots: List<ExcludeUrlEntity.Builder>
       get() {
         // Getter of the list of non-abstract referenced types
         val _diff = diff
         return if (_diff != null) {
-          _diff.extractOneToManyChildren<ExcludeUrlEntity>(EXCLUDEDROOTS_CONNECTION_ID, this)!!.toList() + (this.entityLinks[EntityLink(
-            true, EXCLUDEDROOTS_CONNECTION_ID)] as? List<ExcludeUrlEntity> ?: emptyList())
+          @OptIn(EntityStorageInstrumentationApi::class)
+          ((_diff as MutableEntityStorageInstrumentation).getManyChildrenBuilders(EXCLUDEDROOTS_CONNECTION_ID,
+                                                                                  this)!!.toList() as List<ExcludeUrlEntity.Builder>) +
+          (this.entityLinks[EntityLink(true, EXCLUDEDROOTS_CONNECTION_ID)] as? List<ExcludeUrlEntity.Builder> ?: emptyList())
         }
         else {
-          this.entityLinks[EntityLink(true, EXCLUDEDROOTS_CONNECTION_ID)] as? List<ExcludeUrlEntity> ?: emptyList()
+          this.entityLinks[EntityLink(true, EXCLUDEDROOTS_CONNECTION_ID)] as? List<ExcludeUrlEntity.Builder> ?: emptyList()
         }
       }
       set(value) {
@@ -383,7 +385,6 @@ class LibraryEntityData : WorkspaceEntityData.WithCalculableSymbolicId<LibraryEn
   override fun wrapAsModifiable(diff: MutableEntityStorage): WorkspaceEntity.Builder<LibraryEntity> {
     val modifiable = LibraryEntityImpl.Builder(null)
     modifiable.diff = diff
-    modifiable.snapshot = diff
     modifiable.id = createEntityId()
     return modifiable
   }
@@ -424,7 +425,7 @@ class LibraryEntityData : WorkspaceEntityData.WithCalculableSymbolicId<LibraryEn
   override fun deserialize(de: EntityInformation.Deserializer) {
   }
 
-  override fun createDetachedEntity(parents: List<WorkspaceEntity>): WorkspaceEntity {
+  override fun createDetachedEntity(parents: List<WorkspaceEntity.Builder<*>>): WorkspaceEntity.Builder<*> {
     return LibraryEntity(name, tableId, roots, entitySource) {
       this.typeId = this@LibraryEntityData.typeId
     }

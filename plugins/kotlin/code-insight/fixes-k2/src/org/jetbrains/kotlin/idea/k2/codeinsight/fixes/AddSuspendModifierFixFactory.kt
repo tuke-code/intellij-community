@@ -12,7 +12,7 @@ import org.jetbrains.kotlin.analysis.api.symbols.KtFunctionSymbol
 import org.jetbrains.kotlin.descriptors.Visibilities
 import org.jetbrains.kotlin.descriptors.Visibility
 import org.jetbrains.kotlin.idea.base.resources.KotlinBundle
-import org.jetbrains.kotlin.idea.codeinsight.api.applicable.intentions.KotlinModCommandAction
+import org.jetbrains.kotlin.idea.codeinsight.api.applicable.intentions.KotlinPsiUpdateModCommandAction
 import org.jetbrains.kotlin.idea.codeinsight.api.applicators.fixes.KotlinQuickFixFactory
 import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.psi.*
@@ -21,8 +21,7 @@ import org.jetbrains.kotlin.psi.psiUtil.getStrictParentOfType
 
 internal object AddSuspendModifierFixFactory {
     val addSuspendModifierFixFactory = KotlinQuickFixFactory.ModCommandBased { diagnostic: KtFirDiagnostic.IllegalSuspendFunctionCall ->
-        val element = diagnostic.psi as? KtElement ?: return@ModCommandBased emptyList()
-        val function = element.containingFunction() ?: return@ModCommandBased emptyList()
+        val function = (diagnostic.psi as? KtElement)?.containingFunction() ?: return@ModCommandBased emptyList()
         val functionName = function.name ?: return@ModCommandBased emptyList()
 
         listOf(AddSuspendModifierFix(function, ElementContext(functionName)))
@@ -35,10 +34,10 @@ internal object AddSuspendModifierFixFactory {
     private class AddSuspendModifierFix(
         element: KtModifierListOwner,
         private val context: ElementContext,
-    ) : KotlinModCommandAction.ElementBased<KtModifierListOwner, ElementContext>(element, context) {
+    ) : KotlinPsiUpdateModCommandAction.ElementBased<KtModifierListOwner, ElementContext>(element, context) {
 
         override fun invoke(
-            context: ActionContext,
+            actionContext: ActionContext,
             element: KtModifierListOwner,
             elementContext: ElementContext,
             updater: ModPsiUpdater,
@@ -77,10 +76,11 @@ private fun KtDeclarationSymbol?.getInlineCallSiteVisibility(): Visibility? {
     var result: Visibility? = null
     while (declaration != null) {
         if (declaration is KtFunctionSymbol && declaration.isInline) {
-            if (Visibilities.isPrivate(declaration.visibility)) {
-                return declaration.visibility
+            val visibility = declaration.visibility
+            if (Visibilities.isPrivate(visibility)) {
+                return visibility
             }
-            result = declaration.visibility
+            result = visibility
         }
         declaration = declaration.getContainingSymbol()
     }

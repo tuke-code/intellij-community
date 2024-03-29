@@ -14,11 +14,11 @@ interface IndexingTestEntity : WorkspaceEntity {
   val excludedRoots: List<VirtualFileUrl>
 
   //region generated code
-  @GeneratedCodeApiVersion(2)
-  interface Builder : IndexingTestEntity, WorkspaceEntity.Builder<IndexingTestEntity> {
+  @GeneratedCodeApiVersion(3)
+  interface Builder : WorkspaceEntity.Builder<IndexingTestEntity> {
     override var entitySource: EntitySource
-    override var roots: MutableList<VirtualFileUrl>
-    override var excludedRoots: MutableList<VirtualFileUrl>
+    var roots: MutableList<VirtualFileUrl>
+    var excludedRoots: MutableList<VirtualFileUrl>
   }
 
   companion object : EntityType<IndexingTestEntity, Builder>() {
@@ -30,7 +30,7 @@ interface IndexingTestEntity : WorkspaceEntity {
       excludedRoots: List<VirtualFileUrl>,
       entitySource: EntitySource,
       init: (Builder.() -> Unit)? = null,
-    ): IndexingTestEntity {
+    ): Builder {
       val builder = builder()
       builder.roots = roots.toMutableWorkspaceList()
       builder.excludedRoots = excludedRoots.toMutableWorkspaceList()

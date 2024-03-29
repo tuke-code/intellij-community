@@ -17,10 +17,11 @@ import com.intellij.platform.workspace.storage.impl.extractOneToOneChild
 import com.intellij.platform.workspace.storage.impl.updateOneToOneChildOfParent
 import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentation
 import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentationApi
+import com.intellij.platform.workspace.storage.instrumentation.MutableEntityStorageInstrumentation
 import com.intellij.platform.workspace.storage.metadata.model.EntityMetadata
 
-@GeneratedCodeApiVersion(2)
-@GeneratedCodeImplVersion(3)
+@GeneratedCodeApiVersion(3)
+@GeneratedCodeImplVersion(5)
 open class ReferredEntityImpl(private val dataSource: ReferredEntityData) : ReferredEntity, WorkspaceEntityBase(dataSource) {
 
   private companion object {
@@ -74,7 +75,6 @@ open class ReferredEntityImpl(private val dataSource: ReferredEntityData) : Refe
       }
 
       this.diff = builder
-      this.snapshot = builder
       addToBuilder()
       this.id = getEntityData().createEntityId()
       // After adding entity data to the builder, we need to unbind it and move the control over entity data to builder
@@ -135,16 +135,16 @@ open class ReferredEntityImpl(private val dataSource: ReferredEntityData) : Refe
         changedProperty.add("name")
       }
 
-    override var contentRoot: ContentRootEntity?
+    override var contentRoot: ContentRootEntity.Builder?
       get() {
         val _diff = diff
         return if (_diff != null) {
-          _diff.extractOneToOneChild(CONTENTROOT_CONNECTION_ID, this) ?: this.entityLinks[EntityLink(
-            true, CONTENTROOT_CONNECTION_ID
-          )] as? ContentRootEntity
+          @OptIn(EntityStorageInstrumentationApi::class)
+          ((_diff as MutableEntityStorageInstrumentation).getOneChildBuilder(CONTENTROOT_CONNECTION_ID, this) as? ContentRootEntity.Builder)
+          ?: (this.entityLinks[EntityLink(true, CONTENTROOT_CONNECTION_ID)] as? ContentRootEntity.Builder)
         }
         else {
-          this.entityLinks[EntityLink(true, CONTENTROOT_CONNECTION_ID)] as? ContentRootEntity
+          this.entityLinks[EntityLink(true, CONTENTROOT_CONNECTION_ID)] as? ContentRootEntity.Builder
         }
       }
       set(value) {
@@ -185,7 +185,6 @@ class ReferredEntityData : WorkspaceEntityData<ReferredEntity>() {
   override fun wrapAsModifiable(diff: MutableEntityStorage): WorkspaceEntity.Builder<ReferredEntity> {
     val modifiable = ReferredEntityImpl.Builder(null)
     modifiable.diff = diff
-    modifiable.snapshot = diff
     modifiable.id = createEntityId()
     return modifiable
   }
@@ -215,7 +214,7 @@ class ReferredEntityData : WorkspaceEntityData<ReferredEntity>() {
   override fun deserialize(de: EntityInformation.Deserializer) {
   }
 
-  override fun createDetachedEntity(parents: List<WorkspaceEntity>): WorkspaceEntity {
+  override fun createDetachedEntity(parents: List<WorkspaceEntity.Builder<*>>): WorkspaceEntity.Builder<*> {
     return ReferredEntity(version, name, entitySource) {
     }
   }
