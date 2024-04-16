@@ -12,18 +12,12 @@ import io.opentelemetry.api.trace.Span
 import kotlinx.collections.immutable.PersistentList
 import kotlinx.collections.immutable.persistentListOf
 import org.jetbrains.intellij.build.*
-import org.jetbrains.intellij.build.dependencies.BuildDependenciesCommunityRoot
 import org.jetbrains.intellij.build.jarCache.JarCacheManager
 import org.jetbrains.intellij.build.jarCache.LocalDiskJarCacheManager
 import org.jetbrains.intellij.build.jarCache.NonCachingJarCacheManager
 import org.jetbrains.intellij.build.jarCache.SourceBuilder
 import org.jetbrains.jps.model.JpsProject
-import org.jetbrains.jps.model.java.JavaModuleSourceRootTypes
-import org.jetbrains.jps.model.java.JavaResourceRootProperties
-import org.jetbrains.jps.model.java.JavaSourceRootProperties
 import org.jetbrains.jps.model.module.JpsModule
-import org.jetbrains.jps.model.module.JpsModuleSourceRoot
-import org.jetbrains.jps.util.JpsPathUtil
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.ConcurrentLinkedQueue
@@ -87,8 +81,9 @@ class BuildContextImpl(
   private var builtinModulesData: BuiltinModulesFileData? = null
 
   internal val jarCacheManager: JarCacheManager by lazy {
-    options.jarCacheDir?.let { LocalDiskJarCacheManager(cacheDir = it, classOutDirectory = classesOutputDirectory) }
-    ?: NonCachingJarCacheManager
+    options.jarCacheDir?.let {
+      LocalDiskJarCacheManager(cacheDir = it, productionClassOutDir = classesOutputDirectory.resolve("production"))
+    } ?: NonCachingJarCacheManager
   }
 
   internal val jarPackagerDependencyHelper: JarPackagerDependencyHelper by lazy { JarPackagerDependencyHelper(this) }
@@ -182,6 +177,19 @@ class BuildContextImpl(
     distFiles.add(file)
   }
 
+  override val bundledPluginModules: List<String>
+    get() {
+      return bundledPluginModulesForModularLoader ?: productProperties.productLayout.bundledPluginModules
+    }
+  
+  private val bundledPluginModulesForModularLoader by lazy {
+    productProperties.rootModuleForModularLoader?.let { rootModule ->
+      originalModuleRepository.loadRawProductModules(rootModule, productProperties.productMode).bundledPluginMainModules.map { 
+        it.stringId 
+      }
+    }
+  }
+
   override fun getDistFiles(os: OsFamily?, arch: JvmArchitecture?): Collection<DistFile> {
     val result = distFiles.filterTo(mutableListOf()) {
       (os == null && arch == null) ||
@@ -196,22 +204,6 @@ class BuildContextImpl(
 
   override fun notifyArtifactBuilt(artifactPath: Path) {
     compilationContext.notifyArtifactBuilt(artifactPath)
-  }
-
-  override fun findFileInModuleSources(moduleName: String, relativePath: String): Path? {
-    return findFileInModuleSources(module = findRequiredModule(moduleName), relativePath = relativePath)
-  }
-
-  override fun findFileInModuleSources(module: JpsModule, relativePath: String): Path? {
-    for (info in getSourceRootsWithPrefixes(module)) {
-      if (relativePath.startsWith(info.second)) {
-        val result = info.first.resolve(relativePath.removePrefix(info.second).removePrefix("/"))
-        if (Files.exists(result)) {
-          return result
-        }
-      }
-    }
-    return null
   }
 
   override val jetBrainsClientModuleFilter: JetBrainsClientModuleFilter by lazy {
@@ -296,7 +288,7 @@ class BuildContextImpl(
   override fun includeBreakGenLibraries() = isJavaSupportedInProduct
 
   private val isJavaSupportedInProduct: Boolean
-    get() = productProperties.productLayout.bundledPluginModules.contains(JavaPluginLayout.MAIN_MODULE_NAME)
+    get() = bundledPluginModules.contains(JavaPluginLayout.MAIN_MODULE_NAME)
 
   override fun patchInspectScript(path: Path) {
     //todo use placeholder in inspect.sh/inspect.bat file instead
@@ -394,22 +386,4 @@ private fun createBuildOutputRootEvaluator(projectHome: Path,
     val appInfo = ApplicationInfoPropertiesImpl(project = project, productProperties = productProperties, buildOptions = buildOptions)
     projectHome.resolve("out/${productProperties.getOutputDirectoryName(appInfo)}")
   }
-}
-
-private fun getSourceRootsWithPrefixes(module: JpsModule): Sequence<Pair<Path, String>> {
-  return module.sourceRoots.asSequence()
-    .filter { JavaModuleSourceRootTypes.PRODUCTION.contains(it.rootType) }
-    .map { moduleSourceRoot: JpsModuleSourceRoot ->
-      val properties = moduleSourceRoot.properties
-      var prefix = if (properties is JavaSourceRootProperties) {
-        properties.packagePrefix.replace('.', '/')
-      }
-      else {
-        (properties as JavaResourceRootProperties).relativeOutputPath
-      }
-      if (!prefix.endsWith('/')) {
-        prefix += "/"
-      }
-      Pair(Path.of(JpsPathUtil.urlToPath(moduleSourceRoot.url)), prefix.trimStart('/'))
-    }
 }

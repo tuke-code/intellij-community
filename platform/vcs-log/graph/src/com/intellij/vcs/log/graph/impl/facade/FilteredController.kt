@@ -1,37 +1,19 @@
 // Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.vcs.log.graph.impl.facade
 
+import com.intellij.vcs.log.graph.api.LinearGraph
 import com.intellij.vcs.log.graph.api.elements.GraphElement
 import com.intellij.vcs.log.graph.api.permanent.PermanentGraphInfo
 import com.intellij.vcs.log.graph.collapsing.CollapsedGraph
-import com.intellij.vcs.log.graph.collapsing.DottedFilterEdgesGenerator.Companion.update
-import com.intellij.vcs.log.graph.utils.DfsWalk
+import com.intellij.vcs.log.graph.collapsing.DottedFilterEdgesGenerator
 import com.intellij.vcs.log.graph.utils.LinearGraphUtils
-import com.intellij.vcs.log.graph.utils.UnsignedBitSet
+import com.intellij.vcs.log.graph.utils.getReachableMatchingNodes
 
-class FilteredController(delegateLinearGraphController: LinearGraphController,
-                         permanentGraphInfo: PermanentGraphInfo<*>,
-                         matchedIds: Set<Int>,
-                         visibleHeadsIds: Set<Int>? = null) :
+class FilteredController(delegateLinearGraphController: LinearGraphController, permanentGraphInfo: PermanentGraphInfo<*>,
+                         buildCollapsedGraph: () -> CollapsedGraph) :
   CascadeController(delegateLinearGraphController, permanentGraphInfo) {
 
-  val collapsedGraph: CollapsedGraph
-
-  init {
-    val initVisibility = UnsignedBitSet()
-    if (visibleHeadsIds != null) {
-      DfsWalk(visibleHeadsIds, permanentGraphInfo.linearGraph).walk(true) { node ->
-        if (matchedIds.contains(node)) initVisibility[node] = true
-        true
-      }
-    }
-    else {
-      for (matchedId in matchedIds) initVisibility[matchedId] = true
-    }
-
-    collapsedGraph = CollapsedGraph.newInstance(delegateLinearGraphController.compiledGraph, initVisibility)
-    update(collapsedGraph, 0, collapsedGraph.delegatedGraph.nodesCount() - 1)
-  }
+  val collapsedGraph: CollapsedGraph = buildCollapsedGraph()
 
   override fun performLinearGraphAction(action: LinearGraphController.LinearGraphAction): LinearGraphController.LinearGraphAnswer {
     // filter prohibits any actions on delegate graph for now
@@ -50,5 +32,19 @@ class FilteredController(delegateLinearGraphController: LinearGraphController,
 
   override fun performAction(action: LinearGraphController.LinearGraphAction) = null
 
-  override fun getCompiledGraph() = collapsedGraph.compiledGraph
+  override val compiledGraph: LinearGraph get() = collapsedGraph.compiledGraph
+
+  companion object {
+    fun create(delegateController: LinearGraphController,
+               permanentGraphInfo: PermanentGraphInfo<*>,
+               matchedIds: Set<Int>,
+               visibleHeadsIds: Set<Int>? = null): FilteredController {
+      val visibility = permanentGraphInfo.linearGraph.getReachableMatchingNodes(visibleHeadsIds, matchedIds)
+      return FilteredController(delegateController, permanentGraphInfo) {
+        CollapsedGraph.newInstance(delegateController.compiledGraph, visibility).also {
+          DottedFilterEdgesGenerator.update(it, 0, it.delegatedGraph.nodesCount() - 1)
+        }
+      }
+    }
+  }
 }

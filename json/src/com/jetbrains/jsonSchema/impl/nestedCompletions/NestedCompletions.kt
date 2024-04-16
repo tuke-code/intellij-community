@@ -6,11 +6,11 @@ import com.intellij.codeInsight.lookup.LookupElementBuilder
 import com.intellij.json.pointer.JsonPointerPosition
 import com.intellij.openapi.editor.*
 import com.intellij.openapi.project.Project
-import com.intellij.psi.PsiElement
-import com.intellij.psi.PsiFile
-import com.intellij.psi.util.parents
-import com.intellij.refactoring.suggested.endOffset
-import com.intellij.refactoring.suggested.startOffset
+import com.intellij.openapi.util.TextRange
+import com.intellij.psi.*
+import com.intellij.psi.impl.source.tree.LeafPsiElement
+import com.intellij.psi.util.*
+import com.intellij.util.containers.Stack
 import com.jetbrains.jsonSchema.extension.JsonLikePsiWalker
 import com.jetbrains.jsonSchema.extension.adapters.JsonObjectValueAdapter
 import com.jetbrains.jsonSchema.extension.adapters.JsonValueAdapter
@@ -58,7 +58,7 @@ internal fun LookupElementBuilder.prefixedBy(path: SchemaPath?, treeWalker: Json
           insertHandler?.handleInsert(context, element) // Perform existing handler.
           context.file.findElementAt(context.startOffset)
             ?.sideEffect { completedElement ->
-              createMoveData(treeWalker.findContainingObjectAdapter(completedElement), path.accessor())
+              createMoveData(treeWalker.findContainingObjectAdapter(completedElement), path.accessor(), context.document)
                 .performMove(treeWalker, context, completedElement)
             }
         }
@@ -92,23 +92,32 @@ private fun NestedCompletionMoveData.performMove(completedRange: CompletedRange,
                                                  completedElement: PsiElement,
                                                  editor: Editor,
                                                  file: PsiFile) {
+  // if the document had been fine-tuned between the insertion and the move, we need to recompute the range
+  val pointer = SmartPointerManager.getInstance(file.project).createSmartPsiFileRangePointer(file, TextRange(completedRange.startOffset, completedRange.endOffsetExclusive))
+  PsiDocumentManager.getInstance(file.project).doPostponedOperationsAndUnblockDocument(editor.document)
+  val elementRange = pointer.range?.let { CompletedRange(it.startOffset, it.endOffset) } ?: completedRange
+
   val caretModel = editor.caretModel
   val text = editor.document.charsSequence
 
-  val oldCaretState = caretModel.tryCaptureCaretState(editor, relativeOffset = completedRange.startOffset)
+  val oldCaretState = caretModel.tryCaptureCaretState(editor, relativeOffset = elementRange.startOffset)
 
+  val fileIndent = treeWalker.indentOf(file)
   val (additionalCaretOffset, fullTextWithoutCorrectingNewline) = createTextWrapper(treeWalker, wrappingPath)
     .wrapText(
-      around = text.substring(completedRange.toIntRange()),
+      around = text.substring(elementRange.toIntRange()),
       caretOffset = oldCaretState?.relativeCaretPosition,
-      destinationIndent = destination?.let { treeWalker.indentOf(it) },
-      completedElementIndent = completedElement.manuallyDeterminedIndentIn(text)
-                               ?: treeWalker.indentOf(completedElement),
-      fileIndent = treeWalker.indentOf(file),
+      destinationIndent = destination?.let {
+        treeWalker.indentOf(it) +
+        if (shouldReindentDestinationStart(destination, treeWalker)) fileIndent else 0
+      },
+      completedElementIndent = (completedElement.manuallyDeterminedIndentIn(text)
+                               ?: treeWalker.indentOf(completedElement)),
+      fileIndent = fileIndent,
     )
 
-  val startOfLine = completedRange.startOffset.movedToStartOfLine(text)
-  val endOfLine = completedRange.endOffsetExclusive.movedToEndOfLine(text)
+  val startOfLine = elementRange.startOffset.movedToStartOfLine(text)
+  val endOfLine = elementRange.endOffsetExclusive.movedToEndOfLine(text)
   val takePrecedingNewline = startOfLine > 0
   val takeSucceedingNewline = !takePrecedingNewline && endOfLine < editor.document.lastIndex
   val fullText = fullTextWithoutCorrectingNewline
@@ -119,7 +128,7 @@ private fun NestedCompletionMoveData.performMove(completedRange: CompletedRange,
     documentChangeAt(startOfLine) {
       replaceString(startOfLine - takePrecedingNewline.toInt(), endOfLine + takeSucceedingNewline.toInt(), "")
     },
-    documentChangeAt(offsetOfInsertionLine(destination, completedElement.startOffset).movedToStartOfLine(text)) { insertionOffset ->
+    documentChangeAt(offsetOfInsertionLine(destination, completedElement.startOffset, treeWalker).movedToStartOfLine(text)) { insertionOffset ->
       insertString(insertionOffset - takePrecedingNewline.toInt(), fullText)
       oldCaretState
         ?.restored(editor, newRelativeOffset = insertionOffset + (additionalCaretOffset ?: 0))
@@ -128,14 +137,36 @@ private fun NestedCompletionMoveData.performMove(completedRange: CompletedRange,
   )
 }
 
+private fun shouldReindentDestinationStart(destination: PsiElement?, treeWalker: JsonLikePsiWalker): Boolean {
+  destination ?: return false
+  val destAdapter = treeWalker.createValueAdapter(destination)
+  return when {
+    destAdapter?.asObject != null -> treeWalker.defaultObjectValue.isNotEmpty()
+    destAdapter?.asArray != null -> treeWalker.defaultArrayValue.isNotEmpty()
+    else -> false
+  }
+}
+
 internal fun CharSequence.mark(index: Int): String = substring(0, index) + "|" + substring(index)  // TODO: Remove, debugging only!
 internal fun CharSequence.mark(vararg indices: Int): String = indices.sortedDescending()  // TODO: Remove, debugging only!
   .fold(toString()) { acc, mark -> acc.mark(mark) } // TODO: Remove, debugging only!
 
-private fun offsetOfInsertionLine(destination: PsiElement?, originOffset: Int): Int = when {
-  destination == null -> originOffset // If there is no destination, we insert at the origin
-  destination.startOffset > originOffset -> destination.startOffset // Caret is above destination, let's insert at top
-  else -> destination.endOffset // Caret is below destination, let's insert at bottom
+private fun offsetOfInsertionLine(destination: PsiElement?, originOffset: Int, treeWalker: JsonLikePsiWalker): Int {
+  // If there is no destination, we insert at the origin
+  if (destination == null) return originOffset
+
+  // If we have objects and arrays with start/end syntax like {} or [], we should insert after the start or before the end
+  // length/2 is not the best heuristic, but let it be for now
+  val destAdapter = treeWalker.createValueAdapter(destination)
+  val offsetWithinParent = when {
+    destAdapter?.asObject != null -> treeWalker.defaultObjectValue.takeIf { it.isNotEmpty() }?.let { it.length / 2 } ?: 0
+    destAdapter?.asArray != null -> treeWalker.defaultArrayValue.takeIf { it.isNotEmpty() }?.let { it.length / 2 } ?: 0
+    else -> 0
+  }
+  return when {
+    destination.startOffset > originOffset -> destination.startOffset + offsetWithinParent // Caret is above destination, let's insert at top
+    else -> destination.endOffset - offsetWithinParent // Caret is below destination, let's insert at bottom
+  }
 }
 
 private val Document.lastIndex get() = textLength - 1
@@ -268,15 +299,40 @@ private fun WrappedText?.textWithoutSuffix(
           .let { numberOfLinesBeforeCaret -> numberOfLinesBeforeCaret * (indent - indentOnWhichBodyIsBased) }
       },
       // We do not want to account for the rest of the text, because it already existed in the document before our changes
-      text = body.replace("\n", "\n" + " ".repeat(indent - indentOnWhichBodyIsBased)),
+      text = if (indent <= indentOnWhichBodyIsBased) body
+             else body.replace("\n", "\n" + " ".repeat(indent - indentOnWhichBodyIsBased)),
     ).withTextPrefixedBy(" ".repeat(indent))
     else -> wrapped.textWithoutSuffix(indent + fileIndent, fileIndent, caretOffset, indentOnWhichBodyIsBased, body)
       .withTextPrefixedBy(" ".repeat(indent) + prefix + "\n")
   }
 
-private fun WrappedText?.getFullSuffix(indent: Int, fileIndent: Int): String =
-  if (this == null || suffix.isEmpty()) ""
-  else wrapped.getFullSuffix(indent + fileIndent, fileIndent) + " ".repeat(indent) + suffix + "\n"
+private fun WrappedText?.getFullSuffix(indent: Int, fileIndent: Int): String {
+  if (this == null) return ""
+  // create a reversed stack of wrappers
+  val allLayers = Stack<WrappedText>()
+  var wr = this
+  while (wr != null) {
+    allLayers.push(wr)
+    wr = wr.wrapped
+  }
+  var totalIndent = indent + fileIndent * allLayers.size
+  var iteration = 0
+  val builder = StringBuilder()
+  while (allLayers.isNotEmpty()) {
+    allLayers.pop().run {
+      iteration += 1
+      // the indent is decreasing for each next suffix
+      totalIndent -= fileIndent
+      // indent every line of the suffix; preserve the first newline but drop other blank lines
+      if (suffix.isNotEmpty()) {
+        builder.append(
+          suffix.split('\n').filter { iteration == 1 || it.isNotBlank() }.map { " ".repeat(totalIndent) + it }.joinToString("\n") + "\n"
+        )
+      }
+    }
+  }
+  return builder.toString()
+}
 
 private data class CompletedRange(val startOffset: Int, val endOffsetExclusive: Int)
 
@@ -300,7 +356,7 @@ private fun TextWithAdditionalCaretOffset.withTextPrefixedBy(prefix: String) =
  */
 private class NestedCompletionMoveData(val destination: PsiElement?, val wrappingPath: List<String>)
 
-private fun createMoveData(objectWhereUserIsWithCursor: JsonObjectValueAdapter?, accessor: List<String>): NestedCompletionMoveData {
+private fun createMoveData(objectWhereUserIsWithCursor: JsonObjectValueAdapter?, accessor: List<String>, document: Document): NestedCompletionMoveData {
   var currentNode: JsonObjectValueAdapter? = objectWhereUserIsWithCursor
   var i = 0
   while (i < accessor.size) {
@@ -311,9 +367,38 @@ private fun createMoveData(objectWhereUserIsWithCursor: JsonObjectValueAdapter?,
   }
 
   return NestedCompletionMoveData(
-    destination = currentNode?.takeUnless { i == 0 }?.delegate,
+    destination = adjustDestinationIfNeeded(currentNode?.takeUnless { i == 0 }?.delegate, document),
     wrappingPath = accessor.subList(i, accessor.size),
   )
+}
+
+private fun adjustDestinationIfNeeded(element: PsiElement?, document: Document): PsiElement? {
+  element ?: return null
+  // need to turn a single-liner into multiline for the insertion
+  // expand any element that has brackets or braces by default
+  val text = element.text
+  if ((text.contains('{') || text.contains('[')) && !text.contains("\n")) {
+    // commit the document before changes
+    PsiDocumentManager.getInstance(element.project).commitDocument(document)
+    val lbrace = element.childrenOfType<LeafPsiElement>().firstOrNull { it.text == "{" || it.text == "[" }
+    if (lbrace != null) {
+      val rbraceText = if (lbrace.text == "{") "}" else "]"
+      val rbrace = element.childrenOfType<LeafPsiElement>().lastOrNull { it.text == rbraceText }
+      if (rbrace != null) {
+        element.addBefore(createLeaf("\n", element)!!, rbrace)
+      }
+      element.addAfter(createLeaf("\n", element)!!, lbrace)
+    }
+  }
+  return element
+}
+
+@Suppress("SameParameterValue")
+private fun createLeaf(content: String, context: PsiElement): LeafPsiElement? {
+  val psiFileFactory = PsiFileFactory.getInstance(context.project)
+  return psiFileFactory.createFileFromText("dummy." + context.containingFile.virtualFile.extension,
+                                           context.containingFile.fileType, content)
+    .descendantsOfType<LeafPsiElement>().firstOrNull { it.text == content }
 }
 
 private class CapturedCaretState(

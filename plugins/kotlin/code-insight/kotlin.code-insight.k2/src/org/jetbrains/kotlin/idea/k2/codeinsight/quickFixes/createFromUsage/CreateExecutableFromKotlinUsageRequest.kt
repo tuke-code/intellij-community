@@ -9,6 +9,7 @@ import com.intellij.psi.PsiJvmSubstitutor
 import com.intellij.psi.PsiSubstitutor
 import com.intellij.psi.SmartPsiElementPointer
 import org.jetbrains.kotlin.analysis.api.analyze
+import org.jetbrains.kotlin.idea.k2.codeinsight.quickFixes.createFromUsage.K2CreateFromUsageUtil.getExpectedParameterInfo
 import org.jetbrains.kotlin.psi.KtCallElement
 import org.jetbrains.kotlin.psi.psiUtil.createSmartPointer
 
@@ -22,9 +23,9 @@ internal abstract class CreateExecutableFromKotlinUsageRequest<out T : KtCallEle
 
     private fun computeExpectedParams(call: T): List<ExpectedParameter> {
         return analyze(call) {
-            call.valueArgumentList?.arguments?.mapIndexed { index, valueArgument ->
-                valueArgument.getExpectedParameterInfo(index)
-            } ?: emptyList()
+            call.valueArguments.mapIndexed { index, valueArgument ->
+                valueArgument.getExpectedParameterInfo { "p$index" }
+            }
         }
     }
 

@@ -11,10 +11,15 @@ import org.gradle.util.GradleVersion
 import org.jetbrains.plugins.gradle.execution.test.runner.GradleTestsExecutionConsole
 import org.jetbrains.plugins.gradle.testFramework.fixture.*
 import org.jetbrains.plugins.gradle.testFramework.util.ExternalSystemExecutionTracer
+import org.junit.jupiter.api.AfterEach
 
 abstract class GradleExecutionBaseTestCase : GradleProjectTestCase() {
 
-  private lateinit var executionFixture: GradleExecutionTestFixture
+  private var _executionFixture: GradleExecutionTestFixture? = null
+  private val executionFixture: GradleExecutionTestFixture
+    get() = requireNotNull(_executionFixture) {
+      "Gradle execution fixture wasn't setup. Please use [GradleBaseTestCase.test] function inside your tests."
+    }
 
   fun getExecutionEnvironment(): ExecutionEnvironment {
     return executionFixture.getExecutionEnvironment()
@@ -29,16 +34,26 @@ abstract class GradleExecutionBaseTestCase : GradleProjectTestCase() {
 
     cleanupProjectBuildDirectory()
 
-    executionFixture = GradleExecutionTestFixtureImpl(project, projectRoot)
+    _executionFixture = GradleExecutionTestFixtureImpl(project, projectRoot)
     executionFixture.setUp()
   }
 
   override fun tearDown() {
     runAll(
-      { executionFixture.tearDown() },
+      { _executionFixture?.tearDown() },
+      { _executionFixture = null },
       { cleanupProjectBuildDirectory() },
       { super.tearDown() },
     )
+  }
+
+  /**
+   * Forces a project closing after each Gradle execution test.
+   * The BuildViewTestFixture cannot release all editors in console view after the test.
+   */
+  @AfterEach
+  fun destroyAllGradleFixturesAfterEachTest() {
+    destroyAllGradleFixtures()
   }
 
   // '--rerun-tasks' corrupts gradle build caches fo gradle versions before 4.0 (included)

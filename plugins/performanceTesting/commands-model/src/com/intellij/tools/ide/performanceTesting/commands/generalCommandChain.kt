@@ -102,6 +102,10 @@ fun <T : CommandChain> T.reopenProject(): T = apply {
   addCommand("${CMD_PREFIX}openProject")
 }
 
+fun <T : CommandChain> T.closeProject(): T = apply {
+  addCommand("${CMD_PREFIX}closeProject")
+}
+
 fun <T : CommandChain> T.storeIndices(): T = apply {
   addCommand("${CMD_PREFIX}storeIndices")
 }
@@ -584,8 +588,16 @@ fun <T : CommandChain> T.linkGradleProject(projectPath: Path): T = apply {
   addCommand("${CMD_PREFIX}linkGradleProject ${projectPath}")
 }
 
-fun <T : CommandChain> T.refreshProject(): T = apply {
-  addCommand("${CMD_PREFIX}refreshProject")
+fun <T : CommandChain> T.analyzeDependencies(moduleName: String, providerId: BuildType): T = apply {
+  addCommand("${CMD_PREFIX}analyzeDependencies $moduleName $providerId")
+}
+
+fun <T : CommandChain> T.refreshMavenProject(failureExpectedPattern: String = ""): T = apply {
+  addCommand("${CMD_PREFIX}refreshMavenProject $failureExpectedPattern")
+}
+
+fun <T : CommandChain> T.refreshGradleProject(): T = apply {
+  addCommand("${CMD_PREFIX}refreshGradleProject")
 }
 
 fun <T : CommandChain> T.setGradleDelegatedBuildCommand(delegatedBuild: Boolean = true,
@@ -616,6 +628,10 @@ fun <T : CommandChain> T.downloadMavenArtifacts(sources: Boolean = true, docs: B
 fun <T : CommandChain> T.createMavenProject(newMavenProjectDto: NewMavenProjectDto): T = apply {
   val options = objectMapper.writeValueAsString(newMavenProjectDto)
   addCommand("${CMD_PREFIX}createMavenProject $options")
+}
+
+fun <T : CommandChain> T.renameModule(oldName: String, newName: String): T = apply {
+  addCommand("${CMD_PREFIX}renameModule $oldName $newName")
 }
 
 fun <T : CommandChain> T.createGradleProject(newGradleProjectDto: NewGradleProjectDto): T = apply {
@@ -666,6 +682,10 @@ fun <T : CommandChain> T.setRegistry(registry: String, value: String): T = apply
   addCommand("${CMD_PREFIX}set $registry=$value")
 }
 
+fun <T : CommandChain> T.validateGradleMatrixCompatibility(): T = apply {
+  addCommand("${CMD_PREFIX}validateGradleMatrixCompatibility")
+}
+
 fun <T : CommandChain> T.collectNameSuggestionContext(file: String, offset: Int): T = apply {
   addCommand("${CMD_PREFIX}collectNameSuggestionContext $file $offset")
 }
@@ -681,6 +701,10 @@ fun <T : CommandChain> T.assertOpenedFileInRoot(path: String): T = apply {
 
 fun <T : CommandChain> T.importGradleProject(): T = apply {
   addCommand("${CMD_PREFIX}importGradleProject")
+}
+
+fun <T : CommandChain> T.awaitCompleteProjectConfiguration(): T = apply {
+  addCommand("${CMD_PREFIX}awaitCompleteProjectConfiguration")
 }
 
 fun <T : CommandChain> T.executeGradleTask(taskInfo: GradleTaskInfoDto): T {

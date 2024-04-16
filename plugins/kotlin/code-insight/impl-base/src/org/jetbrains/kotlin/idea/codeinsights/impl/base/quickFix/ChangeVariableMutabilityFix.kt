@@ -22,7 +22,7 @@ class ChangeVariableMutabilityFix(
     private val deleteInitializer: Boolean = false
 ) : KotlinPsiOnlyQuickFixAction<KtValVarKeywordOwner>(element) {
 
-    override fun getText() = actionText ?: buildString {
+    override fun getText(): String = actionText ?: buildString {
         if (makeVar) append(KotlinBundle.message("change.to.var")) else append(KotlinBundle.message("change.to.val"))
         if (deleteInitializer) append(KotlinBundle.message("and.delete.initializer"))
     }
@@ -56,20 +56,20 @@ class ChangeVariableMutabilityFix(
             }
 
         val VAL_REASSIGNMENT = KotlinQuickFixFactory.IntentionBased { diagnostic: KtFirDiagnostic.ValReassignment ->
-            val property = diagnostic.variable.psi as? KtValVarKeywordOwner
-                ?: return@IntentionBased emptyList()
-            listOf(
-                ChangeVariableMutabilityFix(property, makeVar = true),
-            )
+            (diagnostic.variable.psi as? KtValVarKeywordOwner)?.takeIf(PsiElement::isWritable)?.let {
+                listOf(ChangeVariableMutabilityFix(it, makeVar = true))
+            } ?: emptyList()
         }
 
 
         val VAR_OVERRIDDEN_BY_VAL_FACTORY: QuickFixesPsiBasedFactory<PsiElement> =
             quickFixesPsiBasedFactory { psiElement: PsiElement ->
                 when (psiElement) {
-                    is KtProperty, is KtParameter -> listOf(ChangeVariableMutabilityFix(psiElement as KtValVarKeywordOwner, true))
-                    else -> emptyList()
-                }
+                    is KtProperty, is KtParameter -> {
+                        listOf(ChangeVariableMutabilityFix((psiElement as KtValVarKeywordOwner), true))
+                    }
+                    else -> null
+                } ?: emptyList()
             }
 
         val VAR_ANNOTATION_PARAMETER_FACTORY: QuickFixesPsiBasedFactory<KtParameter> =
@@ -79,12 +79,13 @@ class ChangeVariableMutabilityFix(
 
         val LATEINIT_VAL_FACTORY: QuickFixesPsiBasedFactory<KtModifierListOwner> =
             quickFixesPsiBasedFactory { psiElement: KtModifierListOwner ->
-                val property = psiElement as? KtProperty ?: return@quickFixesPsiBasedFactory emptyList()
-                if (property.valOrVarKeyword.text != "val") {
-                    emptyList()
-                } else {
-                    listOf(ChangeVariableMutabilityFix(property, makeVar = true))
-                }
+                (psiElement as? KtProperty)?.let {
+                    if (it.valOrVarKeyword.text != "val") {
+                        null
+                    } else {
+                        listOf(ChangeVariableMutabilityFix(it, makeVar = true))
+                    }
+                } ?: emptyList()
             }
 
         val CONST_VAL_FACTORY: QuickFixesPsiBasedFactory<PsiElement> =
@@ -101,6 +102,14 @@ class ChangeVariableMutabilityFix(
                 if (!getter.hasBody()) return@quickFixesPsiBasedFactory emptyList()
                 if (getter.hasBlockBody() && property.typeReference == null) return@quickFixesPsiBasedFactory emptyList()
                 listOf(ChangeVariableMutabilityFix(property, makeVar = false))
+            }
+
+        val VOLATILE_ON_VALUE_FACTORY: QuickFixesPsiBasedFactory<KtAnnotationEntry> =
+            quickFixesPsiBasedFactory { annotationEntry: KtAnnotationEntry ->
+                val modifierList = annotationEntry.parent as? KtDeclarationModifierList ?: return@quickFixesPsiBasedFactory emptyList()
+                val property = modifierList.parent as? KtProperty ?: return@quickFixesPsiBasedFactory emptyList()
+                if (!property.isWritable || property.isLocal) return@quickFixesPsiBasedFactory emptyList()
+                listOf(ChangeVariableMutabilityFix(property, makeVar = true))
             }
     }
 }

@@ -13,6 +13,7 @@ import java.beans.PropertyChangeListener
 import java.lang.ref.WeakReference
 import javax.swing.JComponent
 import javax.swing.JScrollPane
+import javax.swing.SwingUtilities
 import javax.swing.border.Border
 
 @ApiStatus.Experimental
@@ -36,7 +37,9 @@ class ScrollableContentBorder private constructor(
   override fun paintBorder(c: Component, g: Graphics, x: Int, y: Int, width: Int, height: Int) {
     val alreadyHasBorder = when (mySideMask) {
       TOP -> ClientProperty.isTrue(c, HEADER_WITH_BORDER_ABOVE) || ClientProperty.isTrue(c, TOOLBAR_WITH_BORDER_ABOVE)
-      LEFT -> ClientProperty.isTrue(c, TOOLBAR_WITH_BORDER_LEFT)
+      LEFT -> ClientProperty.isTrue(c, TOOLBAR_WITH_BORDER_LEFT) || ClientProperty.isTrue(c, TOOL_WINDOW_EDGE_LEFT)
+      RIGHT -> ClientProperty.isTrue(c, TOOL_WINDOW_EDGE_RIGHT)
+      BOTTOM -> ClientProperty.isTrue(c, TOOL_WINDOW_EDGE_BOTTOM)
       else -> false
     }
     if (!alreadyHasBorder) {
@@ -52,6 +55,18 @@ class ScrollableContentBorder private constructor(
 
     @ApiStatus.Internal
     @JvmField
+    val TOOL_WINDOW_EDGE_LEFT: Key<Boolean> = Key.create("TOOL_WINDOW_EDGE_LEFT")
+
+    @ApiStatus.Internal
+    @JvmField
+    val TOOL_WINDOW_EDGE_RIGHT: Key<Boolean> = Key.create("TOOL_WINDOW_EDGE_RIGHT")
+
+    @ApiStatus.Internal
+    @JvmField
+    val TOOL_WINDOW_EDGE_BOTTOM: Key<Boolean> = Key.create("TOOL_WINDOW_EDGE_BOTTOM")
+
+    @ApiStatus.Internal
+    @JvmField
     val TOOLBAR_WITH_BORDER_ABOVE: Key<Boolean> = Key.create("TOOLBAR_WITH_BORDER_ABOVE")
 
     @ApiStatus.Internal
@@ -62,27 +77,18 @@ class ScrollableContentBorder private constructor(
 
     @JvmStatic
     @JvmOverloads
-    fun setup(scrollPane: JScrollPane,
-              side: Side,
-              targetComponent: JComponent = scrollPane) {
+    fun setup(scrollPane: JScrollPane, side: Side, targetComponent: JComponent = scrollPane) {
       setup(scrollPane, setOf(side), targetComponent)
     }
 
     @JvmStatic
     @JvmOverloads
-    fun setup(scrollPane: JScrollPane,
-              sides: Set<Side>,
-              targetComponent: JComponent = scrollPane) {
-
+    fun setup(scrollPane: JScrollPane, sides: Set<Side>, targetComponent: JComponent = scrollPane) {
       ClientProperty.put(scrollPane, TARGET_COMPONENT, WeakReference(targetComponent))
-
-      val borders = sides.associateWith { side -> ScrollableContentBorder(side.toMask()) }
-
-      val tracker = ScrollPaneScrolledStateTracker(scrollPane) { state ->
-        updateBorderVisibility(targetComponent, borders, state)
+      val borders = installBorders(targetComponent, sides)
+      val tracker = ScrollPaneScrolledStateTracker(scrollPane) { scrollPaneState ->
+        updateBorderVisibility(targetComponent, borders, scrollPaneState.state)
       }
-
-      targetComponent.border = if (borders.size == 1) borders.values.single() else JBUI.Borders.compound(*borders.values.toTypedArray())
       targetComponent.addPropertyChangeListener("border", object : PropertyChangeListener {
         override fun propertyChange(evt: PropertyChangeEvent?) {
           targetComponent.removePropertyChangeListener("border", this)
@@ -91,6 +97,57 @@ class ScrollableContentBorder private constructor(
         }
       })
     }
+
+    @JvmStatic
+    fun setup(container: JComponent, side: Side) {
+      setup(container, setOf(side))
+    }
+
+    @JvmStatic
+    fun setup(container: JComponent, sides: Set<Side>) {
+      val borders = installBorders(container, sides)
+      ScrollPaneTracker(container, { true }) { tracker ->
+        updateScrollPaneStates(container, borders, tracker)
+      }
+    }
+
+    private fun installBorders(targetComponent: JComponent, sides: Set<Side>): Map<Side, ScrollableContentBorder> {
+      val borders = sides.associateWith { side -> ScrollableContentBorder(side.toMask()) }
+      targetComponent.border = if (borders.size == 1) borders.values.single() else JBUI.Borders.compound(*borders.values.toTypedArray())
+      return borders
+    }
+
+    private fun updateScrollPaneStates(
+      container: JComponent,
+      borders: Map<Side, ScrollableContentBorder>,
+      tracker: ScrollPaneTracker,
+    ) {
+      for (scrollPaneState in tracker.scrollPaneStates) {
+        ClientProperty.put(scrollPaneState.scrollPane, TARGET_COMPONENT, WeakReference(container))
+      }
+      val state = ScrolledState(
+        isHorizontalAtStart = tracker.noneMatch { atLeft(container, it.scrollPane) && !it.state.isHorizontalAtStart },
+        isHorizontalAtEnd = tracker.noneMatch { atRight(container, it.scrollPane) && !it.state.isHorizontalAtEnd },
+        isVerticalAtStart = tracker.noneMatch { atTop(container, it.scrollPane) && !it.state.isVerticalAtStart },
+        isVerticalAtEnd = tracker.noneMatch { atBottom(container, it.scrollPane) && !it.state.isVerticalAtEnd },
+      )
+      updateBorderVisibility(container, borders, state)
+    }
+
+    private fun ScrollPaneTracker.noneMatch(predicate: (ScrollPaneScrolledState) -> Boolean): Boolean =
+      scrollPaneStates.none { it.scrollPane.isShowing && predicate(it) }
+
+    private fun atLeft(container: JComponent, scrollPane: JScrollPane): Boolean =
+      SwingUtilities.convertPoint(scrollPane.parent, scrollPane.location, container).x == container.insets.left
+
+    private fun atRight(container: JComponent, scrollPane: JScrollPane): Boolean =
+      SwingUtilities.convertRectangle(scrollPane.parent, scrollPane.bounds, container).let { it.x + it.width } == container.width - container.insets.right
+
+    private fun atTop(container: JComponent, scrollPane: JScrollPane): Boolean =
+      SwingUtilities.convertPoint(scrollPane.parent, scrollPane.location, container).y == container.insets.top
+
+    private fun atBottom(container: JComponent, scrollPane: JScrollPane): Boolean =
+      SwingUtilities.convertRectangle(scrollPane.parent, scrollPane.bounds, container).let { it.y + it.height } == container.height - container.insets.bottom
 
     private fun isOneSideBorder(sideBorder: Border): Boolean {
       if (sideBorder !is SideBorder) return false
@@ -108,7 +165,7 @@ class ScrollableContentBorder private constructor(
 private fun updateBorderVisibility(
   targetComponent: JComponent,
   borders: Map<Side, ScrollableContentBorder>,
-  state: ScrollPaneScrolledState,
+  state: ScrolledState,
 ) {
   var changed = false
   for ((side, border) in borders) {

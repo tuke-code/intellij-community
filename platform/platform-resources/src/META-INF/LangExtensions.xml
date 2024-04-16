@@ -121,7 +121,7 @@
                  description="Pause dumb queue (including indexing) while scanning is in progress."/>
     <registryKey defaultValue="true" key="scanning.trust.indexing.flag" restartRequired="true"
                  description="Use previously stored 'indexed flag' while scanning. To store 'indexing flag' please set registry option 'indexing.disable.virtual.file.system.entry.is.file.indexed=false'."/>
-    <registryKey defaultValue="false" key="full.scanning.on.startup.can.be.skipped" restartRequired="false"
+    <registryKey defaultValue="true" key="full.scanning.on.startup.can.be.skipped" restartRequired="false"
                  description="Full scanning on startup will be skipped when possible."/>
     <registryKey defaultValue="true" key="indexing.over.fast.attributes" restartRequired="true"
                  description="Store indexing data (including IndexingStamps) in regular (false) or fast (true) attributes storage"/>
@@ -697,10 +697,6 @@
     <applicationService serviceInterface="com.intellij.modcommand.ModCommandExecutor"
                         serviceImplementation="com.intellij.lang.impl.modcommand.ModCommandExecutorImpl" overrides="true"/>
 
-    <getDataRule key="cutProvider" type="fast" implementationClass="com.intellij.ide.navbar.ide.CutProviderDataRule"/>
-    <getDataRule key="copyProvider" type="fast" implementationClass="com.intellij.ide.navbar.ide.CopyProviderDataRule"/>
-    <getDataRule key="pasteProvider" type="fast" implementationClass="com.intellij.ide.navbar.ide.PasteProviderDataRule"/>
-
     <statistician key="completion" implementationClass="com.intellij.codeInsight.completion.DefaultCompletionStatistician" order="last"/>
 
     <weigher key="proximity" implementationClass="com.intellij.psi.util.proximity.OpenedInEditorWeigher" id="openedInEditor"/>
@@ -752,7 +748,6 @@
     <gotoRelatedProvider implementation="com.intellij.ide.actions.RelatedItemLineMarkerGotoAdapter"/>
 
     <selectInTarget implementation="com.intellij.ide.impl.ProjectViewSelectInGroupTarget"/>
-    <selectInTarget implementation="com.intellij.ide.navigationToolbar.SelectInNavBarTarget"/>
     <selectInTarget implementation="com.intellij.ide.impl.StructureViewSelectInTarget"/>
     <selectInTarget implementation="com.intellij.ide.impl.ProjectViewSelectInExplorerTarget"/>
 
@@ -808,7 +803,7 @@
     <directoryProjectConfigurator implementation="com.intellij.platform.PlatformProjectConfigurator" order="first"
                                   id="PlatformProjectConfigurator"/>
 
-    <fileIconProvider implementation="com.intellij.ide.FileIconPatcherImpl"/>
+    <fileIconProvider implementation="com.intellij.ide.PsiBasedFileIconProvider"/>
     <iconProvider implementation="com.intellij.ide.NativeIconProvider" id="native"/>
     <iconProvider implementation="com.intellij.psi.impl.file.SourceRootIconProvider$DirectoryProvider" id="directory" order="last"/>
     <iconLayerProvider implementation="com.intellij.psi.impl.file.SourceRootIconProvider$FileLayerProvider" id="sourceRoot" order="last"/>
@@ -1180,7 +1175,6 @@
 
     <statistics.counterUsagesCollector implementationClass="com.intellij.internal.statistic.service.fus.collectors.TooltipActionsLogger"/>
     <statistics.counterUsagesCollector implementationClass="com.intellij.refactoring.rename.RenameInplacePopupUsagesCollector"/>
-    <statistics.counterUsagesCollector implementationClass="com.intellij.refactoring.RefactoringCodeVisionCollector"/>
     <statistics.counterUsagesCollector implementationClass="com.intellij.refactoring.move.MoveUsagesCollector"/>
     <statistics.counterUsagesCollector implementationClass="com.intellij.webcore.packaging.PackageManagementUsageCollector"/>
     <statistics.counterUsagesCollector implementationClass="com.intellij.codeInsight.lookup.impl.LookupUsageTracker"/>
@@ -1210,6 +1204,7 @@
     <statistics.validation.customValidationRule implementation="com.intellij.internal.statistic.collectors.fus.MethodNameRuleValidator"/>
     <statistics.validation.customValidationRule implementation="com.intellij.internal.statistic.collectors.fus.LangCustomRuleValidator"/>
     <statistics.validation.customValidationRule implementation="com.intellij.internal.statistic.collectors.fus.PluginIdRuleValidator"/>
+    <statistics.validation.customValidationRule implementation="com.intellij.internal.statistic.collectors.fus.ProductCodeRuleValidator"/>
     <statistics.validation.customValidationRule
       implementation="com.intellij.execution.impl.statistics.RunConfigurationTypeUsagesCollector$RunConfigurationUtilValidator"/>
     <statistics.validation.customValidationRule
@@ -1259,6 +1254,7 @@
     <statistics.counterUsagesCollector implementationClass="com.intellij.refactoring.ui.RefactoringDialogUsageCollector"/>
     <statistics.counterUsagesCollector
       implementationClass="com.intellij.ide.projectView.impl.ProjectViewImpl$ProjectViewPaneChangesCollector"/>
+    <statistics.counterUsagesCollector implementationClass="com.intellij.execution.impl.statistics.ProgramRunnerUsageCollector"/>
     <statistics.counterUsagesCollector implementationClass="com.intellij.execution.impl.statistics.RunConfigurationUsageTriggerCollector"/>
     <statistics.counterUsagesCollector implementationClass="com.intellij.execution.impl.statistics.MacroUsageCollector"/>
     <statistics.counterUsagesCollector implementationClass="com.intellij.internal.statistic.IntentionFUSCollector"/>
@@ -1627,7 +1623,7 @@
     <highlightingPassFactory implementation="com.intellij.codeInsight.daemon.impl.ExternalToolPassFactory"/>
     <highlightingPassFactory implementation="com.intellij.codeInsight.daemon.impl.WolfPassFactory"/>
 
-    <highlightingPassFactory implementation="com.intellij.formatting.visualLayer.VisualFormattingLayerHighlightingPassFactory$Registrar"/>
+    <highlightingPassFactory implementation="com.intellij.formatting.visualLayer.VisualFormattingLayerHighlightingPassFactory"/>
 
     <applicationService serviceInterface="com.intellij.openapi.roots.libraries.LibraryKindRegistry"
                         serviceImplementation="com.intellij.openapi.roots.impl.libraries.LibraryKindRegistryImpl"

@@ -81,6 +81,12 @@ interface BuildContext : CompilationContext {
    * Specifies whether the runtime module repository should be added to the distributions, see [BuildOptions.generateRuntimeModuleRepository].
    */
   val generateRuntimeModuleRepository: Boolean
+
+  /**
+   * Returns main modules' names of plugins bundled with the product.
+   * In IDEs, which use path-based loader, this list is specified manually in [ProductModulesLayout.bundledPluginModules] property.
+   */
+  val bundledPluginModules: List<String>
   
   /**
    * see BuildTasksImpl.buildProvidedModuleList
@@ -113,10 +119,6 @@ interface BuildContext : CompilationContext {
                                 isPortableDist: Boolean = false): List<String>
 
   fun findApplicationInfoModule(): JpsModule
-
-  fun findFileInModuleSources(moduleName: String, relativePath: String): Path?
-
-  fun findFileInModuleSources(module: JpsModule, relativePath: String): Path?
 
   suspend fun signFiles(files: List<Path>, options: PersistentMap<String, String> = persistentMapOf()) {
     proprietaryBuildTools.signTool.signFiles(files = files, context = this, options = options)
@@ -153,9 +155,22 @@ suspend inline fun BuildContext.executeStep(spanBuilder: SpanBuilder,
 @Serializable
 class BuiltinModulesFileData(
   @JvmField val plugins: MutableList<String> = mutableListOf(),
-  @JvmField val modules: MutableList<String> = mutableListOf(),
+  @JvmField var layout: List<ProductInfoLayoutItem> = emptyList(),
   @JvmField val fileExtensions: MutableList<String> = mutableListOf(),
 )
+
+@Serializable
+data class ProductInfoLayoutItem(
+  @JvmField val name: String,
+  @JvmField val kind: ProductInfoLayoutItemKind,
+  @JvmField val classPath: List<String> = emptyList(),
+)
+
+@Suppress("EnumEntryName")
+@Serializable
+enum class ProductInfoLayoutItemKind {
+  plugin, pluginAlias, productModuleV2, moduleV2
+}
 
 sealed interface DistFileContent {
   fun readAsStringForDebug(): String

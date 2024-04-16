@@ -1,6 +1,7 @@
 // Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.intellij.build.impl
 
+import com.intellij.openapi.application.PathManager
 import com.intellij.platform.diagnostic.telemetry.helpers.use
 import com.intellij.platform.diagnostic.telemetry.helpers.useWithScope
 import com.intellij.util.JavaModuleOptions
@@ -23,8 +24,8 @@ import org.jetbrains.intellij.build.io.runJava
 import java.nio.file.Files
 import java.nio.file.NoSuchFileException
 import java.nio.file.Path
+import java.nio.file.StandardCopyOption
 import java.util.function.Predicate
-import kotlin.io.path.copyTo
 import kotlin.time.Duration
 
 internal fun span(spanBuilder: SpanBuilder, task: Runnable) {
@@ -75,7 +76,7 @@ suspend fun runIdea(context: CompilationContext,
                     onError: (() -> Unit)? = null) {
   runJava(mainClass = mainClass,
           args = args,
-          jvmArgs = getCommandLineArgumentsForOpenPackages(context) + jvmArgs + listOf("-Dij.dir.lock.debug=true"),
+          jvmArgs = getCommandLineArgumentsForOpenPackages(context) + jvmArgs + listOf("-Dij.dir.lock.debug=true", "-Dintellij.log.to.json.stdout=true"),
           classPath = classPath,
           javaExe = context.stableJavaExecutable,
           timeout = timeout,
@@ -83,24 +84,27 @@ suspend fun runIdea(context: CompilationContext,
           onError = onError)
 }
 
-suspend fun runApplicationStarter(context: BuildContext,
-                                  tempDir: Path,
-                                  ideClasspath: Set<String>,
-                                  arguments: List<String>,
-                                  systemProperties: Map<String, Any> = emptyMap(),
-                                  vmOptions: List<String> = emptyList(),
-                                  timeout: Duration = DEFAULT_TIMEOUT) {
+suspend fun runApplicationStarter(
+  context: BuildContext,
+  tempDir: Path,
+  ideClasspath: Collection<String>,
+  arguments: List<String>,
+  systemProperties: Map<String, Any> = emptyMap(),
+  vmOptions: List<String> = emptyList(),
+  homePath: Path = context.paths.projectHome,
+  timeout: Duration = DEFAULT_TIMEOUT,
+) {
   Files.createDirectories(tempDir)
   val jvmArgs = mutableListOf<String>()
   val systemDir = tempDir.resolve("system")
-  BuildUtils.addVmProperty(jvmArgs, "idea.home.path", context.paths.projectHome.toString())
+  BuildUtils.addVmProperty(jvmArgs, PathManager.PROPERTY_HOME_PATH, homePath.toString())
   BuildUtils.addVmProperty(jvmArgs, "idea.system.path", systemDir.toString())
   BuildUtils.addVmProperty(jvmArgs, "idea.config.path", "$tempDir/config")
   BuildUtils.addVmProperty(jvmArgs, "idea.builtin.server.disabled", "true")
   BuildUtils.addVmProperty(jvmArgs, "java.system.class.loader", "com.intellij.util.lang.PathClassLoader")
   BuildUtils.addVmProperty(jvmArgs, "idea.platform.prefix", context.productProperties.platformPrefix)
   jvmArgs.addAll(BuildUtils.propertiesToJvmArgs(systemProperties.entries.map { it.key to it.value.toString() }))
-  jvmArgs.addAll(vmOptions.takeIf { it.isNotEmpty() } ?: listOf("-Xmx1536m"))
+  jvmArgs.addAll(vmOptions.takeIf { it.isNotEmpty() } ?: listOf("-Xmx2g"))
   System.getProperty("intellij.build.${arguments.first()}.debug.port")?.let {
     jvmArgs.add("-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=*:$it")
   }
@@ -120,16 +124,18 @@ suspend fun runApplicationStarter(context: BuildContext,
     }
   }
   disableCompatibleIgnoredPlugins(context = context, configDir = tempDir.resolve("config"), explicitlyEnabledPlugins = additionalPluginIds)
-  runIdea(context = context,
-          mainClass = context.productProperties.mainClassName,
-          args = arguments,
-          jvmArgs = jvmArgs,
-          classPath = effectiveIdeClasspath.toList(),
-          timeout = timeout) {
+  runIdea(
+    context = context,
+    mainClass = context.productProperties.mainClassName,
+    args = arguments,
+    jvmArgs = jvmArgs,
+    classPath = effectiveIdeClasspath.toList(),
+    timeout = timeout
+  ) {
     val logFile = systemDir.resolve("log").resolve("idea.log")
     if (Files.exists(logFile)) {
       val logFileToPublish = Files.createTempFile("idea-", ".log")
-      logFile.copyTo(target = logFileToPublish, overwrite = true)
+      Files.copy(logFile, logFileToPublish, StandardCopyOption.REPLACE_EXISTING)
       context.notifyArtifactBuilt(logFileToPublish)
       Span.current().addEvent("log file $logFileToPublish attached to build artifacts")
     }

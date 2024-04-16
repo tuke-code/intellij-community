@@ -25,6 +25,7 @@ open class IdeaCommunityProperties(private val communityHomeDir: Path) : BaseIde
     val MAVEN_ARTIFACTS_ADDITIONAL_MODULES = persistentListOf(
       "intellij.tools.jps.build.standalone",
       "intellij.devkit.runtimeModuleRepository.jps",
+      "intellij.devkit.jps",
       "intellij.idea.community.build.tasks",
       "intellij.platform.debugger.testFramework",
       "intellij.platform.vcs.testFramework",
@@ -45,10 +46,6 @@ open class IdeaCommunityProperties(private val communityHomeDir: Path) : BaseIde
     scrambleMainJar = false
     useSplash = true
     buildCrossPlatformDistribution = true
-
-    /* main module for JetBrains Client isn't available in the intellij-community project, 
-       so this property is set only when IDEA CE is built from the intellij-ultimate project. */
-    embeddedJetBrainsClientMainModule = null
 
     productLayout.productImplementationModules = listOf(
       "intellij.platform.main",

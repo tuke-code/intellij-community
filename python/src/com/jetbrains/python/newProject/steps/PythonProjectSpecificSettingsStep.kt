@@ -111,6 +111,10 @@ class PythonProjectSpecificSettingsStep<T>(projectGenerator: DirectoryProjectGen
       row(message("new.project.name")) {
         projectNameFiled = textField()
           .bindText(projectName)
+          .validationOnInput {
+            val validationResult = projectGenerator.validate(getProjectLocation())
+            if (validationResult.isOk) null else error(validationResult.errorMessage)
+          }
           .component
       }
       row(message("new.project.location")) {
@@ -122,11 +126,17 @@ class PythonProjectSpecificSettingsStep<T>(projectGenerator: DirectoryProjectGen
       row("") {
         comment("", maxLineLength = 60).bindText(locationHint)
       }
+     val uiCustomizer =  projectGenerator.mainPartUiCustomizer
       row("") {
         checkBox(message("new.project.git")).bindSelected(createRepository)
         if (projectGenerator.supportsWelcomeScript()) {
           checkBox(message("new.project.welcome")).bindSelected(createScript)
         }
+        uiCustomizer?.checkBoxSection(this)
+      }
+
+      uiCustomizer?.let {
+          uiCustomizer.underCheckBoxSection(this)
       }
 
       panel {
@@ -136,6 +146,7 @@ class PythonProjectSpecificSettingsStep<T>(projectGenerator: DirectoryProjectGen
 
     mainPanel.registerValidators(this) { validations ->
       val anyErrors = validations.entries.any { (key, value) -> key.isVisible && !value.okEnabled }
+      val projectLocationValidation = projectGenerator.validate(getProjectLocation())
       myCreateButton.isEnabled = !anyErrors
     }
     myCreateButton.addActionListener { mainPanel.apply() }

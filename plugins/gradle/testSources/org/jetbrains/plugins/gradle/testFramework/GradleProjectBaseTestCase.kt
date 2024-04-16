@@ -4,35 +4,33 @@ package org.jetbrains.plugins.gradle.testFramework
 import com.intellij.testFramework.common.runAll
 import org.gradle.util.GradleVersion
 import org.jetbrains.plugins.gradle.testFramework.fixtures.GradleProjectTestFixture
-import org.jetbrains.plugins.gradle.testFramework.fixtures.application.GradleTestApplication
+import org.jetbrains.plugins.gradle.testFramework.fixtures.application.GradleProjectTestApplication
 import org.jetbrains.plugins.gradle.testFramework.util.onFailureCatching
 import org.junit.jupiter.api.AfterAll
 
-@GradleTestApplication
+@GradleProjectTestApplication
 abstract class GradleProjectBaseTestCase {
 
-  private var fixture: GradleProjectTestFixture? = null
-
+  private var _gradleFixture: GradleProjectTestFixture? = null
   val gradleFixture: GradleProjectTestFixture
-    get() = requireNotNull(fixture) {
-      "Gradle fixture isn't setup. Please use [GradleBaseTestCase.test] function inside your tests."
+    get() = requireNotNull(_gradleFixture) {
+      "Gradle fixture wasn't setup. Please use [GradleBaseTestCase.test] function inside your tests."
     }
 
   open fun setUp() = Unit
 
   open fun tearDown() = Unit
 
-  open fun patchFixtureBuilder(fixtureBuilder: GradleTestFixtureBuilder): GradleTestFixtureBuilder = fixtureBuilder
-
   open fun test(gradleVersion: GradleVersion, fixtureBuilder: GradleTestFixtureBuilder, test: () -> Unit) {
-    val patchedBuilder = patchFixtureBuilder(fixtureBuilder)
-    fixture = getOrCreateGradleTestFixture(gradleVersion, patchedBuilder)
-    setUp()
     runAll(
-      { test() },
+      {
+        _gradleFixture = getOrCreateGradleTestFixture(gradleVersion, fixtureBuilder)
+        setUp()
+        test()
+      },
       { tearDown() },
-      { rollbackOrDestroyGradleTestFixture(gradleFixture) },
-      { fixture = null }
+      { _gradleFixture?.let { rollbackOrDestroyGradleTestFixture(it) } },
+      { _gradleFixture = null }
     )
   }
 
@@ -63,7 +61,7 @@ abstract class GradleProjectBaseTestCase {
       return fixtures[fixtureId]!!
     }
 
-    private fun destroyAllGradleFixtures() {
+    fun destroyAllGradleFixtures() {
       runAll(fixtures.values.reversed(), ::destroyGradleFixture)
     }
 

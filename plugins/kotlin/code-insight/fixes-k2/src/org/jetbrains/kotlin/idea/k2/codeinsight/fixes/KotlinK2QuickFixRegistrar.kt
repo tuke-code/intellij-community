@@ -87,9 +87,8 @@ class KotlinK2QuickFixRegistrar : KotlinQuickFixRegistrar() {
         registerFactory(MakeSuperTypeOpenFixFactory.makeUpperBoundOpenFixFactory)
         registerFactory(AddFunModifierFixFactory.addFunModifierFixFactory)
         registerFactory(AddSuspendModifierFixFactory.addSuspendModifierFixFactory)
-        registerFactory(AddInlineModifierFix.usageIsNotInlinableFactory)
-        registerFactory(AddInlineModifierFix.nonLocalReturnNotAllowed)
-        registerFactory(AddInlineModifierFix.inlineSuspendFunctionTypeUnsupported)
+        registerFactory(SpecifyOverrideExplicitlyFixFactory.specifyOverrideExplicitlyFixFactory)
+        registerFactory(MakeOverriddenMemberOpenFixFactory.makeOverriddenMemberOpenFixFactory)
     }
 
     private val addAbstract = KtQuickFixesListBuilder.registerPsiQuickFix {
@@ -104,6 +103,15 @@ class KotlinK2QuickFixRegistrar : KotlinQuickFixRegistrar() {
         registerPsiQuickFixes(KtFirDiagnostic.MustBeInitializedOrBeFinalWarning::class, AddModifierFix.addFinalToProperty)
         registerPsiQuickFixes(KtFirDiagnostic.MustBeInitializedOrFinalOrAbstract::class, AddModifierFix.addFinalToProperty)
         registerPsiQuickFixes(KtFirDiagnostic.MustBeInitializedOrFinalOrAbstractWarning::class, AddModifierFix.addFinalToProperty)
+    }
+
+    private val addInline = KtQuickFixesListBuilder.registerPsiQuickFix {
+        registerFactory(AddInlineModifierFixFactories.usageIsNotInlinableFactory)
+        registerFactory(AddInlineModifierFixFactories.nonLocalReturnNotAllowed)
+        registerFactory(AddInlineModifierFixFactories.inlineSuspendFunctionTypeUnsupported)
+        registerFactory(MakeTypeParameterReifiedAndFunctionInlineFixFactory.cannotCheckForErasedFactory)
+        registerFactory(AddInlineToFunctionFixFactories.illegalInlineParameterModifierFactory)
+        registerPsiQuickFixes(KtFirDiagnostic.ReifiedTypeParameterNoInline::class, AddModifierFix.addInlineToFunctionWithReified)
     }
 
     private val propertyInitialization = KtQuickFixesListBuilder.registerPsiQuickFix {
@@ -134,6 +142,7 @@ class KotlinK2QuickFixRegistrar : KotlinQuickFixRegistrar() {
         registerFactory(MemberNotImplementedQuickfixFactories.abstractClassMemberNotImplemented)
         registerFactory(MemberNotImplementedQuickfixFactories.manyInterfacesMemberNotImplemented)
         registerFactory(MemberNotImplementedQuickfixFactories.manyImplMemberNotImplemented)
+        registerFactory(MemberNotImplementedQuickfixFactories.abstractMemberNotImplementedByEnumEntry)
     }
 
     private val imports = KtQuickFixesListBuilder.registerPsiQuickFix {
@@ -168,6 +177,7 @@ class KotlinK2QuickFixRegistrar : KotlinQuickFixRegistrar() {
             KtFirDiagnostic.MustBeInitializedOrFinalOrAbstractWarning::class,
             ChangeVariableMutabilityFix.MUST_BE_INITIALIZED_FACTORY
         )
+        registerPsiQuickFixes(KtFirDiagnostic.VolatileOnValue::class, ChangeVariableMutabilityFix.VOLATILE_ON_VALUE_FACTORY)
     }
 
     private val expressions = KtQuickFixesListBuilder.registerPsiQuickFix {
@@ -288,6 +298,17 @@ class KotlinK2QuickFixRegistrar : KotlinQuickFixRegistrar() {
             RemoveAnnotationFix.UseSiteGetDoesntHaveAnyEffect,
             RemoveUseSiteTargetFix.UseSiteGetDoesntHaveAnyEffect
         )
+        registerPsiQuickFixes(
+            KtFirDiagnostic.DataClassCopyVisibilityWillBeChangedWarning::class,
+            AddAnnotationFix.AddConsistentDataCopyVisibilityAnnotationFactory,
+        )
+        registerPsiQuickFixes(
+            KtFirDiagnostic.DataClassCopyVisibilityWillBeChangedError::class,
+            AddAnnotationFix.AddConsistentDataCopyVisibilityAnnotationFactory,
+        )
+        registerPsiQuickFixes(KtFirDiagnostic.RedundantAnnotation::class, RemoveAnnotationFix)
+        registerPsiQuickFixes(KtFirDiagnostic.DataClassConsistentCopyWrongAnnotationTarget::class, RemoveAnnotationFix)
+        registerPsiQuickFixes(KtFirDiagnostic.DataClassConsistentCopyAndExposedCopyAreIncompatibleAnnotations::class, RemoveAnnotationFix)
     }
 
     private val optIn = KtQuickFixesListBuilder.registerPsiQuickFix {
@@ -327,6 +348,7 @@ class KotlinK2QuickFixRegistrar : KotlinQuickFixRegistrar() {
         keywords,
         addAbstract,
         addFinal,
+        addInline,
         propertyInitialization,
         overrides,
         imports,

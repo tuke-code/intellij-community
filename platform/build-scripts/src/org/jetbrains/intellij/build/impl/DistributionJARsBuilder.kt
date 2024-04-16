@@ -1,6 +1,4 @@
 // Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
-@file:Suppress("ReplaceGetOrSet", "ReplaceJavaStaticMethodWithKotlinAnalog")
-
 package org.jetbrains.intellij.build.impl
 
 import com.fasterxml.jackson.jr.ob.JSON
@@ -22,7 +20,6 @@ import io.opentelemetry.extension.kotlin.asContextElement
 import kotlinx.coroutines.*
 import org.apache.commons.compress.archivers.zip.Zip64Mode
 import org.jetbrains.annotations.ApiStatus.Internal
-import org.jetbrains.annotations.VisibleForTesting
 import org.jetbrains.intellij.build.*
 import org.jetbrains.intellij.build.TraceManager.spanBuilder
 import org.jetbrains.intellij.build.fus.createStatisticsRecorderBundledMetadataProviderTask
@@ -65,10 +62,10 @@ internal suspend fun buildDistribution(
   context.productProperties.validateLayout(state.platform, context)
   createBuildBrokenPluginListJob(context)
 
-  val flatIdeClassPath = createIdeClassPath(state.platform, context)
+  val ide = createDevIdeBuild(context)
   if (context.productProperties.buildDocAuthoringAssets) {
     launch {
-      buildAdditionalAuthoringArtifacts(ideClassPath = flatIdeClassPath, context = context)
+      buildAdditionalAuthoringArtifacts(ide = ide, context = context)
     }
   }
 
@@ -76,11 +73,11 @@ internal suspend fun buildDistribution(
   val entries = coroutineScope {
     // must be completed before plugin building
     context.executeStep(spanBuilder("build searchable options index"), BuildOptions.SEARCHABLE_OPTIONS_INDEX_STEP) {
-      buildSearchableOptions(ideClassPath = flatIdeClassPath, context = context)
+      buildSearchableOptions(ide = ide, context = context)
     }
 
     val pluginLayouts = getPluginLayoutsByJpsModuleNames(
-      modules = context.productProperties.productLayout.bundledPluginModules,
+      modules = context.bundledPluginModules,
       productLayout = context.productProperties.productLayout,
     )
     val moduleOutputPatcher = ModuleOutputPatcher()
@@ -94,7 +91,7 @@ internal suspend fun buildDistribution(
         val distAllDir = context.paths.distAllDir
         val libDir = distAllDir.resolve("lib")
         context.bootClassPathJarNames = if (context.useModularLoader) {
-          java.util.List.of(PLATFORM_LOADER_JAR)
+          listOf(PLATFORM_LOADER_JAR)
         }
         else {
           generateClasspath(homeDir = distAllDir, libDir = libDir)
@@ -163,7 +160,7 @@ private suspend fun buildBundledPluginsForAllPlatforms(
     }
 
     val additionalDeferred = async {
-      copyAdditionalPlugins(context)
+      copyAdditionalPlugins(context, context.paths.distAllDir.resolve(PLUGINS_DIRECTORY))
     }
 
     val pluginDirs = getPluginDirs(context, isUpdateFromSources)
@@ -179,7 +176,7 @@ private suspend fun buildBundledPluginsForAllPlatforms(
 
     val specific = specificDeferred.await()
     for ((supportedDist) in pluginDirs) {
-      val specificList = specific.get(supportedDist)
+      val specificList = specific[supportedDist]
       val specificClasspath = specificList?.let { generatePluginClassPath(pluginEntries = it, writeDescriptor = true) }
 
       val byteOut = ByteArrayOutputStream()
@@ -212,27 +209,15 @@ fun validateModuleStructure(platform: PlatformLayout, context: BuildContext) {
   }
 }
 
-fun getProductModules(state: DistributionBuilderState): List<String> {
-  return state.platform.includedModules.asSequence()
-    .filter {
-      !it.relativeOutputFile.contains('\\') && !it.relativeOutputFile.contains('/')
-    }  // filter out jars with relative paths in the name
-    .map { it.moduleName }
-    .distinct()
-    .toList()
-}
-
-private fun getPluginDirs(context: BuildContext, isUpdateFromSources: Boolean): List<Pair<SupportedDistribution, Path>> {
+private fun getPluginDirs(context: BuildContext, isUpdateFromSources: Boolean): List<Pair<SupportedDistribution, Path>> =
   if (isUpdateFromSources) {
-    return listOf(SupportedDistribution(os = OsFamily.currentOs, arch = JvmArchitecture.currentJvmArch) to
-                    context.paths.distAllDir.resolve(PLUGINS_DIRECTORY))
+    listOf(SupportedDistribution(OsFamily.currentOs, JvmArchitecture.currentJvmArch) to context.paths.distAllDir.resolve(PLUGINS_DIRECTORY))
   }
   else {
-    return SUPPORTED_DISTRIBUTIONS.map {
-      it to getOsAndArchSpecificDistDirectory(osFamily = it.os, arch = it.arch, context = context).resolve(PLUGINS_DIRECTORY)
+    SUPPORTED_DISTRIBUTIONS.map {
+      it to getOsAndArchSpecificDistDirectory(it.os, it.arch, context).resolve(PLUGINS_DIRECTORY)
     }
   }
-}
 
 suspend fun buildBundledPlugins(
   state: DistributionBuilderState,
@@ -330,7 +315,7 @@ private suspend fun buildOsSpecificBundledPlugins(
     .associateBy(keySelector = { it.first }, valueTransform = { it.second })
 }
 
-suspend fun copyAdditionalPlugins(context: BuildContext): List<Pair<Path, List<Path>>>? {
+suspend fun copyAdditionalPlugins(context: BuildContext, pluginDir: Path): List<Pair<Path, List<Path>>>? {
   val additionalPluginPaths = context.productProperties.getAdditionalPluginPaths(context)
   if (additionalPluginPaths.isEmpty()) {
     return null
@@ -339,7 +324,6 @@ suspend fun copyAdditionalPlugins(context: BuildContext): List<Pair<Path, List<P
   return spanBuilder("copy additional plugins").useWithScope(Dispatchers.IO) {
     val allEntries = mutableListOf<Pair<Path, List<Path>>>()
 
-    val pluginDir = context.paths.distAllDir.resolve(PLUGINS_DIRECTORY)
     for (sourceDir in additionalPluginPaths) {
       val targetDir = pluginDir.resolve(sourceDir.fileName)
       copyDir(sourceDir, targetDir)
@@ -347,7 +331,7 @@ suspend fun copyAdditionalPlugins(context: BuildContext): List<Pair<Path, List<P
       check(entries.isNotEmpty()) {
         "Suspicious additional plugin (no 'lib/*.jar' files): ${sourceDir}"
       }
-      allEntries += targetDir to entries
+      allEntries.add(targetDir to entries)
     }
 
     allEntries
@@ -452,12 +436,14 @@ private suspend fun validatePlugin(path: Path, context: BuildContext) {
     }
 
     val pluginManager = IdePluginManager.createManager()
-    val id = (pluginManager.createPlugin(path, validateDescriptor = false) as? PluginCreationSuccess)?.plugin?.pluginId
     val result = pluginManager.createPlugin(path, validateDescriptor = true)
     // todo fix AddStatisticsEventLogListenerTemporary
     val problems = context.productProperties.validatePlugin(result, context)
-      .filter { !it.message.contains("Service preloading is deprecated in the") }
+      .filter {
+        !it.message.contains("Service preloading is deprecated in the") && !it.message.contains("Plugin has no dependencies")
+      }
     if (problems.isNotEmpty()) {
+      val id = (pluginManager.createPlugin(path, validateDescriptor = false) as? PluginCreationSuccess)?.plugin?.pluginId
       context.messages.reportBuildProblem(problems.joinToString(
         prefix = "${id ?: path}: ",
         separator = ". ",
@@ -506,7 +492,7 @@ internal suspend fun generateProjectStructureMapping(
     }
 
     val allPlugins = getPluginLayoutsByJpsModuleNames(
-      modules = context.productProperties.productLayout.bundledPluginModules,
+      modules = context.bundledPluginModules,
       productLayout = context.productProperties.productLayout,
     )
     val entries = mutableListOf<DistributionFileEntry>()
@@ -770,7 +756,6 @@ private fun patchKeyMapWithAltClickReassignedToMultipleCarets(moduleOutputPatche
   moduleOutputPatcher.patchModuleOutput(moduleName, "keymaps/\$default.xml", text)
 }
 
-@VisibleForTesting
 fun getOsAndArchSpecificDistDirectory(osFamily: OsFamily, arch: JvmArchitecture, context: BuildContext): Path {
   return context.paths.buildOutputDir.resolve("dist.${osFamily.distSuffix}.${arch.name}")
 }
@@ -786,7 +771,7 @@ private fun checkOutputOfPluginModules(mainPluginModule: String,
       val moduleName = item.moduleName
       if (containsFileInOutput(moduleName = moduleName,
                                filePath = "META-INF/plugin.xml",
-                               excludes = moduleExcludes.get(moduleName) ?: emptyList(),
+                               excludes = moduleExcludes[moduleName] ?: emptyList(),
                                context = context)) {
         modulesWithPluginXml.add(moduleName)
       }
@@ -805,7 +790,7 @@ private fun checkOutputOfPluginModules(mainPluginModule: String,
     if (module == "intellij.java.guiForms.rt" ||
         !containsFileInOutput(moduleName = module,
                               filePath = "com/intellij/uiDesigner/core/GridLayoutManager.class",
-                              excludes = moduleExcludes.get(module) ?: emptyList(),
+                              excludes = moduleExcludes[module] ?: emptyList(),
                               context = context)) {
       "Runtime classes of GUI designer must not be packaged to \'$module\' module in \'$mainPluginModule\' plugin, " +
       "because they are included into a platform JAR. Make sure that 'Automatically copy form runtime classes " +
@@ -1320,8 +1305,11 @@ suspend fun createIdeClassPath(platform: PlatformLayout, context: BuildContext):
 
   val libDir = context.paths.distAllDir.resolve("lib")
   for (entry in lib) {
-    if (libDir.relativize(entry.path).nameCount != 1) {
-      continue
+    if (!(entry is ModuleOutputEntry && entry.reason == ModuleIncludeReasons.PRODUCT_MODULES)) {
+      val relativePath = libDir.relativize(entry.path)
+      if (relativePath.nameCount != 1 && !relativePath.startsWith("modules")) {
+        continue
+      }
     }
 
     when (entry) {
@@ -1359,12 +1347,11 @@ suspend fun createIdeClassPath(platform: PlatformLayout, context: BuildContext):
 }
 
 suspend fun buildSearchableOptions(
-  platform: PlatformLayout,
   context: BuildContext,
   systemProperties: Map<String, Any> = emptyMap(),
 ): Path? {
   return buildSearchableOptions(
-    ideClassPath = createIdeClassPath(platform, context),
+    ide = createDevIdeBuild(context),
     context = context,
     systemProperties = systemProperties,
   )
@@ -1373,8 +1360,8 @@ suspend fun buildSearchableOptions(
 /**
  * Build index which is used to search options in the Settings dialog.
  */
-suspend fun buildSearchableOptions(
-  ideClassPath: Set<String>,
+private suspend fun buildSearchableOptions(
+  ide: DevIdeBuild,
   context: BuildContext,
   systemProperties: Map<String, Any> = emptyMap(),
 ): Path? {
@@ -1406,13 +1393,11 @@ suspend fun buildSearchableOptions(
     }
     // Start the product in headless mode using com.intellij.ide.ui.search.TraverseUIStarter.
     // It'll process all UI elements in the `Settings` dialog and build an index for them.
-    runApplicationStarter(
-      context = context,
+    ide.runProduct(
       tempDir = context.paths.tempDir.resolve("searchableOptions"),
-      ideClasspath = ideClassPath,
       arguments = listOf("traverseUI", targetDirectory.toString(), "true"),
-      vmOptions = listOf("-Xmx2g"),
       systemProperties = systemProperties,
+      isLongRunning = true,
     )
     check(Files.isDirectory(targetDirectory)) {
       "Failed to build searchable options index: $targetDirectory does not exist. See log above for error output from traverseUI run."

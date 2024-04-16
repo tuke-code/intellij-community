@@ -25,7 +25,7 @@ class EntireSessionLoggingScheme<P : Any, F>(
   override fun configureLogger(sessionAnalysisDeclaration: List<EventField<*>>,
                                sessionStructureAnalysisDeclaration: List<AnalysedLevelScheme>,
                                eventLogGroup: EventLogGroup,
-                               eventPrefix: String): MLSessionLoggerBuilder<P> {
+                               eventPrefix: String): MLSessionLogger<P> {
     require(sessionStructureAnalysisDeclaration.isNotEmpty())
     val sessionStructureFields = if (sessionStructureAnalysisDeclaration.size == 1)
       PredictionSessionFields(sessionStructureAnalysisDeclaration.first(), predictionField, predictionTransformer)
@@ -40,44 +40,13 @@ class EntireSessionLoggingScheme<P : Any, F>(
                                                     fieldSessionStructure,
                                                     fieldSession)
 
-    return MLSessionLoggerBuilder {
-      var bufferAnalysisSessionStructure: ObjectEventData? = null
-      val bufferAnalysisSession: MutableList<EventPair<*>> = mutableListOf()
-      var logged = false
-
-      fun logEvent() {
-        assert(!logged) { "Attempted to log session twice" }
-        eventId.log(listOfNotNull(
-          bufferAnalysisSessionStructure?.let { fieldSessionStructure with it },
-          fieldSession with ObjectEventData(bufferAnalysisSession)
-        ))
-        logged = true
-      }
-
-      object : MLSessionLogger<P> {
-        override fun logBeforeSessionStarted(startedSessionAnalysis: List<EventPair<*>>) {
-          bufferAnalysisSession.addAll(startedSessionAnalysis)
+    return object : MLSessionLogger<P> {
+      override fun logSession(session: List<EventPair<*>>, structure: AnalysedRootContainer<P>?) {
+        eventId.log(buildList {
+          if (structure != null) add(fieldSessionStructure with sessionStructureFields.buildObjectEventData(structure))
+          add(fieldSession with ObjectEventData(session))
         }
-
-        override fun logStartFailure(failureAnalysis: List<EventPair<*>>) {
-          bufferAnalysisSession.addAll(failureAnalysis)
-          logEvent()
-        }
-
-        override fun logSessionException(exceptionAnalysis: List<EventPair<*>>) {
-          bufferAnalysisSession.addAll(exceptionAnalysis)
-          logEvent()
-        }
-
-        override fun logStarted(startAnalysis: List<EventPair<*>>) {
-          bufferAnalysisSession.addAll(startAnalysis)
-        }
-
-        override fun logFinished(sessionStructure: AnalysedRootContainer<P>, finishedSessionAnalysis: List<EventPair<*>>) {
-          bufferAnalysisSessionStructure = sessionStructureFields.buildObjectEventData(sessionStructure)
-          bufferAnalysisSession.addAll(finishedSessionAnalysis)
-          logEvent()
-        }
+        )
       }
     }
   }

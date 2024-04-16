@@ -72,33 +72,46 @@ public final class LanguageLevelUtil {
 
   static {
     for (LanguageLevel level : LanguageLevel.values()) {
-      if (level.ordinal() >= LanguageLevel.HIGHEST.ordinal()) break;
+      if (level.ordinal() > LanguageLevel.HIGHEST.ordinal()) break;
       int feature = level.feature() + 1;
       ourPresentableShortMessage.put(level, feature >= 9 ? String.valueOf(feature) : "1." + feature);
     }
   }
 
+  /**
+   * Retrieves the short language-level name like "17" for Java 17 or "1.5" for Java 1.5.
+   *
+   * @param languageLevel The language level for which to retrieve the short name.
+   * @return The short name associated with the specified language level, or null if the language level is not released yet.
+   */
   @Nullable
   public static String getShortMessage(@NotNull LanguageLevel languageLevel) {
     return ourPresentableShortMessage.get(languageLevel);
   }
 
   /**
-   * For performance reasons the forbidden API is pre-generated.
-   * @see com.intellij.codeInspection.tests.JavaApiUsageGenerator
+   * For performance reasons, the forbidden API is pre-generated.
+   * @see com.intellij.jvm.analysis.internal.testFramework.JavaApiUsageGenerator
    */
   @Nullable
   private static Set<String> getForbiddenApi(@NotNull LanguageLevel languageLevel) {
-    if (!ourPresentableShortMessage.containsKey(languageLevel)) return null;
+    String message = getShortMessage(languageLevel);
+    if (message == null) return null;
     Reference<Set<String>> ref = ourForbiddenAPI.get(languageLevel);
     Set<String> result = dereference(ref);
     if (result == null) {
-      String fileName = "api" + getShortMessage(languageLevel) + ".txt";
+      String fileName = "api" + message + ".txt";
       URL resource = LanguageLevelUtil.class.getResource(fileName);
       if (resource != null) {
         result = loadSignatureList(resource);
-      } else {
-        Logger.getInstance(LanguageLevelUtil.class).warn("File not found: " + fileName);
+      }
+      else if (languageLevel.isAtLeast(LanguageLevel.HIGHEST)) {
+        // For preview or experimental language levels, there might be no API files yet.
+        // This is not considered an error because the API might not be stable yet.
+        result = Collections.emptySet();
+      }
+      else {
+        Logger.getInstance(LanguageLevelUtil.class).error("File not found: " + fileName);
         result = Collections.emptySet();
       }
       ourForbiddenAPI.put(languageLevel, new SoftReference<>(result));

@@ -4,7 +4,6 @@ package com.intellij.openapi.actionSystem.toolbarLayout
 import com.intellij.openapi.actionSystem.ActionToolbar
 import com.intellij.util.ui.JBInsets
 import com.intellij.util.ui.JBUI
-import com.intellij.util.ui.html.width
 import java.awt.*
 import javax.swing.JComponent
 import kotlin.math.max
@@ -15,7 +14,7 @@ import kotlin.math.max
  * Preferentially, the largest components are compressed first to optimize the use of available space.
  * Note: for correct work, it's necessary to have a parent component for row with toolbar.
  */
-class CompressingLayoutStrategy : ToolbarLayoutStrategy {
+open class CompressingLayoutStrategy : ToolbarLayoutStrategy {
   override fun calculateBounds(toolbar: ActionToolbar): MutableList<Rectangle> {
     val toolbarComponent = toolbar.component
     val componentsCount = toolbarComponent.componentCount
@@ -99,7 +98,6 @@ class CompressingLayoutStrategy : ToolbarLayoutStrategy {
 
   private fun getPreferredAndRealWidth(mainToolbar: Container): Pair<Double, Double> {
     var totalWidth = 0
-    var insets = 0
     for (i in 0 until mainToolbar.componentCount) {
       val component = mainToolbar.getComponent(i)
       if (component !is JComponent) continue
@@ -107,21 +105,19 @@ class CompressingLayoutStrategy : ToolbarLayoutStrategy {
       if (toolbar != null && toolbar.layoutStrategy is CompressingLayoutStrategy) {
         for (element in toolbar.component.components) {
           if (!element.isVisible || element !is JComponent) continue
-          val elementInsets = getComponentInsetsWidth(element)
-          totalWidth += element.preferredSize.width + elementInsets
-          insets += elementInsets
+          totalWidth += element.preferredSize.width
         }
       }
       else {
-        val componentInsets = getComponentInsetsWidth(component)
-        totalWidth += component.preferredSize.width + componentInsets
-        insets += componentInsets
+        totalWidth += component.preferredSize.width
       }
     }
     val width = mainToolbar.width
-    val nonCompressibleWidth = mainToolbar.components.filterNot { it is ActionToolbar && it.layoutStrategy is CompressingLayoutStrategy }.sumOf { it.preferredSize.width}
+    return Pair((totalWidth).toDouble(), (width - getNonCompressibleWidth(mainToolbar)).toDouble())
+  }
 
-    return Pair((totalWidth).toDouble(), (width - nonCompressibleWidth - insets).toDouble())
+  protected open fun getNonCompressibleWidth(mainToolbar: Container): Int {
+    return mainToolbar.components.filterNot { it is ActionToolbar && it.layoutStrategy is CompressingLayoutStrategy }.sumOf { it.preferredSize.width}
   }
 
   private fun calculateComponentSizes(toolbar: ActionToolbar, preferredAndRealSize: Pair<Double, Double>): Map<Component, Dimension> {
@@ -153,10 +149,6 @@ class CompressingLayoutStrategy : ToolbarLayoutStrategy {
       }
     }
     return componentWidths
-  }
-
-  private fun getComponentInsetsWidth(c: Component): Int {
-    return ((c as? JComponent)?.border?.getBorderInsets(c)?.width ?: 0) + ((c as? JComponent)?.insets?.width ?: 0)
   }
 
   override fun calcMinimumSize(toolbar: ActionToolbar): Dimension {

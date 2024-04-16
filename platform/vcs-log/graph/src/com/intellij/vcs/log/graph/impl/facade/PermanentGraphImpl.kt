@@ -9,8 +9,9 @@ import com.intellij.vcs.log.graph.api.permanent.PermanentGraphInfo
 import com.intellij.vcs.log.graph.api.printer.GraphColorGetterFactory
 import com.intellij.vcs.log.graph.collapsing.BranchFilterController
 import com.intellij.vcs.log.graph.collapsing.CollapsedController
-import com.intellij.vcs.log.graph.impl.facade.bek.BekIntMap
-import com.intellij.vcs.log.graph.impl.facade.bek.BekSorter
+import com.intellij.vcs.log.graph.impl.facade.sort.SortIndexMap
+import com.intellij.vcs.log.graph.impl.facade.sort.SortedBaseController
+import com.intellij.vcs.log.graph.impl.facade.sort.bek.BekSorter
 import com.intellij.vcs.log.graph.impl.permanent.*
 import com.intellij.vcs.log.graph.linearBek.LinearBekController
 import com.intellij.vcs.log.graph.utils.LinearGraphUtils
@@ -30,53 +31,58 @@ class PermanentGraphImpl<CommitId : Any> private constructor(private val permane
                                                              branchesCommitId: Set<CommitId>) : PermanentGraph<CommitId>, PermanentGraphInfo<CommitId> {
   private val branchNodeIds: Set<Int> = permanentCommitsInfo.convertToNodeIds(branchesCommitId)
 
-  private val bekIntMap: BekIntMap by lazy {
+  private val bekIntMap: SortIndexMap by lazy {
     BekSorter.createBekMap(permanentLinearGraph, permanentGraphLayout, permanentCommitsInfo.timestampGetter)
   }
 
   private val graphColorGetter = colorGetterFactory.createColorGetter(this)
   private val reachableNodes = ReachableNodes(LinearGraphUtils.asLiteLinearGraph(permanentLinearGraph))
 
-  private fun createBaseController(sortType: PermanentGraph.SortType): LinearGraphController {
-    return when (sortType) {
-      PermanentGraph.SortType.Normal -> BaseController(this)
-      PermanentGraph.SortType.LinearBek -> LinearBekController(BekBaseController(this, bekIntMap), this)
-      else -> BekBaseController(this, bekIntMap)
-    }
-  }
-
-  private fun createFilteredController(baseController: LinearGraphController,
-                                       sortType: PermanentGraph.SortType,
-                                       visibleHeads: Set<CommitId>?,
-                                       matchingCommits: Set<CommitId>?): LinearGraphController {
+  private fun createFilteredController(options: PermanentGraph.Options, visibleHeads: Set<CommitId>?, matchingCommits: Set<CommitId>?): LinearGraphController {
     val visibleHeadsIds = if (visibleHeads != null) permanentCommitsInfo.convertToNodeIds(visibleHeads) else null
-    if (matchingCommits != null) {
-      return FilteredController(baseController, this, permanentCommitsInfo.convertToNodeIds(matchingCommits), visibleHeadsIds)
-    }
+    val matchingCommitIds = if (matchingCommits != null) permanentCommitsInfo.convertToNodeIds(matchingCommits) else null
 
-    if (sortType == PermanentGraph.SortType.LinearBek) {
-      if (visibleHeadsIds != null) {
-        return BranchFilterController(baseController, this, visibleHeadsIds)
+    when (options) {
+      is PermanentGraph.Options.Base -> {
+        val baseController = when (options.sortType) {
+          PermanentGraph.SortType.Normal -> BaseController(this)
+          PermanentGraph.SortType.Bek -> SortedBaseController(this, bekIntMap)
+        }
+        if (matchingCommitIds != null) {
+          return FilteredController.create(baseController, this, matchingCommitIds, visibleHeadsIds)
+        }
+        return CollapsedController(baseController, this, visibleHeadsIds)
       }
-      return baseController
+      PermanentGraph.Options.FirstParent -> {
+        val baseController = BaseController(this)
+        return FirstParentController.create(baseController, this, matchingCommitIds, visibleHeadsIds)
+      }
+      PermanentGraph.Options.LinearBek -> {
+        val baseController = LinearBekController(SortedBaseController(this, bekIntMap), this)
+        if (matchingCommitIds != null) {
+          return FilteredController.create(baseController, this, matchingCommitIds, visibleHeadsIds)
+        }
+        if (visibleHeadsIds != null) {
+          return BranchFilterController(baseController, this, visibleHeadsIds)
+        }
+        return baseController
+      }
     }
-
-    return CollapsedController(baseController, this, visibleHeadsIds)
   }
 
-  fun createVisibleGraph(sortType: PermanentGraph.SortType,
+  fun createVisibleGraph(options: PermanentGraph.Options,
                          visibleHeads: Set<CommitId>?,
                          matchingCommits: Set<CommitId>?,
                          preprocessor: BiConsumer<in LinearGraphController, in PermanentGraphInfo<CommitId>>): VisibleGraph<CommitId> {
-    val controller = createFilteredController(createBaseController(sortType), sortType, visibleHeads, matchingCommits)
+    val controller = createFilteredController(options, visibleHeads, matchingCommits)
     preprocessor.accept(controller, this)
     return VisibleGraphImpl(controller, this, graphColorGetter)
   }
 
-  override fun createVisibleGraph(sortType: PermanentGraph.SortType,
+  override fun createVisibleGraph(options: PermanentGraph.Options,
                                   headsOfVisibleBranches: Set<CommitId>?,
                                   matchedCommits: Set<CommitId>?): VisibleGraph<CommitId> {
-    return createVisibleGraph(sortType, headsOfVisibleBranches, matchedCommits) { _: LinearGraphController?, _: PermanentGraphInfo<CommitId>? -> }
+    return createVisibleGraph(options, headsOfVisibleBranches, matchedCommits) { _: LinearGraphController?, _: PermanentGraphInfo<CommitId>? -> }
   }
 
   override val allCommits: List<GraphCommit<CommitId>>

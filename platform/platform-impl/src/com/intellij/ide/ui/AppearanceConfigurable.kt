@@ -6,6 +6,7 @@ import com.intellij.application.options.colors.SchemesPanel
 import com.intellij.application.options.colors.SchemesPanelFactory
 import com.intellij.application.options.editor.CheckboxDescriptor
 import com.intellij.application.options.editor.checkBox
+import com.intellij.icons.AllIcons
 import com.intellij.ide.DataManager
 import com.intellij.ide.GeneralSettings
 import com.intellij.ide.IdeBundle.message
@@ -70,6 +71,7 @@ import java.awt.Window
 import java.awt.event.InputEvent
 import java.awt.event.KeyEvent
 import javax.swing.*
+import javax.swing.event.ListDataEvent
 import javax.swing.event.ListDataListener
 
 private val settings: UISettings
@@ -177,7 +179,7 @@ internal class AppearanceConfigurable : BoundSearchableConfigurable(message("tit
 
       panel {
         row(message("combobox.look.and.feel")) {
-          val lafComboBoxModelWrapper = LafComboBoxModelWrapper(lafManager.lafComboBoxModel)
+          val lafComboBoxModelWrapper = LafComboBoxModelWrapper { lafManager.lafComboBoxModel }
           val theme = comboBox(lafComboBoxModelWrapper)
             .bindItem(lafProperty)
             .accessibleName(message("combobox.look.and.feel"))
@@ -216,6 +218,12 @@ internal class AppearanceConfigurable : BoundSearchableConfigurable(message("tit
           }.onReset {
             colorAndFontsOptions.reset()
           }.enabledIf(syncThemeAndEditorSchemePredicate.not())
+
+          syncThemeAndEditorSchemePredicate.addListener { isSyncOn ->
+            if (isSyncOn) {
+              colorAndFontsOptions.reset()
+            }
+          }
         }
 
         disposable?.whenDisposed {
@@ -521,9 +529,10 @@ internal class AppearanceConfigurable : BoundSearchableConfigurable(message("tit
           if (ResizeStripeManager.enabled()) {
             twoColumnsRow(
               {
-                checkBox(cdShowToolWindowNames).onApply {
+                checkBox(cdShowToolWindowNames).gap(RightGap.SMALL).onApply {
                   ResizeStripeManager.applyShowNames()
                 }
+                icon(AllIcons.General.Beta)
               },
               { checkBox(cdLeftToolWindowLayout) }
             )
@@ -667,10 +676,41 @@ private fun logIdeZoomChanged(value: Float, isPresentation: Boolean) {
 }
 
 @Internal
-class LafComboBoxModelWrapper(private val lafComboBoxModel: CollectionComboBoxModel<LafReference>): ComboBoxModel<LafReference> {
+class LafComboBoxModelWrapper(private val lafComboBoxModelProvider: () -> CollectionComboBoxModel<LafReference>): ComboBoxModel<LafReference> {
+  private var lafComboBoxModel: CollectionComboBoxModel<LafReference> = lafComboBoxModelProvider()
   private val moreAction = LafReference(name = message("link.get.more.themes"), themeId = "")
   private val additionalItems = listOf(moreAction)
-  var comboBoxComponent: JComponent? = null
+  var comboBoxComponent: ComboBox<LafReference>? = null
+  private val listDataListener = object : ListDataListener {
+    override fun intervalAdded(e: ListDataEvent?) {
+      recreateModelIfNeeded()
+    }
+
+    override fun intervalRemoved(e: ListDataEvent?) {
+      recreateModelIfNeeded()
+    }
+
+    override fun contentsChanged(e: ListDataEvent?) {
+      recreateModelIfNeeded()
+    }
+  }
+
+  init {
+    lafComboBoxModel.addListDataListener(listDataListener)
+  }
+
+  private fun recreateModelIfNeeded() {
+    if (lafComboBoxModel === lafComboBoxModelProvider()) return
+    val comboBoxComponent = comboBoxComponent ?: return
+
+    lafComboBoxModel.removeListDataListener(comboBoxComponent)
+    lafComboBoxModel.removeListDataListener(listDataListener)
+
+    lafComboBoxModel = lafComboBoxModelProvider()
+
+    comboBoxComponent.model = this
+    lafComboBoxModel.addListDataListener(listDataListener)
+  }
 
   override fun getSize(): Int = lafComboBoxModel.size.let { if (it > 0) it + additionalItems.size else it }
 

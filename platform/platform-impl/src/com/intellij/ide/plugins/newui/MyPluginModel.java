@@ -1,4 +1,4 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.ide.plugins.newui;
 
 import com.intellij.externalDependencies.DependencyOnPlugin;
@@ -391,15 +391,22 @@ public class MyPluginModel extends InstalledPluginsTableModel implements PluginE
                              @NotNull IdeaPluginDescriptor descriptor,
                              @Nullable IdeaPluginDescriptor updateDescriptor,
                              @NotNull ModalityState modalityState) {
+    boolean isUpdate = updateDescriptor != null;
+    IdeaPluginDescriptor actionDescriptor = isUpdate ? updateDescriptor : descriptor;
+    if (!PluginManagerMain.checkThirdPartyPluginsAllowed(List.of(actionDescriptor))) {
+      return;
+    }
+
     if (myInstallSource != null) {
       String pluginId = descriptor.getPluginId().getIdString();
       myInstallSource.logInstallPlugins(Collections.singletonList(pluginId));
     }
 
-    boolean isUpdate = updateDescriptor != null;
-    IdeaPluginDescriptor actionDescriptor = isUpdate ? updateDescriptor : descriptor;
-    if (!PluginManagerMain.checkThirdPartyPluginsAllowed(List.of(actionDescriptor))) {
-      return;
+    if (descriptor instanceof PluginNode node) {
+      FUSEventSource installSource = node.getInstallSource();
+      if (installSource != null) {
+        installSource.logInstallPlugins(List.of(descriptor.getPluginId().getIdString()));
+      }
     }
 
     Ref<Boolean> allowInstallWithoutRestart = Ref.create(true);
@@ -983,8 +990,9 @@ public class MyPluginModel extends InstalledPluginsTableModel implements PluginE
     for (PluginId pluginId : requiredPluginIds) {
       IdeaPluginDescriptor result = ContainerUtil.find(view, d -> pluginId.equals(d.getPluginId()));
       if (result == null && PluginManagerCore.isModuleDependency(pluginId)) {
-        result = ContainerUtil.find(view,
-                                    d -> d instanceof IdeaPluginDescriptorImpl && ((IdeaPluginDescriptorImpl)d).modules.contains(pluginId));
+        result = ContainerUtil.find(view, d -> {
+          return d instanceof IdeaPluginDescriptorImpl && ((IdeaPluginDescriptorImpl)d).pluginAliases.contains(pluginId);
+        });
         if (result != null) {
           setEnabled(pluginId, PluginEnabledState.ENABLED); // todo
         }

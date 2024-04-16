@@ -26,6 +26,7 @@ import com.intellij.openapi.projectRoots.JavaSdkVersion;
 import com.intellij.openapi.util.*;
 import com.intellij.openapi.util.text.HtmlBuilder;
 import com.intellij.openapi.util.text.HtmlChunk;
+import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.pom.java.JavaFeature;
 import com.intellij.pom.java.LanguageLevel;
@@ -450,7 +451,7 @@ public final class HighlightMethodUtil {
       if (builder == null) {
         builder = createIncompatibleTypeHighlightInfo(methodCall, resolveHelper, (MethodCandidateInfo)resolveResult, methodCall);
       }
-      
+
       if (builder == null) {
         builder = checkInferredReturnTypeAccessible((MethodCandidateInfo)resolveResult, methodCall);
       }
@@ -523,7 +524,7 @@ public final class HighlightMethodUtil {
     }
   }
 
-  private static void registerImplementsExtendsFix(@NotNull HighlightInfo.Builder builder, @NotNull PsiMethodCallExpression methodCall, 
+  private static void registerImplementsExtendsFix(@NotNull HighlightInfo.Builder builder, @NotNull PsiMethodCallExpression methodCall,
                                                    @NotNull PsiMethod resolvedMethod) {
     if (!JavaPsiConstructorUtil.isSuperConstructorCall(methodCall)) return;
     if (!resolvedMethod.isConstructor() || !resolvedMethod.getParameterList().isEmpty()) return;
@@ -583,13 +584,15 @@ public final class HighlightMethodUtil {
           toolTip = createMismatchedArgumentCountTooltip(parameters.length, expressions.length);
         }
         else {
-          toolTip = mismatchedExpressions.isEmpty() ? description : createMismatchedArgumentsHtmlTooltip(candidateInfo, list);
+          toolTip = mismatchedExpressions.isEmpty()
+                    ? XmlStringUtil.escapeString(description)
+                    : createMismatchedArgumentsHtmlTooltip(candidateInfo, list);
         }
       }
     }
     else {
       mismatchedExpressions = Collections.emptyList();
-      toolTip = description;
+      toolTip = XmlStringUtil.escapeString(description);
     }
 
     if (mismatchedExpressions.size() == list.getExpressions().length || mismatchedExpressions.isEmpty()) {
@@ -631,7 +634,7 @@ public final class HighlightMethodUtil {
       HtmlChunk reason = getTypeMismatchErrorHtml(errorMessage);
       return HighlightUtil.createIncompatibleTypesTooltip(
         paramType, argType, (lRawType, lTypeArguments, rRawType, rTypeArguments) ->
-          JavaErrorBundle.message("incompatible.types.html.tooltip", 
+          JavaErrorBundle.message("incompatible.types.html.tooltip",
                                   lRawType, lTypeArguments, rRawType, rTypeArguments, reason, ColorUtil.toHtmlColor(UIUtil.getContextHelpForeground())));
     }
     return null;
@@ -2273,7 +2276,7 @@ public final class HighlightMethodUtil {
     if (typeParameterList != null && typeParameterList.getTypeParameters().length > 0) {
       HighlightInfo.Builder info = HighlightInfo.newHighlightInfo(HighlightInfoType.ERROR).range(typeParameterList)
         .descriptionAndTooltip(JavaErrorBundle.message("record.special.method.type.parameters", methodTitle));
-      IntentionAction action = QuickFixFactory.getInstance().createDeleteFix(typeParameterList.getTypeParameters());
+      IntentionAction action = QuickFixFactory.getInstance().createDeleteFix(typeParameterList);
       info.registerFix(action, null, null, null, null);
       return info;
     }
@@ -2300,9 +2303,9 @@ public final class HighlightMethodUtil {
     }
     PsiReferenceList throwsList = method.getThrowsList();
     if (throwsList.getReferenceElements().length > 0) {
-      HighlightInfo.Builder info = HighlightInfo.newHighlightInfo(HighlightInfoType.ERROR).range(throwsList)
-        .descriptionAndTooltip(JavaErrorBundle.message("record.special.method.throws", methodTitle));
-      IntentionAction action = QuickFixFactory.getInstance().createDeleteFix(throwsList.getReferenceElements());
+      HighlightInfo.Builder info = HighlightInfo.newHighlightInfo(HighlightInfoType.ERROR).range(throwsList.getFirstChild())
+        .descriptionAndTooltip(JavaErrorBundle.message("record.special.method.throws", StringUtil.decapitalize(methodTitle)));
+      IntentionAction action = QuickFixFactory.getInstance().createDeleteFix(throwsList);
       info.registerFix(action, null, null, null, null);
       return info;
     }

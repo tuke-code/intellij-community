@@ -628,6 +628,84 @@ public abstract class HighLevelQuickFixTestGenerated extends AbstractHighLevelQu
     }
 
     @RunWith(JUnit3RunnerWithInners.class)
+    @TestMetadata("../../../idea/tests/testData/quickfix/addValVar")
+    public abstract static class AddValVar extends AbstractHighLevelQuickFixTest {
+        @RunWith(JUnit3RunnerWithInners.class)
+        @TestMetadata("../../../idea/tests/testData/quickfix/addValVar/inline")
+        public static class Inline extends AbstractHighLevelQuickFixTest {
+            private void runTest(String testDataFilePath) throws Exception {
+                KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+            }
+
+            @TestMetadata("basic.kt")
+            public void testBasic() throws Exception {
+                runTest("../../../idea/tests/testData/quickfix/addValVar/inline/basic.kt");
+            }
+
+            @TestMetadata("var.kt")
+            public void testVar() throws Exception {
+                runTest("../../../idea/tests/testData/quickfix/addValVar/inline/var.kt");
+            }
+        }
+
+        @RunWith(JUnit3RunnerWithInners.class)
+        @TestMetadata("../../../idea/tests/testData/quickfix/addValVar")
+        public static class Uncategorized extends AbstractHighLevelQuickFixTest {
+            private void runTest(String testDataFilePath) throws Exception {
+                KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+            }
+
+            @TestMetadata("addVal.kt")
+            public void testAddVal() throws Exception {
+                runTest("../../../idea/tests/testData/quickfix/addValVar/addVal.kt");
+            }
+
+            @TestMetadata("addValAfterVarArg.kt")
+            public void testAddValAfterVarArg() throws Exception {
+                runTest("../../../idea/tests/testData/quickfix/addValVar/addValAfterVarArg.kt");
+            }
+
+            @TestMetadata("annotation.kt")
+            public void testAnnotation() throws Exception {
+                runTest("../../../idea/tests/testData/quickfix/addValVar/annotation.kt");
+            }
+
+            @TestMetadata("expectAnnotation.kt")
+            public void testExpectAnnotation() throws Exception {
+                runTest("../../../idea/tests/testData/quickfix/addValVar/expectAnnotation.kt");
+            }
+
+            @TestMetadata("library.kt")
+            public void testLibrary() throws Exception {
+                runTest("../../../idea/tests/testData/quickfix/addValVar/library.kt");
+            }
+        }
+
+        @RunWith(JUnit3RunnerWithInners.class)
+        @TestMetadata("../../../idea/tests/testData/quickfix/addValVar/value")
+        public static class Value extends AbstractHighLevelQuickFixTest {
+            private void runTest(String testDataFilePath) throws Exception {
+                KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+            }
+
+            @TestMetadata("basic.kt")
+            public void testBasic() throws Exception {
+                runTest("../../../idea/tests/testData/quickfix/addValVar/value/basic.kt");
+            }
+
+            @TestMetadata("genericParameter.kt")
+            public void testGenericParameter() throws Exception {
+                runTest("../../../idea/tests/testData/quickfix/addValVar/value/genericParameter.kt");
+            }
+
+            @TestMetadata("var.kt")
+            public void testVar() throws Exception {
+                runTest("../../../idea/tests/testData/quickfix/addValVar/value/var.kt");
+            }
+        }
+    }
+
+    @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/quickfix/autoImports")
     public abstract static class AutoImports extends AbstractHighLevelQuickFixTest {
         @RunWith(JUnit3RunnerWithInners.class)
@@ -2091,6 +2169,11 @@ public abstract class HighLevelQuickFixTestGenerated extends AbstractHighLevelQu
             runTest("../../../idea/tests/testData/quickfix/override/implementMember.kt");
         }
 
+        @TestMetadata("implementMemberByEnumEntry.kt")
+        public void testImplementMemberByEnumEntry() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/override/implementMemberByEnumEntry.kt");
+        }
+
         @TestMetadata("implementMemberFromAbstractClass.kt")
         public void testImplementMemberFromAbstractClass() throws Exception {
             runTest("../../../idea/tests/testData/quickfix/override/implementMemberFromAbstractClass.kt");
@@ -2829,6 +2912,16 @@ public abstract class HighLevelQuickFixTestGenerated extends AbstractHighLevelQu
         @TestMetadata("varAnnotationParameter.kt")
         public void testVarAnnotationParameter() throws Exception {
             runTest("../../../idea/tests/testData/quickfix/variables/changeMutability/varAnnotationParameter.kt");
+        }
+
+        @TestMetadata("volatileOnValue.kt")
+        public void testVolatileOnValue() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/variables/changeMutability/volatileOnValue.kt");
+        }
+
+        @TestMetadata("volatileOnValueLocal.kt")
+        public void testVolatileOnValueLocal() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/variables/changeMutability/volatileOnValueLocal.kt");
         }
     }
 
@@ -4541,6 +4634,34 @@ public abstract class HighLevelQuickFixTestGenerated extends AbstractHighLevelQu
         }
     }
 
+    @RunWith(JUnit3RunnerWithInners.class)
+    @TestMetadata("../../../idea/tests/testData/quickfix/dataClassPrivateConstructor")
+    public static class DataClassPrivateConstructor extends AbstractHighLevelQuickFixTest {
+        private void runTest(String testDataFilePath) throws Exception {
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+        }
+
+        @TestMetadata("AddConsistentCopyVisibilityAnnotation.kt")
+        public void testAddConsistentCopyVisibilityAnnotation() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/dataClassPrivateConstructor/AddConsistentCopyVisibilityAnnotation.kt");
+        }
+
+        @TestMetadata("DataClassConsistentCopyAndExposedCopyAreIncompatibleAnnotations.kt")
+        public void testDataClassConsistentCopyAndExposedCopyAreIncompatibleAnnotations() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/dataClassPrivateConstructor/DataClassConsistentCopyAndExposedCopyAreIncompatibleAnnotations.kt");
+        }
+
+        @TestMetadata("DataClassConsistentCopyWrongAnnotationTarget.kt")
+        public void testDataClassConsistentCopyWrongAnnotationTarget() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/dataClassPrivateConstructor/DataClassConsistentCopyWrongAnnotationTarget.kt");
+        }
+
+        @TestMetadata("RemoveRedundantConsistentCopyVisibilityAnnotation.kt")
+        public void testRemoveRedundantConsistentCopyVisibilityAnnotation() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/dataClassPrivateConstructor/RemoveRedundantConsistentCopyVisibilityAnnotation.kt");
+        }
+    }
+
 
 
 
@@ -4730,9 +4851,36 @@ public abstract class HighLevelQuickFixTestGenerated extends AbstractHighLevelQu
 
 
 
+    @RunWith(JUnit3RunnerWithInners.class)
+    @TestMetadata("../../../idea/tests/testData/quickfix/addInline")
+    public static class AddInline extends AbstractHighLevelQuickFixTest {
+        private void runTest(String testDataFilePath) throws Exception {
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+        }
 
+        @TestMetadata("basic.kt")
+        public void testBasic() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/addInline/basic.kt");
+        }
 
+        @TestMetadata("local.kt")
+        public void testLocal() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/addInline/local.kt");
+        }
+    }
 
+    @RunWith(JUnit3RunnerWithInners.class)
+    @TestMetadata("../../../idea/tests/testData/quickfix/addInlineToReifiedFunctionFix")
+    public static class AddInlineToReifiedFunctionFix extends AbstractHighLevelQuickFixTest {
+        private void runTest(String testDataFilePath) throws Exception {
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+        }
+
+        @TestMetadata("basic.kt")
+        public void testBasic() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/addInlineToReifiedFunctionFix/basic.kt");
+        }
+    }
 
 
 
@@ -4884,7 +5032,28 @@ public abstract class HighLevelQuickFixTestGenerated extends AbstractHighLevelQu
 
 
 
+    @RunWith(JUnit3RunnerWithInners.class)
+    @TestMetadata("../../../idea/tests/testData/quickfix/makeTypeParameterReified")
+    public static class MakeTypeParameterReified extends AbstractHighLevelQuickFixTest {
+        private void runTest(String testDataFilePath) throws Exception {
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+        }
 
+        @TestMetadata("noTypeParameter.kt")
+        public void testNoTypeParameter() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/makeTypeParameterReified/noTypeParameter.kt");
+        }
+
+        @TestMetadata("noTypeParameter2.kt")
+        public void testNoTypeParameter2() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/makeTypeParameterReified/noTypeParameter2.kt");
+        }
+
+        @TestMetadata("typeParameter.kt")
+        public void testTypeParameter() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/makeTypeParameterReified/typeParameter.kt");
+        }
+    }
 
 
 
@@ -5173,7 +5342,53 @@ public abstract class HighLevelQuickFixTestGenerated extends AbstractHighLevelQu
 
 
 
+    @RunWith(JUnit3RunnerWithInners.class)
+    @TestMetadata("../../../idea/tests/testData/quickfix/specifyOverrideExplicitly")
+    public static class SpecifyOverrideExplicitly extends AbstractHighLevelQuickFixTest {
+        private void runTest(String testDataFilePath) throws Exception {
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+        }
 
+        @TestMetadata("base.kt")
+        public void testBase() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/specifyOverrideExplicitly/base.kt");
+        }
+
+        @TestMetadata("global.kt")
+        public void testGlobal() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/specifyOverrideExplicitly/global.kt");
+        }
+
+        @TestMetadata("lists.kt")
+        public void testLists() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/specifyOverrideExplicitly/lists.kt");
+        }
+
+        @TestMetadata("lists2.kt")
+        public void testLists2() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/specifyOverrideExplicitly/lists2.kt");
+        }
+
+        @TestMetadata("notPossible.kt")
+        public void testNotPossible() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/specifyOverrideExplicitly/notPossible.kt");
+        }
+
+        @TestMetadata("objectDeclaration.kt")
+        public void testObjectDeclaration() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/specifyOverrideExplicitly/objectDeclaration.kt");
+        }
+
+        @TestMetadata("outer.kt")
+        public void testOuter() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/specifyOverrideExplicitly/outer.kt");
+        }
+
+        @TestMetadata("property.kt")
+        public void testProperty() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/specifyOverrideExplicitly/property.kt");
+        }
+    }
 
 
 

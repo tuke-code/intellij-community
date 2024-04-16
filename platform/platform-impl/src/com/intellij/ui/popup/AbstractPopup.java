@@ -316,7 +316,7 @@ public class AbstractPopup implements JBPopup, ScreenAreaConsumer, AlignedPopup 
 
     myCancelKeyEnabled = cancelKeyEnabled;
     myLocateByContent = locateByContent;
-    myLocateWithinScreen = placeWithinScreenBounds;
+    myLocateWithinScreen = placeWithinScreenBounds && !StartupUiUtil.isWaylandToolkit();
     myAlpha = alpha;
     myMaskProvider = maskProvider;
     myInStack = inStack;
@@ -533,7 +533,7 @@ public class AbstractPopup implements JBPopup, ScreenAreaConsumer, AlignedPopup 
   }
 
   @Nullable
-  protected static Window getCurrentWindow(@NotNull Project project) {
+  public static Window getCurrentWindow(@NotNull Project project) {
     Window window = null;
 
     WindowManagerEx manager = getWndManager();
@@ -1220,6 +1220,12 @@ public class AbstractPopup implements JBPopup, ScreenAreaConsumer, AlignedPopup 
       popupOwner = popupOwner instanceof Window
                    ? popupOwner
                    : SwingUtilities.getWindowAncestor(popupOwner);
+      // The Wayland server may refuse to show a popup whose top-left corner
+      // is located outside of parent window's bounds
+      Rectangle okBounds = new Rectangle();
+      okBounds.width = popupOwner.getWidth() + targetBounds.width;
+      okBounds.height = popupOwner.getHeight() + targetBounds.height;
+      ScreenUtil.moveToFit(targetBounds, okBounds, new Insets(0, 0, 1, 1));
     }
     if (LOG.isDebugEnabled()) {
       LOG.debug("expected preferred size: " + myContent.getPreferredSize());
@@ -1424,6 +1430,8 @@ public class AbstractPopup implements JBPopup, ScreenAreaConsumer, AlignedPopup 
   }
 
   private static void fitToVisibleArea(Rectangle targetBounds) {
+    if (StartupUiUtil.isWaylandToolkit()) return; // Wrt screen edges, only the Wayland server can reliably position popups
+
     Point topLeft = new Point(targetBounds.x, targetBounds.y);
     Point bottomRight = new Point((int)targetBounds.getMaxX(), (int)targetBounds.getMaxY());
     Rectangle topLeftScreen = ScreenUtil.getScreenRectangle(topLeft);
@@ -2019,10 +2027,15 @@ public class AbstractPopup implements JBPopup, ScreenAreaConsumer, AlignedPopup 
   }
 
   @Override
-  public void setSize(final @NotNull Dimension size) {
+  public void setSize(@NotNull Dimension size) {
+    setSize(null, size);
+  }
+
+  @Override
+  public void setSize(@Nullable Point location, @NotNull Dimension size) {
     // do not update the bounds programmatically if the user moves or resizes the popup
     if (!isBusy()) {
-      setBounds(null, new Dimension(size));
+      setBounds(location, new Dimension(size));
       if (myPopup != null) Optional.ofNullable(getContentWindow(myContent)).ifPresent(Container::validate); // to adjust content size
     }
   }

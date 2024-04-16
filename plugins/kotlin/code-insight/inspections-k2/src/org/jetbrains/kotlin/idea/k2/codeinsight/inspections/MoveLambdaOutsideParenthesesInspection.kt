@@ -16,9 +16,7 @@ import org.jetbrains.kotlin.idea.refactoring.getLastLambdaExpression
 import org.jetbrains.kotlin.idea.refactoring.isComplexCallWithLambdaArgument
 import org.jetbrains.kotlin.idea.refactoring.moveFunctionLiteralOutsideParentheses
 import org.jetbrains.kotlin.psi.KtCallExpression
-import org.jetbrains.kotlin.psi.KtValueArgument
 import org.jetbrains.kotlin.psi.KtVisitorVoid
-import org.jetbrains.kotlin.psi.psiUtil.getStrictParentOfType
 
 internal class MoveLambdaOutsideParenthesesInspection : KotlinApplicableInspectionBase.Simple<KtCallExpression, Unit>() {
 
@@ -47,10 +45,9 @@ internal class MoveLambdaOutsideParenthesesInspection : KotlinApplicableInspecti
         }
     }
 
-    override fun isApplicableByPsi(element: KtCallExpression): Boolean = element.canMoveLambdaOutsideParentheses(skipComplexCalls = false)
-
     context(KtAnalysisSession)
-    override fun prepareContext(element: KtCallExpression) {
+    override fun prepareContext(element: KtCallExpression): Unit? {
+        return if (!element.canMoveLambdaOutsideParentheses(skipComplexCalls = false)) null else Unit
     }
 
     override fun createQuickFix(
@@ -71,9 +68,7 @@ internal class MoveLambdaOutsideParenthesesInspection : KotlinApplicableInspecti
     }
 
     override fun getApplicableRanges(element: KtCallExpression): List<TextRange> {
-        val textRange = element.getLastLambdaExpression()
-            ?.getStrictParentOfType<KtValueArgument>()?.asElement()
-            ?.textRangeIn(element)
+        val textRange = element.getLastLambdaExpression()?.functionLiteral?.lBrace?.textRangeIn(element)
         return listOfNotNull(textRange)
     }
 }

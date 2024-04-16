@@ -61,13 +61,15 @@ private var logStream: Writer? = null
 private val parentListCacheIdCounter = AtomicInteger()
 
 @ApiStatus.Internal
-class PluginClassLoader(classPath: ClassPath,
-                        private val parents: Array<IdeaPluginDescriptorImpl>,
-                        private val pluginDescriptor: PluginDescriptor,
-                        private val coreLoader: ClassLoader,
-                        resolveScopeManager: ResolveScopeManager?,
-                        packagePrefix: String?,
-                        private val libDirectories: MutableList<String>) : UrlClassLoader(classPath), PluginAwareClassLoader {
+class PluginClassLoader(
+  classPath: ClassPath,
+  private val parents: Array<IdeaPluginDescriptorImpl>,
+  private val pluginDescriptor: PluginDescriptor,
+  private val coreLoader: ClassLoader,
+  resolveScopeManager: ResolveScopeManager?,
+  packagePrefix: String?,
+  private val libDirectories: MutableList<String>,
+) : UrlClassLoader(classPath), PluginAwareClassLoader {
   // cache of a computed list of all parents (not only direct)
   @Volatile
   private var allParents: Array<ClassLoader>? = null
@@ -81,6 +83,7 @@ class PluginClassLoader(classPath: ClassPath,
   private val edtTime = AtomicLong()
   private val backgroundTime = AtomicLong()
   private val loadedClassCounter = AtomicInteger()
+  @Suppress("SSBasedInspection")
   private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + CoroutineName(pluginId.idString))
   private val _resolveScopeManager = resolveScopeManager ?: defaultResolveScopeManager
 
@@ -477,7 +480,8 @@ ${if (exception == null) "" else exception.message}""")
     return "${javaClass.simpleName}(" +
            "plugin=$pluginDescriptor, " +
            "packagePrefix=$packagePrefix, " +
-           "state=${if (state == PluginAwareClassLoader.ACTIVE) "active" else "unload in progress"}" +
+           "state=${if (state == PluginAwareClassLoader.ACTIVE) "active" else "unload in progress"}, " +
+           "parents=${parents.joinToString()}, " +
            ")"
   }
 

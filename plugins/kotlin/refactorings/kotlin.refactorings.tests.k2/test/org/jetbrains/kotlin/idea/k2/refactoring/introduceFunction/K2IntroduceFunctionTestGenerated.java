@@ -261,6 +261,11 @@ public abstract class K2IntroduceFunctionTestGenerated extends AbstractK2Introdu
             runTest("../../idea/tests/testData/refactoring/extractFunction/basic/privateMemberRef.kt");
         }
 
+        @TestMetadata("privateMembersAccessible.kt")
+        public void testPrivateMembersAccessible() throws Exception {
+            runTest("../../idea/tests/testData/refactoring/extractFunction/basic/privateMembersAccessible.kt");
+        }
+
         @TestMetadata("privateNestedClass.kt")
         public void testPrivateNestedClass() throws Exception {
             runTest("../../idea/tests/testData/refactoring/extractFunction/basic/privateNestedClass.kt");
@@ -284,6 +289,11 @@ public abstract class K2IntroduceFunctionTestGenerated extends AbstractK2Introdu
         @TestMetadata("selectedConstructor.kt")
         public void testSelectedConstructor() throws Exception {
             runTest("../../idea/tests/testData/refactoring/extractFunction/basic/selectedConstructor.kt");
+        }
+
+        @TestMetadata("selectedFunction.kt")
+        public void testSelectedFunction() throws Exception {
+            runTest("../../idea/tests/testData/refactoring/extractFunction/basic/selectedFunction.kt");
         }
 
         @TestMetadata("selectedParameter.kt")
@@ -1761,6 +1771,29 @@ public abstract class K2IntroduceFunctionTestGenerated extends AbstractK2Introdu
             public void testLocalClassWithSuperclassParameterNoApproximation() throws Exception {
                 runTest("../../idea/tests/testData/refactoring/extractFunction/parameters/nonDenotableTypes/localClassWithSuperclassParameterNoApproximation.kt");
             }
+        }
+    }
+
+    @RunWith(JUnit3RunnerWithInners.class)
+    @TestMetadata("../../idea/tests/testData/refactoring/extractFunction/script")
+    public static class Script extends AbstractK2IntroduceFunctionTest {
+        private void runTest(String testDataFilePath) throws Exception {
+            KotlinTestUtils.runTest(this::doExtractFunctionTest, this, testDataFilePath);
+        }
+
+        @TestMetadata("NotExpression.kts")
+        public void testNotExpression() throws Exception {
+            runTest("../../idea/tests/testData/refactoring/extractFunction/script/NotExpression.kts");
+        }
+
+        @TestMetadata("TopLevelExpression.kts")
+        public void testTopLevelExpression() throws Exception {
+            runTest("../../idea/tests/testData/refactoring/extractFunction/script/TopLevelExpression.kts");
+        }
+
+        @TestMetadata("topLevelFunction.kts")
+        public void testTopLevelFunction() throws Exception {
+            runTest("../../idea/tests/testData/refactoring/extractFunction/script/topLevelFunction.kts");
         }
     }
 

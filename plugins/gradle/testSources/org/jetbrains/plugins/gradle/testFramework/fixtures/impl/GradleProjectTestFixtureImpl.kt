@@ -9,11 +9,13 @@ import com.intellij.openapi.observable.operation.core.whenOperationStarted
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.modules
 import com.intellij.openapi.util.Disposer
+import com.intellij.openapi.util.use
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.testFramework.*
 import com.intellij.testFramework.common.runAll
 import com.intellij.testFramework.fixtures.SdkTestFixture
 import com.intellij.util.indexing.FileBasedIndexEx
+import com.intellij.workspaceModel.ide.impl.WorkspaceModelCacheImpl
 import kotlinx.coroutines.runBlocking
 import org.gradle.util.GradleVersion
 import org.jetbrains.plugins.gradle.service.project.wizard.util.generateGradleWrapper
@@ -32,12 +34,18 @@ internal class GradleProjectTestFixtureImpl private constructor(
   override val fileFixture: FileTestFixture
 ) : GradleProjectTestFixture {
 
-  private lateinit var _project: Project
+  private var _testDisposable: Disposable? = null
+  private val testDisposable: Disposable
+    get() = requireNotNull(_testDisposable) {
+      "Gradle fixture wasn't setup. Please use [GradleBaseTestCase.test] function inside your tests."
+    }
 
-  private lateinit var testDisposable: Disposable
-
+  private var _project: Project? = null
   override val project: Project
-    get() = _project
+    get() = requireNotNull(_project) {
+      "Gradle fixture wasn't setup. Please use [GradleBaseTestCase.test] function inside your tests."
+    }
+
   override val module: Module
     get() = project.modules.single { it.name == project.name }
 
@@ -57,29 +65,24 @@ internal class GradleProjectTestFixtureImpl private constructor(
   )
 
   override fun setUp() {
-    testDisposable = Disposer.newDisposable()
+    _testDisposable = Disposer.newDisposable()
 
+    WorkspaceModelCacheImpl.forceEnableCaching(testDisposable)
     sdkFixture.setUp()
     fileFixture.setUp()
 
     installGradleProjectReloadWatcher()
 
     _project = runBlocking { openProjectAsync(fileFixture.root) }
-    IndexingTestUtil.waitUntilIndexesAreReady(_project)
+    IndexingTestUtil.waitUntilIndexesAreReady(project)
   }
 
   override fun tearDown() {
     runAll(
       { ApplicationManager.getApplication().serviceIfCreated<FileBasedIndexEx>()?.waitUntilIndicesAreInitialized() },
       { runBlocking { fileFixture.root.refreshAndAwait() } },
-      {
-        runBlocking {
-          if (this@GradleProjectTestFixtureImpl::_project.isInitialized) {
-            _project.closeProjectAsync()
-          }
-        }
-      },
-      { Disposer.dispose(testDisposable) },
+      { runBlocking { _project?.closeProjectAsync() } },
+      { _testDisposable?.let { Disposer.dispose(it) } },
       { fileFixture.tearDown() },
       { sdkFixture.tearDown() }
     )

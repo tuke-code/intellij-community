@@ -36,6 +36,8 @@ import org.jetbrains.annotations.ApiStatus.Experimental
 import org.jetbrains.annotations.ApiStatus.Internal
 import java.awt.GraphicsEnvironment
 import java.io.IOException
+import java.lang.invoke.MethodHandle
+import java.lang.invoke.MethodHandles
 import java.nio.file.*
 import java.util.*
 import java.util.concurrent.CancellationException
@@ -126,6 +128,13 @@ object PluginManagerCore {
   @Volatile
   private var initFuture: Deferred<PluginSet>? = null
   private var ourBuildNumber: BuildNumber? = null
+
+
+  private val findLoadedClassHandle : MethodHandle by lazy {
+    val method = ClassLoader::class.java.getDeclaredMethod("findLoadedClass", String::class.java)
+    method.isAccessible = true
+    MethodHandles.lookup().unreflect(method)
+  }
 
   /**
    * Returns a list of all available plugin descriptors (bundled and custom, including disabled ones).
@@ -222,7 +231,13 @@ object PluginManagerCore {
     var result: IdeaPluginDescriptorImpl? = null
     for (descriptor in pluginSet.getEnabledModules()) {
       val classLoader = descriptor.getPluginClassLoader()
-      if (classLoader is UrlClassLoader && classLoader.hasLoadedClass(className)) {
+      if (classLoader is UrlClassLoader) {
+        if (classLoader.hasLoadedClass(className)) {
+          result = descriptor
+          break
+        }
+      }
+      else if (findLoadedClassHandle.invoke(classLoader, className) != null) {
         result = descriptor
         break
       }
@@ -853,8 +868,9 @@ object PluginManagerCore {
   }
 
   @Internal
-  fun findPluginByModuleDependency(id: PluginId): IdeaPluginDescriptorImpl? =
-    getPluginSet().allPlugins.firstOrNull { it.modules.contains(id) }
+  fun findPluginByModuleDependency(id: PluginId): IdeaPluginDescriptorImpl? {
+    return getPluginSet().allPlugins.firstOrNull { it.pluginAliases.contains(id) }
+  }
 
   @JvmStatic
   fun isPluginInstalled(id: PluginId): Boolean {
@@ -873,8 +889,8 @@ object PluginManagerCore {
         duplicateMap = newDuplicateMap
         continue
       }
-      for (module in descriptor.modules) {
-        newDuplicateMap = checkAndPut(descriptor = descriptor, id = module, idMap = idMap, prevDuplicateMap = duplicateMap)
+      for (pluginAlias in descriptor.pluginAliases) {
+        newDuplicateMap = checkAndPut(descriptor = descriptor, id = pluginAlias, idMap = idMap, prevDuplicateMap = duplicateMap)
         if (newDuplicateMap != null) {
           duplicateMap = newDuplicateMap
         }

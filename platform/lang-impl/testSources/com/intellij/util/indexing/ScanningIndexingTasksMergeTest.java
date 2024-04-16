@@ -2,9 +2,7 @@
 package com.intellij.util.indexing;
 
 import com.intellij.openapi.project.DumbModeTask;
-import com.intellij.openapi.project.FilesScanningTaskAsDumbModeTaskWrapper;
 import com.intellij.openapi.project.Project;
-import com.intellij.openapi.project.UnindexedFilesScannerExecutor;
 import com.intellij.openapi.roots.ContentIterator;
 import com.intellij.openapi.util.CheckedDisposable;
 import com.intellij.openapi.util.Disposer;
@@ -89,7 +87,7 @@ public class ScanningIndexingTasksMergeTest extends LightPlatformTestCase {
 
   public void testDumbWrapperInvokesOriginalDispose() {
     UnindexedFilesScanner t1 = createScanningTask(iter1, "reason 1", ScanningType.PARTIAL);
-    UnindexedFilesScannerExecutor executor = new UnindexedFilesScannerExecutor(getProject());
+    UnindexedFilesScannerExecutorImpl executor = new UnindexedFilesScannerExecutorImpl(getProject());
     DumbModeTask dumb1 = executor.wrapAsDumbTask(t1);
 
     // Disposer.isDisposed() deprecated. Use checkedDisposable instead
@@ -133,7 +131,7 @@ public class ScanningIndexingTasksMergeTest extends LightPlatformTestCase {
   }
 
   private UnindexedFilesScanner mergeAsDumbTasks(UnindexedFilesScanner t1, UnindexedFilesScanner t2) {
-    UnindexedFilesScannerExecutor executor = new UnindexedFilesScannerExecutor(getProject());
+    UnindexedFilesScannerExecutorImpl executor = new UnindexedFilesScannerExecutorImpl(getProject());
     DumbModeTask dumb1 = executor.wrapAsDumbTask(t1);
     DumbModeTask dumb2 = executor.wrapAsDumbTask(t2);
     DumbModeTask mergedDumb = dumb1.tryMergeWith(dumb2);

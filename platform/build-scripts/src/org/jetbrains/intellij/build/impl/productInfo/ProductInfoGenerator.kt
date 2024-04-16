@@ -1,21 +1,23 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.intellij.build.impl.productInfo
 
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.serializer
 import org.jetbrains.intellij.build.BuildContext
 import org.jetbrains.intellij.build.BuiltinModulesFileData
+import org.jetbrains.intellij.build.ProductInfoLayoutItem
+import org.jetbrains.intellij.build.ProductInfoLayoutItemKind
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.attribute.FileTime
 import java.util.concurrent.TimeUnit
 
-const val PRODUCT_INFO_FILE_NAME = "product-info.json"
+const val PRODUCT_INFO_FILE_NAME: String = "product-info.json"
 
 @OptIn(ExperimentalSerializationApi::class)
-internal val jsonEncoder by lazy {
+internal val jsonEncoder: Json by lazy {
   Json {
     prettyPrint = true
     prettyPrintIndent = "  "
@@ -27,10 +29,12 @@ internal val jsonEncoder by lazy {
 /**
  * Generates product-info.json file containing meta-information about product installation.
  */
-internal fun generateProductInfoJson(relativePathToBin: String,
-                                     builtinModules: BuiltinModulesFileData?,
-                                     launch: List<ProductInfoLaunchData>,
-                                     context: BuildContext): String {
+internal fun generateProductInfoJson(
+  relativePathToBin: String,
+  builtinModules: BuiltinModulesFileData?,
+  launch: List<ProductInfoLaunchData>,
+  context: BuildContext,
+): String {
   val appInfo = context.applicationInfo
   val jbrFlavors = if (launch.any { it.javaExecutablePath != null } && context.bundledRuntime.build.startsWith("21.")) {
     listOf(ProductFlavorData("jbr21"))
@@ -52,10 +56,13 @@ internal fun generateProductInfoJson(relativePathToBin: String,
     customProperties = context.productProperties.generateCustomPropertiesForProductInfo(),
     bundledPlugins = builtinModules?.plugins ?: emptyList(),
     fileExtensions = builtinModules?.fileExtensions ?: emptyList(),
-    modules = builtinModules?.modules ?: emptyList(),
-    flavors = jbrFlavors + productFlavors
+
+    modules = (builtinModules?.layout?.asSequence() ?: emptySequence()).filter { it.kind == ProductInfoLayoutItemKind.pluginAlias }.map { it.name }.toList(),
+    layout = builtinModules?.layout ?: emptyList(),
+
+    flavors = jbrFlavors + productFlavors,
   )
-  return jsonEncoder.encodeToString(serializer(), json)
+  return jsonEncoder.encodeToString<ProductInfoData>(json)
 }
 
 internal fun writeProductInfoJson(targetFile: Path, json: String, context: BuildContext) {
@@ -81,13 +88,17 @@ data class ProductInfoData(
   val launch: List<ProductInfoLaunchData>,
   val customProperties: List<CustomProperty> = emptyList(),
   val bundledPlugins: List<String>,
+  // it is not modules, but plugin aliases
   val modules: List<String>,
   val fileExtensions: List<String>,
   val flavors: List<ProductFlavorData> = emptyList(),
+
+  // not used by launcher, specify in the end
+  val layout: List<ProductInfoLayoutItem>,
 )
 
 @Serializable
-data class ProductFlavorData(val id: String)
+data class ProductFlavorData(@JvmField val id: String)
 
 @Serializable
 data class ProductInfoLaunchData(

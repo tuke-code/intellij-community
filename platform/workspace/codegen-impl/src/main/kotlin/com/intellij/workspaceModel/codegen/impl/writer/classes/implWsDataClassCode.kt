@@ -24,12 +24,7 @@ val ObjClass<*>.isEntityWithSymbolicId: Boolean
   }
 
 fun ObjClass<*>.implWsDataClassCode(): String {
-  val entityDataBaseClass = if (isEntityWithSymbolicId) {
-    "${WorkspaceEntityData}.WithCalculableSymbolicId<$javaFullName>()"
-  }
-  else {
-    "${WorkspaceEntityData}<$javaFullName>()"
-  }
+  val entityDataBaseClass = "${WorkspaceEntityData}<$javaFullName>()"
   val hasSoftLinks = hasSoftLinks()
   val softLinkable = if (hasSoftLinks) SoftLinkable else null
   return lines {
@@ -82,41 +77,9 @@ fun ObjClass<*>.implWsDataClassCode(): String {
         }
       }
 
-      if (isEntityWithSymbolicId) {
-        val symbolicIdField = fields.first { it.name == "symbolicId" }
-        val valueKind = symbolicIdField.valueKind
-        val methodBody = (valueKind as ObjProperty.ValueKind.Computable).expression
-        if (methodBody.contains("return")) {
-          if (methodBody.startsWith("{")) {
-            line("override fun symbolicId(): ${SymbolicEntityId}<*> $methodBody \n")
-          } else {
-            sectionNl("override fun symbolicId(): ${SymbolicEntityId}<*>") {
-                line(methodBody)
-            }
-          }
-        } else {
-          sectionNl("override fun symbolicId(): ${SymbolicEntityId}<*>") {
-            if (methodBody.startsWith("=")) {
-              line("return ${methodBody.substring(2)}")
-            }
-            else {
-              line("return $methodBody")
-            }
-          }
-        }
-      }
-
       // --- getEntityInterface method
       sectionNl("override fun getEntityInterface(): Class<out ${WorkspaceEntity}>") {
         line("return $name::class.java")
-      }
-
-      sectionNl("override fun serialize(ser: ${EntityInformation.Serializer})") {
-        //InterfaceTraverser(simpleTypes).traverse(this@implWsDataClassCode, SerializatorVisitor(this@sectionNl))
-      }
-
-      sectionNl("override fun deserialize(de: ${EntityInformation.Deserializer})") {
-        //InterfaceTraverser(simpleTypes).traverse(this@implWsDataClassCode, DeserializationVisitor(this@sectionNl))
       }
 
       sectionNl("override fun createDetachedEntity(parents: List<${WorkspaceEntity.Builder}<*>>): ${WorkspaceEntity.Builder}<*>") {

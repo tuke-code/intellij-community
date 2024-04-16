@@ -84,8 +84,6 @@ private val predefinedMergeRules = HashMap<String, (String, JetBrainsClientModul
   map.put("groovy.jar") { it, _ -> it.startsWith("org.codehaus.groovy:") }
   map.put("jsch-agent.jar") { it, _ -> it.startsWith("jsch-agent") }
   map.put(rdJarName) { it, _ -> it.startsWith("rd-") }
-  // all grpc garbage into one jar
-  map.put("grpc.jar") { it, _ -> it.startsWith("grpc-") }
   // separate file to use in Gradle Daemon classpath
   map.put("opentelemetry.jar") { it, _ -> it == "opentelemetry" || it == "opentelemetry-semconv" || it.startsWith("opentelemetry-exporter-otlp") }
   map.put("bouncy-castle.jar") { it, _ -> it.startsWith("bouncy-castle-") }
@@ -272,7 +270,7 @@ class JarPackager private constructor(
     // for now, check only direct dependencies of the main plugin module
     val childPrefix = "${layout.mainModule}."
     for (name in helper.getModuleDependencies(layout.mainModule)) {
-      if (!name.startsWith(childPrefix) || addedModules.contains(name)) {
+      if ((!name.startsWith(childPrefix) && name != "intellij.platform.commercial.verifier") || addedModules.contains(name)) {
         continue
       }
 
@@ -300,16 +298,41 @@ class JarPackager private constructor(
     readXmlAsModel(file).getChild("content")?.let { content ->
       for (module in content.children("module")) {
         val moduleName = module.attributes.get("name")
-        if (moduleName == null || moduleName.contains('/') || addedModules.contains(moduleName)) {
+        if (moduleName == null || moduleName.contains('/') || !addedModules.add(moduleName)) {
           continue
         }
+
+        val descriptor = readXmlAsModel(context.findFileInModuleSources(moduleName, "$moduleName.xml")!!)
 
         computeSourcesForModule(
           item = ModuleItem(
             moduleName = moduleName,
-            relativeOutputFile = layout.getMainJarName(),
+            // relative path with `/` is always packed by dev-mode, so, we don't need to fix resolving for now and can imporove it later
+            relativeOutputFile = if (descriptor.getAttributeValue("package") == null) "modules/$moduleName.jar" else layout.getMainJarName(),
             reason = "<- ${layout.mainModule} (plugin content)",
           ),
+          moduleOutputPatcher = moduleOutputPatcher,
+          layout = layout,
+          moduleWithSearchableOptions = moduleWithSearchableOptions,
+        )
+      }
+    }
+
+    // check verifier in all included modules
+    val effectiveIncludedNonMainModules = LinkedHashSet<String>(layout.includedModules.size + addedModules.size)
+    layout.includedModules.mapTo(effectiveIncludedNonMainModules) { it.moduleName }
+    effectiveIncludedNonMainModules.remove(layout.mainModule)
+    effectiveIncludedNonMainModules.addAll(addedModules)
+    for (moduleName in effectiveIncludedNonMainModules) {
+      for (name in helper.getModuleDependencies(moduleName)) {
+        if (name != "intellij.platform.commercial.verifier" || addedModules.contains(name)) {
+          continue
+        }
+
+        val moduleItem = ModuleItem(moduleName = name, relativeOutputFile = layout.getMainJarName(), reason = "<- ${layout.mainModule}")
+        addedModules.add(name)
+        computeSourcesForModule(
+          item = moduleItem,
           moduleOutputPatcher = moduleOutputPatcher,
           layout = layout,
           moduleWithSearchableOptions = moduleWithSearchableOptions,
@@ -390,7 +413,7 @@ class JarPackager private constructor(
     }
     moduleSources.add(DirSource(dir = moduleOutDir, excludes = excludes))
 
-    if (layout != null && !item.relativeOutputFile.contains('/') && !layout.modulesWithExcludedModuleLibraries.contains(moduleName)) {
+    if (layout != null && !layout.modulesWithExcludedModuleLibraries.contains(moduleName)) {
       val jarAsset = if (packToDir) {
         getJarAsset(
           targetFile = outFile,
@@ -413,7 +436,7 @@ class JarPackager private constructor(
     asset: AssetDescriptor,
   ) {
     val moduleName = module.name
-    val includeProjectLib = layout is PluginLayout && layout.auto
+    val includeProjectLib = if (layout is PluginLayout) layout.auto else item.reason == ModuleIncludeReasons.PRODUCT_MODULES
 
     val excluded = (layout.excludedLibraries.get(moduleName) ?: emptyList()) + (layout.excludedLibraries.get(null) ?: emptyList())
     for (element in helper.getLibraryDependencies(module)) {
@@ -423,6 +446,9 @@ class JarPackager private constructor(
         val libName = libRef.libraryName
         if (includeProjectLib) {
           if (platformLayout!!.hasLibrary(libName) || layout.hasLibrary(libName)) {
+            //if (item.reason == ModuleIncludeReasons.PRODUCT_MODULES) {
+            //  Span.current().addEvent("$libName is not included into module $moduleName as explicitly included into platform layout")
+            //}
             continue
           }
 
@@ -438,8 +464,8 @@ class JarPackager private constructor(
           libToMetadata.put(element.library!!, projectLibraryData)
         }
         else if (isLibraryAlwaysPackedIntoPlugin(libName)) {
-          check(!platformLayout!!.hasLibrary(libName)) {
-            "Library $libName must not be included into platform layout"
+          platformLayout!!.findProjectLibrary(libName)?.let {
+            throw IllegalStateException("Library $libName must not be included into platform layout: $it")
           }
 
           if (layout.hasLibrary(libName)) {
@@ -469,11 +495,8 @@ class JarPackager private constructor(
       for (i in (files.size - 1) downTo 0) {
         val file = files.get(i)
         val fileName = file.fileName.toString()
-        val jarName = when (layout) {
-          is PluginLayout -> layout.getMainJarName()
-          is PlatformLayout -> PlatformJarNames.APP_JAR
-        }
-        if (item.relativeOutputFile.contains('/') || isSeparateJar(fileName = fileName, file = file, jarName = jarName)) {
+        if (item.reason != ModuleIncludeReasons.PRODUCT_MODULES &&
+            isSeparateJar(fileName = fileName, file = file, jarPath = asset.relativePath)) {
           files.removeAt(i)
           addLibrary(
             library = library,
@@ -512,7 +535,7 @@ class JarPackager private constructor(
                 )
               }
             },
-            isPreSignedAndExtractedCandidate = asset.nativeFiles != null,
+            isPreSignedAndExtractedCandidate = asset.nativeFiles != null || isLibPreSigned(library),
           )
         )
       }
@@ -728,7 +751,11 @@ class JarPackager private constructor(
   }
 }
 
-private suspend fun isSeparateJar(fileName: String, file: Path, jarName: String): Boolean {
+private suspend fun isSeparateJar(fileName: String, file: Path, jarPath: String): Boolean {
+  if (jarPath.contains('/')) {
+    return true
+  }
+
   if (fileName.endsWith("-rt.jar") || fileName.contains("-agent")) {
     return true
   }
@@ -744,7 +771,7 @@ private suspend fun isSeparateJar(fileName: String, file: Path, jarName: String)
     }
   }
   if (result) {
-    Span.current().addEvent("$fileName contains file '$filePreventingMerging' that prevent its merging into $jarName")
+    Span.current().addEvent("$fileName contains file '$filePreventingMerging' that prevent its merging into $jarPath")
   }
   return result
 }
@@ -781,11 +808,19 @@ private fun getLibraryFiles(
 ): MutableList<Path> {
   val files = library.getPaths(JpsOrderRootType.COMPILED)
   val libName = library.name
+  if (libName == "ktor-client-jvm") {
+    return files
+  }
 
   // allow duplication if packed into the same target file and have the same common prefix
   files.removeIf {
     val alreadyCopiedFor = copiedFiles.get(it) ?: return@removeIf false
     val alreadyCopiedLibraryName = alreadyCopiedFor.library.name
+
+    if (alreadyCopiedFor.library.name.startsWith("ktor-") && libName.startsWith("ktor-")) {
+      return@removeIf true
+    }
+
     alreadyCopiedFor.targetFile == targetFile &&
     (alreadyCopiedLibraryName.startsWith("ktor-") ||
      alreadyCopiedLibraryName.startsWith("commons-") ||
@@ -894,8 +929,7 @@ private suspend fun buildJars(
 
                 override fun updateDigest(digest: HashStream64) {
                   if (layout is PluginLayout) {
-                    val mainModule = layout.mainModule
-                    digest.putString(mainModule)
+                    digest.putString(layout.mainModule)
                   }
                   else {
                     digest.putByte(0)

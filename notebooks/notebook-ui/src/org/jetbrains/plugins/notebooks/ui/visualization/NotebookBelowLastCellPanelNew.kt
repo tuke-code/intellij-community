@@ -4,75 +4,77 @@ import com.intellij.ide.ui.customization.CustomActionsSchema
 import com.intellij.openapi.actionSystem.ActionGroup
 import com.intellij.openapi.editor.EditorKind
 import com.intellij.openapi.editor.impl.EditorImpl
+import com.intellij.util.ui.JBUI
 import org.jetbrains.plugins.notebooks.ui.jupyterToolbar.JupyterToolbar
-import org.jetbrains.plugins.notebooks.ui.jupyterToolbar.JupyterToolbarManager
-import java.awt.Dimension
 import java.awt.GridBagLayout
+import java.awt.Point
 import java.awt.Rectangle
 import java.awt.event.ComponentAdapter
 import java.awt.event.ComponentEvent
 import javax.swing.JPanel
+import javax.swing.SwingUtilities
 
 class NotebookBelowLastCellPanelNew(val editor: EditorImpl) : JPanel(GridBagLayout()) {
   private var toolbar: JupyterToolbar? = null
+  private val actionGroup = createActionGroup()
 
   init {
     if (editor.editorKind != EditorKind.DIFF) {
       isOpaque = false
-      preferredSize = Dimension(1, editor.notebookAppearance.CELL_BORDER_HEIGHT * 4)
+      border = JBUI.Borders.empty(editor.notebookAppearance.CELL_BORDER_HEIGHT)
     }
   }
 
   fun initialize() {
-    // this toolbar is special - persistent and unique
-    val actionGroup = createActionGroup() ?: return
-    toolbar = JupyterToolbar(actionGroup).apply {
-      targetComponent = editor.contentComponent
-    }
-    add(toolbar)
-
-    toolbar?.let {
-      it.bounds = calculateToolbarBounds()
-      editor.contentComponent.revalidate()
-      editor.contentComponent.repaint()
-    }
-
     addComponentListeners()
+    recreateToolbar()  // this toolbar is special - persistent and unique
+  }
+
+  private fun recreateToolbar() {
+    actionGroup ?: return
+    toolbar?.let { remove(it) }
+    toolbar = JupyterToolbar(actionGroup, editor.contentComponent)
+    add(toolbar)
+    adjustToolbarBounds()
   }
 
   private fun addComponentListeners() {
     this.addComponentListener(object : ComponentAdapter() {
       override fun componentResized(e: ComponentEvent?) {
         super.componentResized(e)
-        toolbar?.let {
-          it.bounds = calculateToolbarBounds()
-          revalidate()
-          repaint()
-        }
+        adjustToolbarBounds()
       }
 
       override fun componentShown(e: ComponentEvent?) {
         super.componentShown(e)
-        toolbar?.let {
-          it.bounds = calculateToolbarBounds()
-          revalidate()
-          repaint()
-        }
+        adjustToolbarBounds()
       }
     })
   }
 
-  private fun calculateToolbarBounds(): Rectangle {
-    val toolbarPreferredSize = toolbar?.preferredSize ?: Dimension(0, 0)
-    val newBounds = JupyterToolbarManager.calculateToolbarBounds(editor,
-                                                                           this,
-                                                                           toolbarPreferredSize,
-                                                                           extraYOffset = 30)
-    return newBounds
+  override fun updateUI() {
+    super.updateUI()
+    recreateToolbar()
   }
 
   private fun createActionGroup(): ActionGroup? {
     return CustomActionsSchema.getInstance().getCorrectedAction(ACTION_GROUP_ID) as? ActionGroup
+  }
+
+  private fun adjustToolbarBounds() {
+    toolbar?.let { tb ->
+      val toolbarPreferredSize = tb.preferredSize
+      val xOffset = (this.width - toolbarPreferredSize.width) / 2
+      val editorComponent = editor.contentComponent
+      val panelLocationInEditor = SwingUtilities.convertPoint(this, Point(0, 0), editorComponent)
+
+      val xCoordinate = panelLocationInEditor.x + xOffset
+      val yCoordinate = panelLocationInEditor.y
+
+      tb.bounds = Rectangle(xCoordinate, yCoordinate, toolbarPreferredSize.width, toolbarPreferredSize.height)
+      revalidate()
+      repaint()
+    }
   }
 
   companion object {

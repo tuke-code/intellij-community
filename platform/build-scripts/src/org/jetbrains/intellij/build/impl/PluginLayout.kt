@@ -98,8 +98,8 @@ class PluginLayout private constructor(
      * @param mainModuleName name of the module containing META-INF/plugin.xml file of the plugin
      */
     @JvmStatic
-    fun plugin(mainModuleName: String, body: (PluginLayoutSpec) -> Unit): PluginLayout {
-      val layout = PluginLayout(mainModuleName)
+    fun plugin(mainModuleName: String, auto: Boolean = false, body: (PluginLayoutSpec) -> Unit): PluginLayout {
+      val layout = PluginLayout(mainModuleName, auto = auto)
 
       val spec = PluginLayoutSpec(layout)
       body(spec)
@@ -113,15 +113,17 @@ class PluginLayout private constructor(
       return layout
     }
 
-    @JvmStatic
-    fun plugin(moduleNames: List<String>, body: (SimplePluginLayoutSpec) -> Unit): PluginLayout {
-      val layout = PluginLayout(mainModule = moduleNames.first())
+    fun pluginAuto(moduleName: String, body: (SimplePluginLayoutSpec) -> Unit): PluginLayout = pluginAuto(listOf(moduleName), body)
+
+    fun pluginAuto(moduleNames: List<String>, body: (SimplePluginLayoutSpec) -> Unit): PluginLayout {
+      val layout = PluginLayout(mainModule = moduleNames.first(), auto = true)
       layout.withModules(moduleNames)
-      body(SimplePluginLayoutSpec(layout))
+      val spec = SimplePluginLayoutSpec(layout)
+      body(spec)
+      layout.bundlingRestrictions = spec.bundlingRestrictions.build()
       return layout
     }
 
-    @JvmStatic
     fun plugin(moduleNames: List<String>): PluginLayout {
       val layout = PluginLayout(mainModule = moduleNames.first())
       layout.withModules(moduleNames)
@@ -132,22 +134,12 @@ class PluginLayout private constructor(
      * Project-level library is included in the plugin by default, if not yet included in the platform.
      * Direct main module dependencies in the same module group are included automatically.
      */
-    @Experimental
     fun pluginAuto(moduleNames: List<String>): PluginLayout {
       val layout = PluginLayout(mainModule = moduleNames.first(), auto = true)
       layout.withModules(moduleNames)
       return layout
     }
 
-    @Experimental
-    fun pluginAuto(moduleNames: List<String>, body: (SimplePluginLayoutSpec) -> Unit): PluginLayout {
-      val layout = PluginLayout(mainModule = moduleNames.first(), auto = true)
-      layout.withModules(moduleNames)
-      body(SimplePluginLayoutSpec(layout))
-      return layout
-    }
-
-    @JvmStatic
     fun plugin(mainModule: String): PluginLayout {
       val layout = PluginLayout(mainModule = mainModule)
       layout.withModule(mainModule)
@@ -171,6 +163,11 @@ class PluginLayout private constructor(
   }
 
   sealed class PluginLayoutBuilder(@JvmField protected val layout: PluginLayout) : BaseLayoutSpec(layout) {
+    /**
+     * Returns [PluginBundlingRestrictions] instance which can be used to exclude the plugin from some distributions.
+     */
+    val bundlingRestrictions: PluginBundlingRestrictions.Builder = PluginBundlingRestrictions.Builder()
+
     /**
      * @param resourcePath path to resource file or directory relative to the plugin's main module content root
      * @param relativeOutputPath target path relative to the plugin root directory
@@ -198,8 +195,7 @@ class PluginLayout private constructor(
     }
   }
 
-  @Experimental
-  class SimplePluginLayoutSpec(layout: PluginLayout) : PluginLayoutBuilder(layout)
+  class SimplePluginLayoutSpec internal constructor(layout: PluginLayout) : PluginLayoutBuilder(layout)
 
   // as a builder for PluginLayout, that ideally should be immutable
   class PluginLayoutSpec(layout: PluginLayout) : PluginLayoutBuilder(layout) {
@@ -219,11 +215,6 @@ class PluginLayout private constructor(
 
     val mainModule
       get() = layout.mainModule
-
-    /**
-     * Returns [PluginBundlingRestrictions] instance which can be used to exclude the plugin from some distributions.
-     */
-    val bundlingRestrictions: PluginBundlingRestrictions.Builder = PluginBundlingRestrictions.Builder()
 
     var mainJarName: String
       get() = layout.mainJarName

@@ -18,10 +18,10 @@ import java.net.URL
 
 @Internal
 abstract class OnboardingBackgroundImageProviderBase : OnboardingBackgroundImageProvider {
-  open fun getImageUrl(): URL? = null
+  open fun getImageUrl(isDark: Boolean): URL? = null
 
-  override fun getImage(): Image? {
-    val imageUrl = getImageUrl()?.takeIf { isAvailable && it.path.endsWith(".svg"); } ?: return null
+  override fun getImage(isDark: Boolean): Image? {
+    val imageUrl = getImageUrl(isDark)?.takeIf { isAvailable && it.path.endsWith(".svg"); } ?: return null
 
     val image: Image? = BackgroundTaskUtil.tryComputeFast(
       { progressIndicator ->
@@ -43,12 +43,20 @@ abstract class OnboardingBackgroundImageProviderBase : OnboardingBackgroundImage
   }
 
   override fun setBackgroundImageToDialog(dialog: DialogWrapper, image: Image?) {
+    var didHaveImage = false
+
     ClientProperty.get(dialog.rootPane, BACKGROUND_IMAGE_DISPOSABLE_KEY)?.let { previousDisposable ->
+      didHaveImage = true
       Disposer.dispose(previousDisposable)
       ClientProperty.remove(dialog.rootPane, BACKGROUND_IMAGE_DISPOSABLE_KEY)
     }
 
-    if (image == null) return
+    if (image == null) {
+      if (didHaveImage) {
+        dialog.rootPane.repaint()
+      }
+      return
+    }
 
     val disposable = Disposer.newDisposable(dialog.disposable)
     ClientProperty.put(dialog.rootPane, BACKGROUND_IMAGE_DISPOSABLE_KEY, disposable)
@@ -60,7 +68,12 @@ abstract class OnboardingBackgroundImageProviderBase : OnboardingBackgroundImage
                                                          1f,
                                                          JBInsets.emptyInsets(),
                                                          disposable)
+
+    dialog.rootPane.repaint()
   }
+
+  override fun hasBackgroundImage(dialog: DialogWrapper): Boolean =
+    ClientProperty.get(dialog.rootPane, BACKGROUND_IMAGE_DISPOSABLE_KEY) != null
 
   companion object {
     private val BACKGROUND_IMAGE_DISPOSABLE_KEY: Key<Disposable> = Key.create("ide.background.image.provider.background.image")

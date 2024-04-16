@@ -14,8 +14,8 @@ import com.intellij.openapi.util.ModificationTracker
 import com.intellij.platform.backend.navigation.NavigationTarget
 import com.intellij.pom.Navigatable
 import com.intellij.psi.PsiElement
+import com.intellij.psi.createSmartPointer
 import com.intellij.psi.util.PsiModificationTracker
-import com.intellij.refactoring.suggested.createSmartPointer
 import com.intellij.util.containers.Stack
 import com.intellij.webSymbols.*
 import com.intellij.webSymbols.completion.WebSymbolCodeCompletionItem
@@ -29,8 +29,6 @@ import javax.swing.Icon
 import kotlin.contracts.ExperimentalContracts
 import kotlin.contracts.InvocationKind
 import kotlin.contracts.contract
-
-val Project.psiModificationCount get() = PsiModificationTracker.getInstance(this).modificationCount
 
 @OptIn(ExperimentalContracts::class)
 inline fun <T : Any, P : Any> T.applyIfNotNull(param: P?, block: T.(P) -> T): T {

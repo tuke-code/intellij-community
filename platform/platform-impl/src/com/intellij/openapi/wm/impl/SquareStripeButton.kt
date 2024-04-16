@@ -43,8 +43,7 @@ internal abstract class AbstractSquareStripeButton(
     setLook(SquareStripeButtonLook(this))
     addMouseListener(object : PopupHandler() {
       override fun invokePopup(component: Component, x: Int, y: Int) {
-        val popupMenu = ActionManager.getInstance().createActionPopupMenu(ActionPlaces.TOOLWINDOW_POPUP, popupBuilder.invoke())
-        popupMenu.component.show(component, x, y)
+        showPopup(popupBuilder, component, x, y)
       }
     })
   }
@@ -65,6 +64,11 @@ internal abstract class AbstractSquareStripeButton(
     }
 
     buttonLook.paintLookBorder(g, rect, color)
+  }
+
+  protected open fun showPopup(popupBuilder: () -> ActionGroup, component: Component, x: Int, y: Int) {
+    val popupMenu = ActionManager.getInstance().createActionPopupMenu(ActionPlaces.TOOLWINDOW_POPUP, popupBuilder.invoke())
+    popupMenu.component.show(component, x, y)
   }
 }
 
@@ -136,9 +140,10 @@ internal class SquareStripeButton(action: SquareAnActionButton, val toolWindow: 
           val text = toolWindow.stripeShortTitleProvider?.get() ?: toolWindow.stripeTitleProvider.get()
           val button = this@SquareStripeButton
           val insets = button.insets
-          val x = insets.left + JBUI.scale(6)
+          val textOffset = if (UISettings.Companion.getInstance().compactMode) 6 else 8
+          val x = insets.left + JBUI.scale(textOffset)
           val y = iconPosition.y + JBUI.scale(2)
-          val totalWidth = button.width - insets.left - insets.right - JBUI.scale(12)
+          val totalWidth = button.width - insets.left - insets.right - JBUI.scale(textOffset * 2)
           val textWidth = SwingUtilities2.stringWidth(this@SquareStripeButton, fm, text)
           val textHeight = fm.height
 
@@ -189,6 +194,15 @@ internal class SquareStripeButton(action: SquareAnActionButton, val toolWindow: 
         }
       }
     })
+  }
+
+  override fun showPopup(popupBuilder: () -> ActionGroup, component: Component, x: Int, y: Int) {
+    if (ResizeStripeManager.enabled()) {
+      ResizeStripeManager.showPopup(popupBuilder.invoke(), component, x, y)
+    }
+    else {
+      super.showPopup(popupBuilder, component, x, y)
+    }
   }
 
   override fun paintButtonLook(g: Graphics?) {

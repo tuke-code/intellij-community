@@ -15,6 +15,7 @@ import it.unimi.dsi.fastutil.ints.IntList;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.function.IntPredicate;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -116,11 +117,16 @@ public abstract class BaseFilterLexer extends DelegateLexer implements IdTableBu
     myOccurenceMask = occurrenceMask;
     final int start = getTokenStart();
     final int end = getTokenEnd();
-    IdTableBuilding.scanWords(this, myCachedBufferSequence, myCachedArraySequence, start, end, mayHaveEscapes);
+    IdTableBuilding.scanWords(this, myCachedBufferSequence, myCachedArraySequence,
+                              start, end, mayHaveEscapes, getWordCodePointPredicate());
 
     if (mayHaveFileRefs) {
       processPossibleComplexFileName(myCachedBufferSequence, myCachedArraySequence, start, end);
     }
+  }
+
+  protected IntPredicate getWordCodePointPredicate() {
+    return IdTableBuilding::isWordCodePoint;
   }
 
   private void processPossibleComplexFileName(CharSequence chars, char[] cachedArraySequence, int startOffset, int endOffset) {

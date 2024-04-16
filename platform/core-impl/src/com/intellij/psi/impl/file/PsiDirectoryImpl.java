@@ -2,7 +2,6 @@
 package com.intellij.psi.impl.file;
 
 import com.intellij.core.CoreBundle;
-import com.intellij.ide.FileIconProvider;
 import com.intellij.ide.util.PsiNavigationSupport;
 import com.intellij.lang.ASTNode;
 import com.intellij.lang.Language;
@@ -33,8 +32,6 @@ import com.intellij.psi.search.PsiElementProcessor;
 import com.intellij.psi.search.PsiFileSystemItemProcessor;
 import com.intellij.psi.util.PsiUtilCore;
 import com.intellij.testFramework.LightVirtualFile;
-import com.intellij.ui.IconManager;
-import com.intellij.ui.PlatformIcons;
 import com.intellij.util.ArrayUtilRt;
 import com.intellij.util.IncorrectOperationException;
 import com.intellij.util.ThrowableRunnable;
@@ -42,7 +39,6 @@ import com.intellij.util.containers.ContainerUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import javax.swing.*;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -530,18 +526,6 @@ public class PsiDirectoryImpl extends PsiElementBase implements PsiDirectory, Qu
   @Override
   public void navigate(boolean requestFocus) {
     PsiNavigationSupport.getInstance().navigateToDirectory(this, requestFocus);
-  }
-
-  @Override
-  protected Icon getElementIcon(int flags) {
-    for (FileIconProvider provider : FileIconProvider.EP_NAME.getExtensionList()) {
-      Icon icon = provider.getIcon(myFile, flags, getProject());
-      if (icon != null) {
-        return icon;
-      }
-    }
-    return IconManager.getInstance().tooltipOnlyIfComposite(
-      IconManager.getInstance().getPlatformIcon(PlatformIcons.Folder));
   }
 
   @Override

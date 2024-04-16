@@ -72,6 +72,16 @@ class JKQualifiedExpression(
     override fun accept(visitor: JKVisitor) = visitor.visitQualifiedExpression(this)
 }
 
+class JKArrayAccessExpression(
+    receiver: JKExpression,
+    indexExpression: JKExpression,
+    override val expressionType: JKType? = null,
+) : JKExpression() {
+    var receiver: JKExpression by child(receiver)
+    var indexExpression: JKExpression by child(indexExpression)
+    override fun accept(visitor: JKVisitor) = visitor.visitArrayAccessExpression(this)
+}
+
 /**
  * @param shouldBePreserved - parentheses came from original Java code and should be preserved
  * (don't run "Remove unnecessary parentheses" inspection on them)
@@ -195,17 +205,26 @@ class JKDelegationConstructorCall(
     override fun accept(visitor: JKVisitor) = visitor.visitDelegationConstructorCall(this)
 }
 
+/**
+ * @param canMoveLambdaOutsideParentheses if the last argument is a lambda, it can definitely be printed outside parentheses.
+ * Can be set to `true` for some known library methods.
+ * But for arbitrary methods, we try to determine this information on a best-effort basis in the `JKCodeBuilder`.
+ */
 class JKCallExpressionImpl(
     override var identifier: JKMethodSymbol,
     arguments: JKArgumentList = JKArgumentList(),
     typeArgumentList: JKTypeArgumentList = JKTypeArgumentList(),
     override val expressionType: JKType? = null,
+    val canMoveLambdaOutsideParentheses: Boolean = false
 ) : JKCallExpression() {
     override var typeArgumentList by child(typeArgumentList)
     override var arguments by child(arguments)
     override fun accept(visitor: JKVisitor) = visitor.visitCallExpressionImpl(this)
 }
 
+/**
+ * @param canMoveLambdaOutsideParentheses - see [JKCallExpressionImpl.canMoveLambdaOutsideParentheses]
+ */
 class JKNewExpression(
     val classSymbol: JKClassSymbol,
     arguments: JKArgumentList,
@@ -213,6 +232,7 @@ class JKNewExpression(
     classBody: JKClassBody = JKClassBody(),
     val isAnonymousClass: Boolean = false,
     override val expressionType: JKType? = null,
+    val canMoveLambdaOutsideParentheses: Boolean = false
 ) : JKExpression() {
     var typeArgumentList by child(typeArgumentList)
     var arguments by child(arguments)

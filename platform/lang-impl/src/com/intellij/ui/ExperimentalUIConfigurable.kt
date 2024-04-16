@@ -14,6 +14,7 @@ import com.intellij.openapi.ui.DialogPanel
 import com.intellij.openapi.util.IconLoader
 import com.intellij.openapi.util.SystemInfo
 import com.intellij.platform.feedback.newUi.NewUIFeedbackDialog
+import com.intellij.toolWindow.ResizeStripeManager
 import com.intellij.ui.ExperimentalUI.Companion.getInstance
 import com.intellij.ui.components.JBCheckBox
 import com.intellij.ui.dsl.builder.*
@@ -69,8 +70,17 @@ open class ExperimentalUIConfigurable : BoundSearchableConfigurable(IdeBundle.me
         row {
           checkBox(IdeBundle.message("checkbox.compact.mode"))
             .bindSelected(UISettings.getInstance()::compactMode)
-            .enabledIf(newUiCheckBox.selected)
             .comment(IdeBundle.message("checkbox.compact.mode.description"))
+        }
+        if (ResizeStripeManager.enabled()) {
+          row {
+            checkBox(IdeBundle.message("checkbox.show.tool.window.names"))
+              .gap(RightGap.SMALL)
+              .bindSelected(UISettings.getInstance()::showToolWindowsNames).onApply {
+                ResizeStripeManager.applyShowNames()
+              }
+            icon(AllIcons.General.Beta)
+          }
         }
         if (!SystemInfo.isMac) {
           row {
@@ -80,10 +90,10 @@ open class ExperimentalUIConfigurable : BoundSearchableConfigurable(IdeBundle.me
                 if (SystemInfo.isUnix) {
                   comment(IdeBundle.message("ide.restart.required.comment"))
                 }
-              }.enabledIf(newUiCheckBox.selected)
+              }
           }
         }
-      }
+      }.enabledIf(newUiCheckBox.selected)
 
       separator()
         .topGap(TopGap.SMALL)

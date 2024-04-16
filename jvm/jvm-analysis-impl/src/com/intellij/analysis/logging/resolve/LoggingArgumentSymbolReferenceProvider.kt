@@ -10,96 +10,78 @@ import com.intellij.model.psi.PsiSymbolReferenceHints
 import com.intellij.model.psi.PsiSymbolReferenceProvider
 import com.intellij.model.search.SearchRequest
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.util.TextRange
-import com.intellij.psi.PsiLiteralExpression
-import com.siyeh.ig.psiutils.ExpressionUtils
-import org.jetbrains.uast.*
+import org.jetbrains.uast.UCallExpression
+import org.jetbrains.uast.UExpression
+import org.jetbrains.uast.expressions.UInjectionHost
+import org.jetbrains.uast.getParentOfType
+import org.jetbrains.uast.toUElementOfType
 
 class LoggingArgumentSymbolReferenceProvider : PsiSymbolReferenceProvider {
   override fun getReferences(element: PsiExternalReferenceHost, hints: PsiSymbolReferenceHints): Collection<PsiSymbolReference> {
-    if (!hintsCheck(hints)) return emptyList()
-
-    val literalExpression = element.toUElementOfType<UExpression>() ?: return emptyList()
+    val literalExpression = element.toUElementOfType<UInjectionHost>() ?: return emptyList()
     return getLogArgumentReferences(literalExpression) ?: emptyList()
   }
 
-  private fun hintsCheck(hints: PsiSymbolReferenceHints): Boolean {
-    if (!hints.referenceClass.isAssignableFrom(LoggingArgumentSymbolReference::class.java)) return false
-    val targetClass = hints.targetClass
-    if (targetClass != null && !targetClass.isAssignableFrom(LoggingArgumentSymbol::class.java)) return false
-    val target = hints.target
-    return target == null || target is LoggingArgumentSymbol
-  }
-
-  override fun getSearchRequests(project: Project, target: Symbol): Collection<SearchRequest> {
-    return listOf()
-  }
+  override fun getSearchRequests(project: Project, target: Symbol): Collection<SearchRequest> = emptyList()
 }
 
 fun getLogArgumentReferences(uExpression: UExpression): List<PsiSymbolReference>? {
   val context = getContext(uExpression) ?: return null
-  val ranges = getAlignedRanges(uExpression, context) ?: return null
+  val ranges = getPlaceholderRanges(context) ?: return null
 
   val psiLiteralExpression = uExpression.sourcePsi ?: return null
-  val placeholderParametersSize = context.placeholderParameters.size
 
-  val loggerReferenceList = ranges.zip(context.placeholderParameters) { range, parameter ->
+  val loggerReferenceList = ranges.zip(context.placeholderParameters) { placeholderRanges, parameter ->
     val parameterPsi = parameter.sourcePsi ?: return null
-    LoggingArgumentSymbolReference(psiLiteralExpression, range, parameterPsi)
-  }
+    placeholderRanges.ranges.map { range ->
+      if (range == null) return null
+      LoggingArgumentSymbolReference(psiLiteralExpression, range, parameterPsi)
+    }
+  }.flatten()
 
+  return getAlignedPlaceholderCount(loggerReferenceList, context)
+}
+
+internal fun getContext(uExpression: UExpression): PlaceholderContext? {
+  val uCallExpression = uExpression.getParentOfType<UCallExpression>() ?: return null
+  val logMethod = detectLoggerMethod(uCallExpression) ?: return null
+
+  val context = getPlaceholderContext(logMethod, LOGGER_RESOLVE_TYPE_SEARCHERS)
+  if (uExpression != context?.logStringArgument || context.partHolderList.size != 1) return null
+  return context
+}
+
+internal fun <T> getAlignedPlaceholderCount(placeholderList: List<T>, context: PlaceholderContext): List<T>? {
+  val placeholderParametersSize = context.placeholderParameters.size
   return when (context.loggerType) {
     SLF4J -> {
-      loggerReferenceList.take(if (context.lastArgumentIsException) placeholderParametersSize - 1 else placeholderParametersSize)
+      placeholderList.take(if (context.lastArgumentIsException) placeholderParametersSize - 1 else placeholderParametersSize)
     }
     LOG4J_OLD_STYLE, LOG4J_FORMATTED_STYLE -> {
       if (context.lastArgumentIsException && placeholderParametersSize == 1) {
         emptyList()
       }
       else {
-        loggerReferenceList
+        placeholderList
       }
     }
     SLF4J_EQUAL_PLACEHOLDERS, LOG4J_EQUAL_PLACEHOLDERS -> {
-      loggerReferenceList
+      placeholderList
     }
     else -> null
   }
 }
 
-internal fun getContext(uExpression: UExpression): PlaceholderContext? {
-  val uCallExpression = uExpression.getParentOfType<UCallExpression>() ?: return null
-  val log4jHasImplementationForSlf4j = LoggingUtil.hasBridgeFromSlf4jToLog4j2(uCallExpression)
-
-  val logMethod = detectLoggerMethod(uCallExpression) ?: return null
-
-  val context = getPlaceholderContext(logMethod, LOGGER_RESOLVE_TYPE_SEARCHERS, log4jHasImplementationForSlf4j)
-  if (uExpression != context?.logStringArgument || context.partHolderList.size > 1) return null
-  return context
-}
-
-internal fun getAlignedRanges(uExpression: UExpression, context: PlaceholderContext) : List<TextRange>? {
-  val placeholderCountResult = solvePlaceholderCount(context.loggerType, context.placeholderParameters.size, context.partHolderList)
+internal fun getPlaceholderRanges(context: PlaceholderContext): List<PlaceholderRanges>? {
+  val logStringText = context.logStringArgument.sourcePsi?.text ?: return null
+  val partHolders = listOf(
+    LoggingStringPartEvaluator.PartHolder(
+      logStringText,
+      true
+    )
+  )
+  val placeholderCountResult = solvePlaceholderCount(context.loggerType, context.placeholderParameters.size, partHolders)
   if (placeholderCountResult.status != PlaceholdersStatus.EXACTLY) return null
 
-  return placeholderCountResult.placeholderRangeList.map {range ->
-    if (range == null) return null
-    getAlignedRangeInLiteralExpression(uExpression, range) ?: return null
-  }
-}
-
-private fun getAlignedRangeInLiteralExpression(uExpression: UExpression, range: TextRange?): TextRange? {
-  if (range == null) return null
-  val psiLiteralExpression = uExpression.sourcePsi ?: return null
-  return if (psiLiteralExpression is PsiLiteralExpression) {
-    ExpressionUtils.findStringLiteralRange(psiLiteralExpression, range.startOffset, range.endOffset)
-  }
-  else {
-    val text = psiLiteralExpression.text
-    if (text == null) return null
-    val value = uExpression.evaluateString() ?: return null
-    val offset = text.indexOf(value)
-    if (offset == -1) return null
-    range.shiftRight(offset)
-  }
+  return placeholderCountResult.placeholderRangesList
 }

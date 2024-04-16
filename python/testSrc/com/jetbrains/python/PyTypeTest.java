@@ -1125,6 +1125,27 @@ public class PyTypeTest extends PyTestCase {
     );
   }
 
+  // PY-52760
+  public void testTupleLiteralDestructuringAssignmentToDict() {
+    doTest(
+      "Dict[str, int]",
+      """
+        expr = {}
+        expr["a"], _ = (1, 2)
+        """
+    );
+  }
+
+  public void testListLiteralDestructuringAssignmentToDict() {
+    doTest(
+      "Dict[str, int]",
+      """
+        expr = {}
+        expr["a"], _ = [1, 2]
+        """
+    );
+  }
+
   public void testConstructorUnification() {
     doTest("C[int]",
            """
@@ -4543,6 +4564,11 @@ public class PyTypeTest extends PyTestCase {
 
              c = User1(10)
              expr = c.get()""");
+  }
+
+  // PY-28076
+  public void testAssignmentParens() {
+    doTest("int", "((expr)) = 42");
   }
 
   private static List<TypeEvalContext> getTypeEvalContexts(@NotNull PyExpression element) {

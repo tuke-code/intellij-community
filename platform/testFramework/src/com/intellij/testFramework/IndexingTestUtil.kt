@@ -1,6 +1,7 @@
 // Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.testFramework
 
+import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationListener
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.thisLogger
@@ -21,7 +22,7 @@ class IndexingTestUtil(private val project: Project) {
     if (project.isDisposed) return
 
     val listenerDisposable = Disposer.newDisposable()
-    val parentDisposable = UnindexedFilesScannerExecutor.getInstance(project)
+    val parentDisposable = UnindexedFilesScannerExecutor.getInstance(project) as Disposable
     Disposer.register(parentDisposable, listenerDisposable)
 
     ApplicationManager.getApplication().addApplicationListener(object : ApplicationListener {
@@ -50,7 +51,8 @@ class IndexingTestUtil(private val project: Project) {
         at com.intellij.openapi.application.WriteAction.compute(WriteAction.java:95)
         ...
        */
-      // non-volatile: only updated on writing thread
+      // Volatile: any thread could be write thread
+      @Volatile
       private var nested: Int = 1 // 1 because at least one write action is currently happenings
 
       override fun beforeWriteActionStart(action: Any) {
@@ -80,7 +82,7 @@ class IndexingTestUtil(private val project: Project) {
       thisLogger().info("waitNow will be waiting, thread=${Thread.currentThread()}", Throwable())
     }
 
-    if (ApplicationManager.getApplication().isWriteIntentLockAcquired) {
+    if (ApplicationManager.getApplication().isDispatchThread) {
       val scope = GlobalScope.namedChildScope("Indexing waiter", Dispatchers.IO)
       val waiting = scope.launch { suspendUntilIndexesAreReady() }
       try {

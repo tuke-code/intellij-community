@@ -18,6 +18,7 @@ import org.jetbrains.kotlin.idea.base.codeInsight.KotlinNameSuggester
 import org.jetbrains.kotlin.idea.base.psi.imports.addImport
 import org.jetbrains.kotlin.idea.base.psi.kotlinFqName
 import org.jetbrains.kotlin.idea.base.psi.replaced
+import org.jetbrains.kotlin.idea.base.util.quoteIfNeeded
 import org.jetbrains.kotlin.idea.kdoc.KDocElementFactory
 import org.jetbrains.kotlin.idea.refactoring.rename.KtReferenceMutateServiceBase
 import org.jetbrains.kotlin.idea.references.KDocReference
@@ -84,8 +85,9 @@ internal class K2ReferenceMutateService : KtReferenceMutateServiceBase() {
             if (targetElement != null) { // if we are already referencing the target, there is no need to call bindToElement
                 if (simpleNameReference.isReferenceTo(targetElement)) return expression
             } else {
+                // Here we assume that the passed fqName uniquely identifiers the new target element
                 val oldTarget = simpleNameReference.resolve()
-                if (oldTarget?.isCallableAsExtensionFunction() == null && oldTarget?.kotlinFqName == fqName) return expression
+                if (oldTarget?.kotlinFqName == fqName) return expression
             }
             if (fqName.isRoot) return expression
             val writableFqn = if (fqName.pathSegments().last().asString() == SpecialNames.DEFAULT_NAME_FOR_COMPANION_OBJECT.asString()) {
@@ -168,7 +170,7 @@ internal class K2ReferenceMutateService : KtReferenceMutateServiceBase() {
     private fun KtExpression.replaceWithQualified(fqName: FqName, selectorExpression: KtExpression): KtExpression {
         val parentFqName = fqName.parent()
         if (parentFqName.isRoot) return replaced(selectorExpression)
-        val packageName = fqName.parent().asString()
+        val packageName = fqName.parent().quoteIfNeeded().asString()
         val newQualifiedExpression = KtPsiFactory(project).createExpression("$packageName.${selectorExpression.text}")
         return replaced(newQualifiedExpression)
     }

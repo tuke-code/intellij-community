@@ -1,4 +1,4 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.kotlin.idea.k2.refactoring.move
 
 import com.intellij.openapi.application.runWriteAction
@@ -255,5 +255,44 @@ class K2MoveModelTest : KotlinLightCodeInsightFixtureTestCase() {
         assertThrows(RefactoringErrorHintException::class.java) {
             K2MoveModel.create(arrayOf(fooFile, barFile), fooBarFile)
         }
+    }
+
+    fun `test moving declarations from multiple files should fail`() {
+        PsiTestUtil.addSourceRoot(module, myFixture.getTempDirFixture().getFile("")!!)
+        val fooFun = (myFixture.addFileToProject("Foo.kt", """
+            fun foo { }
+        """.trimIndent()) as KtFile).declarations.single()
+        val barFun = (myFixture.addFileToProject("Bar.kt", """
+            fun bar { }
+        """.trimIndent()) as KtFile).declarations.single()
+        assertThrows(RefactoringErrorHintException::class.java) {
+            K2MoveModel.create(arrayOf(fooFun, barFun), null)
+        }
+    }
+
+    fun `test moving file with declaration from different file should fail`() {
+        PsiTestUtil.addSourceRoot(module, myFixture.getTempDirFixture().getFile("")!!)
+        val fooFile = myFixture.addFileToProject("Foo.kt", """
+            fun foo { }
+        """.trimIndent()) as KtFile
+        val barFun = (myFixture.addFileToProject("Bar.kt", """
+            fun bar { }
+        """.trimIndent()) as KtFile).declarations.single()
+        assertThrows(RefactoringErrorHintException::class.java) {
+            K2MoveModel.create(arrayOf(fooFile, barFun), null)
+        }
+    }
+
+    fun `test move declaration and containing file`() {
+        PsiTestUtil.addSourceRoot(module, myFixture.getTempDirFixture().getFile("")!!)
+        val fooFile = myFixture.addFileToProject("Foo.kt", """
+            class Foo { }
+        """.trimIndent()) as KtFile
+        val moveModel = K2MoveModel.create(arrayOf(fooFile, fooFile.declarations.first()), null)
+        assertInstanceOf<K2MoveModel.Declarations>(moveModel)
+        val moveDeclarationsModel = moveModel as K2MoveModel.Declarations
+        assertSize(1, moveDeclarationsModel.source.elements)
+        val sourceElement = moveDeclarationsModel.source.elements.firstOrNull()
+        assert(sourceElement is KtClass && sourceElement.name == "Foo")
     }
 }

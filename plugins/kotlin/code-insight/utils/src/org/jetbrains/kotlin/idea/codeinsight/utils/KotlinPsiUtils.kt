@@ -8,11 +8,10 @@ import com.intellij.psi.PsiMethod
 import com.intellij.psi.tree.IElementType
 import org.jetbrains.kotlin.KtNodeTypes
 import org.jetbrains.kotlin.analysis.api.KtAnalysisSession
-import org.jetbrains.kotlin.analysis.api.analyze
 import org.jetbrains.kotlin.analysis.api.calls.singleFunctionCallOrNull
 import org.jetbrains.kotlin.analysis.api.calls.symbol
-import org.jetbrains.kotlin.analysis.api.symbols.KtCallableSymbol
 import org.jetbrains.kotlin.analysis.api.symbols.KtSymbolOrigin
+import org.jetbrains.kotlin.builtins.StandardNames
 import org.jetbrains.kotlin.idea.base.psi.copied
 import org.jetbrains.kotlin.idea.base.psi.deleteBody
 import org.jetbrains.kotlin.idea.base.psi.replaced
@@ -23,6 +22,7 @@ import org.jetbrains.kotlin.lexer.KtSingleValueToken
 import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.name.FqName
+import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.name.StandardClassIds
 import org.jetbrains.kotlin.parsing.*
 import org.jetbrains.kotlin.psi.*
@@ -356,27 +356,40 @@ fun KtExpression.isSynthesizedFunction(): Boolean {
     return symbol.origin == KtSymbolOrigin.SOURCE_MEMBER_GENERATED
 }
 
-fun KtCallExpression.isCalling(fqNames: List<FqName>): Boolean {
+context(KtAnalysisSession)
+fun KtCallExpression.isCalling(fqNames: Sequence<FqName>): Boolean {
     val calleeText = calleeExpression?.text ?: return false
     val targetFqNames = fqNames.filter { it.shortName().asString() == calleeText }
-    if (targetFqNames.isEmpty()) return false
-    return analyze(this) {
-        val symbol = resolveCall()?.singleFunctionCallOrNull()?.partiallyAppliedSymbol?.symbol as? KtCallableSymbol ?: return false
-        targetFqNames.any { symbol.callableIdIfNonLocal?.asSingleFqName() == it }
-    }
+    if (targetFqNames.none()) return false
+
+    val fqName = resolveCall()
+        ?.singleFunctionCallOrNull()
+        ?.partiallyAppliedSymbol
+        ?.symbol
+        ?.callableIdIfNonLocal
+        ?.asSingleFqName()
+        ?: return false
+    return targetFqNames.any { it == fqName }
 }
 
-private val KOTLIN_BUILTIN_ENUM_FUNCTIONS = listOf(FqName("kotlin.enumValues"), FqName("kotlin.enumValueOf"))
+operator fun FqName.plus(name: Name): FqName = child(name)
+
+operator fun FqName.plus(name: String): FqName = this + Name.identifier(name)
+
+private val KOTLIN_BUILTIN_ENUM_FUNCTION_FQ_NAMES: Sequence<FqName> = sequenceOf(
+    "enumValues",
+    "enumValueOf",
+).map { StandardNames.BUILT_INS_PACKAGE_FQ_NAME + it }
 
 context(KtAnalysisSession)
 fun KtTypeReference.isReferenceToBuiltInEnumFunction(): Boolean {
     val target = (parent.getStrictParentOfType<KtTypeArgumentList>() ?: this)
         .getParentOfTypes(true, KtCallExpression::class.java, KtCallableDeclaration::class.java)
     return when (target) {
-        is KtCallExpression -> target.isCalling(KOTLIN_BUILTIN_ENUM_FUNCTIONS)
+        is KtCallExpression -> target.isCalling(KOTLIN_BUILTIN_ENUM_FUNCTION_FQ_NAMES)
         is KtCallableDeclaration -> {
             target.anyDescendantOfType<KtCallExpression> {
-                it.isCalling(KOTLIN_BUILTIN_ENUM_FUNCTIONS) && it.isUsedAsExpression()
+                it.isCalling(KOTLIN_BUILTIN_ENUM_FUNCTION_FQ_NAMES) && it.isUsedAsExpression()
             }
         }
 

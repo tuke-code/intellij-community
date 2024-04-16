@@ -439,6 +439,12 @@ public abstract class ModifiableWorkspaceEntityBase<T : WorkspaceEntity, E: Work
     }
   }
 
+  protected fun checkModificationAllowed(fieldName: String) {
+    if (diff != null && !modifiable.get()) {
+      throw IllegalStateException("Modifications are allowed inside `modifyEntity` method only! Modified field: ${this.javaClass.simpleName}#$fieldName")
+    }
+  }
+
   public abstract fun getEntityClass(): Class<T>
 
   public open fun applyToBuilder(builder: MutableEntityStorage) {
@@ -584,7 +590,7 @@ public interface SoftLinkable {
   public fun updateLink(oldLink: SymbolicEntityId<*>, newLink: SymbolicEntityId<*>): Boolean
 }
 
-public abstract class WorkspaceEntityData<E : WorkspaceEntity> : Cloneable, SerializableEntityData {
+public abstract class WorkspaceEntityData<E : WorkspaceEntity> : Cloneable {
   public lateinit var entitySource: EntitySource
   public var id: Int = -1
 
@@ -660,14 +666,5 @@ public abstract class WorkspaceEntityData<E : WorkspaceEntity> : Cloneable, Seri
 
   public open fun getRequiredParents(): List<Class<out WorkspaceEntity>> {
     throw NotImplementedError()
-  }
-
-  /**
-   * Temporally solution.
-   * Get symbolic Id without creating of TypedEntity. Should be in sync with TypedEntityWithSymbolicId.
-   * But it doesn't everywhere. E.g. FacetEntity where we should resolve module before creating symbolic id.
-   */
-  public abstract class WithCalculableSymbolicId<E : WorkspaceEntity> : WorkspaceEntityData<E>() {
-    public abstract fun symbolicId(): SymbolicEntityId<*>
   }
 }

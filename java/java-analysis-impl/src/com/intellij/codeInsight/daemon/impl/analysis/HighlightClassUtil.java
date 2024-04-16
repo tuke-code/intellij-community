@@ -542,7 +542,7 @@ public final class HighlightClassUtil {
       if (isExtends) {
         String description = JavaErrorBundle.message(aClass.isRecord() ? "record.extends" : "extends.after.enum");
         HighlightInfo.Builder info =
-          HighlightInfo.newHighlightInfo(HighlightInfoType.ERROR).range(list).descriptionAndTooltip(description);
+          HighlightInfo.newHighlightInfo(HighlightInfoType.ERROR).range(list.getFirstChild()).descriptionAndTooltip(description);
         IntentionAction action = QuickFixFactory.getInstance().createDeleteFix(list);
         info.registerFix(action, null, null, null, null);
         return info;
@@ -557,7 +557,7 @@ public final class HighlightClassUtil {
       if (isImplements) {
         String description = JavaErrorBundle.message("implements.after.interface");
         HighlightInfo.Builder result =
-          HighlightInfo.newHighlightInfo(HighlightInfoType.ERROR).range(list).descriptionAndTooltip(description);
+          HighlightInfo.newHighlightInfo(HighlightInfoType.ERROR).range(list.getFirstChild()).descriptionAndTooltip(description);
         PsiClassType[] referencedTypes = list.getReferencedTypes();
         if (referencedTypes.length > 0) {
           IntentionAction action = QuickFixFactory.getInstance().createChangeExtendsToImplementsFix(aClass, referencedTypes[0]);
@@ -1211,12 +1211,12 @@ public final class HighlightClassUtil {
     PsiIdentifier nameIdentifier = aClass.getNameIdentifier();
     if (nameIdentifier == null) return;
     if (aClass.isEnum() || aClass.isRecord() || aClass.isAnnotationType()) {
-      String description = aClass.isEnum() ? JavaErrorBundle.message("permits.after.enum") : null;
-      if (description == null) {
-        description = JavaErrorBundle.message(aClass.isRecord() ? "record.permits" : "annotation.type.permits");
-      }
+      String description;
+      if (aClass.isEnum()) description = JavaErrorBundle.message("permits.after.enum");
+      else if (aClass.isRecord()) description = JavaErrorBundle.message("record.permits");
+      else description = JavaErrorBundle.message("annotation.type.permits");
       HighlightInfo.Builder builder = HighlightInfo.newHighlightInfo(HighlightInfoType.ERROR)
-        .range(list)
+        .range(list.getFirstChild())
         .descriptionAndTooltip(description);
       IntentionAction action = QuickFixFactory.getInstance().createDeleteFix(list);
       builder.registerFix(action, null, null, null, null);

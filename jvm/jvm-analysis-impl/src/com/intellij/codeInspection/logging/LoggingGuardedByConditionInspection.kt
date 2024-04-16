@@ -17,6 +17,7 @@ import com.intellij.psi.PsiWhiteSpace
 import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.uast.UastHintedVisitorAdapter
 import org.jetbrains.uast.*
+import org.jetbrains.uast.generate.UastCodeGenerationPlugin
 import org.jetbrains.uast.generate.replace
 import org.jetbrains.uast.visitor.AbstractUastNonRecursiveVisitor
 import org.jetbrains.uast.visitor.AbstractUastVisitor
@@ -137,7 +138,13 @@ class LoggingGuardedByConditionInspection : AbstractBaseUastLocalInspectionTool(
         uIfExpression.replace(thenExpression)
         return
       }
+
+
       val ifStatementSourcePsi = uIfExpression.sourcePsi ?: return
+
+      val uastCodeGenerationPlugin = UastCodeGenerationPlugin.byLanguage(ifStatementSourcePsi.language)
+
+      val commentSaver = uastCodeGenerationPlugin?.grabComments(uIfExpression)
 
       val expressions = thenExpression.expressions
       if (expressions.isEmpty()) return
@@ -151,6 +158,7 @@ class LoggingGuardedByConditionInspection : AbstractBaseUastLocalInspectionTool(
       if (nextExpression == null) return
       while (true) {
         if (nextExpression == null) break
+        commentSaver?.markUnchanged(nextExpression.toUElement())
         var newAdded: PsiElement = currentParent.addAfter(nextExpression.copy(), after)
         if (nextExpression is PsiWhiteSpace) {
           while (newAdded.nextSibling !is PsiWhiteSpace) {
@@ -166,6 +174,10 @@ class LoggingGuardedByConditionInspection : AbstractBaseUastLocalInspectionTool(
         nextExpression = nextExpression.nextSibling ?: break
       }
       ifStatementSourcePsi.delete()
+      val uElement = after.toUElement()
+      if (uElement != null) {
+        commentSaver?.restore(uElement)
+      }
     }
   }
 }

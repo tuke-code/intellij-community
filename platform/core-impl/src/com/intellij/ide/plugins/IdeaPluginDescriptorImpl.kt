@@ -46,6 +46,7 @@ class IdeaPluginDescriptorImpl(
   id: PluginId?,
   @JvmField val moduleName: String?,
   @JvmField val useCoreClassLoader: Boolean = false,
+  @JvmField var isDependentOnCoreClassLoader: Boolean = true,
 ) : IdeaPluginDescriptor {
   private val id: PluginId = id ?: PluginId.getId(raw.id ?: raw.name ?: throw RuntimeException("Neither id nor name are specified"))
   private val name = raw.name ?: id?.idString ?: raw.id
@@ -160,7 +161,7 @@ class IdeaPluginDescriptorImpl(
   val dependencies: ModuleDependenciesDescriptor = raw.dependencies
 
   @JvmField
-  var modules: List<PluginId> = raw.modules ?: Java11Shim.INSTANCE.listOf()
+  var pluginAliases: List<PluginId> = raw.pluginAliases ?: Java11Shim.INSTANCE.listOf()
 
   private val descriptionChildText = raw.description
 
@@ -194,7 +195,7 @@ class IdeaPluginDescriptorImpl(
 
   override fun getPluginPath(): Path = path
 
-  private fun createSub(
+  internal fun createSub(
     raw: RawPluginDescriptor,
     descriptorPath: String,
     context: DescriptorListLoadingContext,
@@ -208,6 +209,7 @@ class IdeaPluginDescriptorImpl(
       id = id,
       moduleName = moduleName,
       useCoreClassLoader = useCoreClassLoader,
+      isDependentOnCoreClassLoader = raw.isDependentOnCoreClassLoader,
     )
     context.debugData?.recordDescriptorPath(descriptor = result, rawPluginDescriptor = raw, path = descriptorPath)
     result.descriptorPath = descriptorPath
@@ -228,24 +230,22 @@ class IdeaPluginDescriptorImpl(
     context: DescriptorListLoadingContext,
     dataLoader: DataLoader,
   ) {
-    // include module file descriptor if not specified as `depends` (old way - xi:include)
-    // must be first because merged into raw descriptor
     for (module in content.modules) {
       val subDescriptorFile = module.configFile ?: "${module.name}.xml"
-      val subDescriptor = createSub(
-        raw = pathResolver.resolveModuleFile(
-          readContext = context,
-          dataLoader = dataLoader,
-          path = subDescriptorFile,
-          readInto = null,
-        ),
-        descriptorPath = subDescriptorFile,
-        context = context,
-        moduleName = module.name,
-      )
+      val subRaw = pathResolver.resolveModuleFile(readContext = context, dataLoader = dataLoader, path = subDescriptorFile, readInto = null)
+      val subDescriptor = createSub(raw = subRaw, descriptorPath = subDescriptorFile, context = context, moduleName = module.name)
       module.descriptor = subDescriptor
     }
 
+    initByRawDescriptor(raw = raw, context = context, pathResolver = pathResolver, dataLoader = dataLoader)
+  }
+
+  internal fun initByRawDescriptor(
+    raw: RawPluginDescriptor,
+    context: DescriptorListLoadingContext,
+    pathResolver: PathResolver,
+    dataLoader: DataLoader,
+  ) {
     if (raw.resourceBundleBaseName != null) {
       if (id == PluginManagerCore.CORE_ID) {
         LOG.warn("<resource-bundle>${raw.resourceBundleBaseName}</resource-bundle> tag is found in an xml descriptor" +
@@ -261,13 +261,13 @@ class IdeaPluginDescriptorImpl(
     }
 
     if (id == PluginManagerCore.CORE_ID) {
-      modules = modules + IdeaPluginOsRequirement.getHostOsModuleIds()
+      pluginAliases = pluginAliases + IdeaPluginOsRequirement.getHostOsModuleIds()
       if (!AppMode.isRemoteDevHost()) {
         // Dependency on this ID may be used to enable some functionality in the local IDE
         // and in JetBrains Client, but disable it in product running in backend mode.
         // This is needed because the backend process currently doesn't use module-based loader and therefore cannot
         // use marker modules from ProductModes.
-        modules = modules + PluginId.getId("com.intellij.platform.experimental.frontend")
+        pluginAliases = pluginAliases + PluginId.getId("com.intellij.platform.experimental.frontend")
       }
     }
 

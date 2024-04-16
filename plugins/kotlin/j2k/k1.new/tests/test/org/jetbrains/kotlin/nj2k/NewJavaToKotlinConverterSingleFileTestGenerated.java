@@ -305,6 +305,11 @@ public abstract class NewJavaToKotlinConverterSingleFileTestGenerated extends Ab
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
 
+        @TestMetadata("assignment.java")
+        public void testAssignment() throws Exception {
+            runTest("../../shared/tests/testData/newJ2k/arrayAccessExpression/assignment.java");
+        }
+
         @TestMetadata("expressionIndex.java")
         public void testExpressionIndex() throws Exception {
             runTest("../../shared/tests/testData/newJ2k/arrayAccessExpression/expressionIndex.java");
@@ -794,6 +799,21 @@ public abstract class NewJavaToKotlinConverterSingleFileTestGenerated extends Ab
         @TestMetadata("boolean.java")
         public void testBoolean() throws Exception {
             runTest("../../shared/tests/testData/newJ2k/boxedType/boolean.java");
+        }
+
+        @TestMetadata("booleanStaticMember.java")
+        public void testBooleanStaticMember() throws Exception {
+            runTest("../../shared/tests/testData/newJ2k/boxedType/booleanStaticMember.java");
+        }
+
+        @TestMetadata("booleanStaticMember2.java")
+        public void testBooleanStaticMember2() throws Exception {
+            runTest("../../shared/tests/testData/newJ2k/boxedType/booleanStaticMember2.java");
+        }
+
+        @TestMetadata("booleanStaticMember3.java")
+        public void testBooleanStaticMember3() throws Exception {
+            runTest("../../shared/tests/testData/newJ2k/boxedType/booleanStaticMember3.java");
         }
 
         @TestMetadata("Boxing.java")
@@ -2275,6 +2295,11 @@ public abstract class NewJavaToKotlinConverterSingleFileTestGenerated extends Ab
         @TestMetadata("needInitializer.java")
         public void testNeedInitializer() throws Exception {
             runTest("../../shared/tests/testData/newJ2k/field/needInitializer.java");
+        }
+
+        @TestMetadata("nonConstInitializer.java")
+        public void testNonConstInitializer() throws Exception {
+            runTest("../../shared/tests/testData/newJ2k/field/nonConstInitializer.java");
         }
 
         @TestMetadata("privateField.java")
@@ -4763,6 +4788,11 @@ public abstract class NewJavaToKotlinConverterSingleFileTestGenerated extends Ab
             runTest("../../shared/tests/testData/newJ2k/nullability/FieldInitializedWithNull.java");
         }
 
+        @TestMetadata("FieldWithTypeUseAnnotationAndInitializer.java")
+        public void testFieldWithTypeUseAnnotationAndInitializer() throws Exception {
+            runTest("../../shared/tests/testData/newJ2k/nullability/FieldWithTypeUseAnnotationAndInitializer.java");
+        }
+
         @TestMetadata("IndirectOverride.java")
         public void testIndirectOverride() throws Exception {
             runTest("../../shared/tests/testData/newJ2k/nullability/IndirectOverride.java");
@@ -5141,11 +5171,6 @@ public abstract class NewJavaToKotlinConverterSingleFileTestGenerated extends Ab
             runTest("../../shared/tests/testData/newJ2k/postProcessing/IfToSafeCall.java");
         }
 
-        @TestMetadata("java8MapForEachWithFullJdk.java")
-        public void testJava8MapForEachWithFullJdk() throws Exception {
-            runTest("../../shared/tests/testData/newJ2k/postProcessing/java8MapForEachWithFullJdk.java");
-        }
-
         @TestMetadata("JoinDeclarationAndAssignment.java")
         public void testJoinDeclarationAndAssignment() throws Exception {
             runTest("../../shared/tests/testData/newJ2k/postProcessing/JoinDeclarationAndAssignment.java");
@@ -5169,6 +5194,11 @@ public abstract class NewJavaToKotlinConverterSingleFileTestGenerated extends Ab
         @TestMetadata("LiftReturnSingleStatement.java")
         public void testLiftReturnSingleStatement() throws Exception {
             runTest("../../shared/tests/testData/newJ2k/postProcessing/LiftReturnSingleStatement.java");
+        }
+
+        @TestMetadata("MapForEach.java")
+        public void testMapForEach() throws Exception {
+            runTest("../../shared/tests/testData/newJ2k/postProcessing/MapForEach.java");
         }
 
         @TestMetadata("MapGetOrDefault.java")

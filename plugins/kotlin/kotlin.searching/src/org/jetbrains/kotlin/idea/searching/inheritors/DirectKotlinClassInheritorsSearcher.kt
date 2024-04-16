@@ -11,10 +11,13 @@ import com.intellij.util.Processor
 import com.intellij.util.Query
 import com.intellij.util.concurrency.annotations.RequiresReadLock
 import org.jetbrains.kotlin.analysis.api.analyze
+import org.jetbrains.kotlin.analysis.api.symbols.KtTypeAliasSymbol
 import org.jetbrains.kotlin.analysis.api.symbols.markers.KtNamedSymbol
+import org.jetbrains.kotlin.analysis.api.types.KtUsualClassType
 import org.jetbrains.kotlin.idea.base.projectStructure.scope.KotlinSourceFilterScope
 import org.jetbrains.kotlin.idea.stubindex.KotlinSuperClassIndex
 import org.jetbrains.kotlin.idea.stubindex.KotlinTypeAliasByExpansionShortNameIndex
+import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.psi.KtClass
 import org.jetbrains.kotlin.psi.KtClassOrObject
 import org.jetbrains.kotlin.psi.KtEnumEntry
@@ -92,7 +95,10 @@ internal class DirectKotlinClassInheritorsSearcher : Searcher<DirectKotlinClassI
                         return false
                     }
 
-                    return ktSymbol.isDirectSubClassOf(baseSymbol)
+                    fun KtUsualClassType.classIdWithExpandedTypeAlias(): ClassId? =
+                        ((classSymbol as? KtTypeAliasSymbol)?.expandedType as? KtUsualClassType)?.classId ?: classId
+
+                    return ktSymbol.superTypes.any { it is KtUsualClassType && (it.classSymbol == baseSymbol || it.classIdWithExpandedTypeAlias() == baseSymbol.classIdIfNonLocal) }
                 }
             }
         }

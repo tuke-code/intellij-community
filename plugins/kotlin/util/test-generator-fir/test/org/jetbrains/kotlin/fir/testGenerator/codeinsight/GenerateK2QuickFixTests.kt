@@ -5,18 +5,20 @@ import org.jetbrains.kotlin.idea.k2.codeinsight.fixes.AbstractHighLevelQuickFixM
 import org.jetbrains.kotlin.idea.k2.codeinsight.fixes.AbstractHighLevelQuickFixMultiModuleTest
 import org.jetbrains.kotlin.idea.k2.codeinsight.fixes.AbstractHighLevelQuickFixTest
 import org.jetbrains.kotlin.testGenerator.model.*
+import org.jetbrains.kotlin.testGenerator.model.GroupCategory.*
 import org.jetbrains.kotlin.testGenerator.model.Patterns.DIRECTORY
 import org.jetbrains.kotlin.testGenerator.model.Patterns.KT_WITHOUT_DOTS
 
 internal fun MutableTWorkspace.generateK2FixTests() {
     val idea = "idea/tests/testData/"
-    testGroup("code-insight/fixes-k2/tests", testDataPath = "../../..") {
+    testGroup("code-insight/fixes-k2/tests", category = QUICKFIXES, testDataPath = "../../..") {
         testClass<AbstractHighLevelQuickFixTest> {
             val pattern = Patterns.forRegex("^([\\w\\-_]+)\\.kt$")
             model("$idea/quickfix/abstract", pattern = pattern)
             model("$idea/quickfix/addExclExclCall", pattern = pattern)
             model("$idea/quickfix/addInitializer", pattern = pattern)
             model("$idea/quickfix/addPropertyAccessors", pattern = pattern)
+            model("$idea/quickfix/addValVar", pattern = pattern)
             model("$idea/quickfix/autoImports", pattern = KT_WITHOUT_DOTS, isRecursive = true)
             model("$idea/quickfix/checkArguments", pattern = pattern, isRecursive = false)
             model("$idea/quickfix/conflictingImports", pattern = pattern)
@@ -52,6 +54,7 @@ internal fun MutableTWorkspace.generateK2FixTests() {
             model("$idea/quickfix/specifySuperType", pattern = pattern)
             model("$idea/quickfix/convertToBlockBody", pattern = pattern)
             model("$idea/quickfix/supertypeInitialization", pattern = pattern)
+            model("$idea/quickfix/dataClassPrivateConstructor", pattern = pattern)
             model("$idea/quickfix/addAnnotationTarget", pattern = pattern, isIgnored = true)
             model("$idea/quickfix/addAnnotationUseSiteTarget", pattern = pattern, isIgnored = true)
             model("$idea/quickfix/addConstructorParameter", pattern = pattern, isIgnored = true)
@@ -65,8 +68,8 @@ internal fun MutableTWorkspace.generateK2FixTests() {
             model("$idea/quickfix/addEqEqTrue", pattern = pattern, isIgnored = true)
             model("$idea/quickfix/addFunModifier", pattern = pattern)
             model("$idea/quickfix/addGenericUpperBound", pattern = pattern, isIgnored = true)
-            model("$idea/quickfix/addInline", pattern = pattern, isIgnored = true)
-            model("$idea/quickfix/addInlineToReifiedFunctionFix", pattern = pattern, isIgnored = true)
+            model("$idea/quickfix/addInline", pattern = pattern)
+            model("$idea/quickfix/addInlineToReifiedFunctionFix", pattern = pattern)
             model("$idea/quickfix/addIsToWhenCondition", pattern = pattern, isIgnored = true)
             model("$idea/quickfix/addJvmInline", pattern = pattern, isIgnored = true)
             model("$idea/quickfix/addJvmStaticAnnotation", pattern = pattern, isIgnored = true)
@@ -129,7 +132,7 @@ internal fun MutableTWorkspace.generateK2FixTests() {
             model("$idea/quickfix/libraries", pattern = pattern, isIgnored = true)
             model("$idea/quickfix/makeConstructorParameterProperty", pattern = pattern, isIgnored = true)
             model("$idea/quickfix/makePrivateAndOverrideMember", pattern = pattern, isIgnored = true)
-            model("$idea/quickfix/makeTypeParameterReified", pattern = pattern, isIgnored = true)
+            model("$idea/quickfix/makeTypeParameterReified", pattern = pattern)
             model("$idea/quickfix/makeUpperBoundNonNullable", pattern = pattern, isIgnored = true)
             model("$idea/quickfix/memberVisibilityCanBePrivate", pattern = pattern, isIgnored = true)
             model("$idea/quickfix/migration", pattern = pattern, isIgnored = true)
@@ -180,7 +183,7 @@ internal fun MutableTWorkspace.generateK2FixTests() {
             model("$idea/quickfix/restrictedRetentionForExpressionAnnotation", pattern = pattern, isIgnored = true)
             model("$idea/quickfix/simplifyComparison", pattern = pattern)
             model("$idea/quickfix/smartCastImpossibleInIfThen", pattern = pattern, isIgnored = true)
-            model("$idea/quickfix/specifyOverrideExplicitly", pattern = pattern, isIgnored = true)
+            model("$idea/quickfix/specifyOverrideExplicitly", pattern = pattern)
             model("$idea/quickfix/specifySuperExplicitly", pattern = pattern, isIgnored = true)
             model("$idea/quickfix/specifyTypeExplicitly", pattern = pattern, isIgnored = true)
             model("$idea/quickfix/superTypeIsExtensionType", pattern = pattern, isIgnored = true)

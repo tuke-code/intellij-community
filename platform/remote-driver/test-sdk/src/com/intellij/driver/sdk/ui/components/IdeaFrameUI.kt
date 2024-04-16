@@ -17,8 +17,10 @@ fun Driver.ideFrame(action: IdeaFrameUI.() -> Unit) {
 }
 
 open class IdeaFrameUI(data: ComponentData) : UiComponent(data) {
+  private val projectViewTreeClass = if (isRemoteIdeMode) "ThinClientProjectViewTree" else "ProjectViewTree"
+  val projectViewTree = tree("//div[@class='${projectViewTreeClass}']")
+
   private val ideaFrameComponent by lazy { driver.cast(component, IdeFrameImpl::class) }
-  val projectViewTree = tree("//div[@class='ProjectViewTree']")
 
   val project: Project?
     get() = driver.utility(ProjectFrameHelper::class).getFrameHelper(component).getProject()
@@ -29,6 +31,7 @@ open class IdeaFrameUI(data: ComponentData) : UiComponent(data) {
   val leftToolWindowToolbar: ToolWindowLeftToolbarUi = x(Locators.byClass("ToolWindowLeftToolbar"), ToolWindowLeftToolbarUi::class.java)
   val rightToolWindowToolbar: ToolWindowRightToolbarUi = x(Locators.byClass("ToolWindowRightToolbar"), ToolWindowRightToolbarUi::class.java)
   val settingsButton = x("//div[@myicon='settings.svg']")
+  val runActionButton = x("//div[@myicon='run.svg']")
 }
 
 @Remote("com.intellij.openapi.wm.impl.ProjectFrameHelper")

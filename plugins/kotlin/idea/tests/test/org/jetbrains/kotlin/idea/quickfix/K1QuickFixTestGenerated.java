@@ -2038,6 +2038,11 @@ public abstract class K1QuickFixTestGenerated extends AbstractK1QuickFixTest {
             public void testExpectAnnotation() throws Exception {
                 runTest("testData/quickfix/addValVar/expectAnnotation.kt");
             }
+
+            @TestMetadata("library.kt")
+            public void testLibrary() throws Exception {
+                runTest("testData/quickfix/addValVar/library.kt");
+            }
         }
 
         @RunWith(JUnit3RunnerWithInners.class)
@@ -5252,6 +5257,11 @@ public abstract class K1QuickFixTestGenerated extends AbstractK1QuickFixTest {
                         runTest("testData/quickfix/createFromUsage/createFunction/call/simple/memberVarDelegateRuntime.kt");
                     }
 
+                    @TestMetadata("noInferCheck.kt")
+                    public void testNoInferCheck() throws Exception {
+                        runTest("testData/quickfix/createFromUsage/createFunction/call/simple/noInferCheck.kt");
+                    }
+
                     @TestMetadata("notExactArgument.kt")
                     public void testNotExactArgument() throws Exception {
                         runTest("testData/quickfix/createFromUsage/createFunction/call/simple/notExactArgument.kt");
@@ -6785,6 +6795,34 @@ public abstract class K1QuickFixTestGenerated extends AbstractK1QuickFixTest {
         @TestMetadata("returnNoLambda.kt")
         public void testReturnNoLambda() throws Exception {
             runTest("testData/quickfix/createLabel/returnNoLambda.kt");
+        }
+    }
+
+    @RunWith(JUnit3RunnerWithInners.class)
+    @TestMetadata("testData/quickfix/dataClassPrivateConstructor")
+    public static class DataClassPrivateConstructor extends AbstractK1QuickFixTest {
+        private void runTest(String testDataFilePath) throws Exception {
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+        }
+
+        @TestMetadata("AddConsistentCopyVisibilityAnnotation.kt")
+        public void testAddConsistentCopyVisibilityAnnotation() throws Exception {
+            runTest("testData/quickfix/dataClassPrivateConstructor/AddConsistentCopyVisibilityAnnotation.kt");
+        }
+
+        @TestMetadata("DataClassConsistentCopyAndExposedCopyAreIncompatibleAnnotations.kt")
+        public void testDataClassConsistentCopyAndExposedCopyAreIncompatibleAnnotations() throws Exception {
+            runTest("testData/quickfix/dataClassPrivateConstructor/DataClassConsistentCopyAndExposedCopyAreIncompatibleAnnotations.kt");
+        }
+
+        @TestMetadata("DataClassConsistentCopyWrongAnnotationTarget.kt")
+        public void testDataClassConsistentCopyWrongAnnotationTarget() throws Exception {
+            runTest("testData/quickfix/dataClassPrivateConstructor/DataClassConsistentCopyWrongAnnotationTarget.kt");
+        }
+
+        @TestMetadata("RemoveRedundantConsistentCopyVisibilityAnnotation.kt")
+        public void testRemoveRedundantConsistentCopyVisibilityAnnotation() throws Exception {
+            runTest("testData/quickfix/dataClassPrivateConstructor/RemoveRedundantConsistentCopyVisibilityAnnotation.kt");
         }
     }
 
@@ -12002,6 +12040,11 @@ public abstract class K1QuickFixTestGenerated extends AbstractK1QuickFixTest {
                 runTest("testData/quickfix/override/implementMember.kt");
             }
 
+            @TestMetadata("implementMemberByEnumEntry.kt")
+            public void testImplementMemberByEnumEntry() throws Exception {
+                runTest("testData/quickfix/override/implementMemberByEnumEntry.kt");
+            }
+
             @TestMetadata("implementMemberFromAbstractClass.kt")
             public void testImplementMemberFromAbstractClass() throws Exception {
                 runTest("testData/quickfix/override/implementMemberFromAbstractClass.kt");
@@ -14100,6 +14143,11 @@ public abstract class K1QuickFixTestGenerated extends AbstractK1QuickFixTest {
         @TestMetadata("notPossible.kt")
         public void testNotPossible() throws Exception {
             runTest("testData/quickfix/specifyOverrideExplicitly/notPossible.kt");
+        }
+
+        @TestMetadata("objectDeclaration.kt")
+        public void testObjectDeclaration() throws Exception {
+            runTest("testData/quickfix/specifyOverrideExplicitly/objectDeclaration.kt");
         }
 
         @TestMetadata("outer.kt")
@@ -17634,6 +17682,16 @@ public abstract class K1QuickFixTestGenerated extends AbstractK1QuickFixTest {
                 @TestMetadata("varAnnotationParameter.kt")
                 public void testVarAnnotationParameter() throws Exception {
                     runTest("testData/quickfix/variables/changeMutability/varAnnotationParameter.kt");
+                }
+
+                @TestMetadata("volatileOnValue.kt")
+                public void testVolatileOnValue() throws Exception {
+                    runTest("testData/quickfix/variables/changeMutability/volatileOnValue.kt");
+                }
+
+                @TestMetadata("volatileOnValueLocal.kt")
+                public void testVolatileOnValueLocal() throws Exception {
+                    runTest("testData/quickfix/variables/changeMutability/volatileOnValueLocal.kt");
                 }
             }
         }

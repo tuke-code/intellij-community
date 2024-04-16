@@ -1,7 +1,6 @@
 // Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.platform.workspace.jps.entities
 
-import com.intellij.platform.workspace.storage.EntityInformation
 import com.intellij.platform.workspace.storage.EntitySource
 import com.intellij.platform.workspace.storage.EntityType
 import com.intellij.platform.workspace.storage.GeneratedCodeApiVersion
@@ -20,10 +19,10 @@ import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInst
 import com.intellij.platform.workspace.storage.instrumentation.EntityStorageInstrumentationApi
 import com.intellij.platform.workspace.storage.instrumentation.MutableEntityStorageInstrumentation
 import com.intellij.platform.workspace.storage.metadata.model.EntityMetadata
-import org.jetbrains.annotations.ApiStatus
+import org.jetbrains.annotations.ApiStatus.Internal
 import org.jetbrains.annotations.NonNls
 
-@ApiStatus.Internal // Just insert this manually. This is needed for correct api surface
+@Internal
 @GeneratedCodeApiVersion(3)
 @GeneratedCodeImplVersion(5)
 open class LibraryPropertiesEntityImpl(private val dataSource: LibraryPropertiesEntityData) : LibraryPropertiesEntity, WorkspaceEntityBase(
@@ -131,8 +130,7 @@ open class LibraryPropertiesEntityImpl(private val dataSource: LibraryProperties
         return if (_diff != null) {
           @OptIn(EntityStorageInstrumentationApi::class)
           ((_diff as MutableEntityStorageInstrumentation).getParentBuilder(LIBRARY_CONNECTION_ID, this) as? LibraryEntity.Builder)
-          ?: (this.entityLinks[EntityLink(false,
-                                                                                                  LIBRARY_CONNECTION_ID)]!! as LibraryEntity.Builder)
+          ?: (this.entityLinks[EntityLink(false, LIBRARY_CONNECTION_ID)]!! as LibraryEntity.Builder)
         }
         else {
           this.entityLinks[EntityLink(false, LIBRARY_CONNECTION_ID)]!! as LibraryEntity.Builder
@@ -203,12 +201,6 @@ class LibraryPropertiesEntityData : WorkspaceEntityData<LibraryPropertiesEntity>
 
   override fun getEntityInterface(): Class<out WorkspaceEntity> {
     return LibraryPropertiesEntity::class.java
-  }
-
-  override fun serialize(ser: EntityInformation.Serializer) {
-  }
-
-  override fun deserialize(de: EntityInformation.Deserializer) {
   }
 
   override fun createDetachedEntity(parents: List<WorkspaceEntity.Builder<*>>): WorkspaceEntity.Builder<*> {
