@@ -5,6 +5,7 @@ import com.intellij.psi.tree.IElementType
 import com.intellij.psi.util.elementType
 import com.intellij.psi.util.startOffset
 import org.jetbrains.kotlin.analysis.api.KtAnalysisSession
+import org.jetbrains.kotlin.analysis.api.analyze
 import org.jetbrains.kotlin.analysis.api.calls.*
 import org.jetbrains.kotlin.analysis.api.fir.diagnostics.KtFirDiagnostic
 import org.jetbrains.kotlin.analysis.api.symbols.*
@@ -16,6 +17,7 @@ import org.jetbrains.kotlin.idea.base.analysis.api.utils.CallParameterInfoProvid
 import org.jetbrains.kotlin.idea.base.psi.isInsideKtTypeReference
 import org.jetbrains.kotlin.idea.base.psi.safeDeparenthesize
 import org.jetbrains.kotlin.idea.codeinsight.utils.findRelevantLoopForExpression
+import org.jetbrains.kotlin.idea.refactoring.introduce.extractableSubstringInfo
 import org.jetbrains.kotlin.idea.references.KtReference
 import org.jetbrains.kotlin.idea.references.KtSimpleNameReference
 import org.jetbrains.kotlin.idea.references.mainReference
@@ -30,13 +32,34 @@ object K2SemanticMatcher {
     fun findMatches(patternElement: KtElement, scopeElement: KtElement): List<KtElement> {
         val matches = mutableListOf<KtElement>()
 
+        val substringInfo = (patternElement as? KtExpression)?.extractableSubstringInfo as? K2ExtractableSubstringInfo
+
         scopeElement.accept(
             object : KtTreeVisitorVoid() {
                 override fun visitKtElement(element: KtElement) {
-                    if (element.isSemanticMatch(patternElement)) {
-                        matches.add(element)
-                    } else {
-                        super.visitKtElement(element)
+                    when {
+                        element == substringInfo?.template -> matches.add(patternElement)
+                        element is KtStringTemplateExpression && substringInfo != null -> {
+                            val extractableSubstringInfo = getMatchedStringFragmentsOrNull(element, substringInfo)
+                            when {
+                                extractableSubstringInfo != null -> {
+                                    matches.add(extractableSubstringInfo.createExpression())
+                                }
+
+                                else -> {
+
+                                    super.visitKtElement(element)
+                                }
+                            }
+                        }
+
+                        element.isSemanticMatch(patternElement) -> {
+                            matches.add(element)
+                        }
+
+                        else -> {
+                            super.visitKtElement(element)
+                        }
                     }
                 }
             }
@@ -53,6 +76,65 @@ object K2SemanticMatcher {
         patternElement: KtElement,
         context: MatchingContext,
     ): Boolean = this == patternElement || accept(VisitingMatcher(this@KtAnalysisSession, context), patternElement)
+
+    context(KtAnalysisSession)
+    private fun getMatchedStringFragmentsOrNull(target: KtStringTemplateExpression, patternInfo: K2ExtractableSubstringInfo): K2ExtractableSubstringInfo? {
+        val prefixLength = patternInfo.prefix.length
+        val suffixLength = patternInfo.suffix.length
+        val targetEntries = target.entries
+        val patternEntries = patternInfo.entries.toList()
+        for ((index, targetEntry) in targetEntries.withIndex()) {
+            if (index + patternEntries.size > targetEntries.size) return null
+
+            val targetEntryText = targetEntry.text
+
+            if (patternInfo.startEntry == patternInfo.endEntry && (prefixLength > 0 || suffixLength > 0)) {
+                if (targetEntry !is KtLiteralStringTemplateEntry) continue
+
+                val patternText = with(patternInfo.startEntry.text) { substring(prefixLength, length - suffixLength) }
+                val i = targetEntryText.indexOf(patternText)
+                if (i < 0) continue
+                val targetPrefix = targetEntryText.substring(0, i)
+                val targetSuffix = targetEntryText.substring(i + patternText.length)
+                return K2ExtractableSubstringInfo(targetEntry, targetEntry, targetPrefix, targetSuffix, patternInfo.isString)
+            }
+
+            val matchStartByText = patternInfo.startEntry is KtLiteralStringTemplateEntry
+            val matchEndByText = patternInfo.endEntry is KtLiteralStringTemplateEntry
+
+            val targetPrefix = if (matchStartByText) {
+                if (targetEntry !is KtLiteralStringTemplateEntry) continue
+
+                val patternText = patternInfo.startEntry.text.substring(prefixLength)
+                if (!targetEntryText.endsWith(patternText)) continue
+                targetEntryText.substring(0, targetEntryText.length - patternText.length)
+            } else ""
+
+            val lastTargetEntry = targetEntries[index + patternEntries.lastIndex]
+
+            val targetSuffix = if (matchEndByText) {
+                if (lastTargetEntry !is KtLiteralStringTemplateEntry) continue
+
+                val patternText = with(patternInfo.endEntry.text) { substring(0, length - suffixLength) }
+                val lastTargetEntryText = lastTargetEntry.text
+                if (!lastTargetEntryText.startsWith(patternText)) continue
+                lastTargetEntryText.substring(patternText.length)
+            } else ""
+
+            val fromIndex = if (matchStartByText) 1 else 0
+            val toIndex = if (matchEndByText) patternEntries.lastIndex - 1 else patternEntries.lastIndex
+            val status = (fromIndex..toIndex).fold(true) { status, patternEntryIndex ->
+                val targetEntryToUnify = targetEntries[index + patternEntryIndex]
+                val patternEntryToUnify = patternEntries[patternEntryIndex]
+                status && targetEntryToUnify.isSemanticMatch(patternEntryToUnify)
+            }
+            if (!status) continue
+            return K2ExtractableSubstringInfo(targetEntry, lastTargetEntry, targetPrefix, targetSuffix, patternInfo.isString)
+        }
+
+        return null
+    }
+
 
     private data class MatchingContext(
         val symbols: MutableMap<KtSymbol, KtSymbol> = mutableMapOf(),
@@ -444,26 +526,36 @@ object K2SemanticMatcher {
             return true
         }
 
+        override fun visitEscapeStringTemplateEntry(
+            entry: KtEscapeStringTemplateEntry,
+            data: KtElement?
+        ): Boolean? {
+            val patternEntry = data as? KtEscapeStringTemplateEntry ?: return false
+            return entry.unescapedValue == patternEntry.unescapedValue
+        }
+
+        override fun visitStringTemplateEntryWithExpression(
+            entry: KtStringTemplateEntryWithExpression,
+            data: KtElement?
+        ): Boolean? {
+            val patternEntry = data?.deparenthesized() as? KtStringTemplateEntryWithExpression ?: return false
+            return elementsMatchOrBothAreNull(entry.expression, patternEntry.expression)
+        }
+
+        override fun visitLiteralStringTemplateEntry(
+            entry: KtLiteralStringTemplateEntry,
+            data: KtElement?
+        ): Boolean? {
+            val patternLiteral = data?.deparenthesized() as? KtLiteralStringTemplateEntry ?: return false
+            return entry.text == patternLiteral.text
+        }
+
         override fun visitStringTemplateExpression(expression: KtStringTemplateExpression, data: KtElement): Boolean {
             val patternExpression = data.deparenthesized() as? KtStringTemplateExpression ?: return false
 
             if (expression.entries.size != patternExpression.entries.size) return false
             for ((targetEntry, patternEntry) in expression.entries.zip(patternExpression.entries)) {
-                when {
-                    targetEntry is KtLiteralStringTemplateEntry && patternEntry is KtLiteralStringTemplateEntry -> {
-                        if (targetEntry.text != patternEntry.text) return false
-                    }
-
-                    targetEntry is KtStringTemplateEntryWithExpression && patternEntry is KtStringTemplateEntryWithExpression -> {
-                        if (!elementsMatchOrBothAreNull(targetEntry.expression, patternEntry.expression)) return false
-                    }
-
-                    targetEntry is KtEscapeStringTemplateEntry && patternEntry is KtEscapeStringTemplateEntry -> {
-                        if (targetEntry.unescapedValue != patternEntry.unescapedValue) return false
-                    }
-
-                    else -> return false
-                }
+                if (!elementsMatchOrBothAreNull(targetEntry, patternEntry)) return false
             }
 
             return true

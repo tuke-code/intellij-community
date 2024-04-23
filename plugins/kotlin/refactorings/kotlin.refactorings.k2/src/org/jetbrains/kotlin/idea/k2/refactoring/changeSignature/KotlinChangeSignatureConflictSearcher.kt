@@ -29,6 +29,7 @@ import org.jetbrains.kotlin.idea.refactoring.conflicts.checkRedeclarationConflic
 import org.jetbrains.kotlin.idea.refactoring.conflicts.registerAlreadyDeclaredConflict
 import org.jetbrains.kotlin.idea.refactoring.conflicts.registerRetargetJobOnPotentialCandidates
 import org.jetbrains.kotlin.idea.refactoring.rename.BasicUnresolvableCollisionUsageInfo
+import org.jetbrains.kotlin.idea.references.KtDestructuringDeclarationReference
 import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.psi.psiUtil.containingClassOrObject
 import org.jetbrains.kotlin.psi.psiUtil.getQualifiedExpressionForSelector
@@ -63,7 +64,9 @@ class KotlinChangeSignatureConflictSearcher(
 
 
         val parametersToRemove = originalInfo.parametersToRemove
-        checkParametersToDelete(function, parametersToRemove)
+        if (originalInfo.checkUsedParameters) {
+            checkParametersToDelete(function, parametersToRemove)
+        }
 
         for (parameter in originalInfo.getNonReceiverParameters()) {
 
@@ -98,7 +101,9 @@ class KotlinChangeSignatureConflictSearcher(
         for (usageInfo in usageInfos) {
             when (usageInfo) {
                 is KotlinOverrideUsageInfo -> {
-                    checkParametersToDelete(usageInfo.element as KtCallableDeclaration, parametersToRemove)
+                    if (originalInfo.checkUsedParameters) {
+                        checkParametersToDelete(usageInfo.element as KtCallableDeclaration, parametersToRemove)
+                    }
                 }
                 is OverriderUsageInfo -> {
                     JavaChangeSignatureUsageProcessor.ConflictSearcher.checkParametersToDelete(usageInfo.overridingMethod, parametersToRemove, result)
@@ -146,7 +151,6 @@ class KotlinChangeSignatureConflictSearcher(
         callableDeclaration: KtCallableDeclaration,
         toRemove: BooleanArray,
     ) {
-        val scope = LocalSearchScope(callableDeclaration)
         val valueParameters = callableDeclaration.valueParameters
         val hasReceiver = callableDeclaration.receiverTypeReference != null
         if (hasReceiver && toRemove[0]) {
@@ -163,7 +167,7 @@ class KotlinChangeSignatureConflictSearcher(
         for ((i, parameter) in valueParameters.withIndex()) {
             val index = (if (hasReceiver) 1 else 0) + i
             if (toRemove[index]) {
-                registerConflictIfUsed(parameter, scope)
+                registerConflictIfUsed(parameter)
             }
         }
     }
@@ -222,10 +226,12 @@ class KotlinChangeSignatureConflictSearcher(
     }
 
     private fun registerConflictIfUsed(
-        element: PsiNamedElement,
-        scope: LocalSearchScope
+        element: PsiNamedElement
     ) {
-        if (ReferencesSearch.search(element, scope).findFirst() != null) {
+        if (ReferencesSearch.search(element).filtering { ref ->
+                val refElement = ref.element
+                !(refElement is KtSimpleNameExpression && refElement.parent is KtValueArgumentName)
+            }.findFirst() != null) {
             result.putValue(element, KotlinBundle.message("parameter.used.in.declaration.body.warning", element.name.toString()))
         }
     }

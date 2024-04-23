@@ -51,7 +51,7 @@ internal class WindowsDistributionBuilder(
         .copyToDir(distBinDir)
 
       generateBuildTxt(context, targetPath)
-      generateLanguagePluginsXml(context, distBinDir)
+      generateLanguagePluginsXml(context, targetPath)
       copyDistFiles(context = context, newDir = targetPath, os = OsFamily.WINDOWS, arch = arch)
 
       Files.writeString(distBinDir.resolve(PROPERTIES_FILE_NAME), StringUtilRt.convertLineSeparators(ideaProperties!!, "\r\n"))
@@ -355,8 +355,7 @@ internal class WindowsDistributionBuilder(
 
       val communityHome = context.paths.communityHomeDir
       val inputPath = if (customizer.useXPlatLauncher) {
-        val (execPath, licensePath) = NativeLauncherDownloader.findLocalLauncher(context, OsFamily.WINDOWS, arch)
-                                      ?: NativeLauncherDownloader.downloadLauncher(context, OsFamily.WINDOWS, arch)
+        val (execPath, licensePath) = NativeLauncherDownloader.findLocalOrDownload(context, OsFamily.WINDOWS, arch)
         val licenses = winDistPath.resolve("license/launcher-third-party-libraries.html")
         if (!licenses.exists()) {
           copyFile(licensePath, licenses)
