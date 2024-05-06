@@ -1459,6 +1459,19 @@ public abstract class FindUsagesWithCompilerReferenceIndexTestGenerated extends 
 
             @RunWith(JUnit3RunnerWithInners.class)
             @TestMetadata("../../idea/tests/testData/findUsages/kotlin/findClassUsages")
+            public static class TestPrimaryConstructorOfEnum extends AbstractFindUsagesWithCompilerReferenceIndexTest {
+                private void runTest(String testDataFilePath) throws Exception {
+                    KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+                }
+
+                @TestMetadata("primaryConstructorOfEnum.0.kt")
+                public void testPrimaryConstructorOfEnum() throws Exception {
+                    runTest("../../idea/tests/testData/findUsages/kotlin/findClassUsages/primaryConstructorOfEnum.0.kt");
+                }
+            }
+
+            @RunWith(JUnit3RunnerWithInners.class)
+            @TestMetadata("../../idea/tests/testData/findUsages/kotlin/findClassUsages")
             public static class TestPrimaryConstructorWithDefaultParams extends AbstractFindUsagesWithCompilerReferenceIndexTest {
                 private void runTest(String testDataFilePath) throws Exception {
                     KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
@@ -2599,6 +2612,19 @@ public abstract class FindUsagesWithCompilerReferenceIndexTestGenerated extends 
         @RunWith(JUnit3RunnerWithInners.class)
         @TestMetadata("../../idea/tests/testData/findUsages/kotlin/findPrimaryConstructorUsages")
         public abstract static class FindPrimaryConstructorUsages extends AbstractFindUsagesWithCompilerReferenceIndexTest {
+            @RunWith(JUnit3RunnerWithInners.class)
+            @TestMetadata("../../idea/tests/testData/findUsages/kotlin/findPrimaryConstructorUsages")
+            public static class TestAnnotationConstructorCall extends AbstractFindUsagesWithCompilerReferenceIndexTest {
+                private void runTest(String testDataFilePath) throws Exception {
+                    KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+                }
+
+                @TestMetadata("annotationConstructorCall.0.kt")
+                public void testAnnotationConstructorCall() throws Exception {
+                    runTest("../../idea/tests/testData/findUsages/kotlin/findPrimaryConstructorUsages/annotationConstructorCall.0.kt");
+                }
+            }
+
             @RunWith(JUnit3RunnerWithInners.class)
             @TestMetadata("../../idea/tests/testData/findUsages/kotlin/findPrimaryConstructorUsages")
             public static class TestAnnotationEntry extends AbstractFindUsagesWithCompilerReferenceIndexTest {

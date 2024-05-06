@@ -2364,6 +2364,12 @@ public abstract class DebugProcessImpl extends UserDataHolderBase implements Deb
                 boolean terminated =
                   processHandler != null && (processHandler.isProcessTerminating() || processHandler.isProcessTerminated());
 
+                try {
+                  myDebugProcessDispatcher.getMulticaster().attachException(null, e, myConnection);
+                }
+                catch (Exception ex) {
+                  LOG.debug(ex);
+                }
                 fail();
                 DebuggerInvocationUtil.swingInvokeLater(myProject, () -> {
                   // propagate exception only in case we succeeded to obtain execution result,
@@ -2644,6 +2650,7 @@ public abstract class DebugProcessImpl extends UserDataHolderBase implements Deb
           BalloonBuilder balloonBuilder = JBPopupFactory.getInstance()
             .createHtmlTextBalloonBuilder(content, messageType, null)
             .setHideOnClickOutside(true)
+            .setDisposable(myDisposable)
             .setHideOnFrameResize(false);
           Balloon balloon = balloonBuilder.createBalloon();
           balloon.show(new AnchoredPoint(AnchoredPoint.Anchor.TOP, target), Balloon.Position.above);

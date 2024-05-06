@@ -83,7 +83,18 @@ data class ChildContext internal constructor(
 }
 
 @Internal
-fun createChildContext(): ChildContext {
+fun createChildContext() : ChildContext = doCreateChildContext(false)
+
+@Internal
+fun createChildContextWithContextJob() : ChildContext = doCreateChildContext(true)
+
+/**
+ * Use `unconditionalCancellationPropagation` only when you are sure that the current context will always outlive a child computation.
+ * This is the case with `invokeAndWait`, as it parks the thread before computation is finished,
+ * but it is not the case with `invokeLater`
+ */
+@Internal
+private fun doCreateChildContext(unconditionalCancellationPropagation: Boolean): ChildContext {
   val currentThreadContext = currentThreadContext()
 
   // Problem: a task may infinitely reschedule itself
@@ -100,11 +111,13 @@ fun createChildContext(): ChildContext {
   //
   // Effectively, the chain becomes a 1-level tree,
   // as jobs of all scheduled tasks are attached to the initial current Job.
-  val parentBlockingJob = currentThreadContext[BlockingJob]
+
+  val parentBlockingJob =
+    if (unconditionalCancellationPropagation) currentThreadContext[Job]
+    else currentThreadContext[BlockingJob]?.blockingJob
   val (cancellationContext, childContinuation) = if (parentBlockingJob != null) {
-    val parentJob = parentBlockingJob.blockingJob
-    val continuation: Continuation<Unit> = childContinuation(parentJob)
-    Pair(parentBlockingJob + continuation.context.job, continuation)
+    val continuation: Continuation<Unit> = childContinuation(parentBlockingJob)
+    Pair((currentThreadContext[BlockingJob] ?: EmptyCoroutineContext) + continuation.context.job, continuation)
   }
   else {
     Pair(EmptyCoroutineContext, null)
@@ -179,6 +192,9 @@ private fun isContextAwareComputation(runnable: Any): Boolean {
 @Throws(ProcessCanceledException::class)
 @OptIn(DelicateCoroutinesApi::class, ExperimentalCoroutinesApi::class)
 fun <T> runAsCoroutine(continuation: Continuation<Unit>, completeOnFinish: Boolean, action: () -> T): T {
+  // Even though catching and restoring PCE is unnecessary,
+  // we still would like to have it thrown, as it indicates _where the canceled job was accessed_,
+  // in addition to the original exception indicating _where the canceled job was canceled_
   val originalPCE: Ref<ProcessCanceledException> = Ref(null)
   val deferred = GlobalScope.async(
     // we need to have a job in CoroutineContext so that `Deferred` becomes its child and properly delays cancellation
@@ -188,7 +204,6 @@ fun <T> runAsCoroutine(continuation: Continuation<Unit>, completeOnFinish: Boole
       action()
     }
     catch (e: ProcessCanceledException) {
-      // A raw PCE scares coroutine framework. Instead, we should message coroutines that we intend to cancel an activity, not fail it.
       originalPCE.set(e)
       throw CancellationException("Masking ProcessCanceledException: ${e.message}", e)
     }
@@ -199,11 +214,19 @@ fun <T> runAsCoroutine(continuation: Continuation<Unit>, completeOnFinish: Boole
         continuation.resume(Unit)
       }
       // `deferred` is an integral part of `job`, so manual cancellation within `action` should lead to the cancellation of `job`
-      is CancellationException -> continuation.resumeWithException(it)
-      // Regular exceptions and PCE get propagated to `job` via parent-child relations between Jobs
+      is CancellationException ->
+        // We have scheduled periodic runnables, which use `runAsCoroutine` several times on the same `Continuation`.
+        // When the context `Job` gets canceled and a corresponding `SchedulingExecutorService` does not,
+        // we appear in a situation where the `SchedulingExecutorService` still launches its tasks with a canceled `Continuation`
+        //
+        // Multiple resumption of a single continuation is disallowed; hence, we need to prevent this situation
+        // by avoiding resumption in the case of a dead coroutine scope
+        if (!continuation.context.job.isCompleted) {
+          continuation.resumeWithException(it)
+        }
+      // Regular exceptions get propagated to `job` via parent-child relations between Jobs
     }
   }
-  // Since this function is called strictly in blocking context, we need to preserve the PCE that was thrown
   originalPCE.get()?.let { throw it }
   try {
     return deferred.getCompleted()
@@ -212,12 +235,14 @@ fun <T> runAsCoroutine(continuation: Continuation<Unit>, completeOnFinish: Boole
   }
 }
 
-internal fun capturePropagationContext(r: Runnable): Runnable {
+internal fun capturePropagationContext(r: Runnable, forceUseContextJob : Boolean = false): Runnable {
   var command = captureClientIdInRunnable(r)
   if (isContextAwareComputation(r)) {
     return command
   }
-  val (childContext, childContinuation) = createChildContext()
+  val (childContext, childContinuation) =
+    if (forceUseContextJob) createChildContextWithContextJob()
+    else createChildContext()
   if (childContext != EmptyCoroutineContext) {
     command = ContextRunnable(true, childContext, command)
   }

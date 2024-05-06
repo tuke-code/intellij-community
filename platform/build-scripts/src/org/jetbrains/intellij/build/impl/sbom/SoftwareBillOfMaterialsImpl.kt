@@ -2,6 +2,11 @@
 package org.jetbrains.intellij.build.impl.sbom
 
 import com.intellij.openapi.util.SystemInfoRt
+import com.intellij.util.io.DigestUtil
+import com.intellij.util.io.DigestUtil.sha1Hex
+import com.intellij.util.io.DigestUtil.updateContentHash
+import com.intellij.util.io.bytesToHex
+import com.intellij.util.io.sha256Hex
 import com.jetbrains.plugin.structure.base.utils.exists
 import com.jetbrains.plugin.structure.base.utils.outputStream
 import io.opentelemetry.api.common.AttributeKey
@@ -12,7 +17,6 @@ import kotlinx.coroutines.flow.asFlow
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.toList
-import org.apache.commons.codec.digest.DigestUtils
 import org.apache.maven.model.Model
 import org.apache.maven.model.io.xpp3.MavenXpp3Reader
 import org.jetbrains.intellij.build.*
@@ -61,7 +65,11 @@ internal class SoftwareBillOfMaterialsImpl(
   private val context: BuildContext,
   private val distributions: List<DistributionForOsTaskResult>,
   private val distributionFiles: List<DistributionFileEntry>
-): SoftwareBillOfMaterials {
+) : SoftwareBillOfMaterials {
+  private companion object {
+    val JETBRAINS_GITHUB_ORGANIZATIONS = setOf("JetBrains", "Kotlin")
+  }
+
   private val specVersion: String = Version.TWO_POINT_THREE_VERSION
 
   private val creator: String
@@ -172,9 +180,22 @@ internal class SoftwareBillOfMaterialsImpl(
     checkNtiaConformance(documents, context)
   }
 
-  private class Checksums(val path: Path) {
-    val sha1sum: String = Files.newInputStream(path).use(DigestUtils::sha1Hex)
-    val sha256sum: String = Files.newInputStream(path).use(DigestUtils::sha256Hex)
+  private class Checksums(@JvmField val path: Path) {
+    val sha1sum: String
+    val sha256sum: String
+
+    init {
+      val buffer = ByteArray(512 * 1024)
+      val digests = Files.newInputStream(path).use {
+        val sha1 = DigestUtil.sha1()
+        val sha256 = DigestUtil.sha256()
+        updateContentHash(digest = sha1, inputStream = it, buffer = buffer)
+        updateContentHash(digest = sha256, inputStream = it, buffer = buffer)
+        bytesToHex(sha1.digest()) to bytesToHex(sha256.digest())
+      }
+      sha1sum = digests.first
+      sha256sum = digests.second
+    }
   }
 
   private suspend fun generateFromDistributions(): List<Path> {
@@ -228,9 +249,9 @@ internal class SoftwareBillOfMaterialsImpl(
      */
     val extractedRuntimePackage = spdxPackage(this, name = "./jbr/**") {
       setVersionInfo(version)
-      setSupplier(runtimeArchivePackage.supplier.get())
       setDownloadLocation(SpdxConstants.NOASSERTION_VALUE)
     }
+    claimOwnership(spdxPackage = extractedRuntimePackage, document = this, license = license)
     extractedRuntimePackage.relatesTo(runtimeArchivePackage, RelationshipType.EXPANDED_FROM_ARCHIVE)
     addRuntimeUpstreams(runtimeArchivePackage, os, arch)
     validate(runtimeArchivePackage)
@@ -532,7 +553,7 @@ internal class SoftwareBillOfMaterialsImpl(
       coordinates = coordinates ?: return null,
       license = libraryLicense,
       entry = libraryEntry,
-      sha256Checksum = Files.newInputStream(libraryFile).use(DigestUtils::sha256Hex),
+      sha256Checksum = sha256Hex(libraryFile),
       pomXmlModel = pomXmlModel
     )
   }
@@ -567,15 +588,16 @@ internal class SoftwareBillOfMaterialsImpl(
     val license: LibraryLicense,
     val entry: LibraryFileEntry,
     val pomXmlUrl: String? = null,
-    pomXmlModel: Model?
+    val pomXmlModel: Model?
   ) {
-    val organizations = (pomXmlModel?.organization?.name ?: pomXmlModel
-      ?.developers?.asSequence()
-      ?.mapNotNull { it.organization }
+    val organizations = (pomXmlModel?.organization?.name?.let { sequenceOf(it) }
+                         ?: pomXmlModel?.developers?.asSequence()?.mapNotNull { it.organization })
       ?.filter { it.isNotBlank() }
-      ?.map(::translateSupplier)
-      ?.distinct()
-      ?.joinToString())
+      ?.mapNotNull {
+        @Suppress("HardCodedStringLiteral")
+        Jsoup.parse(it).wholeText().takeIf { it.isNotBlank() } ?: it
+      }?.distinct()
+      ?.joinToString(transform = ::translateSupplier)
       ?.takeIf { it.isNotBlank() }
       ?.let { "Organization: $it" }
 
@@ -594,18 +616,27 @@ internal class SoftwareBillOfMaterialsImpl(
 
     val supplier: String? = license.supplier ?: organizations ?: developers
 
-    val copyrightText: String?
-      get() = if (license.copyrightText == null && license.license == LibraryLicense.JETBRAINS_OWN) {
-        jetBrainsOwnLicense.copyrightText
+    val copyrightText: String? by lazy {
+      license.copyrightText ?: when {
+        isSupplierJetBrains -> jetBrainsOwnLicense.copyrightText
+        pomXmlModel?.inceptionYear == null || supplier == null -> null
+        else -> "Copyright (C) ${pomXmlModel.inceptionYear} " + supplier
+          .removePrefix("Organization: ")
+          .removePrefix("Person: ")
       }
-      else {
-        license.copyrightText
+    }
+
+    val isSupplierJetBrains: Boolean by lazy {
+      license.license == LibraryLicense.JETBRAINS_OWN || JETBRAINS_GITHUB_ORGANIZATIONS.any {
+        license.url?.startsWith("https://github.com/$it/") == true ||
+        license.licenseUrl?.startsWith("https://github.com/$it/") == true
       }
+    }
 
     fun license(document: SpdxDocument): AnyLicenseInfo {
       return when {
-        license.licenseUrl == null || license.spdxIdentifier == null -> SpdxNoAssertionLicense()
         license.license == LibraryLicense.JETBRAINS_OWN -> document.jetBrainsOwnLicense
+        license.licenseUrl == null || license.spdxIdentifier == null -> SpdxNoAssertionLicense()
         else -> parseLicense(document, checkNotNull(license.spdxIdentifier))
       }
     }
@@ -681,13 +712,7 @@ internal class SoftwareBillOfMaterialsImpl(
   private fun SpdxPackageBuilder.setOrigin(library: MavenLibrary, upstreamPackage: SpdxPackage?) {
     when {
       library.supplier != null -> setSupplier(library.supplier)
-      library.license.license == LibraryLicense.JETBRAINS_OWN ||
-      library.license.url?.startsWith("https://github.com/JetBrains/") == true ||
-      library.license.licenseUrl?.startsWith("https://github.com/JetBrains/") == true ||
-      library.license.url?.startsWith("https://github.com/Kotlin/") == true ||
-      library.license.licenseUrl?.startsWith("https://github.com/Kotlin/") == true -> {
-        setSupplier("Organization: ${Suppliers.JETBRAINS}")
-      }
+      library.isSupplierJetBrains -> setSupplier("Organization: ${Suppliers.JETBRAINS}")
       library.license.url?.startsWith("https://github.com/apache/") == true ||
       library.license.licenseUrl?.startsWith("https://github.com/apache/") == true -> {
         setSupplier("Organization: ${Suppliers.APACHE}")
@@ -749,24 +774,34 @@ internal class SoftwareBillOfMaterialsImpl(
     return licenseInfo
   }
 
+  private fun claimOwnership(
+    spdxPackage: SpdxPackage,
+    document: SpdxDocument,
+    license: Options.DistributionLicense,
+  ) {
+    spdxPackage.setSupplier(creator)
+    spdxPackage.copyrightText = license.copyrightText
+    val licenseInfo = extractedLicenseInfo(
+      spdxDocument = document,
+      name = license.name,
+      text = license.text,
+      url = license.url
+    )
+    spdxPackage.licenseDeclared = licenseInfo
+    spdxPackage.licenseConcluded = licenseInfo
+  }
+
   private fun claimContainedFiles(
     spdxPackage: SpdxPackage,
     files: Collection<SpdxFile> = spdxPackage.files,
     document: SpdxDocument,
     license: Options.DistributionLicense,
   ) {
-    spdxPackage.setSupplier(creator)
-    spdxPackage.copyrightText = license.copyrightText
-    spdxPackage.licenseDeclared = extractedLicenseInfo(
-      spdxDocument = document,
-      name = license.name,
-      text = license.text,
-      url = license.url
-    )
-    spdxPackage.licenseConcluded = spdxPackage.licenseDeclared
+    claimOwnership(spdxPackage, document, license)
+    val licenseInfo = spdxPackage.licenseConcluded
     files.forEach {
       it.copyrightText = license.copyrightText
-      it.licenseConcluded = spdxPackage.licenseConcluded
+      it.licenseConcluded = licenseInfo
     }
     spdxPackage.setPackageVerificationCode(
       document.createPackageVerificationCode(
@@ -807,7 +842,7 @@ internal class SoftwareBillOfMaterialsImpl(
     return files.asSequence()
       .map { it.sha1 }.sorted()
       .joinToString(separator = "")
-      .let(DigestUtils::sha1Hex)
+      .let(::sha1Hex)
   }
 
   /**

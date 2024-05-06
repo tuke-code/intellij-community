@@ -446,6 +446,11 @@ public abstract class LocalInspectionTestGenerated extends AbstractLocalInspecti
                 KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
 
+            @TestMetadata("argumentInCallWithReceiver.kt")
+            public void testArgumentInCallWithReceiver() throws Exception {
+                runTest("testData/inspectionsLocal/branched/ifThenToSafeAccess/argumentInCallWithReceiver.kt");
+            }
+
             @TestMetadata("blockHasMoreThanOneStatement.kt")
             public void testBlockHasMoreThanOneStatement() throws Exception {
                 runTest("testData/inspectionsLocal/branched/ifThenToSafeAccess/blockHasMoreThanOneStatement.kt");
@@ -474,6 +479,16 @@ public abstract class LocalInspectionTestGenerated extends AbstractLocalInspecti
             @TestMetadata("call4.kt")
             public void testCall4() throws Exception {
                 runTest("testData/inspectionsLocal/branched/ifThenToSafeAccess/call4.kt");
+            }
+
+            @TestMetadata("callChainWithImplicitReceiver.kt")
+            public void testCallChainWithImplicitReceiver() throws Exception {
+                runTest("testData/inspectionsLocal/branched/ifThenToSafeAccess/callChainWithImplicitReceiver.kt");
+            }
+
+            @TestMetadata("callChainWithVariableCalls.kt")
+            public void testCallChainWithVariableCalls() throws Exception {
+                runTest("testData/inspectionsLocal/branched/ifThenToSafeAccess/callChainWithVariableCalls.kt");
             }
 
             @TestMetadata("callInvokeOperator.kt")
@@ -561,9 +576,19 @@ public abstract class LocalInspectionTestGenerated extends AbstractLocalInspecti
                 runTest("testData/inspectionsLocal/branched/ifThenToSafeAccess/ifAndElseBothInBlocks.kt");
             }
 
+            @TestMetadata("ifAndElseBothInBlocks2.kt")
+            public void testIfAndElseBothInBlocks2() throws Exception {
+                runTest("testData/inspectionsLocal/branched/ifThenToSafeAccess/ifAndElseBothInBlocks2.kt");
+            }
+
             @TestMetadata("ifAndElseNotInBlocks.kt")
             public void testIfAndElseNotInBlocks() throws Exception {
                 runTest("testData/inspectionsLocal/branched/ifThenToSafeAccess/ifAndElseNotInBlocks.kt");
+            }
+
+            @TestMetadata("ifAndElseNotInBlocks2.kt")
+            public void testIfAndElseNotInBlocks2() throws Exception {
+                runTest("testData/inspectionsLocal/branched/ifThenToSafeAccess/ifAndElseNotInBlocks2.kt");
             }
 
             @TestMetadata("ifAsExpression.kt")
@@ -589,6 +614,16 @@ public abstract class LocalInspectionTestGenerated extends AbstractLocalInspecti
             @TestMetadata("implicitReceiverInApply.kt")
             public void testImplicitReceiverInApply() throws Exception {
                 runTest("testData/inspectionsLocal/branched/ifThenToSafeAccess/implicitReceiverInApply.kt");
+            }
+
+            @TestMetadata("implicitReceiverIsNotLeftMostReceiver.kt")
+            public void testImplicitReceiverIsNotLeftMostReceiver() throws Exception {
+                runTest("testData/inspectionsLocal/branched/ifThenToSafeAccess/implicitReceiverIsNotLeftMostReceiver.kt");
+            }
+
+            @TestMetadata("implicitReceiverVariableCall.kt")
+            public void testImplicitReceiverVariableCall() throws Exception {
+                runTest("testData/inspectionsLocal/branched/ifThenToSafeAccess/implicitReceiverVariableCall.kt");
             }
 
             @TestMetadata("isCheckSimple.kt")
@@ -631,6 +666,16 @@ public abstract class LocalInspectionTestGenerated extends AbstractLocalInspecti
                 runTest("testData/inspectionsLocal/branched/ifThenToSafeAccess/lhsNotEqualsNull.kt");
             }
 
+            @TestMetadata("lhsNotEqualsNull2.kt")
+            public void testLhsNotEqualsNull2() throws Exception {
+                runTest("testData/inspectionsLocal/branched/ifThenToSafeAccess/lhsNotEqualsNull2.kt");
+            }
+
+            @TestMetadata("localVar.kt")
+            public void testLocalVar() throws Exception {
+                runTest("testData/inspectionsLocal/branched/ifThenToSafeAccess/localVar.kt");
+            }
+
             @TestMetadata("missingNecessaryElseClause.kt")
             public void testMissingNecessaryElseClause() throws Exception {
                 runTest("testData/inspectionsLocal/branched/ifThenToSafeAccess/missingNecessaryElseClause.kt");
@@ -641,6 +686,26 @@ public abstract class LocalInspectionTestGenerated extends AbstractLocalInspecti
                 runTest("testData/inspectionsLocal/branched/ifThenToSafeAccess/missingNecessaryThenClause.kt");
             }
 
+            @TestMetadata("multipleUsagesNullCheck.kt")
+            public void testMultipleUsagesNullCheck() throws Exception {
+                runTest("testData/inspectionsLocal/branched/ifThenToSafeAccess/multipleUsagesNullCheck.kt");
+            }
+
+            @TestMetadata("multipleUsagesThis.kt")
+            public void testMultipleUsagesThis() throws Exception {
+                runTest("testData/inspectionsLocal/branched/ifThenToSafeAccess/multipleUsagesThis.kt");
+            }
+
+            @TestMetadata("multipleUsagesTypeCheck.kt")
+            public void testMultipleUsagesTypeCheck() throws Exception {
+                runTest("testData/inspectionsLocal/branched/ifThenToSafeAccess/multipleUsagesTypeCheck.kt");
+            }
+
+            @TestMetadata("multipleUsagesVariableCalls.kt")
+            public void testMultipleUsagesVariableCalls() throws Exception {
+                runTest("testData/inspectionsLocal/branched/ifThenToSafeAccess/multipleUsagesVariableCalls.kt");
+            }
+
             @TestMetadata("noCondition.kt")
             public void testNoCondition() throws Exception {
                 runTest("testData/inspectionsLocal/branched/ifThenToSafeAccess/noCondition.kt");
@@ -649,6 +714,11 @@ public abstract class LocalInspectionTestGenerated extends AbstractLocalInspecti
             @TestMetadata("noElseBlock.kt")
             public void testNoElseBlock() throws Exception {
                 runTest("testData/inspectionsLocal/branched/ifThenToSafeAccess/noElseBlock.kt");
+            }
+
+            @TestMetadata("noElseBlock2.kt")
+            public void testNoElseBlock2() throws Exception {
+                runTest("testData/inspectionsLocal/branched/ifThenToSafeAccess/noElseBlock2.kt");
             }
 
             @TestMetadata("noElseBlockAsExpression.kt")
@@ -676,14 +746,19 @@ public abstract class LocalInspectionTestGenerated extends AbstractLocalInspecti
                 runTest("testData/inspectionsLocal/branched/ifThenToSafeAccess/noThenBlock.kt");
             }
 
+            @TestMetadata("noThenBlock2.kt")
+            public void testNoThenBlock2() throws Exception {
+                runTest("testData/inspectionsLocal/branched/ifThenToSafeAccess/noThenBlock2.kt");
+            }
+
             @TestMetadata("notApplicableForFunction.kt")
             public void testNotApplicableForFunction() throws Exception {
                 runTest("testData/inspectionsLocal/branched/ifThenToSafeAccess/notApplicableForFunction.kt");
             }
 
-            @TestMetadata("notApplicableForLocalVar.kt")
-            public void testNotApplicableForLocalVar() throws Exception {
-                runTest("testData/inspectionsLocal/branched/ifThenToSafeAccess/notApplicableForLocalVar.kt");
+            @TestMetadata("notApplicableForNonLocalVar.kt")
+            public void testNotApplicableForNonLocalVar() throws Exception {
+                runTest("testData/inspectionsLocal/branched/ifThenToSafeAccess/notApplicableForNonLocalVar.kt");
             }
 
             @TestMetadata("notApplicableResultInCallChain.kt")
@@ -716,6 +791,11 @@ public abstract class LocalInspectionTestGenerated extends AbstractLocalInspecti
                 runTest("testData/inspectionsLocal/branched/ifThenToSafeAccess/propertyNotNull.kt");
             }
 
+            @TestMetadata("propertyVariableCall.kt")
+            public void testPropertyVariableCall() throws Exception {
+                runTest("testData/inspectionsLocal/branched/ifThenToSafeAccess/propertyVariableCall.kt");
+            }
+
             @TestMetadata("propertyWithProperty.kt")
             public void testPropertyWithProperty() throws Exception {
                 runTest("testData/inspectionsLocal/branched/ifThenToSafeAccess/propertyWithProperty.kt");
@@ -741,9 +821,19 @@ public abstract class LocalInspectionTestGenerated extends AbstractLocalInspecti
                 runTest("testData/inspectionsLocal/branched/ifThenToSafeAccess/rhsEqualsNull.kt");
             }
 
+            @TestMetadata("rhsEqualsNull2.kt")
+            public void testRhsEqualsNull2() throws Exception {
+                runTest("testData/inspectionsLocal/branched/ifThenToSafeAccess/rhsEqualsNull2.kt");
+            }
+
             @TestMetadata("rhsNotEqualsNull.kt")
             public void testRhsNotEqualsNull() throws Exception {
                 runTest("testData/inspectionsLocal/branched/ifThenToSafeAccess/rhsNotEqualsNull.kt");
+            }
+
+            @TestMetadata("rhsNotEqualsNull2.kt")
+            public void testRhsNotEqualsNull2() throws Exception {
+                runTest("testData/inspectionsLocal/branched/ifThenToSafeAccess/rhsNotEqualsNull2.kt");
             }
 
             @TestMetadata("senselessComparison.kt")
@@ -779,6 +869,16 @@ public abstract class LocalInspectionTestGenerated extends AbstractLocalInspecti
             @TestMetadata("unacceptableNoThenBlock.kt")
             public void testUnacceptableNoThenBlock() throws Exception {
                 runTest("testData/inspectionsLocal/branched/ifThenToSafeAccess/unacceptableNoThenBlock.kt");
+            }
+
+            @TestMetadata("usageInBlock.kt")
+            public void testUsageInBlock() throws Exception {
+                runTest("testData/inspectionsLocal/branched/ifThenToSafeAccess/usageInBlock.kt");
+            }
+
+            @TestMetadata("usageInBlock2.kt")
+            public void testUsageInBlock2() throws Exception {
+                runTest("testData/inspectionsLocal/branched/ifThenToSafeAccess/usageInBlock2.kt");
             }
 
             @TestMetadata("uselessIsCheck.kt")
@@ -883,6 +983,204 @@ public abstract class LocalInspectionTestGenerated extends AbstractLocalInspecti
             public void testWhenWithUnmatchedCandidateSubjects() throws Exception {
                 runTest("testData/inspectionsLocal/branched/introduceWhenSubject/whenWithUnmatchedCandidateSubjects.kt");
             }
+        }
+    }
+
+    @RunWith(JUnit3RunnerWithInners.class)
+    @TestMetadata("testData/inspectionsLocal/canBeParameter")
+    public static class CanBeParameter extends AbstractLocalInspectionTest {
+        private void runTest(String testDataFilePath) throws Exception {
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+        }
+
+        @TestMetadata("modifiedInInit.kt")
+        public void testModifiedInInit() throws Exception {
+            runTest("testData/inspectionsLocal/canBeParameter/modifiedInInit.kt");
+        }
+
+        @TestMetadata("nonUsed.kt")
+        public void testNonUsed() throws Exception {
+            runTest("testData/inspectionsLocal/canBeParameter/nonUsed.kt");
+        }
+
+        @TestMetadata("similarPropNameUsedInDelegate.kt")
+        public void testSimilarPropNameUsedInDelegate() throws Exception {
+            runTest("testData/inspectionsLocal/canBeParameter/similarPropNameUsedInDelegate.kt");
+        }
+
+        @TestMetadata("similarPropNameUsedInInitializer.kt")
+        public void testSimilarPropNameUsedInInitializer() throws Exception {
+            runTest("testData/inspectionsLocal/canBeParameter/similarPropNameUsedInInitializer.kt");
+        }
+
+        @TestMetadata("similarPropNameUsedInPropertyInitializer.kt")
+        public void testSimilarPropNameUsedInPropertyInitializer() throws Exception {
+            runTest("testData/inspectionsLocal/canBeParameter/similarPropNameUsedInPropertyInitializer.kt");
+        }
+
+        @TestMetadata("usedActualModifier.kt")
+        public void testUsedActualModifier() throws Exception {
+            runTest("testData/inspectionsLocal/canBeParameter/usedActualModifier.kt");
+        }
+
+        @TestMetadata("usedAsReference.kt")
+        public void testUsedAsReference() throws Exception {
+            runTest("testData/inspectionsLocal/canBeParameter/usedAsReference.kt");
+        }
+
+        @TestMetadata("usedFromJava.kt")
+        public void testUsedFromJava() throws Exception {
+            runTest("testData/inspectionsLocal/canBeParameter/usedFromJava.kt");
+        }
+
+        @TestMetadata("usedInConstructor.kt")
+        public void testUsedInConstructor() throws Exception {
+            runTest("testData/inspectionsLocal/canBeParameter/usedInConstructor.kt");
+        }
+
+        @TestMetadata("usedInDataClass.kt")
+        public void testUsedInDataClass() throws Exception {
+            runTest("testData/inspectionsLocal/canBeParameter/usedInDataClass.kt");
+        }
+
+        @TestMetadata("usedInDelegate.kt")
+        public void testUsedInDelegate() throws Exception {
+            runTest("testData/inspectionsLocal/canBeParameter/usedInDelegate.kt");
+        }
+
+        @TestMetadata("usedInDerivedClass.kt")
+        public void testUsedInDerivedClass() throws Exception {
+            runTest("testData/inspectionsLocal/canBeParameter/usedInDerivedClass.kt");
+        }
+
+        @TestMetadata("usedInFunction.kt")
+        public void testUsedInFunction() throws Exception {
+            runTest("testData/inspectionsLocal/canBeParameter/usedInFunction.kt");
+        }
+
+        @TestMetadata("usedInFunctionProperty.kt")
+        public void testUsedInFunctionProperty() throws Exception {
+            runTest("testData/inspectionsLocal/canBeParameter/usedInFunctionProperty.kt");
+        }
+
+        @TestMetadata("usedInGetter.kt")
+        public void testUsedInGetter() throws Exception {
+            runTest("testData/inspectionsLocal/canBeParameter/usedInGetter.kt");
+        }
+
+        @TestMetadata("usedInInitializer.kt")
+        public void testUsedInInitializer() throws Exception {
+            runTest("testData/inspectionsLocal/canBeParameter/usedInInitializer.kt");
+        }
+
+        @TestMetadata("usedInInnerClass.kt")
+        public void testUsedInInnerClass() throws Exception {
+            runTest("testData/inspectionsLocal/canBeParameter/usedInInnerClass.kt");
+        }
+
+        @TestMetadata("usedInLambda.kt")
+        public void testUsedInLambda() throws Exception {
+            runTest("testData/inspectionsLocal/canBeParameter/usedInLambda.kt");
+        }
+
+        @TestMetadata("usedInLocalFunction.kt")
+        public void testUsedInLocalFunction() throws Exception {
+            runTest("testData/inspectionsLocal/canBeParameter/usedInLocalFunction.kt");
+        }
+
+        @TestMetadata("usedInLocalSuper.kt")
+        public void testUsedInLocalSuper() throws Exception {
+            runTest("testData/inspectionsLocal/canBeParameter/usedInLocalSuper.kt");
+        }
+
+        @TestMetadata("usedInObjectLiteral.kt")
+        public void testUsedInObjectLiteral() throws Exception {
+            runTest("testData/inspectionsLocal/canBeParameter/usedInObjectLiteral.kt");
+        }
+
+        @TestMetadata("usedInObjectSuper.kt")
+        public void testUsedInObjectSuper() throws Exception {
+            runTest("testData/inspectionsLocal/canBeParameter/usedInObjectSuper.kt");
+        }
+
+        @TestMetadata("usedInOpenClassProtectedOpen.kt")
+        public void testUsedInOpenClassProtectedOpen() throws Exception {
+            runTest("testData/inspectionsLocal/canBeParameter/usedInOpenClassProtectedOpen.kt");
+        }
+
+        @TestMetadata("usedInOverride.kt")
+        public void testUsedInOverride() throws Exception {
+            runTest("testData/inspectionsLocal/canBeParameter/usedInOverride.kt");
+        }
+
+        @TestMetadata("usedInParent.kt")
+        public void testUsedInParent() throws Exception {
+            runTest("testData/inspectionsLocal/canBeParameter/usedInParent.kt");
+        }
+
+        @TestMetadata("usedInPrivateProperty.kt")
+        public void testUsedInPrivateProperty() throws Exception {
+            runTest("testData/inspectionsLocal/canBeParameter/usedInPrivateProperty.kt");
+        }
+
+        @TestMetadata("usedInProperty.kt")
+        public void testUsedInProperty() throws Exception {
+            runTest("testData/inspectionsLocal/canBeParameter/usedInProperty.kt");
+        }
+
+        @TestMetadata("usedInPropertyAnnotated.kt")
+        public void testUsedInPropertyAnnotated() throws Exception {
+            runTest("testData/inspectionsLocal/canBeParameter/usedInPropertyAnnotated.kt");
+        }
+
+        @TestMetadata("usedInPropertyVar.kt")
+        public void testUsedInPropertyVar() throws Exception {
+            runTest("testData/inspectionsLocal/canBeParameter/usedInPropertyVar.kt");
+        }
+
+        @TestMetadata("usedInSetter.kt")
+        public void testUsedInSetter() throws Exception {
+            runTest("testData/inspectionsLocal/canBeParameter/usedInSetter.kt");
+        }
+
+        @TestMetadata("usedInSuper.kt")
+        public void testUsedInSuper() throws Exception {
+            runTest("testData/inspectionsLocal/canBeParameter/usedInSuper.kt");
+        }
+
+        @TestMetadata("usedOutside.kt")
+        public void testUsedOutside() throws Exception {
+            runTest("testData/inspectionsLocal/canBeParameter/usedOutside.kt");
+        }
+
+        @TestMetadata("usedOverridden.kt")
+        public void testUsedOverridden() throws Exception {
+            runTest("testData/inspectionsLocal/canBeParameter/usedOverridden.kt");
+        }
+
+        @TestMetadata("usedPrivateInInitializer.kt")
+        public void testUsedPrivateInInitializer() throws Exception {
+            runTest("testData/inspectionsLocal/canBeParameter/usedPrivateInInitializer.kt");
+        }
+
+        @TestMetadata("usedVarArg.kt")
+        public void testUsedVarArg() throws Exception {
+            runTest("testData/inspectionsLocal/canBeParameter/usedVarArg.kt");
+        }
+
+        @TestMetadata("usedWithLabeledThisInInitProperty.kt")
+        public void testUsedWithLabeledThisInInitProperty() throws Exception {
+            runTest("testData/inspectionsLocal/canBeParameter/usedWithLabeledThisInInitProperty.kt");
+        }
+
+        @TestMetadata("usedWithThisInInitProperty.kt")
+        public void testUsedWithThisInInitProperty() throws Exception {
+            runTest("testData/inspectionsLocal/canBeParameter/usedWithThisInInitProperty.kt");
+        }
+
+        @TestMetadata("usedWithoutThisInInitProperty.kt")
+        public void testUsedWithoutThisInInitProperty() throws Exception {
+            runTest("testData/inspectionsLocal/canBeParameter/usedWithoutThisInInitProperty.kt");
         }
     }
 

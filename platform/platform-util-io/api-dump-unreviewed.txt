@@ -549,7 +549,7 @@ c:com.intellij.execution.process.ScriptRunnerUtil$ScriptOutput
 - getOutputToParseArray():java.lang.String[]
 - onTextAvailable(com.intellij.execution.process.ProcessEvent,com.intellij.openapi.util.Key):V
 com.intellij.execution.process.SelfKiller
-- tryDestroyGracefully():Z
+- *:tryDestroyGracefully():Z
 f:com.intellij.execution.process.SynchronizedProcessOutput
 - com.intellij.execution.process.ProcessOutput
 - <init>():V
@@ -659,7 +659,6 @@ f:com.intellij.util.Urls
 - sf:parseEncoded(java.lang.String):com.intellij.util.Url
 - sf:parseFromIdea(java.lang.CharSequence):com.intellij.util.Url
 - sf:toUriWithoutParameters(com.intellij.util.Url):java.net.URI
-f:com.intellij.util.UrlsKt
 f:com.intellij.util.io.EnumeratorLongDescriptor
 - com.intellij.util.io.KeyDescriptor
 - sf:INSTANCE:com.intellij.util.io.EnumeratorLongDescriptor

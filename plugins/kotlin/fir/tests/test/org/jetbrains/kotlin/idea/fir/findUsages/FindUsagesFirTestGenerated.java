@@ -609,6 +609,11 @@ public abstract class FindUsagesFirTestGenerated extends AbstractFindUsagesFirTe
                 runTest("../../idea/tests/testData/findUsages/kotlin/findClassUsages/localAndNonLocalClass.0.kt");
             }
 
+            @TestMetadata("primaryConstructorOfEnum.0.kt")
+            public void testPrimaryConstructorOfEnum() throws Exception {
+                runTest("../../idea/tests/testData/findUsages/kotlin/findClassUsages/primaryConstructorOfEnum.0.kt");
+            }
+
             @TestMetadata("primaryConstructorWithDefaultParams.0.kt")
             public void testPrimaryConstructorWithDefaultParams() throws Exception {
                 runTest("../../idea/tests/testData/findUsages/kotlin/findClassUsages/primaryConstructorWithDefaultParams.0.kt");
@@ -1085,6 +1090,11 @@ public abstract class FindUsagesFirTestGenerated extends AbstractFindUsagesFirTe
         public static class FindPrimaryConstructorUsages extends AbstractFindUsagesFirTest {
             private void runTest(String testDataFilePath) throws Exception {
                 KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+            }
+
+            @TestMetadata("annotationConstructorCall.0.kt")
+            public void testAnnotationConstructorCall() throws Exception {
+                runTest("../../idea/tests/testData/findUsages/kotlin/findPrimaryConstructorUsages/annotationConstructorCall.0.kt");
             }
 
             @TestMetadata("annotationEntry.0.kt")

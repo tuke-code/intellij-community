@@ -1,4 +1,4 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.util.indexing;
 
 import com.google.common.collect.Iterators;
@@ -70,7 +70,7 @@ import com.intellij.util.indexing.diagnostic.IndexStatisticGroup;
 import com.intellij.util.indexing.diagnostic.StorageDiagnosticData;
 import com.intellij.util.indexing.events.*;
 import com.intellij.util.indexing.impl.MapReduceIndexMappingException;
-import com.intellij.util.indexing.impl.storage.DefaultIndexStorageLayout;
+import com.intellij.util.indexing.impl.storage.IndexStorageLayoutLocator;
 import com.intellij.util.indexing.impl.storage.TransientFileContentIndex;
 import com.intellij.util.indexing.projectFilter.IncrementalProjectIndexableFilesFilterHolder;
 import com.intellij.util.indexing.projectFilter.ProjectIndexableFilesFilterHolder;
@@ -81,7 +81,6 @@ import com.intellij.util.io.StorageLockContext;
 import com.intellij.util.io.storage.HeavyProcessLatch;
 import com.intellij.util.messages.MessageBus;
 import com.intellij.util.messages.SimpleMessageBusConnection;
-import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
 import kotlinx.coroutines.CoroutineScope;
@@ -158,8 +157,6 @@ public final class FileBasedIndexImpl extends FileBasedIndexEx {
   private final IntSet myStaleIds = new IntOpenHashSet();
   private final DirtyFiles myDirtyFiles = new DirtyFiles(); // project dirty files from last session and new orphan files not in collectors
   private final Map<Project, Ref<Long>> myLastSeenIndexesInOrphanQueue = new ConcurrentHashMap<>();
-  @Nullable
-  private volatile OrphanDirtyFilesQueue myOrphanDirtyFileIdsFromLastSession;
 
   final Lock myReadLock;
   public final Lock myWriteLock;
@@ -336,10 +333,6 @@ public final class FileBasedIndexImpl extends FileBasedIndexEx {
     }
   }
 
-  void setOrphanDirtyFilesQueueFromLastSession(@NotNull OrphanDirtyFilesQueue dirtyFileIds) {
-    myOrphanDirtyFileIdsFromLastSession = dirtyFileIds;
-  }
-
   @NotNull
   DirtyFiles getDirtyFiles() {
     return myDirtyFiles;
@@ -491,7 +484,7 @@ public final class FileBasedIndexImpl extends FileBasedIndexEx {
     int attemptCount = 2;
     for (int attempt = 0; attempt < attemptCount; attempt++) {
       try {
-        VfsAwareIndexStorageLayout<K, V> layout = DefaultIndexStorageLayout.getLayout(extension);
+        VfsAwareIndexStorageLayout<K, V> layout = IndexStorageLayoutLocator.getLayout(extension);
         index = createIndex(extension, layout);
 
         for (FileBasedIndexInfrastructureExtension infrastructureExtension : FileBasedIndexInfrastructureExtension.EP_NAME.getExtensionList()) {
@@ -511,7 +504,7 @@ public final class FileBasedIndexImpl extends FileBasedIndexEx {
         boolean lastAttempt = attempt == attemptCount - 1;
 
         try {
-          VfsAwareIndexStorageLayout<K, V> layout = DefaultIndexStorageLayout.getLayout(extension);
+          VfsAwareIndexStorageLayout<K, V> layout = IndexStorageLayoutLocator.getLayout(extension);
           layout.clearIndexData();
         }
         catch (Exception layoutEx) {
@@ -597,8 +590,9 @@ public final class FileBasedIndexImpl extends FileBasedIndexEx {
     new ProjectDirtyFilesQueue(dirtyFileIds, lastSeenIndex).store(project, vfsCreationStamp);
   }
 
+  @ApiStatus.Internal
   @NotNull
-  private IntSet getAllDirtyFiles(@Nullable Project project) {
+  public IntSet getAllDirtyFiles(@Nullable Project project) {
     IntSet dirtyFileIds = new IntOpenHashSet();
     dirtyFileIds.addAll(getDirtyFiles(getChangedFilesCollector().getDirtyFiles(), project));
     dirtyFileIds.addAll(getDirtyFiles(myFilesToUpdateCollector.getDirtyFiles(), project));
@@ -645,7 +639,7 @@ public final class FileBasedIndexImpl extends FileBasedIndexEx {
         PersistentIndicesConfiguration.saveConfiguration();
 
         IntSet unprocessedOrphanDirtyFiles = new IntOpenHashSet();
-        OrphanDirtyFilesQueue orphanDirtyFileIds = getOrphanDirtyFileIdsFromLastSession();
+        OrphanDirtyFilesQueue orphanDirtyFileIds = registeredIndexes.getOrphanDirtyFilesQueue();
         unprocessedOrphanDirtyFiles.addAll(orphanDirtyFileIds.getFileIds());
 
         if (myIsUnitTestMode) {
@@ -678,7 +672,6 @@ public final class FileBasedIndexImpl extends FileBasedIndexEx {
         myFilesToUpdateCollector.clear();
         myDirtyFiles.clear();
         vfsCreationStamp = 0;
-        myOrphanDirtyFileIdsFromLastSession = null;
 
         // TODO-ank: Should we catch and ignore CancellationException here to allow other lines to execute?
         IndexingStamp.close();
@@ -902,11 +895,6 @@ public final class FileBasedIndexImpl extends FileBasedIndexEx {
         myStaleIds.clear();
       }
     }
-  }
-
-  @NotNull
-  OrphanDirtyFilesQueue getOrphanDirtyFileIdsFromLastSession() {
-    return Objects.requireNonNullElse(myOrphanDirtyFileIdsFromLastSession, new OrphanDirtyFilesQueue(new IntArrayList(), 0L));
   }
 
   void ensureDirtyFileIndexesDeleted(@NotNull Collection<Integer> dirtyFiles) {
@@ -1419,6 +1407,7 @@ public final class FileBasedIndexImpl extends FileBasedIndexEx {
     FileIndexesValuesApplier applier;
     if (isDeleteRequest || !isValid || isTooLarge(file)) {
       ProgressManager.checkCanceled();
+      myIndexableFilesFilterHolder.removeFile(fileId); // in case this is not isDeleteRequest
       applier = new FileIndexesValuesApplier(this, fileId, file, indexingStamp, Collections.emptyList(), Collections.emptyList(),
                                              true, true, applicationMode,
                                              cachedFileType == null ? file.getFileType() : cachedFileType, false);

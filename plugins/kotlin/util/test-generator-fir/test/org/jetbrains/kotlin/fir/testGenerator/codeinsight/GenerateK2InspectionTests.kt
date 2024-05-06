@@ -28,6 +28,7 @@ internal fun MutableTWorkspace.generateK2InspectionTests() {
             model("${idea}/inspectionsLocal/implicitThis")
             model("${idea}/inspectionsLocal/doubleNegation")
             model("${idea}/inspectionsLocal/enumValuesSoftDeprecate")
+            model("${idea}/inspectionsLocal/branched/ifThenToSafeAccess", pattern = Patterns.KT_WITHOUT_DOTS)
             model("${idea}/inspectionsLocal/conventionNameCalls/replaceGetOrSet")
             model("${idea}/inspectionsLocal/nullableBooleanElvis")
             model("${idea}/inspectionsLocal/redundantElvisReturnNull")
@@ -60,6 +61,7 @@ internal fun MutableTWorkspace.generateK2InspectionTests() {
             model("${idea}/inspectionsLocal/branched/introduceWhenSubject")
             model("${idea}/inspectionsLocal/usePropertyAccessSyntax")
             model("${idea}/inspectionsLocal/redundantUnitReturnType")
+            model("${idea}/inspectionsLocal/canBeParameter")
             model("code-insight/inspections-k2/tests/testData/inspectionsLocal", pattern = pattern)
         }
         /**

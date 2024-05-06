@@ -6,6 +6,7 @@ import com.intellij.collaboration.async.launchNow
 import com.intellij.diff.util.DiffDrawUtil
 import com.intellij.diff.util.DiffUtil
 import com.intellij.icons.AllIcons
+import com.intellij.openapi.application.EDT
 import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.application.asContextElement
 import com.intellij.openapi.editor.CustomFoldRegion
@@ -27,7 +28,10 @@ import com.intellij.openapi.util.Disposer
 import com.intellij.ui.ExperimentalUI
 import com.intellij.ui.scale.JBUIScale
 import icons.CollaborationToolsIcons
-import kotlinx.coroutines.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 import org.jetbrains.annotations.ApiStatus
 import java.awt.Graphics
 import java.awt.Rectangle
@@ -40,8 +44,7 @@ import kotlin.properties.Delegates.observable
  */
 @ApiStatus.Internal
 class CodeReviewEditorGutterControlsRenderer
-private constructor(cs: CoroutineScope,
-                    private val model: CodeReviewEditorGutterControlsModel,
+private constructor(private val model: CodeReviewEditorGutterControlsModel,
                     private val editor: EditorEx)
   : LineMarkerRenderer, LineMarkerRendererEx, ActiveGutterRenderer {
 
@@ -58,25 +61,24 @@ private constructor(cs: CoroutineScope,
 
   private val hoverHandler = HoverHandler(editor)
 
-  init {
-    val areaDisposable = Disposer.newDisposable()
-    editor.gutterComponentEx.reserveLeftFreePaintersAreaWidth(areaDisposable, ICON_AREA_WIDTH)
-    editor.addEditorMouseListener(hoverHandler)
-    editor.addEditorMouseMotionListener(hoverHandler)
+  suspend fun launch(): Nothing {
+    withContext(Dispatchers.Main) {
+      val areaDisposable = Disposer.newDisposable()
+      editor.gutterComponentEx.reserveLeftFreePaintersAreaWidth(areaDisposable, ICON_AREA_WIDTH)
+      editor.addEditorMouseListener(hoverHandler)
+      editor.addEditorMouseMotionListener(hoverHandler)
 
-    cs.launchNow {
-      model.gutterControlsState.collect {
-        state = it
-      }
-    }
-    cs.launchNow {
       try {
-        awaitCancellation()
+        model.gutterControlsState.collect {
+          state = it
+        }
       }
       finally {
-        editor.removeEditorMouseListener(hoverHandler)
-        editor.removeEditorMouseMotionListener(hoverHandler)
-        Disposer.dispose(areaDisposable)
+        withContext(NonCancellable) {
+          editor.removeEditorMouseListener(hoverHandler)
+          editor.removeEditorMouseMotionListener(hoverHandler)
+          Disposer.dispose(areaDisposable)
+        }
       }
     }
   }
@@ -304,9 +306,16 @@ private constructor(cs: CoroutineScope,
       }
     }
 
+    @Deprecated("Use a suspending function", ReplaceWith("cs.launch { render(model, editor) }"))
     fun setupIn(cs: CoroutineScope, model: CodeReviewEditorGutterControlsModel, editor: EditorEx) {
       cs.launchNow(Dispatchers.Main) {
-        val renderer = CodeReviewEditorGutterControlsRenderer(this, model, editor)
+        render(model, editor)
+      }
+    }
+
+    suspend fun render(model: CodeReviewEditorGutterControlsModel, editor: EditorEx): Nothing {
+      withContext(Dispatchers.Main) {
+        val renderer = CodeReviewEditorGutterControlsRenderer(model, editor)
         val highlighter = editor.markupModel.addRangeHighlighter(null, 0, editor.document.textLength,
                                                                  DiffDrawUtil.LST_LINE_MARKER_LAYER,
                                                                  HighlighterTargetArea.LINES_IN_RANGE).apply {
@@ -315,7 +324,7 @@ private constructor(cs: CoroutineScope,
           setLineMarkerRenderer(renderer)
         }
         try {
-          awaitCancellation()
+          renderer.launch()
         }
         finally {
           withContext(NonCancellable + ModalityState.any().asContextElement()) {

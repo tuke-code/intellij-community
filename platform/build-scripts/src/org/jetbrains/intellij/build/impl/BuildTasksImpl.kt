@@ -1,4 +1,6 @@
 // Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+@file:Suppress("ReplaceGetOrSet", "ReplacePutWithAssignment")
+
 package org.jetbrains.intellij.build.impl
 
 import com.intellij.openapi.util.JDOMUtil
@@ -32,6 +34,7 @@ import org.jetbrains.intellij.build.impl.productInfo.PRODUCT_INFO_FILE_NAME
 import org.jetbrains.intellij.build.impl.productInfo.ProductInfoLaunchData
 import org.jetbrains.intellij.build.impl.productInfo.checkInArchive
 import org.jetbrains.intellij.build.impl.productInfo.generateProductInfoJson
+import org.jetbrains.intellij.build.impl.productRunner.IntellijProductRunner
 import org.jetbrains.intellij.build.impl.projectStructureMapping.DistributionFileEntry
 import org.jetbrains.intellij.build.impl.projectStructureMapping.includedModules
 import org.jetbrains.intellij.build.impl.projectStructureMapping.writeProjectStructureReport
@@ -50,6 +53,7 @@ import org.jetbrains.jps.model.java.JavaSourceRootType
 import org.jetbrains.jps.model.java.JpsJavaExtensionService
 import org.jetbrains.jps.model.library.*
 import org.jetbrains.jps.model.module.JpsModule
+import org.jetbrains.jps.model.module.JpsModuleDependency
 import org.jetbrains.jps.model.module.JpsTypedModuleSourceRoot
 import org.jetbrains.jps.model.serialization.JpsModelSerializationDataService
 import org.jetbrains.jps.util.JpsPathUtil
@@ -88,7 +92,7 @@ class BuildTasksImpl(private val context: BuildContextImpl) : BuildTasks {
       "intellij.tools.launcherGenerator"
     ).let {
       compilationTasks.compileModules(moduleNames = it)
-      localizeModules(context, moduleNames = it)
+      localizeModules(context = context, moduleNames = it)
     }
 
     buildProjectArtifacts(
@@ -100,12 +104,13 @@ class BuildTasksImpl(private val context: BuildContextImpl) : BuildTasks {
       compilationTasks = compilationTasks,
       context = context,
     )
-    buildSearchableOptions(context)
+    val searchableOptionSetDescriptor = buildSearchableOptions(context)
     buildNonBundledPlugins(
       pluginsToPublish = pluginsToPublish,
       compressPluginArchive = context.options.compressZipFiles,
       buildPlatformLibJob = null,
       state = distState,
+      searchableOptionSetDescriptor = searchableOptionSetDescriptor,
       context = context
     )
   }
@@ -180,7 +185,18 @@ private suspend fun localizeModules(context: BuildContext, moduleNames: Collecti
   }
 
   val localizationDir = getLocalizationDir(context) ?: return
-  val modules = if (moduleNames.isEmpty()) context.project.modules else moduleNames.mapNotNull { context.findModule(it) }
+
+  val modules = if (moduleNames.isEmpty()) {
+    context.project.modules
+  }
+  else {
+    moduleNames.asSequence().mapNotNull { context.findModule(it) }
+      .flatMap { m ->
+        (context as BuildContextImpl).jarPackagerDependencyHelper.readPluginContentFromDescriptor(m).mapNotNull { context.findModule(it) } + sequenceOf(m)
+      }.flatMap { m ->
+        m.dependenciesList.dependencies.asSequence().filterIsInstance<JpsModuleDependency>().mapNotNull { it.module } + sequenceOf(m)
+      }.distinctBy { m -> m.name }.toList()
+  }
   spanBuilder("bundle localizations").setAttribute("moduleCount", modules.size.toLong()).useWithScope {
     for (module in modules) {
       launch(Dispatchers.IO) {
@@ -659,10 +675,8 @@ private suspend fun compileModulesForDistribution(context: BuildContext): Distri
 
       val builtinModuleData = spanBuilder("build provided module list").useWithScope {
         Files.deleteIfExists(providedModuleFile)
-        val tempDir = context.paths.tempDir.resolve("builtinModules")
         // start the product in headless mode using com.intellij.ide.plugins.BundledPluginsLister
-        createDevIdeBuild(context = context).runProduct(
-          tempDir = tempDir,
+        IntellijProductRunner.createRunner(context = context).runProduct(
           listOf("listBundledPlugins", providedModuleFile.toString()),
         )
 
@@ -749,12 +763,12 @@ suspend fun buildDistributions(context: BuildContext): Unit = spanBuilder("build
       Span.current().addEvent(
         "skip building product distributions because 'intellij.build.target.os' property is set to '${BuildOptions.OS_NONE}'"
       )
-      buildSearchableOptions(context)
       buildNonBundledPlugins(
         pluginsToPublish = pluginsToPublish,
         compressPluginArchive = context.options.compressZipFiles,
         buildPlatformLibJob = null,
         state = distributionState,
+        searchableOptionSetDescriptor = buildSearchableOptions(context),
         context = context
       )
       return@coroutineScope
@@ -978,7 +992,8 @@ private fun checkBaseLayout(layout: BaseLayout, description: String, context: Bu
     val libraries = (if (key == null) context.project.libraryCollection else context.findRequiredModule(key).libraryCollection).libraries
     for (libraryName in value) {
       check(libraries.any { getLibraryFileName(it) == libraryName }) {
-        "Cannot find library \'$libraryName\' in \'$key\' (used in \'excludedModuleLibraries\' in $description)"
+        val where = key?.let { "module \'$it\'" } ?: "project"
+        "Cannot find library \'$libraryName\' in $where (used in \'excludedModuleLibraries\' in $description)"
       }
     }
   }
@@ -1398,7 +1413,7 @@ fun collectModulesToCompile(context: BuildContext, result: MutableSet<String>) {
 // Captures information about all available inspections in a JSON format as part of an Inspectopedia project.
 // This is later used by Qodana and other tools.
 // Keymaps are extracted as an XML file and also used in authoring help.
-internal suspend fun buildAdditionalAuthoringArtifacts(ide: DevIdeBuild, context: BuildContext) {
+internal suspend fun buildAdditionalAuthoringArtifacts(productRunner: IntellijProductRunner, context: BuildContext) {
   context.executeStep(spanBuilder("build authoring asserts"), BuildOptions.DOC_AUTHORING_ASSETS_STEP) {
     val commands = listOf(
       Pair("inspectopedia-generator", "inspections-${context.applicationInfo.productCode.lowercase()}"),
@@ -1407,9 +1422,8 @@ internal suspend fun buildAdditionalAuthoringArtifacts(ide: DevIdeBuild, context
     val temporaryBuildDirectory = context.paths.tempDir
     for (command in commands) {
       launch {
-        val temporaryStepDirectory = temporaryBuildDirectory.resolve(command.first)
-        val targetPath = temporaryStepDirectory.resolve(command.second)
-        ide.runProduct(temporaryStepDirectory, arguments = listOf(command.first, targetPath.toString()), isLongRunning = true)
+        val targetPath = temporaryBuildDirectory.resolve(command.first).resolve(command.second)
+        productRunner.runProduct(arguments = listOf(command.first, targetPath.toString()), isLongRunning = true)
 
         val targetFile = context.paths.artifactDir.resolve("${command.second}.zip")
         zipWithCompression(
@@ -1437,11 +1451,7 @@ internal suspend fun setLastModifiedTime(directory: Path, context: BuildContext)
 /**
  * @return list of all modules which output is included in the plugin's JARs
  */
-internal fun collectIncludedPluginModules(
-  enabledPluginModules: Collection<String>,
-  product: ProductModulesLayout,
-  result: MutableSet<String>
-) {
+internal fun collectIncludedPluginModules(enabledPluginModules: Collection<String>, product: ProductModulesLayout, result: MutableSet<String>) {
   result.addAll(enabledPluginModules)
   val enabledPluginModuleSet = if (enabledPluginModules is Set<String> || enabledPluginModules.size < 2) {
     enabledPluginModules
@@ -1501,7 +1511,7 @@ internal fun copyInspectScript(context: BuildContext, distBinDir: Path) {
   }
 }
 
-private fun getLocalizationDir(context: BuildContext): Path? {
+internal fun getLocalizationDir(context: BuildContext): Path? {
   val localizationDir = context.paths.communityHomeDir.parent.resolve("localization")
   if (!Files.exists(localizationDir)) {
     Span.current().addEvent("unable to find 'localization' directory, skip localization bundling")
@@ -1562,6 +1572,14 @@ private fun buildInBundlePropertiesLocalization(
     }
 
     Files.walkFileTree(resourceRoot.path, object : SimpleFileVisitor<Path>() {
+      override fun preVisitDirectory(dir: Path, attrs: BasicFileAttributes): FileVisitResult {
+        val dirName = dir.fileName.toString()
+        if (dirName == "fileTemplates" || dirName == "META-INF" || dirName == "inspections" || dirName == "icons") {
+          return FileVisitResult.SKIP_SUBTREE
+        }
+        return FileVisitResult.CONTINUE
+      }
+
       override fun visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult {
         val fileName = file.fileName
         if (fileName.toString().endsWith("Bundle.properties")) {

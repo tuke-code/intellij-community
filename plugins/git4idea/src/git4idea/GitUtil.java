@@ -544,6 +544,10 @@ public final class GitUtil {
     return ObjectUtils.notNull(remoteBranch, new GitStandardRemoteBranch(remote, branchName));
   }
 
+  /**
+   * @param remotes is REQUIRED to parse 'origin/feature/branch' references:
+   *                these can be both 'branch on origin/feature remote' and 'feature/branch on origin remote'.
+   */
   public static @NotNull GitRemoteBranch parseRemoteBranch(@NotNull String fullBranchName,
                                                            @NotNull Collection<GitRemote> remotes) {
     String stdName = GitBranchUtil.stripRefsPrefix(fullBranchName);
@@ -566,6 +570,11 @@ public final class GitUtil {
 
       if (remote == null) {
         // user may remove the remote section from .git/config, but leave remote refs untouched in .git/refs/remotes
+        // assume that remote names with slashes are less common than branches
+        int firstSlash = stdName.indexOf('/');
+        remoteName = stdName.substring(0, firstSlash);
+        branchName = stdName.substring(firstSlash + 1);
+
         LOG.trace(String.format("No remote found with the name [%s]. All remotes: %s", remoteName, remotes));
         GitRemote fakeRemote = new GitRemote(remoteName, emptyList(), emptyList(), emptyList(), emptyList());
         return new GitStandardRemoteBranch(fakeRemote, branchName);

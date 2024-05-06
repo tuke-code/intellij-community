@@ -88,11 +88,6 @@ public abstract class InspectionTestGenerated extends AbstractInspectionTest {
             runTest("testData/inspections/arrayInDataClass/inspectionData/inspections.test");
         }
 
-        @TestMetadata("canBeParameter/inspectionData/inspections.test")
-        public void testCanBeParameter_inspectionData_Inspections_test() throws Exception {
-            runTest("testData/inspections/canBeParameter/inspectionData/inspections.test");
-        }
-
         @TestMetadata("canBePrimaryConstructorProperty/inspectionData/inspections.test")
         public void testCanBePrimaryConstructorProperty_inspectionData_Inspections_test() throws Exception {
             runTest("testData/inspections/canBePrimaryConstructorProperty/inspectionData/inspections.test");
@@ -414,11 +409,6 @@ public abstract class InspectionTestGenerated extends AbstractInspectionTest {
         @TestMetadata("branched/ifThenToElvis/inspectionData/inspections.test")
         public void testBranched_ifThenToElvis_inspectionData_Inspections_test() throws Exception {
             runTest("testData/inspectionsLocal/branched/ifThenToElvis/inspectionData/inspections.test");
-        }
-
-        @TestMetadata("branched/ifThenToSafeAccess/inspectionData/inspections.test")
-        public void testBranched_ifThenToSafeAccess_inspectionData_Inspections_test() throws Exception {
-            runTest("testData/inspectionsLocal/branched/ifThenToSafeAccess/inspectionData/inspections.test");
         }
 
         @TestMetadata("conventionNameCalls/replaceGetOrSet/inspectionData/inspections.test")

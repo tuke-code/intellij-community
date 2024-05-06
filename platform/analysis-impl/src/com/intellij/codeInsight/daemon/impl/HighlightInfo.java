@@ -56,6 +56,11 @@ import static com.intellij.openapi.util.NlsContexts.Tooltip;
 public class HighlightInfo implements Segment {
   private static final Logger LOG = Logger.getInstance(HighlightInfo.class);
 
+  /**
+   * Short name of the {@link com.intellij.codeInsight.daemon.impl.HighlightVisitorBasedInspection} tool, which needs to be treated differently from other inspections:
+   * it doesn't have "disable" or "suppress" quickfixes
+   */
+  static final String ANNOTATOR_INSPECTION_SHORT_NAME = "Annotator";
   // optimization: if tooltip contains this marker object, then it replaced with description field in getTooltip()
   private static final String DESCRIPTION_PLACEHOLDER = "\u0000";
 
@@ -507,7 +512,12 @@ public class HighlightInfo implements Segment {
     if (gutterIconRenderer != null) {
       s += "; gutter: " + gutterIconRenderer;
     }
-    s += "; toolId: " + toolId;
+    if (toolId != null) {
+      s += "; toolId: " + toolId;
+    }
+    if (forcedTextAttributesKey != null) {
+      s += "; forcedTextAttributesKey: " + forcedTextAttributesKey;
+    }
     return s;
   }
 
@@ -618,20 +628,18 @@ public class HighlightInfo implements Segment {
     TextAttributesKey key = annotation.getTextAttributes();
     TextAttributesKey forcedAttributesKey = forcedAttributes == null && key != HighlighterColors.NO_HIGHLIGHTING ? key : null;
 
-    PsiReference unresolvedReference = annotation.getUnresolvedReference();
     HighlightInfo info = new HighlightInfo(
       forcedAttributes, forcedAttributesKey, convertType(annotation), annotation.getStartOffset(), annotation.getEndOffset(),
       annotation.getMessage(), annotation.getTooltip(), annotation.getSeverity(), annotation.isAfterEndOfLine(),
       annotation.needsUpdateOnTyping(),
       annotation.isFileLevelAnnotation(), 0, annotation.getProblemGroup(), annotatorClass, annotation.getGutterIconRenderer(), Pass.UPDATE_ALL,
-      unresolvedReference);
+      annotation.getUnresolvedReference());
 
     List<? extends Annotation.QuickFixInfo> fixes = batchMode ? annotation.getBatchFixes() : annotation.getQuickFixes();
     if (fixes != null) {
       for (Annotation.QuickFixInfo quickFixInfo : fixes) {
         TextRange range = quickFixInfo.textRange;
-        HighlightDisplayKey k = quickFixInfo.key != null ? quickFixInfo.key
-                                                         : HighlightDisplayKey.find(HighlightVisitorBasedInspection.SHORT_NAME);
+        HighlightDisplayKey k = quickFixInfo.key != null ? quickFixInfo.key : HighlightDisplayKey.find(ANNOTATOR_INSPECTION_SHORT_NAME);
         info.registerFix(quickFixInfo.quickFix, null, HighlightDisplayKey.getDisplayNameByKey(k), range, k);
       }
     }
@@ -727,7 +735,7 @@ public class HighlightInfo implements Segment {
     }
 
     @Nullable IntentionActionDescriptor copyWithEmptyAction() {
-      if (myKey == null || myKey.getID().equals(HighlightVisitorBasedInspection.SHORT_NAME)) {
+      if (myKey == null || myKey.getID().equals(ANNOTATOR_INSPECTION_SHORT_NAME)) {
         // No need to show "Inspection 'Annotator' options" quick fix, it wouldn't be actionable.
         return null;
       }
@@ -805,7 +813,7 @@ public class HighlightInfo implements Segment {
         InspectionProfileEntry wrappedTool =
           toolWrapper instanceof LocalInspectionToolWrapper ? ((LocalInspectionToolWrapper)toolWrapper).getTool()
                                                             : ((GlobalInspectionToolWrapper)toolWrapper).getTool();
-        if (wrappedTool instanceof HighlightVisitorBasedInspection) {
+        if (ANNOTATOR_INSPECTION_SHORT_NAME.equals(wrappedTool.getShortName())) {
           List<IntentionAction> actions = Collections.emptyList();
           if (myProblemGroup instanceof SuppressableProblemGroup) {
             actions = Arrays.asList(((SuppressableProblemGroup)myProblemGroup).getSuppressActions(element));
@@ -1078,5 +1086,8 @@ public class HighlightInfo implements Segment {
   }
   boolean isFromInspection() {
     return toolId instanceof String;
+  }
+  boolean isFromHighlightVisitor() {
+    return toolId instanceof Class<?> c && HighlightVisitor.class.isAssignableFrom(c);
   }
 }

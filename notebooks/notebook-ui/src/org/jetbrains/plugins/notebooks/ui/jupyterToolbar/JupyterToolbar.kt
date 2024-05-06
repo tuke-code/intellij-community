@@ -19,14 +19,9 @@ import javax.swing.BorderFactory
 import javax.swing.JComponent
 import javax.swing.SwingUtilities
 
-
-/**
- * @See com.intellij.bigdatatools.visualization.inlays.components.FadingToolbar
- * PY-66455
- */
 @ApiStatus.Internal
 class JupyterToolbar(actionGroup: ActionGroup, target: JComponent, place: String = ActionPlaces.EDITOR_INLAY) :
-  ActionToolbarImpl(place, actionGroup, true)
+  ActionToolbarImpl(place, actionGroup, true)  // PY-66455
 {
   init {
     val borderColor = when (NewUiValue.isEnabled()) {
@@ -62,11 +57,16 @@ class JupyterToolbar(actionGroup: ActionGroup, target: JComponent, place: String
   }
 
   fun getRespectiveLineNumberInEditor(editor: Editor): Int? {
-    val point = SwingUtilities.convertPoint(this, 0, this.height, editor.contentComponent)
-    return point.y
-      .takeIf { it >= 0 }
-      ?.let { editor.xyToLogicalPosition(point).line }
+    val point = SwingUtilities.convertPoint(this, 0, this.height * 2, editor.contentComponent)
+    val documentLineCount = editor.document.lineCount
+    var prospectiveLineNumber = point.y
+                                  .takeIf { it >= 0 }
+                                  ?.let { editor.xyToLogicalPosition(point).line } ?: return null
+    if (prospectiveLineNumber >= documentLineCount) { prospectiveLineNumber = documentLineCount - 1 }
+    return prospectiveLineNumber
   }
+
+  override fun installPopupHandler(customizable: Boolean, popupActionGroup: ActionGroup?, popupActionId: String?) = Unit
 
   companion object {
     private const val ALPHA = 1.0f

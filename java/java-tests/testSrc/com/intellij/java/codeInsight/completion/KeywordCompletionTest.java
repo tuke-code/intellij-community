@@ -123,13 +123,9 @@ public class KeywordCompletionTest extends LightCompletionTestCase {
 
   public void testNewInCast() { doTest(2, "new", "null", "true", "false"); }
 
+  @NeedsIndex.ForStandardLibrary
   public void testNewInNegation() {
-    if (getIndexingMode() == IndexingMode.DUMB_EMPTY_INDEX) {
-      // Object's methods are not found in empty indices, so the only element is inserted
-      doTest();
-    } else {
-      doTest(1, "new", "null", "true", "false");
-    }
+    doTest(1, "new", "null", "true", "false");
   }
 
   public void testSpaceAfterInstanceof() { doTest(); }
@@ -217,6 +213,12 @@ public class KeywordCompletionTest extends LightCompletionTestCase {
   public void testEnumPermitsList() {setLanguageLevel(LanguageLevel.JDK_17);  doTest(0, "permits"); }
   public void testInnerClassSealedModifier() {setLanguageLevel(LanguageLevel.JDK_17);  doTest(1, "sealed");}
   public void testInterfaceInnerClassSealedModifier() {setLanguageLevel(LanguageLevel.JDK_17);  doTest(1, "sealed");}
+  
+  public void testModuleKeyword() {
+    configureFromFileText("module-info.java", "m<caret>odule hello;");
+    complete();
+    assertContainsItems("module");
+  }
 
   public void testOverwriteCatch() {
     configureByTestName();
@@ -244,6 +246,34 @@ public class KeywordCompletionTest extends LightCompletionTestCase {
   public void testAfterWildcard() {
     configureByTestName();
     assertStringItems("extends", "super");
+  }
+
+  public void testImportKeyword() {
+    configureFromFileText("Test.java", """
+      import java.util.*;
+      <caret>import java.util.stream.Stream;
+      
+      class Main {}""");
+    complete();
+    assertContainsItems("import");
+  }
+
+  public void testPackageKeyword() {
+    configureFromFileText("Test.java", """
+      pa<caret>ckage hello.world;
+      """);
+    complete();
+    assertContainsItems("package");
+  }
+
+  public void testPackageKeywordNotInClass() {
+    configureFromFileText("Test.java", """
+      class Test {
+        <caret>
+      }
+      """);
+    complete();
+    assertNotContainItems("package");
   }
 
   private void doTest() {

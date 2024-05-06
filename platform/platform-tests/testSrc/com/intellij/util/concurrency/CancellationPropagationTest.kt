@@ -22,6 +22,7 @@ import com.intellij.testFramework.TestLoggerFactory.TestLoggerAssertionError
 import com.intellij.testFramework.common.timeoutRunBlocking
 import com.intellij.testFramework.junit5.SystemProperty
 import com.intellij.testFramework.junit5.TestApplication
+import com.intellij.util.application
 import com.intellij.util.getValue
 import com.intellij.util.setValue
 import kotlinx.coroutines.*
@@ -31,6 +32,7 @@ import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertDoesNotThrow
 import org.junit.jupiter.api.assertThrows
+import java.util.EnumSet
 import java.util.concurrent.*
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
@@ -286,6 +288,7 @@ class CancellationPropagationTest {
       service.scheduleWithFixedDelay(it.runnable(), 5, 10, TimeUnit.MILLISECONDS)
     }
     doTestScheduleWithFixedDelay(service)
+    doTestNoErrorsWhenOuterJobDied(service)
   }
 
   private suspend fun doTestJobIsCancelledByFuture(submit: (() -> Unit) -> Future<*>) {
@@ -387,6 +390,29 @@ class CancellationPropagationTest {
     //suppressed until this one is fixed: https://youtrack.jetbrains.com/issue/KT-52379
     @Suppress("AssertBetweenInconvertibleTypes")
     assertSame(throwable, ce.cause)
+  }
+
+  private fun doTestNoErrorsWhenOuterJobDied(service: ScheduledExecutorService) {
+    // scheduled executor service should not throw exceptions when the outer scope is canceled
+    // it was the case previously, because internal continuations were resumed multiple times, which is forbidden
+    val counter = AtomicInteger(0)
+    val errorList = AtomicReference(emptyList<Throwable?>())
+
+    LoggedErrorProcessor.executeWith<Nothing>(object : LoggedErrorProcessor() {
+      override fun processError(category: String, message: String, details: Array<out String>, t: Throwable?): Set<Action> {
+        // errors here are unexpected
+        errorList.updateAndGet { it + listOf(t) }
+        return EnumSet.of(Action.RETHROW)
+      }
+    }) {
+      withRootJob { outerJob ->
+        // enable cancellation propagation
+        service.scheduleWithFixedDelay({ if (counter.incrementAndGet() == 3) outerJob.cancel() }, 0, 100, TimeUnit.MILLISECONDS)
+      }
+      // after the root job dies, we give some scheduled tasks a chance to run
+      Thread.sleep(1000)
+    }
+    assertTrue(errorList.get().isEmpty())
   }
 
   @Test
@@ -607,7 +633,7 @@ class CancellationPropagationTest {
     }
 
   @Test
-  fun `blockingContextScope fails with exception even in cancelled state`() : Unit = timeoutRunBlocking {
+  fun `blockingContextScope fails with exception even in cancelled state`(): Unit = timeoutRunBlocking {
     // this scenario represents a case where an error occurs during the cleanup after cancellation
     // we should not silently swallow the error, since it is important to know that the cleanup went wrong
     try {
@@ -726,9 +752,9 @@ class CancellationPropagationTest {
   }
 
   @Test
-  fun `runAsCoroutinesThrows PCE`() : Unit = timeoutRunBlocking {
+  fun `runAsCoroutinesThrows PCE`(): Unit = timeoutRunBlocking {
     assertThrows<ProcessCanceledException> {
-      runAsCoroutine(Continuation(EmptyCoroutineContext) {}, true) {
+      runAsCoroutine(Continuation(EmptyCoroutineContext + Job()) {}, true) {
         throw CancellationException()
       }
     }
@@ -742,7 +768,7 @@ class CancellationPropagationTest {
   }
 
   @Test
-  fun `external cancellation of scheduled runnable`() : Unit = timeoutRunBlocking {
+  fun `external cancellation of scheduled runnable`(): Unit = timeoutRunBlocking {
     val semaphore = Semaphore(1)
     val normalExecutionCounter = AtomicInteger(0)
     assertThrows<CancellationException> {
@@ -764,11 +790,28 @@ class CancellationPropagationTest {
   }
 
   @Test
-  fun `invokeLater throws PCE`() : Unit = timeoutRunBlocking {
+  fun `invokeLater throws PCE`(): Unit = timeoutRunBlocking {
     blockingContextScope {
       ApplicationManager.getApplication().invokeLater {
         throw ProcessCanceledException()
       }
     }
+  }
+
+  @Test
+  fun `invokeAndWait propagates cancellation`(): Unit = timeoutRunBlocking {
+    val semaphore = Semaphore(1)
+    val job = launch(Dispatchers.Default) {
+      blockingContext {
+        semaphore.up()
+        application.invokeAndWait {
+          while (true) {
+            Cancellation.checkCancelled()
+          }
+        }
+      }
+    }
+    semaphore.timeoutWaitUp()
+    job.cancel()
   }
 }

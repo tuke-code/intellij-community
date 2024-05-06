@@ -51,6 +51,7 @@ import java.time.LocalTime
 import javax.imageio.ImageIO
 import kotlin.reflect.full.createInstance
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 
 @TestOnly
 @ApiStatus.Internal
@@ -61,11 +62,11 @@ open class DistributedTestHost(coroutineScope: CoroutineScope) {
 
     fun getDistributedTestPort(): Int? =
       System.getProperty(AgentConstants.protocolPortPropertyName)?.toIntOrNull()
-    
-    /** 
+
+    /**
      * ID of the plugin which contains test code.
      * Currently, only test code of the client part is put to a separate plugin.
-     */    
+     */
     const val TEST_PLUGIN_ID: String = "com.intellij.tests.plugin"
     const val TEST_PLUGIN_DIRECTORY_NAME: String = "tests-plugin"
   }
@@ -226,18 +227,19 @@ open class DistributedTestHost(coroutineScope: CoroutineScope) {
           }
         }
 
+        suspend fun waitProjectInitialisedOrDisposed(it: Project) {
+          runLogged("Wait project '${it.name}' is initialised or disposed", 10.seconds) {
+            while (!it.isInitialized || it.isDisposed) {
+              delay(1.seconds)
+            }
+          }
+        }
+
         // causes problems if not scheduled on ui thread
         session.closeProjectIfOpened.setSuspendPreserveClientId { _, _ ->
-          runLogged("Close project if it is opened") {
-            ProjectManagerEx.getOpenProjects().forEach {
-              // (RDCT-960) ModalityState.current() is used here, because
-              // both ModalityState.current() and ModalityState.any() allow to start project closing even under modality,
-              // but project closing is not allowed under ModalityState.any() (see doc for ModalityState.any())
-              withContext(Dispatchers.EDT + ModalityState.current().asContextElement() + NonCancellable) {
-                ProjectManagerEx.getInstanceEx().forceCloseProject(it)
-              }
-            }
-            true
+          withContext(Dispatchers.EDT + ModalityState.any().asContextElement() + NonCancellable) {
+            ProjectManagerEx.getOpenProjects().forEach { waitProjectInitialisedOrDisposed(it) }
+            ProjectManagerEx.getInstanceEx().closeAndDisposeAllProjects(checkCanClose = false)
           }
         }
         /**
@@ -246,7 +248,7 @@ open class DistributedTestHost(coroutineScope: CoroutineScope) {
         session.exitApp.adviseOn(lifetime, Dispatchers.Default.asRdScheduler) {
           lifetime.launch(Dispatchers.EDT + ModalityState.any().asContextElement() + NonCancellable) {
             LOG.info("Exiting the application...")
-            app.exit(true, true, false)
+            app.exit(/* force = */ false, /* exitConfirmed = */ true, /* restart = */ false)
           }
         }
 

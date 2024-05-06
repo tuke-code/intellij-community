@@ -1028,6 +1028,79 @@ public abstract class K2IntroduceFunctionTestGenerated extends AbstractK2Introdu
     }
 
     @RunWith(JUnit3RunnerWithInners.class)
+    @TestMetadata("../../idea/tests/testData/refactoring/extractFunction/duplicates")
+    public static class Duplicates extends AbstractK2IntroduceFunctionTest {
+        private void runTest(String testDataFilePath) throws Exception {
+            KotlinTestUtils.runTest(this::doExtractFunctionTest, this, testDataFilePath);
+        }
+
+        @TestMetadata("branchingMatch1.kt")
+        public void testBranchingMatch1() throws Exception {
+            runTest("../../idea/tests/testData/refactoring/extractFunction/duplicates/branchingMatch1.kt");
+        }
+
+        @TestMetadata("branchingMatch2.kt")
+        public void testBranchingMatch2() throws Exception {
+            runTest("../../idea/tests/testData/refactoring/extractFunction/duplicates/branchingMatch2.kt");
+        }
+
+        @TestMetadata("defaultCF.kt")
+        public void testDefaultCF() throws Exception {
+            runTest("../../idea/tests/testData/refactoring/extractFunction/duplicates/defaultCF.kt");
+        }
+
+        @TestMetadata("insertAfterDuplicates.kt")
+        public void testInsertAfterDuplicates() throws Exception {
+            runTest("../../idea/tests/testData/refactoring/extractFunction/duplicates/insertAfterDuplicates.kt");
+        }
+
+        @TestMetadata("insertBeforeDuplicates.kt")
+        public void testInsertBeforeDuplicates() throws Exception {
+            runTest("../../idea/tests/testData/refactoring/extractFunction/duplicates/insertBeforeDuplicates.kt");
+        }
+
+        @TestMetadata("literalAsParameter.kt")
+        public void testLiteralAsParameter() throws Exception {
+            runTest("../../idea/tests/testData/refactoring/extractFunction/duplicates/literalAsParameter.kt");
+        }
+
+        @TestMetadata("multipleOutputValuesMatching.kt")
+        public void testMultipleOutputValuesMatching() throws Exception {
+            runTest("../../idea/tests/testData/refactoring/extractFunction/duplicates/multipleOutputValuesMatching.kt");
+        }
+
+        @TestMetadata("nestedStrongMatch.kt")
+        public void testNestedStrongMatch() throws Exception {
+            runTest("../../idea/tests/testData/refactoring/extractFunction/duplicates/nestedStrongMatch.kt");
+        }
+
+        @TestMetadata("notNullAssertion.kt")
+        public void testNotNullAssertion() throws Exception {
+            runTest("../../idea/tests/testData/refactoring/extractFunction/duplicates/notNullAssertion.kt");
+        }
+
+        @TestMetadata("outputValueAndUnitMatching.kt")
+        public void testOutputValueAndUnitMatching() throws Exception {
+            runTest("../../idea/tests/testData/refactoring/extractFunction/duplicates/outputValueAndUnitMatching.kt");
+        }
+
+        @TestMetadata("outputValueMatching.kt")
+        public void testOutputValueMatching() throws Exception {
+            runTest("../../idea/tests/testData/refactoring/extractFunction/duplicates/outputValueMatching.kt");
+        }
+
+        @TestMetadata("singleExpression.kt")
+        public void testSingleExpression() throws Exception {
+            runTest("../../idea/tests/testData/refactoring/extractFunction/duplicates/singleExpression.kt");
+        }
+
+        @TestMetadata("syntheticJavaReference.kt")
+        public void testSyntheticJavaReference() throws Exception {
+            runTest("../../idea/tests/testData/refactoring/extractFunction/duplicates/syntheticJavaReference.kt");
+        }
+    }
+
+    @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../idea/tests/testData/refactoring/extractFunction/initializers")
     public abstract static class Initializers extends AbstractK2IntroduceFunctionTest {
         @RunWith(JUnit3RunnerWithInners.class)
@@ -1256,6 +1329,11 @@ public abstract class K2IntroduceFunctionTestGenerated extends AbstractK2Introdu
         @TestMetadata("filterPropagatingMarkers.kt")
         public void testFilterPropagatingMarkers() throws Exception {
             runTest("../../idea/tests/testData/refactoring/extractFunction/optIn/filterPropagatingMarkers.kt");
+        }
+
+        @TestMetadata("filterPropagatingMarkersImplicitUsage.kt")
+        public void testFilterPropagatingMarkersImplicitUsage() throws Exception {
+            runTest("../../idea/tests/testData/refactoring/extractFunction/optIn/filterPropagatingMarkersImplicitUsage.kt");
         }
 
         @TestMetadata("filterPropagatingMarkersWitArgs.kt")
@@ -1704,6 +1782,11 @@ public abstract class K2IntroduceFunctionTestGenerated extends AbstractK2Introdu
                 runTest("../../idea/tests/testData/refactoring/extractFunction/parameters/misc/qualifiedTypeRef.kt");
             }
 
+            @TestMetadata("receiverWithFunctionalLiteral.kt")
+            public void testReceiverWithFunctionalLiteral() throws Exception {
+                runTest("../../idea/tests/testData/refactoring/extractFunction/parameters/misc/receiverWithFunctionalLiteral.kt");
+            }
+
             @TestMetadata("reducedParameterList.kt")
             public void testReducedParameterList() throws Exception {
                 runTest("../../idea/tests/testData/refactoring/extractFunction/parameters/misc/reducedParameterList.kt");
@@ -1935,6 +2018,11 @@ public abstract class K2IntroduceFunctionTestGenerated extends AbstractK2Introdu
     public static class TypeParameters extends AbstractK2IntroduceFunctionTest {
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doExtractFunctionTest, this, testDataFilePath);
+        }
+
+        @TestMetadata("definitelyNotNullType.kt")
+        public void testDefinitelyNotNullType() throws Exception {
+            runTest("../../idea/tests/testData/refactoring/extractFunction/typeParameters/definitelyNotNullType.kt");
         }
 
         @TestMetadata("localClassInBound.kt")

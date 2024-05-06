@@ -561,6 +561,11 @@ public abstract class ExtractionTestGenerated extends AbstractExtractionTest {
                 runTest("testData/refactoring/introduceVariable/It.kt");
             }
 
+            @TestMetadata("javaInnerClassQualifier.kt")
+            public void testJavaInnerClassQualifier() throws Exception {
+                runTest("testData/refactoring/introduceVariable/javaInnerClassQualifier.kt");
+            }
+
             @TestMetadata("kt10808.kt")
             public void testKt10808() throws Exception {
                 runTest("testData/refactoring/introduceVariable/kt10808.kt");
@@ -724,6 +729,11 @@ public abstract class ExtractionTestGenerated extends AbstractExtractionTest {
             @TestMetadata("PropertyAccessorAddBlockInner.kt")
             public void testPropertyAccessorAddBlockInner() throws Exception {
                 runTest("testData/refactoring/introduceVariable/PropertyAccessorAddBlockInner.kt");
+            }
+
+            @TestMetadata("propertyBasedQualifier.kt")
+            public void testPropertyBasedQualifier() throws Exception {
+                runTest("testData/refactoring/introduceVariable/propertyBasedQualifier.kt");
             }
 
             @TestMetadata("qualifier.kt")
@@ -1891,6 +1901,11 @@ public abstract class ExtractionTestGenerated extends AbstractExtractionTest {
                 runTest("testData/refactoring/extractFunction/duplicates/insertBeforeDuplicates.kt");
             }
 
+            @TestMetadata("literalAsParameter.kt")
+            public void testLiteralAsParameter() throws Exception {
+                runTest("testData/refactoring/extractFunction/duplicates/literalAsParameter.kt");
+            }
+
             @TestMetadata("multipleOutputValuesMatching.kt")
             public void testMultipleOutputValuesMatching() throws Exception {
                 runTest("testData/refactoring/extractFunction/duplicates/multipleOutputValuesMatching.kt");
@@ -1919,6 +1934,11 @@ public abstract class ExtractionTestGenerated extends AbstractExtractionTest {
             @TestMetadata("singleExpression.kt")
             public void testSingleExpression() throws Exception {
                 runTest("testData/refactoring/extractFunction/duplicates/singleExpression.kt");
+            }
+
+            @TestMetadata("syntheticJavaReference.kt")
+            public void testSyntheticJavaReference() throws Exception {
+                runTest("testData/refactoring/extractFunction/duplicates/syntheticJavaReference.kt");
             }
         }
 
@@ -2151,6 +2171,11 @@ public abstract class ExtractionTestGenerated extends AbstractExtractionTest {
             @TestMetadata("filterPropagatingMarkers.kt")
             public void testFilterPropagatingMarkers() throws Exception {
                 runTest("testData/refactoring/extractFunction/optIn/filterPropagatingMarkers.kt");
+            }
+
+            @TestMetadata("filterPropagatingMarkersImplicitUsage.kt")
+            public void testFilterPropagatingMarkersImplicitUsage() throws Exception {
+                runTest("testData/refactoring/extractFunction/optIn/filterPropagatingMarkersImplicitUsage.kt");
             }
 
             @TestMetadata("filterPropagatingMarkersWitArgs.kt")
@@ -2599,6 +2624,11 @@ public abstract class ExtractionTestGenerated extends AbstractExtractionTest {
                     runTest("testData/refactoring/extractFunction/parameters/misc/qualifiedTypeRef.kt");
                 }
 
+                @TestMetadata("receiverWithFunctionalLiteral.kt")
+                public void testReceiverWithFunctionalLiteral() throws Exception {
+                    runTest("testData/refactoring/extractFunction/parameters/misc/receiverWithFunctionalLiteral.kt");
+                }
+
                 @TestMetadata("reducedParameterList.kt")
                 public void testReducedParameterList() throws Exception {
                     runTest("testData/refactoring/extractFunction/parameters/misc/reducedParameterList.kt");
@@ -2830,6 +2860,11 @@ public abstract class ExtractionTestGenerated extends AbstractExtractionTest {
         public static class TypeParameters extends AbstractExtractionTest {
             private void runTest(String testDataFilePath) throws Exception {
                 KotlinTestUtils.runTest(this::doExtractFunctionTest, this, testDataFilePath);
+            }
+
+            @TestMetadata("definitelyNotNullType.kt")
+            public void testDefinitelyNotNullType() throws Exception {
+                runTest("testData/refactoring/extractFunction/typeParameters/definitelyNotNullType.kt");
             }
 
             @TestMetadata("localClassInBound.kt")
@@ -3444,6 +3479,11 @@ public abstract class ExtractionTestGenerated extends AbstractExtractionTest {
             @TestMetadata("classUsedParameter.kt")
             public void testClassUsedParameter() throws Exception {
                 runTest("testData/refactoring/introduceParameter/classUsedParameter.kt");
+            }
+
+            @TestMetadata("defaultParameter.kt")
+            public void testDefaultParameter() throws Exception {
+                runTest("testData/refactoring/introduceParameter/defaultParameter.kt");
             }
 
             @TestMetadata("defaultValueInParens.kt")

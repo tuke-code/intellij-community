@@ -8,7 +8,7 @@ fun main() {
             launch(Dispatchers.Default) {
                 val x = funWithSuspendLast(i)
                 println("x = $x")
-                delay(1)
+                delay(100)
                 println("i = $i")
             }
         }
@@ -26,7 +26,7 @@ suspend fun funWithSuspendLast(i: Int): Int {
 }
 
 suspend fun someInt(): Int {
-    delay(1)
+    delay(100)
     return 42
 }
 
@@ -35,3 +35,4 @@ suspend fun someInt(): Int {
 
 // REGISTRY: debugger.filter.breakpoints.by.coroutine.id=true
 // REGISTRY: debugger.always.suspend.thread.before.switch=true
+// REGISTRY: debugger.async.stacks.coroutines=false

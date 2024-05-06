@@ -14,12 +14,16 @@ import kotlin.properties.Delegates
  * A very special panel that does optimized painting for rounded combined diff panels
  */
 internal class CombinedDiffContainerPanel(
-  layout: LayoutManager?, private val roundedBottom: Boolean
+  layout: LayoutManager?, var roundedBottom: Boolean
 ) : JPanel(layout) {
   private val arcRadius: Int = CombinedDiffUI.BLOCK_ARC
 
   private val borderThickness: Int = 1
   var borderColor: Color by Delegates.observable(CombinedDiffUI.EDITOR_BORDER_COLOR) { _, oldValue, newValue ->
+    if (oldValue != newValue) repaint()
+  }
+
+  var bottomBorderColor: Color by Delegates.observable(CombinedDiffUI.EDITOR_BORDER_COLOR) { _, oldValue, newValue ->
     if (oldValue != newValue) repaint()
   }
 
@@ -104,7 +108,7 @@ internal class CombinedDiffContainerPanel(
   private fun paintBottomBoxOutline(g: Graphics2D, outerBounds: Rectangle) {
     GraphicsUtil.disableAAPainting(g)
 
-    g.color = CombinedDiffUI.EDITOR_BORDER_COLOR //sticky header bottom border color
+    g.color = bottomBorderColor //sticky header bottom border color
 
     // bottom
     g.fillRect(outerBounds.x, outerBounds.y + height - borderThickness, outerBounds.width, borderThickness)

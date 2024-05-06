@@ -28,6 +28,7 @@ import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.refreshAndFindVirtualFileOrDirectory
 import com.intellij.platform.backend.observation.trackActivityBlocking
 import com.intellij.util.LocalTimeCounter.currentTime
+import kotlinx.serialization.Serializable
 import org.jetbrains.annotations.ApiStatus
 import java.nio.file.Path
 import java.util.concurrent.Executor
@@ -247,7 +248,11 @@ class ProjectSettingsTracker(
     subscribeOnDocumentsAndVirtualFilesChanges(settingsAsyncSupplier, ProjectSettingsListener(), parentDisposable)
   }
 
-  data class State(var isDirty: Boolean = true, var settingsFiles: Map<String, Long> = emptyMap())
+  @Serializable
+  data class State(
+    val isDirty: Boolean = true,
+    val settingsFiles: Map<String, Long> = emptyMap()
+  )
 
   private class SettingsFilesStatus(
     val oldCRC: Map<String, Long>,

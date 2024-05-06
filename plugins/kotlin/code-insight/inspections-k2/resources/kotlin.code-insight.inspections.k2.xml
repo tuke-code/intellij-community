@@ -322,6 +322,13 @@
     <localInspection implementationClass="org.jetbrains.kotlin.idea.k2.codeinsight.inspections.JoinDeclarationAndAssignmentInspection"
                      language="kotlin"
                      groupPath="Kotlin"
+                     groupBundle="messages.KotlinBundle" groupKey="group.names.style.issues"
+                     enabledByDefault="true"
+                     level="WEAK WARNING" key="inspection.if.then.to.safe.access.display.name" bundle="messages.KotlinBundle"/>
+
+    <localInspection implementationClass="org.jetbrains.kotlin.idea.k2.codeinsight.inspections.IfThenToSafeAccessInspection"
+                     language="kotlin"
+                     groupPath="Kotlin"
                      groupBundle="messages.KotlinBundle" groupKey="group.names.redundant.constructs"
                      enabledByDefault="true"
                      level="WEAK WARNING" key="can.be.joined.with.assignment" bundle="messages.KotlinBundle"/>
@@ -390,6 +397,15 @@
                      level="WEAK WARNING"
                      language="kotlin"
                      key="inspection.replace.java.static.method.with.kotlin.analog.display.name" bundle="messages.KotlinBundle"/>
+
+    <localInspection implementationClass="org.jetbrains.kotlin.idea.k2.codeinsight.inspections.CanBeParameterInspection"
+                     shortName="CanBeParameter"
+                     groupPath="Kotlin"
+                     groupBundle="messages.KotlinBundle" groupKey="group.names.redundant.constructs"
+                     enabledByDefault="true"
+                     level="WARNING"
+                     language="kotlin" editorAttributes="NOT_USED_ELEMENT_ATTRIBUTES"
+                     key="inspection.can.be.parameter.display.name" bundle="messages.KotlinBundle"/>
 
   </extensions>
 </idea-plugin>

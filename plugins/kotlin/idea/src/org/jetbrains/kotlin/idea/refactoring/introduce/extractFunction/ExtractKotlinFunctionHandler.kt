@@ -10,7 +10,6 @@ import com.intellij.openapi.util.TextRange
 import com.intellij.openapi.util.registry.Registry
 import com.intellij.psi.PsiElement
 import com.intellij.psi.util.PsiTreeUtil
-import org.jetbrains.kotlin.idea.base.psi.unifier.KotlinPsiRange
 import org.jetbrains.kotlin.idea.base.psi.unifier.toRange
 import org.jetbrains.kotlin.idea.caches.resolve.resolveToCall
 import org.jetbrains.kotlin.idea.refactoring.KotlinNamesValidator
@@ -74,14 +73,6 @@ class ExtractKotlinFunctionHandler(
             allContainersEnabled, InteractiveExtractionHelper
         )
 
-        override fun extractDuplicates(
-            duplicateReplacers: Map<KotlinPsiRange, () -> Unit>,
-            project: Project,
-            editor: Editor
-        ) {
-            processDuplicates(duplicateReplacers, project, editor)
-        }
-
         override fun doRefactor(descriptor: IExtractableCodeDescriptor<KotlinType>, onFinish: (ExtractionResult) -> Unit) {
             val configuration = ExtractionGeneratorConfiguration(descriptor as ExtractableCodeDescriptor, ExtractionGeneratorOptions.DEFAULT)
             doRefactor(configuration, onFinish)
@@ -109,8 +100,9 @@ class ExtractKotlinFunctionHandler(
         elements: List<PsiElement>,
         targetSibling: PsiElement
     ) {
+        val adjustedElements = elements.singleOrNull().safeAs<KtBlockExpression>()?.statements ?: elements
+        if (adjustedElements.isEmpty()) return
         nonBlocking(file.project, {
-            val adjustedElements = elements.singleOrNull().safeAs<KtBlockExpression>()?.statements ?: elements
             ExtractionData(file, adjustedElements.toRange(false), targetSibling)
         }) { extractionData ->
             ExtractionEngine(helper).run(editor, extractionData)
