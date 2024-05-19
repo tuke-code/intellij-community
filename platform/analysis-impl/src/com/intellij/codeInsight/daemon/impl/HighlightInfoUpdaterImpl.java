@@ -8,7 +8,6 @@ import com.intellij.codeInspection.ex.LocalInspectionToolWrapper;
 import com.intellij.injected.editor.DocumentWindow;
 import com.intellij.lang.ASTNode;
 import com.intellij.lang.Language;
-import com.intellij.lang.annotation.Annotator;
 import com.intellij.lang.annotation.HighlightSeverity;
 import com.intellij.lang.injection.InjectedLanguageManager;
 import com.intellij.openapi.Disposable;
@@ -22,6 +21,7 @@ import com.intellij.openapi.editor.ex.RangeHighlighterEx;
 import com.intellij.openapi.editor.impl.DocumentMarkupModel;
 import com.intellij.openapi.editor.impl.SweepProcessor;
 import com.intellij.openapi.editor.markup.RangeHighlighter;
+import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.*;
 import com.intellij.psi.*;
@@ -203,6 +203,7 @@ final class HighlightInfoUpdaterImpl extends HighlightInfoUpdater implements Dis
           while (iterator.hasNext()) {
             Map.Entry<PsiElement, List<? extends HighlightInfo>> entry = iterator.next();
             PsiElement element = entry.getKey();
+            ProgressManager.checkCanceled();
             if (element == PsiUtilCore.NULL_PSI_ELEMENT/*evicted*/ || element != FAKE_ELEMENT && !element.isValid()) {
               List<? extends HighlightInfo> infos = entry.getValue();
               for (HighlightInfo info : infos) {
@@ -306,13 +307,6 @@ final class HighlightInfoUpdaterImpl extends HighlightInfoUpdater implements Dis
       }
       else {
         newInfos = List.of();
-        if (LOG.isDebugEnabled() && toolId instanceof Class<?> c && Annotator.class.isAssignableFrom(c)) {
-          //noinspection removal
-          LOG.debug("psiElementVisited- " + visitedPsiElement + " in " + visitedPsiElement.getTextRange() +
-                    (psiFile.getViewProvider() instanceof InjectedFileViewProvider ?
-                     " injected in " + InjectedLanguageManager.getInstance(project).injectedToHost(psiFile, psiFile.getTextRange()) : "") +
-                    "; tool:" + toolId + "; infos:" + newInfos + "; oldInfos:" + oldInfos + "; document:" + hostDocument);
-        }
       }
       // store back only after markup model changes are applied to avoid PCE thrown in the middle leaving corrupted data behind
       putInfosForVisitedPsi(data, toolId, visitedPsiElement, newInfos, toolHighlights);
@@ -336,8 +330,12 @@ final class HighlightInfoUpdaterImpl extends HighlightInfoUpdater implements Dis
       if (oldInfos != null) {
         for (HighlightInfo oldInfo : oldInfos) {
           RangeHighlighterEx oldHighlighter = oldInfo.getHighlighter();
+          boolean recycled = false;
           if (oldHighlighter != null) {
-            toReuse.recycleHighlighter(oldHighlighter);
+            recycled = toReuse.recycleHighlighter(oldHighlighter);
+          }
+          if (oldInfo.isFileLevelAnnotation() && !recycled) {
+            ((HighlightingSessionImpl)session).removeFileLevelHighlight(oldInfo);
           }
         }
       }
@@ -346,11 +344,13 @@ final class HighlightInfoUpdaterImpl extends HighlightInfoUpdater implements Dis
         if (info.isFileLevelAnnotation()) {
           RangeHighlighterEx salvagedHighlighter = toReuse.pickupHighlighterFromGarbageBin(0, psiFile.getTextLength(), -409423948);
           HighlightInfo oldFileInfo = salvagedHighlighter == null ? null : HighlightInfo.fromRangeHighlighter(salvagedHighlighter);
+
           if (oldFileInfo != null) {
-            UpdateHighlightersUtil.disposeWithFileLevelIgnoreErrors(salvagedHighlighter, oldFileInfo, session);
-            salvagedHighlighter = null;
+            ((HighlightingSessionImpl)session).replaceFileLevelHighlight(oldFileInfo, info, salvagedHighlighter);
           }
-          ((HighlightingSessionImpl)session).addFileLevelHighlight(info, salvagedHighlighter);
+          else {
+            ((HighlightingSessionImpl)session).addFileLevelHighlight(info, salvagedHighlighter);
+          }
         }
         else {
           BackgroundUpdateHighlightersUtil.createOrReuseHighlighterFor(info, session.getColorsScheme(), document, -1,

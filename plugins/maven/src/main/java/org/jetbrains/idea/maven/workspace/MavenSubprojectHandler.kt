@@ -4,36 +4,34 @@ package org.jetbrains.idea.maven.workspace
 import com.intellij.ide.workspace.ImportedProjectSettings
 import com.intellij.ide.workspace.Subproject
 import com.intellij.ide.workspace.SubprojectHandler
-import com.intellij.openapi.externalSystem.service.project.trusted.ExternalSystemTrustedProjectDialog
 import com.intellij.openapi.module.Module
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.guessProjectDir
+import com.intellij.openapi.startup.StartupManager
 import com.intellij.openapi.vfs.VirtualFile
+import icons.MavenIcons
+import kotlinx.coroutines.launch
 import org.jetbrains.idea.maven.project.MavenProject
 import org.jetbrains.idea.maven.project.MavenProjectsManager
-import org.jetbrains.idea.maven.project.MavenRoamableSettings
+import org.jetbrains.idea.maven.utils.MavenCoroutineScopeProvider
 import org.jetbrains.idea.maven.utils.MavenUtil
 import org.jetbrains.idea.maven.wizards.MavenOpenProjectProvider
+import javax.swing.Icon
 
 internal class MavenSubprojectHandler : SubprojectHandler {
   override fun getSubprojects(project: Project): List<Subproject> {
     return MavenProjectsManager.getInstance(project).projects
-      .map { MavenSubproject(project, it) }
-  }
-
-  override fun getSubprojectFor(module: Module): Subproject? {
-    val mavenProject = MavenProjectsManager.getInstance(module.project).findProject(module) ?: return null
-    return MavenSubproject(module.project, mavenProject)
+      .map { MavenSubproject(project, it, this) }
   }
 
   override fun canImportFromFile(project: Project, file: VirtualFile): Boolean {
     return MavenOpenProjectProvider().canOpenProject(file)
   }
 
-  override suspend fun importFromFile(project: Project, file: VirtualFile) {
-    if (ExternalSystemTrustedProjectDialog.confirmLoadingUntrustedProjectAsync(project, MavenUtil.SYSTEM_ID)) {
-      MavenOpenProjectProvider().linkToExistingProjectAsync(file, project)
-    }
+  override fun removeSubprojects(subprojects: List<Subproject>) {
+    val workspace = subprojects.firstOrNull()?.workspace ?: return
+    val files = subprojects.flatMap { MavenUtil.collectFiles(listOf((it as MavenSubproject).mavenProject)) }
+    MavenProjectsManager.getInstance(workspace).removeManagedFiles(files, null, null)
   }
 
   override fun importFromProject(project: Project, newWorkspace: Boolean): ImportedProjectSettings {
@@ -44,26 +42,29 @@ internal class MavenSubprojectHandler : SubprojectHandler {
   override fun suppressGenericImportFor(module: Module): Boolean {
     return MavenProjectsManager.getInstance(module.project).findProject(module) != null
   }
+
+  override val subprojectIcon: Icon
+    get() = MavenIcons.MavenModule
 }
 
 private class MavenImportedProjectSettings(project: Project) : ImportedProjectSettings {
-  val roamableSettings: MavenRoamableSettings = MavenProjectsManager.getInstance(project).roamableSettings
   val projectDir = project.guessProjectDir()
 
   override suspend fun applyTo(workspace: Project) {
     val openProjectProvider = MavenOpenProjectProvider()
-    if (roamableSettings.originalFiles.isEmpty() && openProjectProvider.canOpenProject(projectDir!!)) {
-      openProjectProvider.linkToExistingProjectAsync(projectDir, workspace)
-      return
+    if (openProjectProvider.canOpenProject(projectDir!!)) {
+      StartupManager.getInstance(workspace).runAfterOpened {
+        MavenCoroutineScopeProvider.getCoroutineScope(workspace).launch {
+          openProjectProvider.forceLinkToExistingProjectAsync(projectDir, workspace)
+        }
+      }
     }
-    val manager = MavenProjectsManager.getInstance(workspace)
-    manager.applyRoamableSettings(roamableSettings)
   }
 }
 
-private class MavenSubproject(override val workspace: Project, val mavenProject: MavenProject) : Subproject {
+private class MavenSubproject(override val workspace: Project, val mavenProject: MavenProject, override val handler: SubprojectHandler) : Subproject {
   override val name: String get() = mavenProject.displayName
-  override val projectPath: String get() = mavenProject.path
+  override val projectPath: String get() = mavenProject.directory
 
   override fun equals(other: Any?): Boolean {
     if (this === other) return true
@@ -81,16 +82,5 @@ private class MavenSubproject(override val workspace: Project, val mavenProject:
     var result = workspace.hashCode()
     result = 31 * result + mavenProject.hashCode()
     return result
-  }
-
-  override fun getModules(): List<Module> {
-    val manager = MavenProjectsManager.getInstance(workspace)
-    val mavenModules = manager.getModules(mavenProject) + mavenProject
-    return mavenModules.mapNotNull { manager.findModule(it) }
-  }
-
-  override fun removeSubproject() {
-    val files = MavenUtil.collectFiles(listOf(mavenProject))
-    MavenProjectsManager.getInstance(workspace).removeManagedFiles(files)
   }
 }

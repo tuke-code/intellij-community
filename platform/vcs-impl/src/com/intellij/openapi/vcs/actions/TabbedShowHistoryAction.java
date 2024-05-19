@@ -1,6 +1,7 @@
 // Copyright 2000-2021 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
 package com.intellij.openapi.vcs.actions;
 
+import com.intellij.idea.ActionsBundle;
 import com.intellij.openapi.actionSystem.ActionUpdateThread;
 import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.actionSystem.CommonDataKeys;
@@ -40,9 +41,20 @@ public class TabbedShowHistoryAction extends DumbAwareAction {
   @Override
   public void update(@NotNull AnActionEvent e) {
     Project project = e.getProject();
+    DataContext context = e.getDataContext();
+
     boolean isVisible = project != null && ProjectLevelVcsManager.getInstance(project).hasActiveVcss();
-    e.getPresentation().setEnabled(isEnabled(e.getDataContext()));
+    boolean isEnabled = isEnabled(context);
+
+    e.getPresentation().setEnabled(isEnabled);
     e.getPresentation().setVisible(isVisible);
+
+    if (isEnabled && isVisible && VcsContextUtil.selectedFilePathsIterable(context).isEmpty()) {
+      VirtualFile editorFile = getEditorFile(context);
+      if (editorFile != null) {
+        e.getPresentation().setText(ActionsBundle.message("action.Vcs.ShowTabbedFileHistory.for.file.text", editorFile.getName()));
+      }
+    }
   }
 
   protected boolean isEnabled(@NotNull DataContext context) {
@@ -106,7 +118,8 @@ public class TabbedShowHistoryAction extends DumbAwareAction {
 
   @Override
   public void actionPerformed(@NotNull AnActionEvent e) {
-    Project project = Objects.requireNonNull(e.getProject());
+    Project project = e.getProject();
+    if (project == null) return;
 
     List<FilePath> symlinkedPaths = getContextSymlinkedPaths(project, getSelectedFile(e.getDataContext()));
     if (symlinkedPaths != null && canShowNewFileHistory(project, symlinkedPaths)) {
@@ -121,8 +134,13 @@ public class TabbedShowHistoryAction extends DumbAwareAction {
     }
 
     if (selectedFiles.size() == 1) {
-      FilePath path = Objects.requireNonNull(ContainerUtil.getFirstItem(selectedFiles));
-      AbstractVcs vcs = Objects.requireNonNull(ChangesUtil.getVcsForFile(Objects.requireNonNull(getExistingFileOrParent(path)), project));
+      FilePath path = ContainerUtil.getOnlyItem(selectedFiles);
+      VirtualFile fileOrParent = getExistingFileOrParent(path);
+      if (fileOrParent == null) return;
+
+      AbstractVcs vcs = ChangesUtil.getVcsForFile(fileOrParent, project);
+      if (vcs == null) return;
+
       showOldFileHistory(project, vcs, path);
     }
   }

@@ -801,6 +801,13 @@ public class MergeThreesideViewer extends ThreesideTextDiffViewerEx {
     myModel.invalidateHighlighters(change.getIndex());
   }
 
+  @ApiStatus.Internal
+  @RequiresEdt
+  public void markChangeResolvedWithAI(@NotNull TextMergeChange change) {
+    change.markChangeResolvedWithAI();
+    markChangeResolved(change);
+  }
+
   public void ignoreChange(@NotNull TextMergeChange change, @NotNull Side side, boolean resolveChange) {
     if (!change.isConflict() || resolveChange) {
       markChangeResolved(change);
@@ -865,6 +872,26 @@ public class MergeThreesideViewer extends ThreesideTextDiffViewerEx {
     if (mergeReferenceData != null) {
       restoreReferenceData(newLineStart, newLineEnd, mergeReferenceData.getReferenceData(sourceSide));
     }
+  }
+
+  @ApiStatus.Internal
+  @RequiresWriteLock
+  void resetResolvedChange(TextMergeChange change) {
+    if (!change.isResolved()) return;
+
+    MergeLineFragment changeFragment = change.getFragment();
+    int startLine = changeFragment.getStartLine(ThreeSide.BASE);
+    int endLine = changeFragment.getEndLine(ThreeSide.BASE);
+
+    Document content = ThreeSide.BASE.select(myMergeRequest.getContents()).getDocument();
+    List<String> baseContent = DiffUtil.getLines(content, startLine, endLine);
+
+    myModel.replaceChange(change.getIndex(), baseContent);
+
+    change.resetState();
+
+    onChangeResolved(change);
+    myModel.invalidateHighlighters(change.getIndex());
   }
 
   private void restoreReferenceData(int newLineStart,
@@ -948,7 +975,7 @@ public class MergeThreesideViewer extends ThreesideTextDiffViewerEx {
 
       TextMergeChange mergeChange = myAllMergeChanges.get(index);
       if (mergeChange.getStartLine() == mergeChange.getEndLine() &&
-          mergeChange.getDiffType() == TextDiffType.DELETED && !mergeChange.isResolved()) {
+          mergeChange.getConflictType().getType() == MergeConflictType.Type.DELETED && !mergeChange.isResolved()) {
         markChangeResolved(mergeChange);
       }
 
@@ -1118,7 +1145,7 @@ public class MergeThreesideViewer extends ThreesideTextDiffViewerEx {
     });
   }
 
-  private boolean isExternalOperationInProgress() {
+  protected boolean isExternalOperationInProgress() {
     return Boolean.TRUE.equals(myMergeContext.getUserData(EXTERNAL_OPERATION_IN_PROGRESS));
   }
 
@@ -1128,19 +1155,18 @@ public class MergeThreesideViewer extends ThreesideTextDiffViewerEx {
     getEditor().setViewer(true);
 
     for (TextMergeChange change : getAllChanges()) {
-      change.destroyOperations();
+      change.reinstallHighlighters();
     }
   }
 
   @RequiresEdt
   private void runAfterExternalOperation() {
+    myMergeContext.putUserData(EXTERNAL_OPERATION_IN_PROGRESS, null);
     getEditor().setViewer(false);
 
     for (TextMergeChange change : getAllChanges()) {
-      change.installOperations();
+      change.reinstallHighlighters();
     }
-
-    myMergeContext.putUserData(EXTERNAL_OPERATION_IN_PROGRESS, null);
   }
 
   private abstract class ApplySelectedChangesActionBase extends AnAction implements DumbAware {

@@ -7,7 +7,6 @@ import com.intellij.codeInsight.daemon.impl.analysis.HighlightInfoHolder;
 import com.intellij.configurationStore.StorageUtilKt;
 import com.intellij.diagnostic.ThreadDumper;
 import com.intellij.ide.highlighter.JavaFileType;
-import com.intellij.idea.IJIgnore;
 import com.intellij.lang.annotation.HighlightSeverity;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.actionSystem.DataContext;
@@ -50,10 +49,14 @@ import java.io.File;
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
+/**
+ * tests {@link HighlightVisitor} behaviour during highlighting
+ */
 @SkipSlowTestLocally
 @DaemonAnalyzerTestCase.CanChangeDocumentDuringHighlighting
 public class DaemonHighlightVisitorRespondToChangesTest extends DaemonAnalyzerTestCase {
@@ -439,7 +442,6 @@ public class DaemonHighlightVisitorRespondToChangesTest extends DaemonAnalyzerTe
     }
   }
 
-  @IJIgnore(issue = "IDEA-353030")
   public void testHighlightVisitorsMustRunIndependentlyAndInParallel() {
     @Language("JAVA")
     String text = """
@@ -464,12 +466,22 @@ public class DaemonHighlightVisitorRespondToChangesTest extends DaemonAnalyzerTe
     TestTimeOut timeOut = TestTimeOut.setTimeout(1, TimeUnit.MINUTES);
     myDaemonCodeAnalyzer.runPasses(getFile(), getEditor().getDocument(), TextEditorProvider.getInstance().getTextEditor(getEditor()), ArrayUtilRt.EMPTY_INT_ARRAY, true, () -> {
       if (timeOut.isTimedOut()) {
-        System.err.println("Timed out\n"+ThreadDumper.dumpThreadsToString());
-        STATE.get("MSG1").THINK.set(false);
-        STATE.get("MSG2").THINK.set(false);
-        STATE.get("MSG1").THINKING.set(false);
-        STATE.get("MSG2").THINKING.set(false);
-        fail();
+        String dump = ThreadDumper.dumpThreadsToString();
+        List<HighlightInfo> infos = DaemonCodeAnalyzerImpl.getHighlights(getEditor().getDocument(), HighlightSeverity.WARNING, getProject());
+        String message = "Timed out\ninfos=" + infos + "\n"
+                         + "; ForkJoinPool.commonPool().getParallelism()=" + ForkJoinPool.commonPool().getParallelism()
+                         + ";visitor1.myState().THINKING.get()=" + visitor1.myState().THINKING.get()
+                         + ";visitor2.myState().THINKING.get()=" + visitor2.myState().THINKING.get()
+                         + ";visitor1.myState().THINK.get()=" + visitor1.myState().THINK.get()
+                         + ";visitor2.myState().THINK.get()=" + visitor2.myState().THINK.get()
+                         + ";visitor1.myState().COMMENT_HIGHLIGHTED.get()=" + visitor1.myState().COMMENT_HIGHLIGHTED.get()
+                         + ";visitor2.myState().COMMENT_HIGHLIGHTED.get()=" + visitor2.myState().COMMENT_HIGHLIGHTED.get()
+                         + "\n" + dump;
+        visitor1.myState().THINK.set(false);
+        visitor2.myState().THINK.set(false);
+        visitor1.myState().THINKING.set(false);
+        visitor2.myState().THINKING.set(false);
+        fail(message);
       }
       if (visitor1.myState().THINKING.get() && visitor2.myState().THINKING.get()) {
         // if two visitors are paused, it means they both have visited comments. Check that corresponding highlights are in the markup model
@@ -478,7 +490,7 @@ public class DaemonHighlightVisitorRespondToChangesTest extends DaemonAnalyzerTe
         visitor2.myState().THINK.set(false);
         boolean b = ContainerUtil.exists(infos, info -> visitor1.isMy(info)) && ContainerUtil.exists(infos, info -> visitor2.isMy(info));
         if (!b) {
-          System.err.println(infos+"\n---\n"+ThreadDumper.dumpThreadsToString()+"\n====");
+          System.out.println(infos+"\n---\n"+ThreadDumper.dumpThreadsToString()+"\n====");
         }
         assertTrue(infos.toString(), b);
       }
@@ -497,26 +509,6 @@ public class DaemonHighlightVisitorRespondToChangesTest extends DaemonAnalyzerTe
     private MyThinkingHighlightVisitor(String MSG) {
       this.MSG = MSG;
     }
-    private static class MyThinkingHighlightVisitor1 extends MyThinkingHighlightVisitor {
-      private MyThinkingHighlightVisitor1() {
-        super("MSG1");
-      }
-
-      @Override
-      public @NotNull HighlightVisitor clone() {
-        return new MyThinkingHighlightVisitor1();
-      }
-    }
-    private static class MyThinkingHighlightVisitor2 extends MyThinkingHighlightVisitor {
-      private MyThinkingHighlightVisitor2() {
-        super("MSG2");
-      }
-
-      @Override
-      public @NotNull HighlightVisitor clone() {
-        return new MyThinkingHighlightVisitor2();
-      }
-    }
 
     @Override
     public abstract @NotNull HighlightVisitor clone();
@@ -528,16 +520,22 @@ public class DaemonHighlightVisitorRespondToChangesTest extends DaemonAnalyzerTe
 
     @Override
     public void visit(@NotNull PsiElement element) {
+      LOG.debug("about to visit " + element + "; this=" + this+"; myState="+myState()+"; "+Thread.currentThread());
       if (element instanceof PsiComment) {
-        myHolder.add(HighlightInfo.newHighlightInfo(HighlightInfoType.WARNING).range(element.getTextRange()).description(MSG).create());
+        HighlightInfo info = HighlightInfo.newHighlightInfo(HighlightInfoType.WARNING).range(element.getTextRange()).description(MSG).create();
+        myHolder.add(info);
         myState().COMMENT_HIGHLIGHTED.set(true);
+        LOG.debug("highlighted " + element + "; "+info+"; this=" + this+"; myState="+myState()+"; "+Thread.currentThread());
       }
       else if (myState().COMMENT_HIGHLIGHTED.get()) {
+        LOG.debug("start thinking about " + element + "; this=" + this+"; myState="+myState()+"; "+Thread.currentThread());
         myState().THINKING.set(true);
         while (myState().THINK.get()) {
-          TimeoutUtil.sleep(1);
+          fjpAwareSleep(1);
         }
+        LOG.debug("stopped thinking about " + element + "; this=" + this+"; myState="+myState()+"; "+Thread.currentThread());
       }
+      LOG.debug("end of visit " + element + "; this=" + this+"; myState="+myState()+"; "+Thread.currentThread());
     }
 
     @Override
@@ -550,12 +548,62 @@ public class DaemonHighlightVisitorRespondToChangesTest extends DaemonAnalyzerTe
       return true;
     }
 
-    boolean isMy(HighlightInfo info) {
+    boolean isMy(@NotNull HighlightInfo info) {
       return HighlightSeverity.WARNING.equals(info.getSeverity()) && MSG.equals(info.getDescription());
     }
 
     State myState() {
       return STATE.get(MSG);
+    }
+
+    private static class MyThinkingHighlightVisitor1 extends MyThinkingHighlightVisitor {
+      private MyThinkingHighlightVisitor1() {
+        super("MSG1");
+      }
+
+      @Override
+      public @NotNull HighlightVisitor clone() {
+        return new MyThinkingHighlightVisitor1();
+      }
+      @Override
+      public void visit(@NotNull PsiElement element) {
+        super.visit(element); // for stacktrace
+      }
+    }
+    private static class MyThinkingHighlightVisitor2 extends MyThinkingHighlightVisitor {
+      private MyThinkingHighlightVisitor2() {
+        super("MSG2");
+      }
+
+      @Override
+      public @NotNull HighlightVisitor clone() {
+        return new MyThinkingHighlightVisitor2();
+      }
+
+      @Override
+      public void visit(@NotNull PsiElement element) {
+        super.visit(element); // for stacktrace
+      }
+    }
+  }
+
+  private static void fjpAwareSleep(int millis) {
+    try {
+      ForkJoinPool.managedBlock(new ForkJoinPool.ManagedBlocker() {
+        @Override
+        public boolean block() {
+          TimeoutUtil.sleep(millis);
+          return true;
+        }
+
+        @Override
+        public boolean isReleasable() {
+          return false;
+        }
+      });
+    }
+    catch (InterruptedException e) {
+      throw new RuntimeException(e);
     }
   }
 }

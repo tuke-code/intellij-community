@@ -409,6 +409,8 @@ public class AllIcons {
     /** 16x16 */ public static final @NotNull Icon AS = load("fileTypes/as.svg", -1805543846, 0);
     /** 16x16 */ public static final @NotNull Icon Aspectj = load("fileTypes/aspectj.svg", 469536666, 0);
     /** 16x16 */ public static final @NotNull Icon Config = load("fileTypes/config.svg", 416412449, 0);
+    /** 16x16 */ public static final @NotNull Icon Contexts = load("fileTypes/contexts.svg", 589986144, 0);
+    /** 16x16 */ public static final @NotNull Icon ContextsModifier = load("fileTypes/contextsModifier.svg", 11227132, 0);
     /** 16x16 */ public static final @NotNull Icon Css = load("fileTypes/css.svg", -1827987051, 0);
     /** 16x16 */ public static final @NotNull Icon Custom = load("fileTypes/custom.svg", 1692794144, 0);
     /** 16x16 */ public static final @NotNull Icon Diagram = load("fileTypes/diagram.svg", 692669001, 0);
@@ -751,6 +753,46 @@ public class AllIcons {
 
   public static final class Linux {
     /** 16x16 */ public static final @NotNull Icon Linux = load("linux/linux.svg", 122737916, 2);
+
+    public static final class Theme {
+      public static final class Gnome {
+        /** 24x24 */ public static final @NotNull Icon Close = load("linux/theme/gnome/close.svg", 1041465849, 2);
+        /** 24x24 */ public static final @NotNull Icon CloseHover = load("linux/theme/gnome/closeHover.svg", 1128310649, 2);
+        /** 24x24 */ public static final @NotNull Icon CloseInactive = load("linux/theme/gnome/closeInactive.svg", -235239049, 2);
+        /** 24x24 */ public static final @NotNull Icon ClosePressed = load("linux/theme/gnome/closePressed.svg", 1451669122, 2);
+        /** 24x24 */ public static final @NotNull Icon Maximize = load("linux/theme/gnome/maximize.svg", -621030100, 2);
+        /** 24x24 */ public static final @NotNull Icon MaximizeHover = load("linux/theme/gnome/maximizeHover.svg", 1326518692, 2);
+        /** 24x24 */ public static final @NotNull Icon MaximizeInactive = load("linux/theme/gnome/maximizeInactive.svg", -28016208, 2);
+        /** 24x24 */ public static final @NotNull Icon MaximizePressed = load("linux/theme/gnome/maximizePressed.svg", -420670284, 2);
+        /** 24x24 */ public static final @NotNull Icon Minimize = load("linux/theme/gnome/minimize.svg", 2127745494, 2);
+        /** 24x24 */ public static final @NotNull Icon MinimizeHover = load("linux/theme/gnome/minimizeHover.svg", -162281172, 2);
+        /** 24x24 */ public static final @NotNull Icon MinimizeInactive = load("linux/theme/gnome/minimizeInactive.svg", -593078237, 2);
+        /** 24x24 */ public static final @NotNull Icon MinimizePressed = load("linux/theme/gnome/minimizePressed.svg", 206506381, 2);
+        /** 24x24 */ public static final @NotNull Icon Restore = load("linux/theme/gnome/restore.svg", 1668500755, 2);
+        /** 24x24 */ public static final @NotNull Icon RestoreHover = load("linux/theme/gnome/restoreHover.svg", 801105303, 2);
+        /** 24x24 */ public static final @NotNull Icon RestoreInactive = load("linux/theme/gnome/restoreInactive.svg", -1904649367, 2);
+        /** 24x24 */ public static final @NotNull Icon RestorePressed = load("linux/theme/gnome/restorePressed.svg", -304033883, 2);
+      }
+
+      public static final class Kde {
+        /** 20x20 */ public static final @NotNull Icon Close = load("linux/theme/kde/close.svg", -446927126, 2);
+        /** 20x20 */ public static final @NotNull Icon CloseHover = load("linux/theme/kde/closeHover.svg", -206211498, 2);
+        /** 20x20 */ public static final @NotNull Icon CloseInactive = load("linux/theme/kde/closeInactive.svg", 1668092313, 2);
+        /** 20x20 */ public static final @NotNull Icon ClosePressed = load("linux/theme/kde/closePressed.svg", 1743614163, 2);
+        /** 20x20 */ public static final @NotNull Icon Maximize = load("linux/theme/kde/maximize.svg", -553937177, 2);
+        /** 20x20 */ public static final @NotNull Icon MaximizeHover = load("linux/theme/kde/maximizeHover.svg", 1967476149, 2);
+        /** 20x20 */ public static final @NotNull Icon MaximizeInactive = load("linux/theme/kde/maximizeInactive.svg", 2057692852, 2);
+        /** 20x20 */ public static final @NotNull Icon MaximizePressed = load("linux/theme/kde/maximizePressed.svg", -903581244, 2);
+        /** 20x20 */ public static final @NotNull Icon Minimize = load("linux/theme/kde/minimize.svg", 1785825068, 2);
+        /** 20x20 */ public static final @NotNull Icon MinimizeHover = load("linux/theme/kde/minimizeHover.svg", 174163678, 2);
+        /** 20x20 */ public static final @NotNull Icon MinimizeInactive = load("linux/theme/kde/minimizeInactive.svg", -2124271439, 2);
+        /** 20x20 */ public static final @NotNull Icon MinimizePressed = load("linux/theme/kde/minimizePressed.svg", -1544125646, 2);
+        /** 20x20 */ public static final @NotNull Icon Restore = load("linux/theme/kde/restore.svg", -746065059, 2);
+        /** 20x20 */ public static final @NotNull Icon RestoreHover = load("linux/theme/kde/restoreHover.svg", -812531410, 2);
+        /** 20x20 */ public static final @NotNull Icon RestoreInactive = load("linux/theme/kde/restoreInactive.svg", 1544088754, 2);
+        /** 20x20 */ public static final @NotNull Icon RestorePressed = load("linux/theme/kde/restorePressed.svg", 1276612883, 2);
+      }
+    }
   }
 
   public static final class Mac {
@@ -1042,6 +1084,7 @@ public class AllIcons {
     /** 16x16 */ public static final @NotNull Icon Couchbase = load("providers/couchbase.svg", 125110449, 0);
     /** 16x16 */ public static final @NotNull Icon Databricks = load("providers/databricks.svg", 1206450250, 2);
     /** 16x16 */ public static final @NotNull Icon DB2 = load("providers/DB2.svg", -700958296, 2);
+    /** 16x16 */ public static final @NotNull Icon Denodo = load("providers/denodo.svg", -1481188209, 2);
     /** 16x16 */ public static final @NotNull Icon DocumentDB = load("providers/documentDB.svg", -1286984491, 2);
     /** 16x16 */ public static final @NotNull Icon DuckDB = load("providers/duckDB.svg", -590062592, 2);
     /** 16x16 */ public static final @NotNull Icon DynamoDB = load("providers/dynamoDB.svg", 820880886, 0);
@@ -1272,7 +1315,6 @@ public class AllIcons {
     /** 16x16 */ public static final @NotNull Icon Patch_file = load("vcs/patch_file.svg", -1991117101, 0);
     /** 16x16 */ public static final @NotNull Icon Push = load("vcs/push.svg", 1768616645, 2);
     /** 16x16 */ public static final @NotNull Icon Remove = load("vcs/remove.svg", -930385649, 2);
-    /** 16x16 */ public static final @NotNull Icon Shelve = load("vcs/Shelve.svg", -1645293825, 2);
     /** 16x16 */ public static final @NotNull Icon ShelveSilent = load("vcs/shelveSilent.svg", -370626475, 2);
     /** 16x16 */ public static final @NotNull Icon ShowUnversionedFiles = load("vcs/ShowUnversionedFiles.svg", -1565476650, 2);
     /** 16x16 */ public static final @NotNull Icon Unshelve = load("vcs/Unshelve.svg", -81545320, 2);

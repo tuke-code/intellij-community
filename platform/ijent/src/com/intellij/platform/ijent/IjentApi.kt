@@ -4,16 +4,14 @@ package com.intellij.platform.ijent
 import com.intellij.platform.ijent.fs.IjentFileSystemApi
 import com.intellij.platform.ijent.fs.IjentFileSystemPosixApi
 import com.intellij.platform.ijent.fs.IjentFileSystemWindowsApi
-import org.jetbrains.annotations.ApiStatus
 
 /**
  * Provides access to an IJent process running on some machine. An instance of this interface gives ability to run commands
  * on a local or a remote machine. Every instance corresponds to a single machine, i.e. unlike Run Targets, if IJent is launched
  * in a Docker container, every call to execute a process (see [IjentExecApi]) runs a command in the same Docker container.
  *
- * Usually, [IjentSessionProvider] creates instances of [IjentApi].
+ * Usually, [com.intellij.platform.ijent.deploy] creates instances of [IjentApi].
  */
-@ApiStatus.Experimental
 sealed interface IjentApi : AutoCloseable {
   val id: IjentId
 

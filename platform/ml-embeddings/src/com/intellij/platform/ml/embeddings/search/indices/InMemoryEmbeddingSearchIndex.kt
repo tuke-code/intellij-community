@@ -33,7 +33,6 @@ class InMemoryEmbeddingSearchIndex(root: Path, override var limit: Int? = null) 
   }
 
   override suspend fun contains(id: String): Boolean = lock.read {
-    uncheckedIds.remove(id)
     id in idToEmbedding
   }
 
@@ -45,8 +44,10 @@ class InMemoryEmbeddingSearchIndex(root: Path, override var limit: Int? = null) 
   }
 
   override suspend fun onIndexingStart() {
-    uncheckedIds.clear()
-    uncheckedIds.addAll(idToEmbedding.keys)
+    lock.write {
+      uncheckedIds.clear()
+      uncheckedIds.addAll(idToEmbedding.keys)
+    }
   }
 
   override suspend fun onIndexingFinish() = lock.write {
@@ -58,6 +59,7 @@ class InMemoryEmbeddingSearchIndex(root: Path, override var limit: Int? = null) 
                                   shouldCount: Boolean) = lock.write {
     if (limit != null) {
       val list = values.toList()
+      list.forEach { uncheckedIds.remove(it.first) }
       idToEmbedding.putAll(list.take(minOf(limit!! - idToEmbedding.size, list.size)))
     }
     else {
@@ -71,6 +73,8 @@ class InMemoryEmbeddingSearchIndex(root: Path, override var limit: Int? = null) 
     val (ids, embeddings) = fileManager.loadIndex() ?: return@write
     idToEmbedding = (ids zip embeddings).toMap().toMutableMap()
   }
+
+  override suspend fun offload() = idToEmbedding.clear()
 
   override suspend fun findClosest(searchEmbedding: FloatTextEmbedding, topK: Int, similarityThreshold: Double?): List<ScoredText> = lock.read {
     idToEmbedding.findClosest(searchEmbedding, topK, similarityThreshold)

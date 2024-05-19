@@ -650,7 +650,6 @@ c:com.intellij.psi.formatter.DocumentBasedFormattingModel
 - shiftIndentInsideRange(com.intellij.lang.ASTNode,com.intellij.openapi.util.TextRange,I):com.intellij.openapi.util.TextRange
 f:com.intellij.psi.formatter.FormatterUtil
 - sf:FORMATTER_ACTION_NAMES:java.util.Collection
-- sf:REFORMAT_BEFORE_COMMIT_COMMAND_NAME:java.lang.String
 - s:containsWhiteSpacesOnly(com.intellij.lang.ASTNode):Z
 - s:getNext(com.intellij.lang.ASTNode,com.intellij.psi.tree.IElementType[]):com.intellij.lang.ASTNode
 - s:getNextNonWhitespaceLeaf(com.intellij.lang.ASTNode):com.intellij.lang.ASTNode
@@ -920,7 +919,6 @@ com.intellij.psi.impl.source.codeStyle.NewLineIndentMarkerProvider
 - sf:EP:com.intellij.lang.LanguageExtension
 - a:createMarker(com.intellij.psi.PsiFile,I):java.lang.String
 f:com.intellij.psi.impl.source.codeStyle.PostFormatProcessorHelper
-- <init>(com.intellij.psi.codeStyle.CodeStyleSettings):V
 - <init>(com.intellij.psi.codeStyle.CommonCodeStyleSettings):V
 - getResultTextRange():com.intellij.openapi.util.TextRange
 - getSettings():com.intellij.psi.codeStyle.CommonCodeStyleSettings

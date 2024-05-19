@@ -2,6 +2,7 @@
 package com.intellij.ide.actions.searcheverywhere;
 
 import com.intellij.accessibility.TextFieldWithListAccessibleContext;
+import com.intellij.find.actions.ShowUsagesAction;
 import com.intellij.find.findInProject.FindInProjectManager;
 import com.intellij.find.findUsages.PsiElement2UsageTargetAdapter;
 import com.intellij.find.impl.SearchEverywhereItem;
@@ -37,6 +38,7 @@ import com.intellij.openapi.actionSystem.*;
 import com.intellij.openapi.actionSystem.ex.ActionUtil;
 import com.intellij.openapi.actionSystem.impl.ActionMenu;
 import com.intellij.openapi.application.*;
+import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.editor.ex.EditorEx;
 import com.intellij.openapi.editor.impl.FontInfo;
@@ -1037,10 +1039,13 @@ public final class SearchEverywhereUI extends BigPopupUI implements DataProvider
             List<UsageInfo> usageInfos = !infos.isEmpty() ? infos : null;
             ReadAction.nonBlocking(() -> UsagePreviewPanel.isOneAndOnlyOnePsiFileInUsages(usageInfos))
               .finishOnUiThread(ModalityState.nonModal(), isOneAndOnlyOnePsiFileInUsages -> {
-                myUsagePreviewPanel.updateLayout(usageInfos);
+                myUsagePreviewPanel.updateLayout(myProject, usageInfos);
               })
               .coalesceBy(this)
               .submit(AppExecutorUtil.getAppExecutorService());
+          }).exceptionally(throwable -> {
+            Logger.getInstance(SearchEverywhereUI.class).error(throwable);
+            return null;
           });
         }
       }

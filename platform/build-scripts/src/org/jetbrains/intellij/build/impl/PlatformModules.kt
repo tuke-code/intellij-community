@@ -105,9 +105,7 @@ internal fun collectPlatformModules(to: MutableCollection<String>) {
 
 internal fun hasPlatformCoverage(productLayout: ProductModulesLayout, enabledPluginModules: Set<String>, context: BuildContext): Boolean {
   val modules = HashSet<String>()
-  collectIncludedPluginModules(enabledPluginModules = enabledPluginModules, product = productLayout, result = modules)
-  modules.addAll(PLATFORM_API_MODULES)
-  modules.addAll(PLATFORM_IMPLEMENTATION_MODULES)
+  collectIncludedPluginModules(enabledPluginModules = enabledPluginModules, product = productLayout, result = modules, context = context)
   modules.addAll(productLayout.productApiModules)
   modules.addAll(productLayout.productImplementationModules)
 
@@ -140,10 +138,9 @@ private fun addModule(relativeJarPath: String, moduleNames: Collection<String>, 
                        .toList())
 }
 
-@Suppress("RedundantSuspendModifier")
-suspend fun createPlatformLayout(pluginsToPublish: Set<PluginLayout>, context: BuildContext): PlatformLayout {
-  val enabledPluginModules = getEnabledPluginModules(pluginsToPublish = pluginsToPublish, context = context)
+suspend fun createPlatformLayout(context: BuildContext): PlatformLayout {
   val productLayout = context.productProperties.productLayout
+  val enabledPluginModules = context.bundledPluginModules.toHashSet()
   return createPlatformLayout(
     addPlatformCoverage = !productLayout.excludedModuleNames.contains("intellij.platform.coverage") &&
                           hasPlatformCoverage(productLayout = productLayout, enabledPluginModules = enabledPluginModules, context = context),
@@ -283,7 +280,6 @@ internal suspend fun createPlatformLayout(addPlatformCoverage: Boolean, projectL
       context = context,
       validateImplicitPlatformModule = false,
     ).asSequence().map { it.first } + explicitModuleNames).toList(),
-    productPluginSourceModuleName = context.productProperties.productPluginSourceModuleName ?: context.productProperties.applicationInfoModule,
   )
 
   val implicit = computeImplicitRequiredModules(
@@ -327,7 +323,7 @@ internal suspend fun createPlatformLayout(addPlatformCoverage: Boolean, projectL
       .dependentModules.computeIfAbsent("core") { mutableListOf() }.add(module.name)
   }
 
-  val platformMainModule = "intellij.platform.main"
+  val platformMainModule = "intellij.platform.starter"
   if (context.isEmbeddedJetBrainsClientEnabled && layout.includedModules.none { it.moduleName == platformMainModule }) {
     /* this module is used by JetBrains Client, but it isn't packed in commercial IDEs, so let's put it in a separate JAR which won't be
        loaded when the IDE is started in the regular mode */
@@ -342,10 +338,7 @@ fun isLibraryAlwaysPackedIntoPlugin(name: String): Boolean = name == "flexmark" 
 
 internal fun computeProjectLibsUsedByPlugins(enabledPluginModules: Set<String>, context: BuildContext): SortedSet<ProjectLibraryData> {
   val result = ObjectLinkedOpenHashSet<ProjectLibraryData>()
-  val pluginLayoutsByJpsModuleNames = getPluginLayoutsByJpsModuleNames(
-    modules = enabledPluginModules,
-    productLayout = context.productProperties.productLayout,
-  )
+  val pluginLayoutsByJpsModuleNames = getPluginLayoutsByJpsModuleNames(modules = enabledPluginModules, productLayout = context.productProperties.productLayout)
 
   val helper = (context as BuildContextImpl).jarPackagerDependencyHelper
   for (plugin in pluginLayoutsByJpsModuleNames) {
@@ -491,25 +484,41 @@ private fun computeTransitive(
 // result _must be_ consistent, do not use Set.of or HashSet here
 private suspend fun processAndGetProductPluginContentModules(
   context: BuildContext,
-  productPluginSourceModuleName: String,
   layout: PlatformLayout,
   includedPlatformModulesPartialList: List<String>,
 ): Set<ModuleItem> {
   val xIncludePathResolver = createXIncludePathResolver(includedPlatformModulesPartialList, context)
   return withContext(Dispatchers.IO) {
+    val productPluginSourceModuleName = context.productProperties.applicationInfoModule
     val file = requireNotNull(
       context.findFileInModuleSources(productPluginSourceModuleName, "META-INF/plugin.xml")
       ?: context.findFileInModuleSources(moduleName = productPluginSourceModuleName, relativePath = "META-INF/${context.productProperties.platformPrefix}Plugin.xml")
     ) { "Cannot find product plugin descriptor in '$productPluginSourceModuleName' module" }
 
-    processProductXmlDescriptor(file = file, moduleName = productPluginSourceModuleName, withPatch = layout::withPatch, xIncludePathResolver = xIncludePathResolver, context = context)
+    val xml = JDOMUtil.load(file)
+    val result = embedAndCollectProductModules(file = file, xml = xml, xIncludePathResolver = xIncludePathResolver, context = context)
+    val data = JDOMUtil.write(xml)
+    val fileName = file.fileName.toString()
+    layout.withPatch { moduleOutputPatcher, _, _ ->
+      moduleOutputPatcher.patchModuleOutput(productPluginSourceModuleName, "META-INF/$fileName", data)
+    }
+
+    result
   }
 }
 
+// todo implement correct processing
+private val excludedPaths = java.util.Set.of(
+  "/META-INF/ultimate.xml",
+  "/META-INF/RdServer.xml",
+  "/META-INF/unattendedHost.xml",
+  "/META-INF/codeWithMe.xml",
+)
+
 fun createXIncludePathResolver(includedPlatformModulesPartialList: List<String>, context: BuildContext): XIncludePathResolver {
   return object : XIncludePathResolver {
-    override fun resolvePath(relativePath: String, base: Path?, isOptional: Boolean): Path? {
-      if (isOptional) {
+    override fun resolvePath(relativePath: String, base: Path?, isOptional: Boolean, isDynamic: Boolean): Path? {
+      if (isOptional || isDynamic || excludedPaths.contains(relativePath)) {
         // It isn't safe to resolve includes at build time if they're optional.
         // This could lead to issues when running another product using this distribution.
         // E.g., if the corresponding module is somehow being excluded on runtime.
@@ -540,22 +549,25 @@ fun createXIncludePathResolver(includedPlatformModulesPartialList: List<String>,
   }
 }
 
-suspend fun processProductXmlDescriptor(
-  file: Path,
-  moduleName: String,
-  withPatch: suspend(patcher: suspend (ModuleOutputPatcher, PlatformLayout, BuildContext) -> Unit) -> Unit,
-  xIncludePathResolver: XIncludePathResolver,
-  context: BuildContext,
-): Set<ModuleItem> {
-  val xml = JDOMUtil.load(file)
+private fun embedAndCollectProductModules(file: Path, xIncludePathResolver: XIncludePathResolver, xml: Element, context: BuildContext): Set<ModuleItem> {
   resolveNonXIncludeElement(original = xml, base = file, pathResolver = xIncludePathResolver)
-  val result = collectAndEmbedProductModules(root = xml, xIncludePathResolver = xIncludePathResolver, context = context)
-  val data = JDOMUtil.write(xml)
-  val fileName = file.fileName.toString()
-  withPatch { moduleOutputPatcher, _, _ ->
-    moduleOutputPatcher.patchModuleOutput(moduleName, "META-INF/$fileName", data)
+  return collectAndEmbedProductModules(root = xml, xIncludePathResolver = xIncludePathResolver, context = context)
+}
+
+fun embedContentModules(file: Path, xIncludePathResolver: XIncludePathResolver, xml: Element, layout: PluginLayout?, context: BuildContext) {
+  resolveNonXIncludeElement(original = xml, base = file, pathResolver = xIncludePathResolver)
+  for (moduleElement in xml.getChildren("content").asSequence().flatMap { it.getChildren("module") }) {
+    val moduleName = moduleElement.getAttributeValue("name") ?: continue
+    check(moduleElement.content.isEmpty())
+
+    val jpsModuleName = moduleName.substringBeforeLast('/')
+    val descriptor = getModuleDescriptor(moduleName = moduleName, jpsModuleName = jpsModuleName, xIncludePathResolver = xIncludePathResolver, context = context)
+    if (jpsModuleName == moduleName &&
+        (context as BuildContextImpl).jarPackagerDependencyHelper.isPluginModulePackedIntoSeparateJar(context.findRequiredModule(jpsModuleName), layout)) {
+      descriptor.setAttribute("separate-jar", "true")
+    }
+    moduleElement.setContent(CDATA(JDOMUtil.write(descriptor)))
   }
-  return result
 }
 
 // see PluginXmlPathResolver.toLoadPath
@@ -567,14 +579,14 @@ private fun toLoadPath(relativePath: String): String {
   }
 }
 
-private fun getModuleDescriptor(moduleName: String, xIncludePathResolver: XIncludePathResolver, context: BuildContext): CDATA {
-  val descriptorFile = "$moduleName.xml"
-  val file = requireNotNull(context.findFileInModuleSources(moduleName, descriptorFile)) {
-    "Cannot find file $descriptorFile in module $moduleName"
+private fun getModuleDescriptor(moduleName: String, jpsModuleName: String, xIncludePathResolver: XIncludePathResolver, context: BuildContext): Element {
+  val descriptorFile = "${moduleName.replace('/', '.')}.xml"
+  val file = requireNotNull(context.findFileInModuleSources(jpsModuleName, descriptorFile)) {
+    "Cannot find file $descriptorFile in module $jpsModuleName"
   }
   val xml = JDOMUtil.load(file)
   resolveNonXIncludeElement(original = xml, base = file, pathResolver = xIncludePathResolver)
-  return CDATA(JDOMUtil.write(xml))
+  return xml
 }
 
 private fun collectAndEmbedProductModules(root: Element, xIncludePathResolver: XIncludePathResolver, context: BuildContext): Set<ModuleItem> {
@@ -590,7 +602,7 @@ private fun collectAndEmbedProductModules(root: Element, xIncludePathResolver: X
     }
 
     check(moduleElement.content.isEmpty())
-    moduleElement.setContent(getModuleDescriptor(moduleName = moduleName, xIncludePathResolver = xIncludePathResolver, context = context))
+    moduleElement.setContent(CDATA(JDOMUtil.write(getModuleDescriptor(moduleName = moduleName, jpsModuleName = moduleName, xIncludePathResolver = xIncludePathResolver, context = context))))
   }
   return result
 }

@@ -4,7 +4,6 @@ package com.intellij.platform.ijent.community.impl.nio
 import com.intellij.platform.ijent.IjentId
 import com.intellij.platform.ijent.fs.*
 import com.intellij.platform.ijent.fs.IjentFileSystemApi.Canonicalize
-import org.jetbrains.annotations.ApiStatus
 import java.net.URI
 import java.nio.file.*
 
@@ -17,7 +16,6 @@ import java.nio.file.*
  * val path: Path = ijent.fs.asNioFileSystem().getPath("/usr/bin/cowsay")
  * ```
  */
-@ApiStatus.Experimental
 class IjentNioPath internal constructor(
   val ijentPath: IjentPath,
   internal val nioFs: IjentNioFileSystem,
@@ -37,29 +35,29 @@ class IjentNioPath internal constructor(
       is IjentPath.Relative -> false
     }
 
-  override fun getRoot(): Path? =
+  override fun getRoot(): IjentNioPath? =
     when (ijentPath) {
       is IjentPath.Absolute -> ijentPath.root.toNioPath()
       is IjentPath.Relative -> null
     }
 
-  override fun getFileName(): Path? =
+  override fun getFileName(): IjentNioPath? =
     IjentPath.Relative
       .parse(ijentPath.fileName)
       .getOrThrow()
       .toNioPath()
       .takeIf { it.nameCount > 0 }
 
-  override fun getParent(): Path? =
+  override fun getParent(): IjentNioPath? =
     ijentPath.parent?.toNioPath()
 
   override fun getNameCount(): Int =
     ijentPath.nameCount
 
-  override fun getName(index: Int): Path =
+  override fun getName(index: Int): IjentNioPath =
     ijentPath.getName(index).toNioPath()
 
-  override fun subpath(beginIndex: Int, endIndex: Int): Path =
+  override fun subpath(beginIndex: Int, endIndex: Int): IjentNioPath =
     TODO()
 
   override fun startsWith(other: Path): Boolean {
@@ -82,19 +80,19 @@ class IjentNioPath internal constructor(
       is IjentPath.Relative -> ijentPath.endsWith(otherIjentPath)
     }
 
-  override fun normalize(): Path =
+  override fun normalize(): IjentNioPath =
     when (ijentPath) {
       is IjentPath.Absolute -> ijentPath.normalize().getOrThrow().toNioPath()
       is IjentPath.Relative -> ijentPath.normalize().toNioPath()
     }
 
-  override fun resolve(other: Path): Path =
+  override fun resolve(other: Path): IjentNioPath =
     when (val otherIjentPath = other.toIjentPath(isWindows)) {
       is IjentPath.Absolute -> otherIjentPath.toNioPath()  // TODO is it the desired behaviour?
       is IjentPath.Relative -> ijentPath.resolve(otherIjentPath).getOrThrow().toNioPath()
     }
 
-  override fun relativize(other: Path): Path =
+  override fun relativize(other: Path): IjentNioPath =
     when (val otherIjentPath = other.toIjentPath(isWindows)) {
       is IjentPath.Absolute -> when (ijentPath) {
         is IjentPath.Absolute -> ijentPath.relativize(otherIjentPath).getOrThrow().toNioPath()
@@ -128,7 +126,7 @@ class IjentNioPath internal constructor(
       throw InvalidPathException(toString(), "Can't build an absolute path for $this")
     }
 
-  override fun toRealPath(vararg options: LinkOption): Path =
+  override fun toRealPath(vararg options: LinkOption): IjentNioPath =
     when (ijentPath) {
       is IjentPath.Absolute ->
         ijentPath.normalize().getOrThrow()

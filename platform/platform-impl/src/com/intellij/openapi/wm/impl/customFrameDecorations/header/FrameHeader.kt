@@ -6,7 +6,8 @@ import com.intellij.icons.AllIcons
 import com.intellij.ide.IdeBundle
 import com.intellij.idea.ActionsBundle
 import com.intellij.openapi.wm.impl.IdeRootPane
-import com.intellij.openapi.wm.impl.customFrameDecorations.ResizableCustomFrameTitleButtons
+import com.intellij.openapi.wm.impl.customFrameDecorations.frameButtons.CustomFrameButtons
+import com.intellij.openapi.wm.impl.customFrameDecorations.frameButtons.LinuxResizableCustomFrameButtons
 import com.intellij.util.ui.JBFont
 import java.awt.Font
 import java.awt.Frame
@@ -28,13 +29,18 @@ internal open class FrameHeader(protected val frame: JFrame) : CustomHeader(fram
   @Suppress("LeakingThis")
   private val closeAction = createCloseAction(this)
 
-  protected val buttonPanes: ResizableCustomFrameTitleButtons? by lazy {
+  protected val buttonPanes: CustomFrameButtons? by lazy {
     createButtonsPane()
   }
 
   override fun windowStateChanged() {
     super.windowStateChanged()
     updateActions()
+  }
+
+  override fun updateActive() {
+    super.updateActive()
+    buttonPanes?.onUpdateFrameActive()
   }
 
   private fun iconify() {
@@ -95,9 +101,9 @@ internal open class FrameHeader(protected val frame: JFrame) : CustomHeader(fram
     closeMenuItem.font = JBFont.label().deriveFont(Font.BOLD)
   }
 
-  private fun createButtonsPane(): ResizableCustomFrameTitleButtons? {
+  private fun createButtonsPane(): CustomFrameButtons? {
     if (IdeRootPane.hideNativeLinuxTitle) {
-      return ResizableCustomFrameTitleButtons.create(closeAction, restoreAction, iconifyAction, maximizeAction)
+      return LinuxResizableCustomFrameButtons.create(closeAction, restoreAction, iconifyAction, maximizeAction)
     }
     return null
   }

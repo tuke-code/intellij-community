@@ -4,7 +4,11 @@ package com.intellij.ide.projectWizard.generators
 import com.intellij.ide.JavaUiBundle
 import com.intellij.ide.highlighter.ModuleFileType
 import com.intellij.ide.projectWizard.NewProjectWizardCollector.Base.logAddSampleCodeChanged
-import com.intellij.ide.projectWizard.NewProjectWizardCollector.Base.logAddSampleOnboardingTipsChangedEvent
+import com.intellij.ide.projectWizard.NewProjectWizardCollector.Base.logAddSampleCodeFinished
+import com.intellij.ide.projectWizard.NewProjectWizardCollector.Base.logAddSampleOnboardingTipsChanged
+import com.intellij.ide.projectWizard.NewProjectWizardCollector.Base.logAddSampleOnboardingTipsFinished
+import com.intellij.ide.projectWizard.NewProjectWizardCollector.BuildSystem.logSdkChanged
+import com.intellij.ide.projectWizard.NewProjectWizardCollector.BuildSystem.logSdkFinished
 import com.intellij.ide.projectWizard.NewProjectWizardCollector.Intellij.logContentRootChanged
 import com.intellij.ide.projectWizard.NewProjectWizardCollector.Intellij.logModuleFileLocationChanged
 import com.intellij.ide.projectWizard.NewProjectWizardCollector.Intellij.logModuleNameChanged
@@ -39,7 +43,6 @@ import com.intellij.openapi.util.io.FileUtil
 import com.intellij.ui.UIBundle
 import com.intellij.ui.dsl.builder.*
 import com.intellij.ui.layout.ValidationInfoBuilder
-import org.jetbrains.annotations.ApiStatus
 import java.nio.file.Paths
 
 abstract class IntelliJNewProjectWizardStep<ParentStep>(val parent: ParentStep) :
@@ -98,6 +101,8 @@ abstract class IntelliJNewProjectWizardStep<ParentStep>(val parent: ParentStep) 
   protected fun setupJavaSdkUI(builder: Panel) {
     builder.row(JavaUiBundle.message("label.project.wizard.new.project.jdk")) {
       projectWizardJdkComboBox(this, sdkProperty, sdkDownloadTaskProperty)
+        .whenItemSelectedFromUi { logSdkChanged(sdk) }
+        .onApply { logSdkFinished(sdk) }
     }.bottomGap(BottomGap.SMALL)
   }
 
@@ -106,6 +111,7 @@ abstract class IntelliJNewProjectWizardStep<ParentStep>(val parent: ParentStep) 
       checkBox(UIBundle.message("label.project.wizard.new.project.add.sample.code"))
         .bindSelected(addSampleCodeProperty)
         .whenStateChangedFromUi { logAddSampleCodeChanged(it) }
+        .onApply { logAddSampleCodeFinished(addSampleCode) }
     }
   }
 
@@ -114,7 +120,8 @@ abstract class IntelliJNewProjectWizardStep<ParentStep>(val parent: ParentStep) 
       row {
         checkBox(UIBundle.message("label.project.wizard.new.project.generate.onboarding.tips"))
           .bindSelected(generateOnboardingTipsProperty)
-          .whenStateChangedFromUi { logAddSampleOnboardingTipsChangedEvent(it) }
+          .whenStateChangedFromUi { logAddSampleOnboardingTipsChanged(it) }
+          .onApply { logAddSampleOnboardingTipsFinished(generateOnboardingTips) }
       }
     }.enabledIf(addSampleCodeProperty)
   }
@@ -162,8 +169,6 @@ abstract class IntelliJNewProjectWizardStep<ParentStep>(val parent: ParentStep) 
 
   protected open fun setupSettingsUI(builder: Panel) {
     setupJavaSdkUI(builder)
-    @Suppress("DEPRECATION")
-    builder.customOptions()
     setupSampleCodeUI(builder)
   }
 
@@ -171,19 +176,7 @@ abstract class IntelliJNewProjectWizardStep<ParentStep>(val parent: ParentStep) 
     setupModuleNameUI(builder)
     setupModuleContentRootUI(builder)
     setupModuleFileLocationUI(builder)
-    @Suppress("DEPRECATION")
-    builder.customAdditionalOptions()
   }
-
-  @Suppress("DeprecatedCallableAddReplaceWith")
-  @Deprecated("Implements setupSettingsUI function directly")
-  @ApiStatus.ScheduledForRemoval
-  open fun Panel.customOptions() = Unit
-
-  @Suppress("DeprecatedCallableAddReplaceWith")
-  @Deprecated("Implements setupAdvancedSettingsUI function directly")
-  @ApiStatus.ScheduledForRemoval
-  open fun Panel.customAdditionalOptions() = Unit
 
   override fun setupUI(builder: Panel) {
     setupSettingsUI(builder)

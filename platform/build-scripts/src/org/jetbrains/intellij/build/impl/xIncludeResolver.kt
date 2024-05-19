@@ -11,6 +11,7 @@ import java.io.IOException
 import java.nio.file.Path
 import java.util.*
 
+
 /**
  * The original element will be mutated in place.
  */
@@ -35,7 +36,12 @@ private fun resolveXIncludeElement(element: Element, bases: Deque<Path>, pathRes
   }
 
   val fallbackElement = element.getChild("fallback", element.namespace)
-  val remote = pathResolver.resolvePath(relativePath = href, base = base, isOptional = fallbackElement != null) ?: return null
+  val remote = pathResolver.resolvePath(
+    relativePath = href,
+    base = base,
+    isOptional = fallbackElement != null,
+    isDynamic = element.getAttribute("includeUnless") != null || element.getAttribute("includeIf") != null,
+  ) ?: return null
 
   assert(!bases.contains(remote)) { "Circular XInclude Reference to $remote" }
 
@@ -146,5 +152,5 @@ private fun doResolveNonXIncludeElement(original: Element, bases: Deque<Path>, p
 
 interface XIncludePathResolver {
   // return null if there is no need to resolve x-include
-  fun resolvePath(relativePath: String, base: Path?, isOptional: Boolean): Path?
+  fun resolvePath(relativePath: String, base: Path?, isOptional: Boolean, isDynamic: Boolean): Path?
 }

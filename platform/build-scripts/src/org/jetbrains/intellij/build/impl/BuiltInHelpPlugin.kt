@@ -8,10 +8,10 @@ import kotlinx.coroutines.sync.withLock
 import org.jetbrains.intellij.build.BuildContext
 import org.jetbrains.intellij.build.CompilationContext
 import org.jetbrains.intellij.build.TraceManager.spanBuilder
-import org.jetbrains.intellij.build.impl.productRunner.runJavaForIntellijModule
 import org.jetbrains.intellij.build.io.ZipArchiver
 import org.jetbrains.intellij.build.io.archiveDir
 import org.jetbrains.intellij.build.io.writeNewZipWithoutIndex
+import org.jetbrains.intellij.build.productRunner.runJavaForIntellijModule
 import java.nio.file.Files
 import java.nio.file.Path
 
@@ -48,7 +48,7 @@ internal fun buildHelpPlugin(pluginVersion: String, context: BuildContext): Plug
       patcher.patchModuleOutput(moduleName = BUILT_IN_HELP_MODULE_NAME,
                                 path = "META-INF/plugin.xml",
                                 content = pluginXml(buildContext, pluginVersion),
-                                overwrite = true)
+                                overwrite = PatchOverwriteMode.TRUE)
     }
     LUCENE_LIBRARIES.forEach { spec.withProjectLibrary(it) }
   }

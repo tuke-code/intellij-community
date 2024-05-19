@@ -41,6 +41,7 @@ class K2DataFlowInspectionTest : AbstractK2InspectionTest() {
     fun testCompareInLoop() = doTest()
     fun testComparison() = doTest()
     fun testComparisonNoValues() = doTest(false)
+    fun testConstantDivisionByZero() = doTest()
     fun testConstantWithDifferentType() = doTest()
     fun testCustomObjectComparison() = doTest()
     fun testDestructuringInLoop() = doTest()
@@ -104,7 +105,9 @@ class K2DataFlowInspectionTest : AbstractK2InspectionTest() {
     fun testTypeTestK2() = doTest()
     fun testUInt() = doTest()
     fun testUsefulNull() = doTest()
+    fun testWhenToDo() = doTest()
     fun testWhenK2() = doTest()
+    fun testWhenInLambdaK2() = doTest()
     fun testWhenIsObject() = doTest()
     fun testWhileLoop() = doTest()
 

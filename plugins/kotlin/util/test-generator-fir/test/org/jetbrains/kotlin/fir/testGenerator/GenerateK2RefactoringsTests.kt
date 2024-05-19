@@ -6,6 +6,8 @@ import org.jetbrains.kotlin.idea.k2.refactoring.bindToElement.AbstractK2BindToFq
 import org.jetbrains.kotlin.idea.k2.refactoring.copy.AbstractK2CopyTest
 import org.jetbrains.kotlin.idea.k2.refactoring.copy.AbstractK2MultiModuleCopyTest
 import org.jetbrains.kotlin.idea.k2.refactoring.inline.AbstractKotlinFirInlineTest
+import org.jetbrains.kotlin.idea.k2.refactoring.introduce.AbstractK2InplaceIntroduceFunctionTest
+import org.jetbrains.kotlin.idea.k2.refactoring.introduce.AbstractK2IntroduceConstantTest
 import org.jetbrains.kotlin.idea.k2.refactoring.introduce.AbstractK2PsiUnifierTest
 import org.jetbrains.kotlin.idea.k2.refactoring.introduce.introduceVariable.AbstractK2IntroduceVariableTest
 import org.jetbrains.kotlin.idea.k2.refactoring.introduce.AbstractK2IntroduceFunctionTest
@@ -84,12 +86,20 @@ internal fun MutableTWorkspace.generateK2RefactoringsTests() {
             model("refactoring/extractFunction", pattern = Patterns.KT_OR_KTS, testMethodName = "doExtractFunctionTest")
         }
 
+        testClass<AbstractK2InplaceIntroduceFunctionTest> {
+            model("refactoring/extractFunctionInplace")
+        }
+
         testClass<AbstractK2IntroduceParameterTest> {
-            model("refactoring/introduceParameter", pattern = Patterns.KT_OR_KTS, testMethodName = "doIntroduceParameterTest")
+            model("refactoring/introduceParameter", pattern = Patterns.KT_OR_KTS_WITHOUT_DOTS, testMethodName = "doIntroduceParameterTest")
         }
 
         testClass<AbstractK2IntroducePropertyTest> {
             model("refactoring/introduceProperty", pattern = Patterns.KT_OR_KTS, testMethodName = "doIntroducePropertyTest")
+        }
+
+        testClass<AbstractK2IntroduceConstantTest> {
+            model("refactoring/introduceConstant", pattern = Patterns.KT_OR_KTS, testMethodName = "doIntroduceConstantTest")
         }
     }
 

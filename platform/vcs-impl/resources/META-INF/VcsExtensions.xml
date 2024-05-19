@@ -45,6 +45,8 @@
     <!-- preload only for performance reasons -->
     <projectService serviceInterface="com.intellij.openapi.vcs.ProjectLevelVcsManager"
                     serviceImplementation="com.intellij.openapi.vcs.impl.ProjectLevelVcsManagerImpl" preload="notHeadless"/>
+    <!--suppress LightServiceMigrationXML - see DefaultProjectStoreTest (IDE needs to know correct Storage without service being loaded) -->
+    <projectService serviceImplementation="com.intellij.openapi.vcs.impl.OptionsAndConfirmationsHolder"/>
     <projectService serviceInterface="com.intellij.vcs.console.VcsConsoleTabService"
                     serviceImplementation="com.intellij.vcs.console.VcsConsoleTabServiceImpl"
                     headlessImplementation="com.intellij.vcs.console.MockVcsConsoleTabService"/>
@@ -234,7 +236,7 @@
     <writingAccessProvider implementation="com.intellij.openapi.vcs.changes.conflicts.ChangelistConflictAccessProvider"/>
     <writingAccessProvider implementation="com.intellij.openapi.vcs.changes.shelf.ShelfFileWritingAccessProvider"/>
     <editorNotificationProvider implementation="com.intellij.openapi.vcs.changes.conflicts.ChangelistConflictNotificationProvider"/>
-    <customFileDropHandler implementation="com.intellij.openapi.vcs.changes.patch.PatchFileDropHandler"/>
+    <fileDropHandler implementation="com.intellij.openapi.vcs.changes.patch.PatchFileDropHandler"/>
 
     <handleTypeFactory implementation="com.intellij.openapi.vcs.readOnlyHandler.VcsHandleTypeFactory"/>
 

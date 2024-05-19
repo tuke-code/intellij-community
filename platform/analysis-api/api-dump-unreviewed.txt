@@ -107,16 +107,10 @@ c:com.intellij.codeInsight.CharTailType
 - toString():java.lang.String
 a:com.intellij.codeInsight.TailType
 - sf:CASE_COLON:com.intellij.codeInsight.TailType
-- sf:COND_EXPR_COLON:com.intellij.codeInsight.TailType
 - sf:DOT:com.intellij.codeInsight.TailType
-- sf:EQUALS:com.intellij.codeInsight.TailType
-- sf:HUMBLE_SPACE_BEFORE_WORD:com.intellij.codeInsight.TailType
-- sf:INSERT_SPACE:com.intellij.codeInsight.TailType
-- sf:LPARENTH:com.intellij.codeInsight.TailType
 - sf:NONE:com.intellij.codeInsight.TailType
 - sf:SEMICOLON:com.intellij.codeInsight.TailType
 - sf:SPACE:com.intellij.codeInsight.TailType
-- sf:UNKNOWN:com.intellij.codeInsight.TailType
 - <init>():V
 - s:createSimpleTailType(C):com.intellij.codeInsight.TailType
 - ps:getFileType(com.intellij.openapi.editor.Editor):com.intellij.openapi.fileTypes.FileType
@@ -422,6 +416,8 @@ f:com.intellij.codeInsight.completion.PrioritizedLookupElement
 - s:withExplicitProximity(com.intellij.codeInsight.lookup.LookupElement,I):com.intellij.codeInsight.lookup.LookupElement
 - s:withGrouping(com.intellij.codeInsight.lookup.LookupElement,I):com.intellij.codeInsight.lookup.LookupElement
 - s:withPriority(com.intellij.codeInsight.lookup.LookupElement,D):com.intellij.codeInsight.lookup.LookupElement
+*:com.intellij.codeInsight.completion.ml.MLRankingIgnorable
+- s:wrap(com.intellij.codeInsight.lookup.LookupElement):com.intellij.codeInsight.lookup.LookupElement
 a:com.intellij.codeInsight.completion.util.ParenthesesInsertHandler
 - com.intellij.codeInsight.completion.InsertHandler
 - sf:NO_PARAMETERS:com.intellij.codeInsight.completion.util.ParenthesesInsertHandler
@@ -2205,9 +2201,10 @@ f:com.intellij.codeInspection.util.RefEntityAlphabeticalComparator
 - s:getInstance():com.intellij.codeInspection.util.RefEntityAlphabeticalComparator
 *:com.intellij.formatting.CaretRestorationDecider
 - *sf:Companion:com.intellij.formatting.CaretRestorationDecider$Companion
+- s:forLanguage(com.intellij.lang.Language):com.intellij.formatting.CaretRestorationDecider
 - a:shouldRestoreCaret(com.intellij.openapi.editor.Document,com.intellij.openapi.editor.Editor,I):Z
 *f:com.intellij.formatting.CaretRestorationDecider$Companion
-- com.intellij.lang.LanguageExtension
+- f:forLanguage(com.intellij.lang.Language):com.intellij.formatting.CaretRestorationDecider
 a:com.intellij.ide.PlatformIdeService
 - <init>():V
 - createHyperlinkConsumer():java.util.function.BiConsumer
@@ -2666,6 +2663,7 @@ com.intellij.modcommand.ModCommandExecutor
 - a:executeForFileCopy(com.intellij.modcommand.ModCommand,com.intellij.psi.PsiFile):V
 - a:executeInBatch(com.intellij.modcommand.ActionContext,com.intellij.modcommand.ModCommand):com.intellij.modcommand.ModCommandExecutor$BatchExecutionResult
 - a:executeInteractively(com.intellij.modcommand.ActionContext,com.intellij.modcommand.ModCommand,com.intellij.openapi.editor.Editor):V
+- *s:executeInteractively(com.intellij.modcommand.ActionContext,java.lang.String,com.intellij.openapi.editor.Editor,java.util.function.Supplier):V
 - s:getInstance():com.intellij.modcommand.ModCommandExecutor
 - a:getPreview(com.intellij.modcommand.ModCommand,com.intellij.modcommand.ActionContext):com.intellij.codeInsight.intention.preview.IntentionPreviewInfo
 com.intellij.modcommand.ModCommandExecutor$BatchExecutionResult

@@ -1,16 +1,13 @@
 // Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
 package org.jetbrains.kotlin.idea.codeInsight.surroundWith.expression
 
-import com.intellij.codeInsight.CodeInsightUtilBase
-import com.intellij.openapi.editor.Editor
-import com.intellij.openapi.project.Project
+import com.intellij.modcommand.ActionContext
+import com.intellij.modcommand.ModPsiUpdater
 import com.intellij.openapi.util.NlsSafe
-import com.intellij.openapi.util.TextRange
+import com.intellij.psi.PsiDocumentManager
 import com.intellij.psi.util.startOffset
-import org.jetbrains.kotlin.analysis.api.KtAllowAnalysisFromWriteAction
 import org.jetbrains.kotlin.analysis.api.KtAllowAnalysisOnEdt
 import org.jetbrains.kotlin.analysis.api.analyze
-import org.jetbrains.kotlin.analysis.api.lifetime.allowAnalysisFromWriteAction
 import org.jetbrains.kotlin.analysis.api.lifetime.allowAnalysisOnEdt
 import org.jetbrains.kotlin.diagnostics.WhenMissingCase
 import org.jetbrains.kotlin.idea.base.psi.replaced
@@ -22,28 +19,27 @@ import org.jetbrains.kotlin.psi.KtWhenExpression
 
 class KotlinWhenSurrounder : KotlinExpressionSurrounder() {
     @NlsSafe
-    override fun getTemplateDescription() = "when (expr) {}"
+    override fun getTemplateDescription(): String = "when (expr) {}"
 
     @OptIn(KtAllowAnalysisOnEdt::class)
-    override fun surroundExpression(project: Project, editor: Editor, expression: KtExpression): TextRange {
+    override fun surroundExpression(context: ActionContext, expression: KtExpression, updater: ModPsiUpdater) {
         val template = "when(a) { \nb -> {}\n else -> {}\n}"
+
+        val project = context.project
+        val factory = KtPsiFactory(project)
         val whenExpression =
-            (KtPsiFactory(project).createExpression(template) as KtWhenExpression).let {
+            (factory.createExpression(template) as KtWhenExpression).let {
                 it.subjectExpression?.replace(expression)
                 expression.replaced(it)
             }
 
         val remainingBranches = allowAnalysisOnEdt {
-            @OptIn(KtAllowAnalysisFromWriteAction::class)
-            allowAnalysisFromWriteAction {
-                analyze(whenExpression) {
-                    whenExpression.getMissingCases().takeIf {
-                        it.isNotEmpty() && it.singleOrNull() != WhenMissingCase.Unknown
-                    }
+            analyze(whenExpression) {
+                whenExpression.getMissingCases().takeIf {
+                    it.isNotEmpty() && it.singleOrNull() != WhenMissingCase.Unknown
                 }
             }
         }
-
 
         if (remainingBranches != null) {
             val context = AddRemainingWhenBranchesUtils.Context(remainingBranches, enumToStarImport = null)
@@ -56,17 +52,21 @@ class KotlinWhenSurrounder : KotlinExpressionSurrounder() {
             }
         }
 
-        CodeInsightUtilBase.forcePsiPostprocessAndRestoreElement(whenExpression)
+        val document = whenExpression.containingFile.getFileDocument()
+        val psiDocumentManager = PsiDocumentManager.getInstance(project)
+        psiDocumentManager.doPostponedOperationsAndUnblockDocument(document)
 
         val firstEntry = whenExpression.entries.first()
         val offset = if (remainingBranches != null) {
             firstEntry.expression?.startOffset ?: firstEntry.startOffset
         } else {
-            val conditionRange = firstEntry.conditions.first().textRange
-            editor.document.deleteString(conditionRange.startOffset, conditionRange.endOffset)
-            conditionRange.startOffset
+            val condition = firstEntry.conditions.first()
+            val textRange = condition.textRange
+            val offset = textRange.startOffset
+            document.deleteString(textRange.startOffset, textRange.endOffset)
+            offset
         }
-        return TextRange(offset, offset)
-
+        updater.moveCaretTo(offset)
+        psiDocumentManager.commitDocument(document)
     }
 }

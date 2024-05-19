@@ -547,8 +547,6 @@ com.intellij.codeInsight.completion.ml.ContextFeatures
 - a:categoricalValue(java.lang.String):java.lang.String
 - a:classNameValue(java.lang.String):java.lang.String
 - a:floatValue(java.lang.String):java.lang.Double
-*:com.intellij.codeInsight.completion.ml.MLRankingIgnorable
-- s:wrap(com.intellij.codeInsight.lookup.LookupElement):com.intellij.codeInsight.lookup.LookupElement
 f:com.intellij.codeInsight.completion.util.CompletionStyleUtil
 - <init>():V
 - s:getCodeStyleSettings(com.intellij.codeInsight.completion.InsertionContext):com.intellij.psi.codeStyle.CommonCodeStyleSettings
@@ -1631,7 +1629,6 @@ c:com.intellij.codeInspection.IntentionWrapper
 - com.intellij.codeInspection.ActionClassHolder
 - com.intellij.codeInspection.LocalQuickFix
 - <init>(com.intellij.codeInsight.intention.IntentionAction):V
-- <init>(com.intellij.codeInsight.intention.IntentionAction,com.intellij.psi.PsiFile):V
 - applyFix(com.intellij.openapi.project.Project,com.intellij.codeInspection.ProblemDescriptor):V
 - generatePreview(com.intellij.openapi.project.Project,com.intellij.openapi.editor.Editor,com.intellij.psi.PsiFile):com.intellij.codeInsight.intention.preview.IntentionPreviewInfo
 - getAction():com.intellij.codeInsight.intention.IntentionAction
@@ -1797,7 +1794,6 @@ c:com.intellij.execution.actions.ConfigurationContext
 - createConfigurationsFromContext():java.util.List
 - s:createEmptyContextForLocation(com.intellij.execution.Location):com.intellij.execution.actions.ConfigurationContext
 - findExisting():com.intellij.execution.RunnerAndConfigurationSettings
-- findPreferredProducers():java.util.List
 - getConfiguration():com.intellij.execution.RunnerAndConfigurationSettings
 - getConfigurationsFromContext():java.util.List
 - getDataContext():com.intellij.openapi.actionSystem.DataContext
@@ -2094,18 +2090,6 @@ a:com.intellij.execution.junit.RuntimeConfigurationProducer
 - p:restoreSourceElement():com.intellij.psi.PsiElement
 - setConfiguration(com.intellij.execution.RunnerAndConfigurationSettings):V
 - p:storeSourceElement(com.intellij.psi.PsiElement):V
-c:com.intellij.execution.junit.RuntimeConfigurationProducer$DelegatingRuntimeConfiguration
-- com.intellij.execution.configurations.LocatableConfigurationBase
-- com.intellij.execution.configurations.ModuleRunConfiguration
-- <init>(com.intellij.execution.configurations.LocatableConfiguration):V
-- checkConfiguration():V
-- clone():com.intellij.execution.junit.RuntimeConfigurationProducer$DelegatingRuntimeConfiguration
-- getConfigurationEditor():com.intellij.openapi.options.SettingsEditor
-- getPeer():com.intellij.execution.configurations.LocatableConfiguration
-- getState(com.intellij.execution.Executor,com.intellij.execution.runners.ExecutionEnvironment):com.intellij.execution.configurations.RunProfileState
-- readExternal(org.jdom.Element):V
-- suggestedName():java.lang.String
-- writeExternal(org.jdom.Element):V
 f:com.intellij.execution.runToolbar.RunToolbarRunProcess
 - com.intellij.execution.runToolbar.RunToolbarProcess
 - <init>():V
@@ -2826,6 +2810,7 @@ com.intellij.ide.actions.searcheverywhere.SearchEverywhereToggleAction
 - a:canToggleEverywhere():Z
 - a:isEverywhere():Z
 - a:setEverywhere(Z):V
+- setScopeIsDefaultAndAutoSet(Z):V
 com.intellij.ide.actions.searcheverywhere.SearchFieldActionsContributor
 - a:createRightActions(kotlin.jvm.functions.Function1,java.lang.Runnable):java.util.List
 com.intellij.ide.actions.searcheverywhere.WeightedSearchEverywhereContributor
@@ -3464,6 +3449,12 @@ com.intellij.lang.parameterInfo.UpdateParameterInfoContext
 - a:setParameterOwner(com.intellij.psi.PsiElement):V
 - a:setPreservedOnHintHidden(Z):V
 - a:setUIComponentEnabled(I,Z):V
+*a:com.intellij.lang.surroundWith.ModCommandSurrounder
+- com.intellij.lang.surroundWith.Surrounder
+- <init>():V
+- f:startInWriteAction():Z
+- a:surroundElements(com.intellij.modcommand.ActionContext,com.intellij.psi.PsiElement[]):com.intellij.modcommand.ModCommand
+- f:surroundElements(com.intellij.openapi.project.Project,com.intellij.openapi.editor.Editor,com.intellij.psi.PsiElement[]):com.intellij.openapi.util.TextRange
 com.intellij.lang.surroundWith.SurroundDescriptor
 - a:getElementsToSurround(com.intellij.psi.PsiFile,I,I):com.intellij.psi.PsiElement[]
 - a:getSurrounders():com.intellij.lang.surroundWith.Surrounder[]

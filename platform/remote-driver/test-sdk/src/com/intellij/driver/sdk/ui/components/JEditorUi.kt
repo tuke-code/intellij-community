@@ -42,12 +42,21 @@ class JEditorUiComponent(data: ComponentData) : UiComponent(data) {
     }
 
   fun getCaretLine() = caretPosition.getLine() + 1
+  fun getCaretColumn() = caretPosition.getColumn() + 1
+
+
 
   fun setCaretPosition(line: Int, column: Int) {
-    setFocus()
+    click()
     driver.withContext(OnDispatcher.EDT) {
       editor.getCaretModel().moveToLogicalPosition(driver.logicalPosition(line - 1, column - 1))
     }
+  }
+
+  fun clickOnPosition(line: Int, column: Int) {
+    setFocus()
+    click(interact { val lowerPoint = editor.logicalPositionToXY(driver.logicalPosition(line-1, column-1))
+      Point(lowerPoint.getX().toInt(), lowerPoint.getY().toInt()+editor.getLineHeight()/2)})
   }
 
   fun getLineText(line: Int) = editor.getDocument().getText().split("\n").let {
@@ -82,8 +91,13 @@ class GutterUiComponent(data: ComponentData) : UiComponent(data) {
   val iconAreaOffset
     get() = gutter.getIconAreaOffset()
 
-  fun getIcon(line: Int) =
+
+  fun getIconName(line: Int) =
     icons.firstOrNull { it.line == line - 1 }?.mark?.getIcon().toString().substringAfterLast("/")
+
+  fun hoverOverIcon(line: Int) {
+    moveMouse(icons.firstOrNull { it.line == line - 1 }!!.location)
+  }
 
   inner class GutterIcon(private val data: GutterIconWithLocation) {
     val line: Int
@@ -96,6 +110,11 @@ class GutterUiComponent(data: ComponentData) : UiComponent(data) {
     fun click() {
       click(location)
     }
+
+
+
+
+
   }
 }
 

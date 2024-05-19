@@ -4,7 +4,6 @@ package org.jetbrains.kotlin.idea.searching.usages
 
 import com.intellij.psi.PsiClass
 import com.intellij.psi.PsiElement
-import com.intellij.psi.PsiMethod
 import com.intellij.psi.PsiReference
 import com.intellij.psi.search.SearchScope
 import com.intellij.psi.search.searches.ClassInheritorsSearch
@@ -15,8 +14,9 @@ import org.jetbrains.kotlin.analysis.api.renderer.base.annotations.KtRendererAnn
 import org.jetbrains.kotlin.analysis.api.renderer.declarations.KtDeclarationRenderer
 import org.jetbrains.kotlin.analysis.api.renderer.declarations.impl.KtDeclarationRendererForSource
 import org.jetbrains.kotlin.analysis.api.symbols.KtCallableSymbol
-import org.jetbrains.kotlin.analysis.api.symbols.KtClassifierSymbol
+import org.jetbrains.kotlin.analysis.api.symbols.KtClassLikeSymbol
 import org.jetbrains.kotlin.analysis.api.symbols.KtConstructorSymbol
+import org.jetbrains.kotlin.analysis.api.symbols.KtDeclarationSymbol
 import org.jetbrains.kotlin.asJava.unwrapped
 import org.jetbrains.kotlin.idea.base.analysis.api.utils.analyzeInModalWindow
 import org.jetbrains.kotlin.idea.base.analysis.api.utils.getImplicitReceivers
@@ -83,10 +83,9 @@ internal class KotlinK2FindUsagesSupport : KotlinFindUsagesSupport {
         }
     }
 
-    override fun formatJavaOrLightMethod(method: PsiMethod): String {
-        val unwrapped = method.unwrapped as KtDeclaration
-        return KotlinPsiDeclarationRenderer.render(unwrapped) ?: analyzeInModalWindow(unwrapped, KotlinBundle.message("find.usages.prepare.dialog.progress")) {
-            unwrapped.getSymbol().render(noAnnotationsShortNameRenderer())
+    override fun renderDeclaration(method: KtDeclaration): String {
+        return KotlinPsiDeclarationRenderer.render(method) ?: analyzeInModalWindow(method, KotlinBundle.message("find.usages.prepare.dialog.progress")) {
+            method.getSymbol().render(noAnnotationsShortNameRenderer())
         }
     }
 
@@ -108,8 +107,13 @@ internal class KotlinK2FindUsagesSupport : KotlinFindUsagesSupport {
                 is KtFunctionCall<*> -> {
                     val constructorSymbol = call.symbol as? KtConstructorSymbol ?: return@withResolvedCall false
                     val constructedClassSymbol =
-                        constructorSymbol.getContainingSymbol() as? KtClassifierSymbol ?: return@withResolvedCall false
-                    constructedClassSymbol == ktClassOrObject.getClassOrObjectSymbol()
+                        constructorSymbol.getContainingSymbol() as? KtClassLikeSymbol ?: return@withResolvedCall false
+                    val classOrObjectSymbol = ktClassOrObject.getClassOrObjectSymbol()
+
+                    fun KtClassLikeSymbol.getExpectsOrSelf(): List<KtDeclarationSymbol> = (listOf(this).takeIf { isExpect } ?: getExpectsForActual())
+
+                    constructedClassSymbol == classOrObjectSymbol ||
+                            constructedClassSymbol.getExpectsOrSelf() == classOrObjectSymbol?.getExpectsOrSelf()
                 }
 
                 else -> false

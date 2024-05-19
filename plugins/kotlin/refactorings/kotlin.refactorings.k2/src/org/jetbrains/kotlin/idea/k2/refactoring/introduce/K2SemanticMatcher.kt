@@ -5,21 +5,29 @@ import com.intellij.psi.PsiNamedElement
 import com.intellij.psi.tree.IElementType
 import com.intellij.psi.util.elementType
 import com.intellij.psi.util.startOffset
+import org.jetbrains.kotlin.analysis.api.KtAllowAnalysisOnEdt
 import org.jetbrains.kotlin.analysis.api.KtAnalysisSession
+import org.jetbrains.kotlin.analysis.api.analyze
+import org.jetbrains.kotlin.analysis.api.analyzeCopy
 import org.jetbrains.kotlin.analysis.api.calls.*
 import org.jetbrains.kotlin.analysis.api.fir.diagnostics.KtFirDiagnostic
+import org.jetbrains.kotlin.analysis.api.lifetime.allowAnalysisOnEdt
 import org.jetbrains.kotlin.analysis.api.symbols.*
 import org.jetbrains.kotlin.analysis.api.symbols.markers.KtNamedSymbol
+import org.jetbrains.kotlin.analysis.api.types.KtErrorType
 import org.jetbrains.kotlin.analysis.api.types.KtType
 import org.jetbrains.kotlin.analysis.api.types.KtTypeParameterType
+import org.jetbrains.kotlin.analysis.project.structure.DanglingFileResolutionMode
 import org.jetbrains.kotlin.analysis.utils.errors.unexpectedElementError
 import org.jetbrains.kotlin.idea.base.analysis.api.utils.CallParameterInfoProvider.getArgumentOrIndexExpressions
 import org.jetbrains.kotlin.idea.base.analysis.api.utils.CallParameterInfoProvider.mapArgumentsToParameterIndices
+import org.jetbrains.kotlin.idea.base.analysis.api.utils.analyzeInModalWindow
 import org.jetbrains.kotlin.idea.base.psi.isInsideKtTypeReference
 import org.jetbrains.kotlin.idea.base.psi.safeDeparenthesize
 import org.jetbrains.kotlin.idea.base.psi.unifier.KotlinPsiRange
 import org.jetbrains.kotlin.idea.base.psi.unifier.KotlinPsiUnificationResult.StrictSuccess
 import org.jetbrains.kotlin.idea.base.psi.unifier.KotlinPsiUnificationResult.Success
+import org.jetbrains.kotlin.idea.base.psi.unifier.toRange
 import org.jetbrains.kotlin.idea.codeinsight.utils.findRelevantLoopForExpression
 import org.jetbrains.kotlin.idea.refactoring.introduce.extractableSubstringInfo
 import org.jetbrains.kotlin.idea.references.KtReference
@@ -44,7 +52,7 @@ object K2SemanticMatcher {
                     when {
                         element == substringInfo?.template -> matches.add(patternElement)
                         element is KtStringTemplateExpression && substringInfo != null -> {
-                            val extractableSubstringInfo = getMatchedStringFragmentsOrNull(element, substringInfo)
+                            val extractableSubstringInfo = getMatchedStringFragmentsOrNull(element, substringInfo, MatchingContext())
                             when {
                                 extractableSubstringInfo != null -> {
                                     matches.add(extractableSubstringInfo.createExpression())
@@ -96,22 +104,38 @@ object K2SemanticMatcher {
 
         val matchingContext = MatchingContext(parameterSubstitution = substitution)
 
+        fun prepareResult(
+            target: KotlinPsiRange,
+            substitution: MutableMap<PsiNamedElement, KtElement?>
+        ): StrictSuccess<PsiNamedElement>? {
+            val result = mutableMapOf<PsiNamedElement, KtElement>()
+            substitution.entries.forEach { (parameter, argument) ->
+                if (argument == null) {
+                    return null
+                }
+                result.put(parameter, argument)
+            }
+            return StrictSuccess(target, result)
+        }
+
         target.elements.zip(pattern.elements) { t, p ->
             if (p !is KtElement) return@zip
 
-            if ((t as? KtElement)?.isSemanticMatch(p, matchingContext) != true) {
-                return null
+            val substringInfo = (p as? KtExpression)?.extractableSubstringInfo as? K2ExtractableSubstringInfo
+
+            if (t is KtStringTemplateExpression && substringInfo != null) {
+                val extractableSubstringInfo = getMatchedStringFragmentsOrNull(t, substringInfo, matchingContext)
+                if (extractableSubstringInfo != null) {
+                    return prepareResult(extractableSubstringInfo.createExpression().toRange(), substitution)
+                } else {
+                    return null
+                }
             }
+
+            if (((t as? KtElement)?.isSemanticMatch(p, matchingContext) != true)) return null
         }
 
-        val result = mutableMapOf<PsiNamedElement, KtElement>()
-        substitution.entries.forEach { (parameter, argument) ->
-            if (argument == null) {
-                return null
-            }
-            result.put(parameter, argument)
-        }
-        return StrictSuccess(target, result)
+        return prepareResult(target, substitution)
     }
 
     context(KtAnalysisSession)
@@ -124,7 +148,9 @@ object K2SemanticMatcher {
     ): Boolean = this == patternElement || accept(VisitingMatcher(this@KtAnalysisSession, context), patternElement)
 
     context(KtAnalysisSession)
-    private fun getMatchedStringFragmentsOrNull(target: KtStringTemplateExpression, patternInfo: K2ExtractableSubstringInfo): K2ExtractableSubstringInfo? {
+    private fun getMatchedStringFragmentsOrNull(
+        target: KtStringTemplateExpression, patternInfo: K2ExtractableSubstringInfo, matchingContext: MatchingContext
+    ): K2ExtractableSubstringInfo? {
         val prefixLength = patternInfo.prefix.length
         val suffixLength = patternInfo.suffix.length
         val targetEntries = target.entries
@@ -172,7 +198,7 @@ object K2SemanticMatcher {
             val status = (fromIndex..toIndex).fold(true) { status, patternEntryIndex ->
                 val targetEntryToUnify = targetEntries[index + patternEntryIndex]
                 val patternEntryToUnify = patternEntries[patternEntryIndex]
-                status && targetEntryToUnify.isSemanticMatch(patternEntryToUnify)
+                status && targetEntryToUnify.isSemanticMatch(patternEntryToUnify, matchingContext)
             }
             if (!status) continue
             return K2ExtractableSubstringInfo(targetEntry, lastTargetEntry, targetPrefix, targetSuffix, patternInfo.isString)
@@ -199,6 +225,9 @@ object K2SemanticMatcher {
             if (patternSymbol is KtNamedSymbol) {
                 val patternElement = patternSymbol.psi as? PsiNamedElement
                 if (patternElement != null && parameterSubstitution.containsKey(patternElement)) {
+                    if (patternSymbol is KtCallableSymbol && targetSymbol is KtCallableSymbol) {
+                        if (!targetSymbol.returnType.isSubTypeOf(patternSymbol.returnType)) return false
+                    }
                     val expression =
                         KtPsiFactory(patternElement.project).createExpression((targetSymbol as KtNamedSymbol).name.asString())
                     val oldElement = parameterSubstitution.put(patternElement, expression)

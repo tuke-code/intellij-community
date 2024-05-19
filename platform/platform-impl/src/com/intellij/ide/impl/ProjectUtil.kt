@@ -398,7 +398,7 @@ object ProjectUtil {
   fun confirmOpenOrAttachProject(project: Project? = null): Int {
     var mode = GeneralSettings.getInstance().confirmOpenNewProject
     if (mode == GeneralSettings.OPEN_PROJECT_ASK) {
-      val processor = ProjectAttachProcessor.getProcessor()
+      val processor = ProjectAttachProcessor.getProcessor(project)
       val exitCode = Messages.showDialog(
         project?.let { processor?.getDescription(it) } ?: IdeBundle.message("prompt.open.project.or.attach"),
         IdeBundle.message("prompt.open.project.or.attach.title"), arrayOf(
@@ -407,7 +407,7 @@ object ProjectUtil {
         project?.let { processor?.getActionText(it) } ?: IdeBundle.message("prompt.open.project.or.attach.button.attach"),
         CommonBundle.getCancelButtonText()
       ),
-        0,
+        processor?.defaultOptionIndex?: 0,
         Messages.getQuestionIcon(),
         ProjectNewWindowDoNotAskOption())
       mode = if (exitCode == 0) GeneralSettings.OPEN_PROJECT_SAME_WINDOW else if (exitCode == 1) GeneralSettings.OPEN_PROJECT_NEW_WINDOW else if (exitCode == 2) GeneralSettings.OPEN_PROJECT_SAME_WINDOW_ATTACH else -1

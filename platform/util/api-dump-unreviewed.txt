@@ -4,7 +4,6 @@ c:com.intellij.AbstractBundle
 - clearLocaleCache():V
 - containsKey(java.lang.String):Z
 - p:findBundle(java.lang.String,java.lang.ClassLoader,java.util.ResourceBundle$Control):java.util.ResourceBundle
-- p:getBundle(Z):java.util.ResourceBundle
 - getLazyMessage(java.lang.String,java.lang.Object[]):java.util.function.Supplier
 - getMessage(java.lang.String,java.lang.Object[]):java.lang.String
 - getPartialMessage(java.lang.String,I,java.lang.Object[]):java.lang.String
@@ -543,8 +542,10 @@ f:com.intellij.openapi.diagnostic.LoggerKt
 - bs:debug$default(com.intellij.openapi.diagnostic.Logger,java.lang.Exception,kotlin.jvm.functions.Function0,I,java.lang.Object):V
 - sf:fileLogger():com.intellij.openapi.diagnostic.Logger
 - sf:getOrLogException(java.lang.Object,com.intellij.openapi.diagnostic.Logger):java.lang.Object
+- sf:ifTraceEnabled(com.intellij.openapi.diagnostic.Logger,kotlin.jvm.functions.Function0):java.lang.Object
 - sf:runAndLogException(com.intellij.openapi.diagnostic.Logger,kotlin.jvm.functions.Function0):java.lang.Object
 - sf:trace(com.intellij.openapi.diagnostic.Logger,kotlin.jvm.functions.Function0):V
+- sf:traceThrowable(com.intellij.openapi.diagnostic.Logger,kotlin.jvm.functions.Function0):V
 *:com.intellij.openapi.diagnostic.ReportingClassSubstitutor
 - s:getClassToReport(java.lang.Object):java.lang.Class
 - a:getSubstitutedClass():java.lang.Class
@@ -592,14 +593,12 @@ a:com.intellij.openapi.util.AtomicClearableLazyValue
 - f:isCached():Z
 a:com.intellij.openapi.util.AtomicNotNullLazyValue
 - com.intellij.openapi.util.NotNullLazyValue
-- p:<init>():V
 - s:createValue(com.intellij.openapi.util.NotNullFactory):com.intellij.openapi.util.AtomicNotNullLazyValue
 - f:getValue():java.lang.Object
 - isComputed():Z
 a:com.intellij.openapi.util.AtomicNullableLazyValue
 - com.intellij.openapi.util.NullableLazyValue
 - p:<init>():V
-- s:createValue(com.intellij.openapi.util.Factory):com.intellij.openapi.util.AtomicNullableLazyValue
 - f:getValue():java.lang.Object
 - isComputed():Z
 com.intellij.openapi.util.BooleanGetter
@@ -1262,7 +1261,6 @@ f:com.intellij.openapi.util.UnorderedPair
 - toString():java.lang.String
 c:com.intellij.openapi.util.UnprotectedUserDataHolder
 - com.intellij.openapi.util.UserDataHolder
-- com.intellij.openapi.util.UserDataHolderUnprotected
 - <init>():V
 - getUserData(com.intellij.openapi.util.Key):java.lang.Object
 - getUserDataUnprotected(com.intellij.openapi.util.Key):java.lang.Object
@@ -1316,9 +1314,6 @@ com.intellij.openapi.util.UserDataHolderEx
 f:com.intellij.openapi.util.UserDataHolderExKt
 - sf:getOrCreateUserData(com.intellij.openapi.util.UserDataHolder,com.intellij.openapi.util.Key,kotlin.jvm.functions.Function0):java.lang.Object
 - sf:nullableLazyValue(com.intellij.openapi.util.UserDataHolder,com.intellij.openapi.util.Key,kotlin.jvm.functions.Function0):java.lang.Object
-com.intellij.openapi.util.UserDataHolderUnprotected
-- a:getUserDataUnprotected(com.intellij.openapi.util.Key):java.lang.Object
-- a:putUserDataUnprotected(com.intellij.openapi.util.Key,java.lang.Object):V
 com.intellij.openapi.util.ValueKey
 - a:getName():java.lang.String
 - match():com.intellij.openapi.util.ValueKey$BeforeIf
@@ -1665,10 +1660,6 @@ f:com.intellij.openapi.util.io.StreamUtil
 - s:readText(java.io.Reader):java.lang.String
 - s:readTextAndConvertSeparators(java.io.Reader):C[]
 - s:readTextFrom(java.io.Reader):java.lang.String
-f:com.intellij.openapi.util.io.UniqueNameBuilder
-- <init>(java.lang.String,java.lang.String,I):V
-- addPath(java.lang.Object,java.lang.String):V
-- getShortPath(java.lang.Object):java.lang.String
 f:com.intellij.openapi.util.io.WindowsRegistryUtil
 - s:readRegistryBranch(java.lang.String):java.util.List
 - s:readRegistryDefault(java.lang.String):java.lang.String
@@ -3342,7 +3333,6 @@ f:com.intellij.util.containers.ContainerUtil
 - s:getOrCreate(java.util.Map,java.lang.Object,com.intellij.openapi.util.Factory):java.lang.Object
 - s:getOrCreate(java.util.Map,java.lang.Object,java.lang.Object):java.lang.Object
 - s:getOrElse(java.util.List,I,java.lang.Object):java.lang.Object
-- s:getOrElse(java.util.Map,java.lang.Object,java.lang.Object):java.lang.Object
 - s:groupBy(java.lang.Iterable,com.intellij.util.NullableFunction):com.intellij.util.containers.MultiMap
 - s:immutableList():java.util.List
 - s:immutableList(java.lang.Object):java.util.List
@@ -4011,7 +4001,6 @@ c:com.intellij.util.containers.MultiMap
 - s:createOrderedSet():com.intellij.util.containers.MultiMap
 - s:createSet():com.intellij.util.containers.MultiMap
 - s:createSet(java.util.Map):com.intellij.util.containers.MultiMap
-- s:createSmart():com.intellij.util.containers.MultiMap
 - s:createWeakKey():com.intellij.util.containers.MultiMap
 - s:empty():com.intellij.util.containers.MultiMap
 - f:entrySet():java.util.Set
@@ -4186,9 +4175,6 @@ f:com.intellij.util.containers.SortedList
 - remove(I):java.lang.Object
 - remove(java.lang.Object):Z
 - size():I
-c:com.intellij.util.containers.StringInterner
-- com.intellij.util.containers.Interner
-- <init>():V
 f:com.intellij.util.containers.ThreadLocalRandom
 - <init>():V
 - s:advanceProbe(I):I
@@ -4831,12 +4817,6 @@ c:com.intellij.util.indexing.impl.MapInputDataDiffBuilder
 - getClassToBlame():java.lang.Class
 com.intellij.util.indexing.impl.RemovedKeyProcessor
 - a:process(java.lang.Object,I):V
-a:com.intellij.util.indexing.impl.UpdatableValueContainer
-- com.intellij.util.indexing.ValueContainer
-- <init>():V
-- a:addValue(I,java.lang.Object):V
-- a:removeAssociatedValue(I):Z
-- a:saveTo(java.io.DataOutput,com.intellij.util.io.DataExternalizer):V
 f:com.intellij.util.indexing.impl.UpdateData
 - com.intellij.util.indexing.impl.AbstractUpdateData
 - <init>(I,java.util.Map,com.intellij.openapi.util.ThrowableComputable,com.intellij.util.indexing.IndexId,com.intellij.util.ThrowableRunnable):V
@@ -4864,20 +4844,11 @@ a:com.intellij.util.indexing.impl.forward.AbstractMapForwardIndexAccessor
 - pa:convertToMap(I,java.lang.Object):java.util.Map
 - pf:createDiffBuilder(I,java.lang.Object):com.intellij.util.indexing.impl.InputDataDiffBuilder
 - createDiffBuilderByMap(I,java.util.Map):com.intellij.util.indexing.impl.InputDataDiffBuilder
-f:com.intellij.util.indexing.impl.forward.EmptyForwardIndex
-- com.intellij.util.indexing.impl.forward.ForwardIndex
-- <init>():V
-- clear():V
-- close():V
-- force():V
-- get(java.lang.Integer):com.intellij.openapi.util.io.ByteArraySequence
-- isDirty():Z
-- keysCountApproximately():I
-- put(java.lang.Integer,com.intellij.openapi.util.io.ByteArraySequence):V
 com.intellij.util.indexing.impl.forward.ForwardIndex
 - com.intellij.util.io.KeyValueStore
 - a:clear():V
 - a:get(java.lang.Integer):com.intellij.openapi.util.io.ByteArraySequence
+- a:isClosed():Z
 - a:put(java.lang.Integer,com.intellij.openapi.util.io.ByteArraySequence):V
 com.intellij.util.indexing.impl.forward.ForwardIndexAccessor
 - a:getDiffBuilder(I,com.intellij.openapi.util.io.ByteArraySequence):com.intellij.util.indexing.impl.InputDataDiffBuilder
@@ -4901,6 +4872,7 @@ f:com.intellij.util.indexing.impl.forward.IntMapForwardIndex
 - close():V
 - force():V
 - getInt(I):I
+- isClosed():Z
 - isDirty():Z
 - keysCountApproximately():I
 - putInt(I,I):V

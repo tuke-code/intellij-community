@@ -1,4 +1,4 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.util.indexing.dependencies
 
 import com.intellij.openapi.Disposable
@@ -64,6 +64,7 @@ class ProjectIndexingDependenciesService @NonInjectable @VisibleForTesting const
       try {
         return ProjectIndexingDependenciesStorage.openOrInit(storagePath)
       } catch (e: IOException) {
+        //FIXME [AK/LK]: don't invalidate VFS if something wrong with indexingStamp -- invalidate indexingStamp itself
         requestVfsRebuildDueToError(e)
         storagePath.deleteIfExists()
         throw e
@@ -132,21 +133,22 @@ class ProjectIndexingDependenciesService @NonInjectable @VisibleForTesting const
   @RequiresBackgroundThread
   fun newScanningToken(): ScanningRequestToken {
     val appCurrent = appIndexingDependenciesService.getCurrent()
-    val token = WriteOnlyScanningRequestTokenImpl(appCurrent)
+    val token = WriteOnlyScanningRequestTokenImpl(appCurrent, false)
     registerIssuedToken(token)
     return token
   }
 
+  @ApiStatus.Internal
   @RequiresBackgroundThread
-  fun newScanningTokenOnProjectOpen(): ScanningRequestToken {
+  fun newScanningTokenOnProjectOpen(allowCheckingForOutdatedIndexesUsingFileModCount: Boolean): ScanningRequestToken {
     val appCurrent = appIndexingDependenciesService.getCurrent()
     val token = if (heavyScanningOnProjectOpen || issuedScanningTokens.contains(RequestFullHeavyScanningToken)) {
       thisLogger().info("Heavy scanning on startup because of incomplete scanning from previous IDE session")
       heavyScanningOnProjectOpen = false
-      WriteOnlyScanningRequestTokenImpl(appCurrent)
+      WriteOnlyScanningRequestTokenImpl(appCurrent, allowCheckingForOutdatedIndexesUsingFileModCount)
     }
     else {
-      ReadWriteScanningRequestTokenImpl(appCurrent)
+      ReadWriteScanningRequestTokenImpl(appCurrent, allowCheckingForOutdatedIndexesUsingFileModCount)
     }
     registerIssuedToken(token)
     completeTokenOrFutureToken(RequestFullHeavyScanningToken, null, true)
@@ -212,6 +214,6 @@ class ProjectIndexingDependenciesService @NonInjectable @VisibleForTesting const
   @TestOnly
   fun getReadOnlyTokenForTest(): ScanningRequestToken {
     val appCurrent = appIndexingDependenciesService.getCurrent()
-    return ReadWriteScanningRequestTokenImpl(appCurrent)
+    return ReadWriteScanningRequestTokenImpl(appCurrent, true)
   }
 }

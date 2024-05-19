@@ -36,6 +36,7 @@
       "profileRed.svg": "actions/profileRed.svg",
       "projectDirectory.svg": "actions/projectDirectory.svg",
       "runAll.svg": "actions/runAll.svg",
+      "selectAll.svg": "actions/selectall.svg",
       "shortcutFilter.svg": "actions/shortcutFilter.svg",
       "reformatCode.svg": "actions/reformatCode.svg",
       "report.svg": "actions/report.svg",
@@ -49,7 +50,8 @@
       "showImportStatements.svg": "actions/showImportStatements.svg",
       "suggestedRefactoringBulb.svg": "actions/suggestedRefactoringBulb.svg",
       "toggleVisibility.svg": "actions/toggleVisibility.svg",
-      "undeploy.svg": "nodes/undeploy.svg"
+      "undeploy.svg": "nodes/undeploy.svg",
+      "unselectAll.svg": "actions/unselectall.svg"
     },
     "bookmarks": {
       "addBookmarksList.svg": "actions/addList.svg",
@@ -192,6 +194,8 @@
       "changedFile.svg": "scope/changedFiles.svg",
       "changedFiles.svg": "scope/changedFilesAll.svg",
       "config.svg": "fileTypes/config.svg",
+      "contexts.svg": "fileTypes/contexts.svg",
+      "contextsModifier.svg": "fileTypes/contextsModifier.svg",
       "css.svg": "fileTypes/css.svg",
       "cucumber.svg": "org/jetbrains/plugins/cucumber/icons/cucumber.svg",
       "eclipse.svg": "providers/eclipse.svg",

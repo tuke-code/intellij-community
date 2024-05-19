@@ -6,16 +6,10 @@ import com.intellij.codeHighlighting.*;
 import com.intellij.codeInsight.EditorInfo;
 import com.intellij.codeInsight.daemon.*;
 import com.intellij.codeInsight.daemon.impl.analysis.FileHighlightingSetting;
-import com.intellij.codeInsight.daemon.impl.analysis.HighlightInfoHolder;
 import com.intellij.codeInsight.daemon.impl.analysis.HighlightingSettingsPerFile;
 import com.intellij.codeInsight.daemon.quickFix.LightQuickFixTestCase;
 import com.intellij.codeInsight.folding.JavaCodeFoldingSettings;
-import com.intellij.codeInsight.hint.EditorHintListener;
-import com.intellij.codeInsight.intention.AbstractIntentionAction;
 import com.intellij.codeInsight.intention.IntentionAction;
-import com.intellij.codeInsight.intention.IntentionManager;
-import com.intellij.codeInsight.intention.impl.IntentionContainer;
-import com.intellij.codeInsight.intention.impl.IntentionHintComponent;
 import com.intellij.codeInspection.InspectionProfile;
 import com.intellij.codeInspection.LocalInspectionTool;
 import com.intellij.codeInspection.accessStaticViaInstance.AccessStaticViaInstance;
@@ -23,6 +17,7 @@ import com.intellij.codeInspection.deadCode.UnusedDeclarationInspection;
 import com.intellij.codeInspection.deadCode.UnusedDeclarationInspectionBase;
 import com.intellij.codeInspection.ex.InspectionProfileImpl;
 import com.intellij.codeInspection.htmlInspections.RequiredAttributesInspectionBase;
+import com.intellij.codeInspection.unusedSymbol.UnusedSymbolLocalInspection;
 import com.intellij.codeInspection.varScopeCanBeNarrowed.FieldCanBeLocalInspection;
 import com.intellij.concurrency.ConcurrentCollectionFactory;
 import com.intellij.configurationStore.StorageUtilKt;
@@ -62,14 +57,16 @@ import com.intellij.openapi.editor.markup.GutterIconRenderer;
 import com.intellij.openapi.editor.markup.HighlighterTargetArea;
 import com.intellij.openapi.editor.markup.MarkupModel;
 import com.intellij.openapi.editor.markup.RangeHighlighter;
-import com.intellij.openapi.fileEditor.*;
+import com.intellij.openapi.fileEditor.FileDocumentManager;
+import com.intellij.openapi.fileEditor.FileEditorManager;
+import com.intellij.openapi.fileEditor.OpenFileDescriptor;
+import com.intellij.openapi.fileEditor.TextEditor;
 import com.intellij.openapi.fileEditor.impl.text.PsiAwareTextEditorProvider;
 import com.intellij.openapi.fileEditor.impl.text.TextEditorProvider;
 import com.intellij.openapi.fileTypes.PlainTextFileType;
 import com.intellij.openapi.module.Module;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.progress.ProgressIndicator;
-import com.intellij.openapi.progress.ProgressIndicatorProvider;
 import com.intellij.openapi.project.DumbAware;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.project.ProjectManager;
@@ -90,10 +87,10 @@ import com.intellij.refactoring.inline.InlineRefactoringActionHandler;
 import com.intellij.refactoring.rename.RenameProcessor;
 import com.intellij.testFramework.*;
 import com.intellij.testFramework.fixtures.impl.CodeInsightTestFixtureImpl;
-import com.intellij.ui.HintHint;
-import com.intellij.ui.HintListener;
-import com.intellij.ui.LightweightHint;
-import com.intellij.util.*;
+import com.intellij.util.ArrayUtilRt;
+import com.intellij.util.DocumentUtil;
+import com.intellij.util.ExceptionUtil;
+import com.intellij.util.FileContentUtilCore;
 import com.intellij.util.concurrency.ThreadingAssertions;
 import com.intellij.util.containers.ContainerUtil;
 import com.intellij.util.io.storage.HeavyProcessLatch;
@@ -101,10 +98,8 @@ import com.intellij.util.ref.GCWatcher;
 import com.intellij.util.ui.EdtInvocationManager;
 import com.intellij.util.ui.UIUtil;
 import com.intellij.xml.util.CheckDtdReferencesInspection;
-import it.unimi.dsi.fastutil.objects.ReferenceOpenHashSet;
 import kotlin.Unit;
 import org.intellij.lang.annotations.Language;
-import org.jetbrains.annotations.Nls;
 import org.jetbrains.annotations.NonNls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -114,12 +109,14 @@ import java.io.File;
 import java.io.IOException;
 import java.util.List;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
+/**
+ * tests general daemon behaviour/interruptibility/restart during highlighting
+ */
 @SkipSlowTestLocally
 @DaemonAnalyzerTestCase.CanChangeDocumentDuringHighlighting
 public class DaemonRespondToChangesTest extends DaemonAnalyzerTestCase {
@@ -1315,12 +1312,7 @@ public class DaemonRespondToChangesTest extends DaemonAnalyzerTestCase {
     PsiFile use = createFile("Use.java", "public class Use { { <caret>X.ffffffffffffff(); } }");
     configureByExistingFile(use.getVirtualFile());
 
-    InspectionProfile profile = InspectionProjectProfileManager.getInstance(myProject).getCurrentProfile();
-    HighlightDisplayKey myDeadCodeKey = HighlightDisplayKey.findOrRegister(UnusedDeclarationInspectionBase.SHORT_NAME,
-                                                                           UnusedDeclarationInspectionBase.getDisplayNameText(), UnusedDeclarationInspectionBase.SHORT_NAME);
-    UnusedDeclarationInspectionBase myDeadCodeInspection = new UnusedDeclarationInspectionBase(true);
-    enableInspectionTool(myDeadCodeInspection);
-    assert profile.isToolEnabled(myDeadCodeKey, myFile);
+    enableDeadCodeInspection();
 
     Editor xEditor = createEditor(x.getVirtualFile());
     List<HighlightInfo> xInfos = filter(CodeInsightTestFixtureImpl.instantiateAndRun(x, xEditor, new int[0], false),
@@ -1341,6 +1333,14 @@ public class DaemonRespondToChangesTest extends DaemonAnalyzerTestCase {
     assertNotNull(xInfos.toString(), info);
   }
 
+  private void enableDeadCodeInspection() {
+    InspectionProfile profile = InspectionProjectProfileManager.getInstance(myProject).getCurrentProfile();
+    HighlightDisplayKey myDeadCodeKey = HighlightDisplayKey.findOrRegister(UnusedDeclarationInspectionBase.SHORT_NAME,
+                                                                           UnusedDeclarationInspectionBase.getDisplayNameText(), UnusedDeclarationInspectionBase.SHORT_NAME);
+    UnusedDeclarationInspectionBase myDeadCodeInspection = new UnusedDeclarationInspectionBase(true);
+    enableInspectionTool(myDeadCodeInspection);
+    assert profile.isToolEnabled(myDeadCodeKey, myFile);
+  }
 
   public void testErrorDisappearsRightAfterTypingInsideVisibleAreaWhileDaemonContinuesToChugAlong() {
     String text = "class X{\nint xxx;\n{\nint i = <selection>null</selection><caret>;\n" + StringUtil.repeat("{ this.hashCode(); }\n\n\n", 10000) + "}}";
@@ -2196,5 +2196,22 @@ public class DaemonRespondToChangesTest extends DaemonAnalyzerTestCase {
     List<HighlightInfo> errors = DaemonCodeAnalyzerImpl.getHighlights(getEditor().getDocument(), HighlightSeverity.ERROR, getProject());
     assertNotEmpty(errors);
     assertTrue(errors.toString().contains("'class' or 'interface' expected"));
+  }
+
+  public void testTypingInsideCodeBlockCanAffectUnusedDeclarationInTheOtherClass() {
+    enableInspectionTool(new UnusedSymbolLocalInspection());
+    enableDeadCodeInspection();
+    configureByFiles(null, BASE_PATH+getTestName(true)+"/p2/A2222.java", BASE_PATH+getTestName(true)+"/p1/A1111.java");
+    assertEquals("A2222.java", getFile().getName());
+    makeEditorWindowVisible(new Point(0, 1000), myEditor);
+    HighlightInfo info = assertOneElement(doHighlighting(HighlightSeverity.WARNING));
+    assertEquals("Class 'A2222' is never used", info.getDescription());
+
+    Document document1111 = getFile().getParent().findFile("A1111.java").getFileDocument();
+    // uncomment (inside codeblock) the reference to A2222
+    WriteCommandAction.writeCommandAction(myProject).run(()->document1111.deleteString(document1111.getText().indexOf("//"), document1111.getText().indexOf("//")+2));
+
+    // now A2222 is no longer unused
+    assertEmpty(doHighlighting(HighlightSeverity.WARNING));
   }
 }

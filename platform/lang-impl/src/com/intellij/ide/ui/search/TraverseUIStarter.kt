@@ -23,7 +23,6 @@ import com.intellij.openapi.actionSystem.impl.ActionManagerImpl
 import com.intellij.openapi.application.EDT
 import com.intellij.openapi.application.ModernApplicationStarter
 import com.intellij.openapi.components.serviceAsync
-import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.extensions.PluginDescriptor
 import com.intellij.openapi.extensions.PluginId
 import com.intellij.openapi.keymap.impl.ui.KeymapPanel
@@ -49,8 +48,6 @@ import java.nio.file.Path
 import java.util.*
 import kotlin.system.exitProcess
 
-private val LOG = logger<TraverseUIStarter>()
-
 /**
  * Used in installer's "build searchable options" step.
  *
@@ -71,7 +68,8 @@ private class TraverseUIStarter : ModernApplicationStarter() {
     }
     catch (e: Throwable) {
       try {
-        LOG.error("Searchable options index builder failed", e)
+        println("Searchable options index builder failed")
+        e.printStackTrace()
       }
       catch (ignored: Throwable) {
       }
@@ -130,7 +128,7 @@ private data class SearchableOptionSetIndexItem(@JvmField val file: String, @Jvm
 
 @OptIn(ExperimentalCoroutinesApi::class, ExperimentalSerializationApi::class)
 private suspend fun saveResults(outDir: Path, roots: Map<OptionSetId, List<ConfigurableEntry>>) {
-  LOG.info("save to $outDir")
+  println("save to $outDir")
   val fileDescriptors = withContext(Dispatchers.IO.limitedParallelism(4)) {
     val createdDirs = HashSet<Path>()
     if (java.lang.Boolean.getBoolean("intellij.searchableOptions.clean.out") && Files.isDirectory(outDir) && outDir.endsWith("searchable-options")) {
@@ -185,7 +183,8 @@ private suspend fun saveResults(outDir: Path, roots: Map<OptionSetId, List<Confi
         .groupBy(keySelector = { it.module.moduleName ?: it.module.pluginId.idString })
         .mapValues { entry ->
           val item = entry.value.single().item
-          listOf(SearchableOptionSetIndexItem(file = item.file, hash = item.hash, size = item.size)) + (existing.get(entry.key) ?: emptyList())
+          setOf(SearchableOptionSetIndexItem(file = item.file, hash = item.hash, size = item.size))
+            .plus(existing.get(entry.key) ?: emptyList()).toList()
         }
     ))
   }
@@ -382,7 +381,7 @@ suspend fun doBuildSearchableOptions(
     }
   }
 
-  LOG.info("Found ${options.size} configurables")
+  println("Found ${options.size} configurables")
 
   for (configurable in options.keys) {
     try {

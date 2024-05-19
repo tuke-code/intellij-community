@@ -121,12 +121,12 @@
                  description="Use previously stored 'indexed flag' while scanning. To store 'indexing flag' please set registry option 'indexing.disable.virtual.file.system.entry.is.file.indexed=false'."/>
     <registryKey defaultValue="true" key="full.scanning.on.startup.can.be.skipped" restartRequired="false"
                  description="Full scanning on startup will be skipped when possible."/>
+    <registryKey defaultValue="1000000" key="maximum.size.of.orphan.dirty.files.queue" restartRequired="false"
+                 description="Limits size of orphan dirty files queue."/>
     <registryKey defaultValue="true" key="indexing.over.fast.attributes" restartRequired="true"
                  description="Store indexing data (including IndexingStamps) in regular (false) or fast (true) attributes storage"/>
     <registryKey defaultValue="true" key="vfs.refresh.should.pause.dumb.queue" restartRequired="true"
                  description="Pause dumb queue (including indexing) while bulk VFS update is in progress."/>
-    <registryKey defaultValue="true" key="retrieve.pushed.properties.from.vfs" restartRequired="true"
-                 description="Retrieve previously pushed properties from VFS (via PersistentKey) if the value is urgently needed before pushers complete their work."/>
     <registryKey defaultValue="true" key="cache.nulls.for.pushed.properties" restartRequired="true"
                  description="Cache null values for pushed properties to avoid reading nulls from disk every time."/>
     <projectService serviceInterface="com.intellij.util.indexing.IndexableFilesIndex"
@@ -316,8 +316,8 @@
 
     <projectService serviceInterface="com.intellij.formatting.service.FormattingNotificationService"
                     serviceImplementation="com.intellij.formatting.service.FormattingUiNotificationService"/>
-    <projectService serviceInterface="com.intellij.formatting.service.DelayedImportsOptimizerService"
-                    serviceImplementation="com.intellij.formatting.service.DelayedImportsOptimizerServiceImpl"/>
+    <projectService serviceInterface="com.intellij.formatting.service.PostQuickFixTaskService"
+                    serviceImplementation="com.intellij.formatting.service.PostQuickFixTaskServiceImpl"/>
 
     <projectService serviceInterface="com.intellij.codeInsight.daemon.impl.analysis.HighlightingLevelManager"
                     serviceImplementation="com.intellij.codeInsight.daemon.impl.analysis.HighlightingSettingsPerFile"
@@ -1559,7 +1559,7 @@
                           order="last"/>
 
     <printHandler implementation="com.intellij.codeEditor.printing.TextPrintHandler" id="TextPrintHandler"/>
-    <customFileDropHandler implementation="com.intellij.application.options.colors.EditorColorSchemeDropHandler"/>
+    <fileDropHandler implementation="com.intellij.application.options.colors.EditorColorSchemeDropHandler"/>
 
     <editorNotificationProvider implementation="com.intellij.internal.retype.RetypeEditorNotificationProvider"/>
 
@@ -1789,8 +1789,6 @@
     <listener topic="com.intellij.openapi.fileEditor.FileEditorManagerListener"
               class="com.intellij.codeInsight.daemon.impl.EditorTrackerImpl$MyAppLevelFileEditorManagerListener"/>
 
-    <listener class="com.intellij.ui.NewUiRegistryListener"
-              topic="com.intellij.openapi.util.registry.RegistryValueListener"/>
     <listener class="com.intellij.ide.projectView.impl.ProjectViewImpl$MyToolWindowManagerListener"
               topic="com.intellij.openapi.wm.ex.ToolWindowManagerListener"/>
   </applicationListeners>
@@ -1810,6 +1808,8 @@
     <listener class="com.intellij.psi.impl.file.impl.PsiVFSListener$MyModuleRootListener"
               topic="com.intellij.openapi.roots.ModuleRootListener"/>
     <listener class="com.intellij.workspaceModel.ide.impl.legacyBridge.facet.FacetEntityChangeListener$WorkspaceModelListener"
+              topic="com.intellij.platform.backend.workspace.WorkspaceModelChangeListener"/>
+    <listener class="com.intellij.workspaceModel.ide.impl.legacyBridge.module.ModuleBridgeCleaner"
               topic="com.intellij.platform.backend.workspace.WorkspaceModelChangeListener"/>
   </projectListeners>
 </idea-plugin>

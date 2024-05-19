@@ -26,9 +26,6 @@ public class DaemonProgressIndicator extends AbstractProgressIndicatorBase imple
 
   @Override
   public final void stop() {
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Stopping daemon progress indicator " + this);
-    }
     boolean cancelled = false;
     synchronized (getLock()) {
       super.stop();
@@ -38,9 +35,6 @@ public class DaemonProgressIndicator extends AbstractProgressIndicatorBase imple
     }
     if (cancelled) {
       onStop();
-    }
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Stopping daemon progress indicator; was cancelled=" + cancelled + "; " + this);
     }
   }
 
@@ -89,7 +83,7 @@ public class DaemonProgressIndicator extends AbstractProgressIndicatorBase imple
   private void doCancel(@Nullable Throwable cause, @NotNull String reason) {
     if (tryCancel()) {
       if (LOG.isDebugEnabled()) {
-        LOG.debug("doCancel(" + this + " " + this.getClass() +
+        LOG.debug("doCancel(" + this +
                   (reason.isEmpty() ? "" : ", reason: '" + reason + "'") +
                   (cause == null ? "" : ", cause: " + ExceptionUtil.getThrowableText(cause)) +
                   ")"
@@ -99,21 +93,7 @@ public class DaemonProgressIndicator extends AbstractProgressIndicatorBase imple
       if (cause != null) {
         myTraceableDisposable.killExceptionally(cause);
       }
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("doCancel; just before onCancelled");
-      }
-      ProgressManager.getInstance().executeNonCancelableSection(() -> {
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("doCancel; before onCancelled");
-        }
-        onCancelled(reason);
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("doCancel; after onCancelled");
-        }
-      });
-    }
-    else if (LOG.isDebugEnabled()) {
-      LOG.debug("doCancel on already cancelled(" + this + ")");
+      ProgressManager.getInstance().executeNonCancelableSection(() -> onCancelled(reason));
     }
   }
 

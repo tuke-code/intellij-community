@@ -111,23 +111,6 @@ public class ConflictsDialog extends DialogWrapper implements ConflictsDialogBas
     init();
   }
 
-  /**
-   * @deprecated use other CTORs
-   */
-  @Deprecated(forRemoval = true)
-  public ConflictsDialog(Project project, String... conflictDescriptions) {
-    super(project, true);
-    myProject = project;
-    myConflictDescriptions = conflictDescriptions;
-    myElementConflictDescription = null;
-    myCanShowConflictsInView = false;
-    myDoRefactoringRunnable = null;
-    myUpdatedDialog = Registry.is("refactorings.use.updated.conflicts.detected.dialog");
-    setTitle(RefactoringBundle.message("problems.detected.title"));
-    setOKButtonText(RefactoringBundle.message("continue.button"));
-    init();
-  }
-
   public List<String> getConflictDescriptions() {
     return List.of(myConflictDescriptions);
   }
@@ -370,7 +353,7 @@ public class ConflictsDialog extends DialogWrapper implements ConflictsDialogBas
         previewTitle.append(spaceAndThinSpace() + getPresentablePath(project, vFile),
                             new SimpleTextAttributes(STYLE_PLAIN, UIUtil.getContextHelpForeground()));
       }
-      usagePreviewPanel.updateLayout(List.of(adapter.getUsageInfo()));
+      usagePreviewPanel.updateLayout(project, List.of(adapter.getUsageInfo()));
     }
   }
 

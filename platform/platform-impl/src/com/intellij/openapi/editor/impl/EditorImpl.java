@@ -358,7 +358,6 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
   private boolean myScrollingToCaret;
 
   private boolean myIsStickyLinePainting;
-  private boolean myIsStickyLineHovered;
 
   EditorImpl(@NotNull Document document,
              boolean viewer,
@@ -5818,13 +5817,29 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
   }
 
   @ApiStatus.Internal
-  public boolean isStickyLineHovered() {
-    return myIsStickyLineHovered;
-  }
-
-  @ApiStatus.Internal
-  public void setStickyLineHovered(boolean stickyLineHovered) {
-    myIsStickyLineHovered = stickyLineHovered;
+  public void stickyLinesForLangChanged(@NotNull ObservableStateListener.PropertyChangeEvent event) {
+    if (myStickyLinesManager != null) {
+      Ref<Object> oldValRef = event.getOldValueRef();
+      if (oldValRef != null &&
+          oldValRef.get() instanceof Boolean oldVal &&
+          event.getNewValue() instanceof Boolean newVal) {
+        if (oldVal && !newVal) {
+          /*
+          Sticky model should be cleared in the following scenario:
+            1) editor is initialized
+            2) editor.language == null
+            3) areStickyLinesShown == true
+            4) sticky model is not empty from previous session
+            5) sticky lines are shown on the panel
+            6) updated editor.language != null
+            7) areStickyLinesShown == false for the particular language
+            8) sticky lines are hidden
+            9) clearing sticky model to avoid showing lines on next editor opening
+           */
+          myStickyLinesManager.clearStickyModel();
+        }
+      }
+    }
   }
 
   private @Nullable StickyLinesManager createStickyLinesPanel() {

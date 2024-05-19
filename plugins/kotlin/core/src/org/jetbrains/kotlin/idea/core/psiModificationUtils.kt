@@ -3,8 +3,6 @@
 package org.jetbrains.kotlin.idea.core
 
 import com.intellij.psi.PsiElement
-import com.intellij.psi.PsiWhiteSpace
-import com.intellij.psi.impl.source.codeStyle.CodeEditUtil
 import com.intellij.psi.tree.IElementType
 import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.psi.util.parentOfType
@@ -25,6 +23,7 @@ import org.jetbrains.kotlin.idea.base.psi.setDefaultValue
 import org.jetbrains.kotlin.idea.caches.resolve.getResolutionFacade
 import org.jetbrains.kotlin.idea.caches.resolve.resolveToDescriptorIfAny
 import org.jetbrains.kotlin.idea.caches.resolve.safeAnalyzeNonSourceRootCode
+import org.jetbrains.kotlin.idea.refactoring.addElement
 import org.jetbrains.kotlin.idea.refactoring.getLastLambdaExpression
 import org.jetbrains.kotlin.idea.refactoring.isComplexCallWithLambdaArgument
 import org.jetbrains.kotlin.idea.refactoring.moveFunctionLiteralOutsideParentheses
@@ -91,25 +90,6 @@ fun KtLambdaArgument.getLambdaArgumentName(bindingContext: BindingContext): Name
     val resolvedCall = callExpression.getResolvedCall(bindingContext)
     return (resolvedCall?.getArgumentMapping(this) as? ArgumentMatch)?.valueParameter?.name
 }
-
-@ApiStatus.ScheduledForRemoval
-@Deprecated(
-    "Use 'org.jetbrains.kotlin.idea.base.psi.KotlinPsiModificationUtils' instead",
-    ReplaceWith(
-        expression = "this.moveInsideParenthesesAndReplaceWith(replacement, if (lambdaArgumentName != null && shouldLambdaParameterBeNamed(this)) lambdaArgumentName else null)",
-        imports = [
-            "org.jetbrains.kotlin.idea.base.psi.moveInsideParenthesesAndReplaceWith",
-            "org.jetbrains.kotlin.idea.base.psi.shouldLambdaParameterBeNamed"
-        ]
-    ), level = DeprecationLevel.ERROR
-)
-fun KtLambdaArgument.moveInsideParenthesesAndReplaceWith(
-    replacement: KtExpression,
-    lambdaArgumentName: Name?,
-    withNameCheck: Boolean = true,
-): KtCallExpression = this.moveInsideParenthesesAndReplaceWith(
-    replacement, if (lambdaArgumentName != null && shouldLambdaParameterBeNamed(this)) lambdaArgumentName else null
-)
 
 fun KtLambdaExpression.moveFunctionLiteralOutsideParenthesesIfPossible() {
     val valueArgument = parentOfType<KtValueArgument>()?.takeIf {
@@ -208,6 +188,11 @@ private fun FunctionDescriptor.allowsMoveOfLastParameterOutsideParentheses(
     return movableParametersOfCandidateCount == lambdaAndCallableReferencesInOriginalCallCount
 }
 
+@Deprecated("Use addElement directly", ReplaceWith("addElement", "org.jetbrains.kotlin.idea.refactoring.addElement"))
+fun KtBlockExpression.appendElement(element: KtElement, addNewLine: Boolean = false): KtElement {
+   return addElement(element, addNewLine)
+}
+
 //TODO: git rid of this method
 fun PsiElement.deleteElementAndCleanParent() {
     val parent = parent
@@ -242,15 +227,6 @@ private fun deleteElementWithDelimiters(element: PsiElement) {
     val parent = element.parent
 
     parent.deleteChildRange(from, to)
-}
-
-@Deprecated(
-    "Use 'org.jetbrains.kotlin.idea.base.psi.KotlinPsiModificationUtils' instead",
-    ReplaceWith("this.deleteSingle()", "org.jetbrains.kotlin.idea.base.psi.deleteSingle")
-)
-@ApiStatus.ScheduledForRemoval
-fun PsiElement.deleteSingle() {
-    CodeEditUtil.removeChild(parent?.node ?: return, node ?: return)
 }
 
 @Deprecated(

@@ -44,14 +44,16 @@ private class DeclarativeHintsEditorInitializer : TextEditorInitializer {
     highlighterReady: suspend () -> Unit,
   ) {
     val grave = project.serviceAsync<DeclarativeHintsGrave>()
-    val inlayDataList = grave.raise(file, document) ?: return
+    val sourceIdToInlayData = grave.raise(file, document)?.groupBy { it.sourceId } ?: return
     val psiManager = project.serviceAsync<PsiManager>()
     val psiFile = readActionBlocking {
       psiManager.findFile(file)
     } ?: return
     val editor = editorSupplier()
     withContext(Dispatchers.EDT) {
-      DeclarativeInlayHintsPass.applyInlayData(editor, psiFile, inlayDataList, DeclarativeInlayHintsPass::class.java)
+      sourceIdToInlayData.forEach {
+        DeclarativeInlayHintsPass.applyInlayData(editor, psiFile, it.value, it.key)
+      }
     }
   }
 }

@@ -29,7 +29,7 @@ data class ComponentData(val xpath: String,
 open class UiComponent(private val data: ComponentData) : Finder, WithKeyboard {
   private var cachedComponent: Component? = null
   val component: Component
-    get() = data.foundComponent ?: cachedComponent?.takeIf { it.isShowing() } ?: findThisComponent().apply { cachedComponent = this }
+    get() = data.foundComponent ?: kotlin.runCatching { cachedComponent?.takeIf { it.isShowing() } }.getOrNull() ?: findThisComponent().apply { cachedComponent = this }
 
   fun setFocus() {
     robotService.robot.focus(this.component)
@@ -112,6 +112,17 @@ open class UiComponent(private val data: ComponentData) : Finder, WithKeyboard {
     return findAllText {
       it.text == text
     }.isNotEmpty()
+  }
+
+  fun hasTextSequence(vararg texts: String,indexOffset: Int = 0): Boolean {
+    require(indexOffset >= 0) { "Value must be non-negative" }
+    val stringList = texts.toList()
+    val uiTextList = findAllText()
+    return stringList.indices.all { index ->
+      val uiTextIndex = index + indexOffset
+      println(stringList[index]+" comparing to "+uiTextList[uiTextIndex].text)
+      uiTextIndex in uiTextList.indices && stringList[index] == uiTextList[uiTextIndex].text
+    }
   }
 
   fun hasSubtext(subtext: String): Boolean {

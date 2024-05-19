@@ -1,4 +1,4 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.openapi.externalSystem.autoimport
 
 import com.intellij.codeInsight.lookup.LookupManagerListener
@@ -34,6 +34,7 @@ import com.intellij.util.ui.update.MergingUpdateQueue
 import kotlinx.serialization.Serializable
 import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.TestOnly
+import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.streams.asStream
@@ -252,10 +253,10 @@ class AutoImportProjectTracker(
   }
 
   override fun getState(): State {
-    val systemStates = HashMap<String, HashMap<String, ProjectDataState>>()
+    val systemStates = TreeMap<String, TreeMap<String, ProjectDataState>>()
     for ((projectId, projectData) in projectDataMap) {
       val (systemId, externalProjectPath) = projectId
-      val projectStates = systemStates.getOrPut(systemId.id) { HashMap() }
+      val projectStates = systemStates.computeIfAbsent(systemId.id) { TreeMap() }
       projectStates[externalProjectPath] = ProjectDataState(
         projectData.status.isDirty(),
         projectData.settingsTracker.getState()
@@ -287,11 +288,13 @@ class AutoImportProjectTracker(
   }
 
   @TestOnly
-  fun getActivatedProjects() =
-    projectDataMap.values
+  fun getActivatedProjects(): Set<ExternalSystemProjectId> {
+    return projectDataMap.values
+      .asSequence()
       .filter { it.isActivated }
       .map { it.projectAware.projectId }
       .toSet()
+  }
 
   @TestOnly
   fun setDispatcherMergingSpan(delay: Int) {
@@ -326,11 +329,11 @@ class AutoImportProjectTracker(
   }
 
   private data class ProjectData(
-    val status: ProjectStatus,
-    val activationProperty: MutableBooleanProperty,
-    val projectAware: ExternalSystemProjectAware,
-    val settingsTracker: ProjectSettingsTracker,
-    val parentDisposable: Disposable
+    @JvmField val status: ProjectStatus,
+    @JvmField val activationProperty: MutableBooleanProperty,
+    @JvmField val projectAware: ExternalSystemProjectAware,
+    @JvmField val settingsTracker: ProjectSettingsTracker,
+    @JvmField val parentDisposable: Disposable
   ) {
     var isActivated by activationProperty
 
@@ -343,13 +346,13 @@ class AutoImportProjectTracker(
 
   @Serializable
   data class State(
-    val projectData: Map<String, Map<String, ProjectDataState>> = emptyMap()
+    @JvmField val projectData: Map<String, Map<String, ProjectDataState>> = emptyMap()
   )
 
   @Serializable
   data class ProjectDataState(
-    val isDirty: Boolean = false,
-    val settingsTracker: ProjectSettingsTracker.State? = null
+    @JvmField val isDirty: Boolean = false,
+    @JvmField val settingsTracker: ProjectSettingsTracker.State? = null
   )
 
   private data class ProjectReloadContext(
@@ -362,7 +365,6 @@ class AutoImportProjectTracker(
 
     private val LOG = Logger.getInstance("#com.intellij.openapi.externalSystem.autoimport")
 
-    @JvmStatic
     fun getInstance(project: Project): AutoImportProjectTracker {
       return ExternalSystemProjectTracker.getInstance(project) as AutoImportProjectTracker
     }
@@ -391,7 +393,6 @@ class AutoImportProjectTracker(
      * Note: project tracker automatically enabled out of tests
      */
     @TestOnly
-    @JvmStatic
     fun enableAutoReloadInTests(parentDisposable: Disposable) {
       enableAutoReloadProperty.set(true, parentDisposable)
     }
@@ -401,17 +402,15 @@ class AutoImportProjectTracker(
      * Note: async processing enabled out of tests
      */
     @TestOnly
-    @JvmStatic
     fun enableAsyncAutoReloadInTests(parentDisposable: Disposable) {
       asyncChangesProcessingProperty.set(true, parentDisposable)
     }
 
     /**
      * Ignores once disable auto-reload registry.
-     * Make sense only in pair with registry key `external.system.auto.import.disabled`.
+     * Make sense only in a pair with registry key `external.system.auto.import.disabled`.
      */
     @ApiStatus.Internal
-    @JvmStatic
     fun onceIgnoreDisableAutoReloadRegistry() {
       onceIgnoreDisableAutoReloadRegistryProperty.set(true)
     }

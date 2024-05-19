@@ -5,6 +5,7 @@ package org.jetbrains.kotlin.idea.gradleJava.scripting.importing
 import com.intellij.gradle.toolingExtension.modelAction.GradleModelFetchPhase
 import com.intellij.gradle.toolingExtension.modelProvider.GradleClassBuildModelProvider
 import com.intellij.openapi.progress.blockingContext
+import com.intellij.platform.workspace.storage.MutableEntityStorage
 import org.gradle.tooling.model.kotlin.dsl.KotlinDslScriptsModel
 import org.jetbrains.kotlin.idea.gradle.scripting.importing.KotlinDslScriptModelResolverCommon
 import org.jetbrains.kotlin.idea.gradleJava.scripting.kotlinDslScriptsModelImportSupported
@@ -34,23 +35,23 @@ class KotlinDslScriptSyncContributor : GradleSyncContributor {
 
     override val name: String = "Kotlin DSL Script"
 
-    override suspend fun onModelFetchCompleted(resolverContext: ProjectResolverContext) {
+    override suspend fun onModelFetchCompleted(context: ProjectResolverContext, storage: MutableEntityStorage) {
         blockingContext {
-            for (buildModel in resolverContext.allBuilds) {
+            for (buildModel in context.allBuilds) {
                 for (projectModel in buildModel.projects) {
                     val projectIdentifier = projectModel.projectIdentifier.projectPath
                     if (projectIdentifier == ":") {
-                        val gradleVersion = resolverContext.projectGradleVersion
+                        val gradleVersion = context.projectGradleVersion
                         if (gradleVersion != null && kotlinDslScriptsModelImportSupported(gradleVersion)) {
-                            val model = resolverContext.getProjectModel(projectModel, KotlinDslScriptsModel::class.java)
+                            val model = context.getProjectModel(projectModel, KotlinDslScriptsModel::class.java)
                             if (model != null) {
-                                if (!processScriptModel(resolverContext, model, projectIdentifier)) {
+                                if (!processScriptModel(context, model, projectIdentifier)) {
                                     continue
                                 }
                             }
                         }
 
-                        saveGradleBuildEnvironment(resolverContext)
+                        saveGradleBuildEnvironment(context)
                     }
                 }
             }

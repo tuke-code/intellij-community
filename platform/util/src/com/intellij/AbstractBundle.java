@@ -141,6 +141,7 @@ public class AbstractBundle {
     return bundle;
   }
 
+  @ApiStatus.Internal
   protected ResourceBundle getBundle(boolean isDefault) {
     return com.intellij.reference.SoftReference.dereference(isDefault ? myDefaultBundle : myBundle);
   }
@@ -179,6 +180,11 @@ public class AbstractBundle {
     return ResourceBundle.getBundle(pathToBundle, locale, loader, control);
   }
 
+  /**
+   * @deprecated This method is no longer required.
+   * The Locale cache now gets cleared automatically after the initialization of the language plugin.
+   */
+  @Deprecated
   public void clearLocaleCache() {
     if (myBundle != null) {
       myBundle.clear();

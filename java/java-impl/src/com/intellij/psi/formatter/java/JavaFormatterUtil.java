@@ -19,16 +19,12 @@ import com.intellij.psi.impl.source.tree.ElementType;
 import com.intellij.psi.impl.source.tree.JavaElementType;
 import com.intellij.psi.tree.IElementType;
 import com.intellij.psi.tree.TokenSet;
-import com.intellij.psi.util.PsiLiteralUtil;
 import com.intellij.util.ArrayUtil;
 import com.intellij.util.containers.ContainerUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.ArrayDeque;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
 
 public final class JavaFormatterUtil {
   /**
@@ -38,6 +34,11 @@ public final class JavaFormatterUtil {
     .create(JavaElementType.ASSIGNMENT_EXPRESSION, JavaElementType.LOCAL_VARIABLE, JavaElementType.FIELD);
 
   private static final int CALL_EXPRESSION_DEPTH = 500;
+
+  private static final Set<String> KNOWN_TYPE_ANNOTATIONS = Set.of(
+    "org.jetbrains.annotations.NotNull",
+    "org.jetbrains.annotations.Nullable"
+  );
 
   private JavaFormatterUtil() { }
 
@@ -57,7 +58,7 @@ public final class JavaFormatterUtil {
    * @param node1 node to check
    * @param node2 node to check
    * @return {@code true} if given nodes are binary expressions and have the same priority;
-   *         {@code false} otherwise
+   * {@code false} otherwise
    */
   public static boolean areSamePriorityBinaryExpressions(ASTNode node1, ASTNode node2) {
     if (node1 == null || node2 == null) {
@@ -83,7 +84,7 @@ public final class JavaFormatterUtil {
    * if there's a line break after it and "keep line breaks" is on.
    *
    * @param settings The current settings
-   * @param node The node to check.
+   * @param node     The node to check.
    * @return True for call chunk start.
    */
   static boolean isStartOfCallChunk(@NotNull CommonCodeStyleSettings settings, @NotNull ASTNode node) {
@@ -127,9 +128,9 @@ public final class JavaFormatterUtil {
    * @return wrap to use for the sub-blocks of the given block
    */
   static @Nullable Wrap createDefaultWrap(ASTBlock block,
-                                CommonCodeStyleSettings settings,
-                                JavaCodeStyleSettings javaSettings,
-                                ReservedWrapsProvider reservedWrapsProvider) {
+                                          CommonCodeStyleSettings settings,
+                                          JavaCodeStyleSettings javaSettings,
+                                          ReservedWrapsProvider reservedWrapsProvider) {
     ASTNode node = block.getNode();
     Wrap wrap = block.getWrap();
     if (node == null) return null;
@@ -211,11 +212,11 @@ public final class JavaFormatterUtil {
    * {@code null} otherwise
    */
   static @Nullable Wrap arrangeChildWrap(ASTNode child,
-                                      ASTNode parent,
-                                      CommonCodeStyleSettings settings,
-                                      JavaCodeStyleSettings javaSettings,
-                                      Wrap suggestedWrap,
-                                      AbstractJavaBlock reservedWrapsProvider) {
+                                         ASTNode parent,
+                                         CommonCodeStyleSettings settings,
+                                         JavaCodeStyleSettings javaSettings,
+                                         Wrap suggestedWrap,
+                                         AbstractJavaBlock reservedWrapsProvider) {
     ASTNode directParent = child.getTreeParent();
     int role = ((CompositeElement)directParent).getChildRole(child);
 
@@ -291,8 +292,10 @@ public final class JavaFormatterUtil {
         ASTNode last = prev.getLastChildNode();
         if (last != null && last.getElementType() == JavaElementType.ANNOTATION) {
           if (javaSettings.DO_NOT_WRAP_AFTER_SINGLE_ANNOTATION && isModifierListWithSingleAnnotation(prev, JavaElementType.FIELD) ||
-              javaSettings.DO_NOT_WRAP_AFTER_SINGLE_ANNOTATION_IN_PARAMETER && isModifierListWithSingleAnnotation(prev, JavaElementType.PARAMETER) ||
-              isAnnotationAfterKeyword(last)
+              javaSettings.DO_NOT_WRAP_AFTER_SINGLE_ANNOTATION_IN_PARAMETER &&
+              isModifierListWithSingleAnnotation(prev, JavaElementType.PARAMETER) ||
+              isAnnotationAfterKeyword(last) ||
+              isTypeAnnotationsBeforeTypeInMethodWithoutModifiers(last)
           ) {
             return Wrap.createWrap(WrapType.NONE, false);
           }
@@ -311,7 +314,7 @@ public final class JavaFormatterUtil {
         if (prev instanceof PsiKeyword) {
           return null;
         }
-        else if (isAnnoInsideModifierListWithAtLeastOneKeyword(child, parent)) {
+        else if (isAnnoInsideModifierListWithAtLeastOneKeyword(child, parent) || isTypeAnnotationsBeforeTypeInMethodWithoutModifiers(child)) {
           return Wrap.createWrap(WrapType.NONE, false);
         }
 
@@ -456,7 +459,10 @@ public final class JavaFormatterUtil {
     return false;
   }
 
-  private static int getAnnotationWrapType(ASTNode parent, ASTNode child, CommonCodeStyleSettings settings, JavaCodeStyleSettings javaSettings) {
+  private static int getAnnotationWrapType(ASTNode parent,
+                                           ASTNode child,
+                                           CommonCodeStyleSettings settings,
+                                           JavaCodeStyleSettings javaSettings) {
     IElementType nodeType = parent.getElementType();
 
     if (nodeType == JavaElementType.METHOD) {
@@ -510,6 +516,25 @@ public final class JavaFormatterUtil {
     return CommonCodeStyleSettings.DO_NOT_WRAP;
   }
 
+  private static boolean isTypeAnnotationsBeforeTypeInMethodWithoutModifiers(@NotNull ASTNode node) {
+    ASTNode parent = node.getTreeParent();
+    if (parent == null || parent.getElementType() != JavaElementType.MODIFIER_LIST) return false;
+
+    ASTNode grandParent = parent.getTreeParent();
+    if (grandParent == null || grandParent.getElementType() != JavaElementType.METHOD) return false;
+
+    ASTNode rightParentSibling = FormatterUtil.getNextNonWhitespaceSibling(parent);
+    if (rightParentSibling == null || (rightParentSibling.getElementType() != JavaElementType.TYPE_PARAMETER_LIST && rightParentSibling.getElementType() != JavaElementType.TYPE)) return false;
+
+    for (ASTNode currentChild = parent.getFirstChildNode(); currentChild != null; currentChild = FormatterUtil.getNextNonWhitespaceSibling(currentChild)) {
+      if (currentChild.getElementType() != JavaElementType.ANNOTATION) return false;
+      PsiElement psiElement = currentChild.getPsi();
+      if (!(psiElement instanceof PsiAnnotation psiAnnotation) || !KNOWN_TYPE_ANNOTATIONS.contains(psiAnnotation.getQualifiedName())) return false;
+    }
+
+    return true;
+  }
+
   private static boolean isAnnoInsideModifierListWithAtLeastOneKeyword(@NotNull ASTNode current, @NotNull ASTNode parent) {
     if (current.getElementType() != JavaElementType.ANNOTATION || parent.getElementType() != JavaElementType.MODIFIER_LIST) return false;
     while (true) {
@@ -523,14 +548,13 @@ public final class JavaFormatterUtil {
     return false;
   }
 
-
   /**
    * Traverses the children of the node and collects nodes with type method calls or reference expressions to the list.
    * If the quantity of the call expressions is greater than {@link JavaFormatterUtil#CALL_EXPRESSION_DEPTH}, call expressions will not be
    * collected, and you should not format them.
-   * @param nodes List in which the method add nodes
-   * @param node Node to traverse
    *
+   * @param nodes List in which the method add nodes
+   * @param node  Node to traverse
    */
   public static void collectCallExpressionNodes(@NotNull List<? super ASTNode> nodes, @NotNull ASTNode node) {
     ArrayDeque<ASTNode> stack = new ArrayDeque<>(CALL_EXPRESSION_DEPTH);
@@ -541,51 +565,74 @@ public final class JavaFormatterUtil {
         return;
       }
       ASTNode currentNode = stack.removeLast();
-        if (!FormatterUtil.containsWhiteSpacesOnly(currentNode)) {
-          IElementType type = currentNode.getElementType();
-          if (type == JavaElementType.METHOD_CALL_EXPRESSION ||
-              type == JavaElementType.REFERENCE_EXPRESSION) {
-            ASTNode firstChild = currentNode.getFirstChildNode();
-            currentNode = FormatterUtil.getNextNonWhitespaceSibling(currentNode);
-            ContainerUtil.addIfNotNull(stack, currentNode);
-            ContainerUtil.addIfNotNull(stack, firstChild);
-          }
-          else {
-            nodes.add(currentNode);
-            currentNode = FormatterUtil.getNextNonWhitespaceSibling(currentNode);
-            ContainerUtil.addIfNotNull(stack, currentNode);
-          }
-        } else {
+      if (!FormatterUtil.containsWhiteSpacesOnly(currentNode)) {
+        IElementType type = currentNode.getElementType();
+        if (type == JavaElementType.METHOD_CALL_EXPRESSION ||
+            type == JavaElementType.REFERENCE_EXPRESSION) {
+          ASTNode firstChild = currentNode.getFirstChildNode();
+          currentNode = FormatterUtil.getNextNonWhitespaceSibling(currentNode);
+          ContainerUtil.addIfNotNull(stack, currentNode);
+          ContainerUtil.addIfNotNull(stack, firstChild);
+        }
+        else {
+          nodes.add(currentNode);
           currentNode = FormatterUtil.getNextNonWhitespaceSibling(currentNode);
           ContainerUtil.addIfNotNull(stack, currentNode);
         }
+      }
+      else {
+        currentNode = FormatterUtil.getNextNonWhitespaceSibling(currentNode);
+        ContainerUtil.addIfNotNull(stack, currentNode);
+      }
     }
   }
 
   /**
-   * Extracts text ranges from a given literal text.
+   * Extracts text ranges corresponding to the lines in a given literal multiline text.
    *
-   * @param text              the literal text to extract text ranges from
-   * @param indent            the number of spaces used for indentation
-   * @param shouldTreatWholeLine  specifies whether the entire line should be treated as a text range
+   * @param text                 the literal text to extract text ranges from
+   * @param indent               the number of spaces used for indentation
    * @return a list of {@code TextRange} objects representing the extracted text ranges
    */
-  public static @NotNull List<TextRange> extractTextRangesFromLiteralText(@NotNull String text, int indent, boolean shouldTreatWholeLine) {
+  static @NotNull List<TextRange> extractTextRangesFromLiteralText(@NotNull String text, int indent) {
     List<TextRange> linesRanges = new ArrayList<>();
-
+    boolean isLastLine = false;
     int start = StringUtil.indexOf(text, '\n', 3);
     if (start == -1) return Collections.emptyList();
     linesRanges.add(new TextRange(0, start));
     start += 1;
-
     while (start < text.length()) {
       int end = StringUtil.indexOf(text, '\n', start);
-      if (end == -1) end = text.length();
-      if (start + indent < end && !shouldTreatWholeLine) start += indent;
-      if (start != end || shouldTreatWholeLine) linesRanges.add(new TextRange(start, end));
+      if (end == -1) {
+        isLastLine = true;
+        end = text.length();
+      }
+      if (start + indent <= end) {
+        int quoteStartIndex = end - 3;
+        if (!isLastLine && containsOnlyWhitespaces(start + indent, end, text)) {
+          start = end;
+        }
+        else if (isLastLine && containsOnlyWhitespaces(start + indent, quoteStartIndex, text) && text.endsWith("\"\"\"")) {
+          start = quoteStartIndex;
+        }
+        else {
+          start += indent;
+        }
+      }
+      else {
+        start = end;
+      }
+      linesRanges.add(new TextRange(start, end));
       start = end + 1;
     }
 
     return linesRanges;
+  }
+
+  private static boolean containsOnlyWhitespaces(int start, int end, @NotNull String text) {
+    for (int i = start; i < end; i++) {
+      if (!Character.isWhitespace(text.charAt(i))) return false;
+    }
+    return true;
   }
 }

@@ -3,11 +3,11 @@ package com.intellij.platform.backend.workspace
 
 import com.intellij.openapi.components.service
 import com.intellij.openapi.project.Project
-import com.intellij.platform.workspace.storage.EntityChange
 import com.intellij.platform.workspace.storage.ImmutableEntityStorage
 import com.intellij.platform.workspace.storage.MutableEntityStorage
 import com.intellij.platform.workspace.storage.VersionedStorageChange
 import com.intellij.platform.workspace.storage.url.VirtualFileUrlManager
+import com.intellij.util.concurrency.annotations.RequiresWriteLock
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.SharedFlow
 import org.jetbrains.annotations.ApiStatus.Obsolete
@@ -52,6 +52,7 @@ public interface WorkspaceModel {
    * on synchronous data modification executed under WA. For all other proposes and for the newly written code, use [update]
    */
   @Obsolete
+  @RequiresWriteLock
   public fun updateProjectModel(description: @NonNls String, updater: (MutableEntityStorage) -> Unit)
 
   /**

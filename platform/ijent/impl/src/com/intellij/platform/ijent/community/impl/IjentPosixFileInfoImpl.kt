@@ -4,12 +4,9 @@ package com.intellij.platform.ijent.community.impl
 import com.intellij.platform.ijent.fs.IjentFileInfo
 import com.intellij.platform.ijent.fs.IjentPath
 import com.intellij.platform.ijent.fs.IjentPosixFileInfo
-import org.jetbrains.annotations.ApiStatus.Internal
 import java.time.ZonedDateTime
 
-@Internal
 data class IjentPosixFileInfoImpl(
-  override val path: IjentPath.Absolute,
   override val type: IjentPosixFileInfo.Type,
   override val permissions: IjentPosixFileInfo.Permissions,
   override val creationTime: ZonedDateTime?,

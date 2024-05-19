@@ -185,6 +185,11 @@ public abstract class K2IntroduceParameterTestGenerated extends AbstractK2Introd
             runTest("../../idea/tests/testData/refactoring/introduceParameter/avoidFunDuplicatingParameters.kt");
         }
 
+        @TestMetadata("callableReferenceToShorten.kt")
+        public void testCallableReferenceToShorten() throws Exception {
+            runTest("../../idea/tests/testData/refactoring/introduceParameter/callableReferenceToShorten.kt");
+        }
+
         @TestMetadata("classInAnonymousInitializer.kt")
         public void testClassInAnonymousInitializer() throws Exception {
             runTest("../../idea/tests/testData/refactoring/introduceParameter/classInAnonymousInitializer.kt");
@@ -245,6 +250,16 @@ public abstract class K2IntroduceParameterTestGenerated extends AbstractK2Introd
             runTest("../../idea/tests/testData/refactoring/introduceParameter/classUsedParameter.kt");
         }
 
+        @TestMetadata("conflictingName.kt")
+        public void testConflictingName() throws Exception {
+            runTest("../../idea/tests/testData/refactoring/introduceParameter/conflictingName.kt");
+        }
+
+        @TestMetadata("conflictingName1.kt")
+        public void testConflictingName1() throws Exception {
+            runTest("../../idea/tests/testData/refactoring/introduceParameter/conflictingName1.kt");
+        }
+
         @TestMetadata("defaultParameter.kt")
         public void testDefaultParameter() throws Exception {
             runTest("../../idea/tests/testData/refactoring/introduceParameter/defaultParameter.kt");
@@ -268,6 +283,11 @@ public abstract class K2IntroduceParameterTestGenerated extends AbstractK2Introd
         @TestMetadata("foreignParameterRef.kt")
         public void testForeignParameterRef() throws Exception {
             runTest("../../idea/tests/testData/refactoring/introduceParameter/foreignParameterRef.kt");
+        }
+
+        @TestMetadata("fromComment.kt")
+        public void testFromComment() throws Exception {
+            runTest("../../idea/tests/testData/refactoring/introduceParameter/fromComment.kt");
         }
 
         @TestMetadata("fun.kt")
@@ -310,6 +330,11 @@ public abstract class K2IntroduceParameterTestGenerated extends AbstractK2Introd
             runTest("../../idea/tests/testData/refactoring/introduceParameter/functionWithDefaultValue.kt");
         }
 
+        @TestMetadata("functionalType.kt")
+        public void testFunctionalType() throws Exception {
+            runTest("../../idea/tests/testData/refactoring/introduceParameter/functionalType.kt");
+        }
+
         @TestMetadata("inDefaultValue.kt")
         public void testInDefaultValue() throws Exception {
             runTest("../../idea/tests/testData/refactoring/introduceParameter/inDefaultValue.kt");
@@ -345,6 +370,11 @@ public abstract class K2IntroduceParameterTestGenerated extends AbstractK2Introd
             runTest("../../idea/tests/testData/refactoring/introduceParameter/lastParameterHasEolCommentAndTrailingComma.kt");
         }
 
+        @TestMetadata("overrideFunction.kt")
+        public void testOverrideFunction() throws Exception {
+            runTest("../../idea/tests/testData/refactoring/introduceParameter/overrideFunction.kt");
+        }
+
         @TestMetadata("partialSubstitution.kt")
         public void testPartialSubstitution() throws Exception {
             runTest("../../idea/tests/testData/refactoring/introduceParameter/partialSubstitution.kt");
@@ -355,9 +385,24 @@ public abstract class K2IntroduceParameterTestGenerated extends AbstractK2Introd
             runTest("../../idea/tests/testData/refactoring/introduceParameter/propertyAccessor.kt");
         }
 
+        @TestMetadata("resultedType.kt")
+        public void testResultedType() throws Exception {
+            runTest("../../idea/tests/testData/refactoring/introduceParameter/resultedType.kt");
+        }
+
+        @TestMetadata("resultedTypeWithJava.kt")
+        public void testResultedTypeWithJava() throws Exception {
+            runTest("../../idea/tests/testData/refactoring/introduceParameter/resultedTypeWithJava.kt");
+        }
+
         @TestMetadata("return.kt")
         public void testReturn() throws Exception {
             runTest("../../idea/tests/testData/refactoring/introduceParameter/return.kt");
+        }
+
+        @TestMetadata("sameNameFunctionNoConflict.kt")
+        public void testSameNameFunctionNoConflict() throws Exception {
+            runTest("../../idea/tests/testData/refactoring/introduceParameter/sameNameFunctionNoConflict.kt");
         }
 
         @TestMetadata("secondaryConstructorWithDefaultValue.kt")

@@ -4,12 +4,28 @@ package com.intellij.ide.settings.json
 import com.intellij.openapi.diagnostic.logger
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import org.jetbrains.annotations.ApiStatus
+import org.jetbrains.annotations.VisibleForTesting
 
 private val logger = logger<JsonSettingsModel>()
 
+/**
+ * Contains supported settings which are publicly available to end users and can be edited without UI using only Json schema.
+ * See [Json Settings](https://youtrack.jetbrains.com/articles/IDEA-A-2100661939/Json-Settings)
+ */
+@ApiStatus.Experimental
 class JsonSettingsModel(val propertyMap: Map<String, PropertyDescriptor>) {
 
+  private val propertyPluginIdMap: Map<String, String> by lazy {
+    propertyMap.values.filter { it.pluginId != "com.intellij" }.mapNotNull { property ->
+      property.pluginId?.let { "${property.componentName}.${property.name}" to it }
+    }.toMap()
+  }
 
+
+  /**
+   * Supported property types.
+   */
   enum class PropertyType {
     Boolean,
     Integer,
@@ -20,11 +36,16 @@ class JsonSettingsModel(val propertyMap: Map<String, PropertyDescriptor>) {
     Unsupported
   }
 
+  /**
+   * Contains a pregenerated raw list of Persistent State Components converted to JsonSettingsModel.
+   */
+  @VisibleForTesting
   @Serializable
   data class ComponentModel (
     val components: List<ComponentInfo> = emptyList()
   )
 
+  @VisibleForTesting
   @Serializable
   data class ComponentInfo (
     val name: String?,
@@ -38,6 +59,7 @@ class JsonSettingsModel(val propertyMap: Map<String, PropertyDescriptor>) {
       if (name != null && pluginId != null) "${pluginId}:${scope}:${name}" else null
   }
 
+  @VisibleForTesting
   @Serializable
   data class ComponentPropertyInfo (
     val name: String,
@@ -48,12 +70,14 @@ class JsonSettingsModel(val propertyMap: Map<String, PropertyDescriptor>) {
   )
 
   data class PropertyDescriptor (
+    val pluginId: String?,
     val componentName: String,
     val name: String,
     val type: PropertyType,
     val storage: String,
     val mapTo: String,
-    val variants: List<VariantInfo> = emptyList()
+    val variants: List<VariantInfo> = emptyList(),
+    val value: Any? = null
   )
 
   @Serializable
@@ -63,12 +87,19 @@ class JsonSettingsModel(val propertyMap: Map<String, PropertyDescriptor>) {
   )
 
   @Serializable
-  data class WhiteList (
+  internal class WhiteList (
     val properties: List<String> = emptyList()
   )
 
+  /**
+   * @return Real production Plugin ID instead of "com.intellij" when the IDE is launched in debug or test mode. Not to be used in
+   * production.
+   */
+  @VisibleForTesting
+  fun getPluginId(key: String): String? = propertyPluginIdMap[key]
+
   companion object {
-    val instance: JsonSettingsModel = jsonDataToModel(loadFromJson())
+    val instance: JsonSettingsModel by lazy { componentToSettingsModel(loadFromJson()) }
 
     private fun loadFromJson(): ComponentModel {
       return JsonSettingsModel::class.java.getResourceAsStream("/settings/ide-settings-model.json")?.let { input ->
@@ -77,9 +108,10 @@ class JsonSettingsModel(val propertyMap: Map<String, PropertyDescriptor>) {
       } ?: ComponentModel()
     }
 
-    fun jsonDataToModel(jsonData: ComponentModel): JsonSettingsModel {
+    @VisibleForTesting
+    fun componentToSettingsModel(componentModel: ComponentModel): JsonSettingsModel {
       val propertyMap = mutableMapOf<String, PropertyDescriptor>()
-      val filteredModel = filterSettings(jsonData)
+      val filteredModel = filterSettings(componentModel)
       filteredModel.components.forEach { componentInfo ->
         componentInfo.properties.forEach { propertyInfo ->
           jsonDataToPropertyDescriptor(componentInfo, propertyInfo)?.let {
@@ -91,10 +123,10 @@ class JsonSettingsModel(val propertyMap: Map<String, PropertyDescriptor>) {
       return JsonSettingsModel(propertyMap)
     }
 
-    private fun jsonDataToPropertyDescriptor(componentData: ComponentInfo, propertyData: ComponentPropertyInfo): PropertyDescriptor? {
-      return if (componentData.name != null && componentData.storage != null) {
-        PropertyDescriptor(componentData.name, propertyData.name, propertyData.type, componentData.storage,
-                           propertyData.mapTo ?: propertyData.name, propertyData.variants)
+    private fun jsonDataToPropertyDescriptor(componentInfo: ComponentInfo, propertyInfo: ComponentPropertyInfo): PropertyDescriptor? {
+      return if (componentInfo.name != null && componentInfo.storage != null) {
+        PropertyDescriptor(componentInfo.pluginId, componentInfo.name, propertyInfo.name, propertyInfo.type, componentInfo.storage,
+                           propertyInfo.mapTo ?: propertyInfo.name, propertyInfo.variants)
       }
       else null
     }
@@ -121,7 +153,8 @@ class JsonSettingsModel(val propertyMap: Map<String, PropertyDescriptor>) {
      * A primitive filter: either "*" (all) or a specific name.
      */
     private fun filterProperties(original: List<ComponentPropertyInfo>, nameFilter: List<String>): List<ComponentPropertyInfo> =
-      if (nameFilter.first() == "*") original else original.filter { nameFilter.contains(it.name) }
+      (if (nameFilter.first() == "*") original else original.filter { nameFilter.contains(it.name) })
+        .filter { it.type != PropertyType.Unsupported }
 
     private fun whiteListToComponentMap(whiteList: WhiteList): Map<String, ComponentInfo> {
       val result = mutableMapOf<String, ComponentInfo>()

@@ -23,7 +23,7 @@ public class MapIndexStorage<Key, Value> implements IndexStorage<Key, Value>, Me
   private static final Logger LOG = Logger.getInstance(MapIndexStorage.class);
   private static final boolean ENABLE_WAL = SystemProperties.getBooleanProperty("idea.index.enable.wal", false);
 
-  protected ValueContainerMap<Key, Value> myMap;
+  private ValueContainerMap<Key, Value> myMap;
 
   private MapIndexStorageCache<Key, Value> myCache;
 
@@ -32,6 +32,7 @@ public class MapIndexStorage<Key, Value> implements IndexStorage<Key, Value>, Me
   private final int myCacheSize;
 
   private final DataExternalizer<Value> myDataExternalizer;
+  /** {@link FileBasedIndexExtension#keyIsUniqueForIndexedFile} and {@link SingleEntryFileBasedIndexExtension} */
   private final boolean myKeyIsUniqueForIndexedFile;
   private final boolean myReadOnly;
   private final boolean myEnableWal;
@@ -84,18 +85,25 @@ public class MapIndexStorage<Key, Value> implements IndexStorage<Key, Value>, Me
 
   private void onDropFromCache(Key key, @NotNull ChangeTrackingValueContainer<Value> valueContainer) {
     try {
-      if (!myReadOnly && valueContainer.isDirty()) {
-        if (myKeyIsUniqueForIndexedFile) {
-          if (valueContainer.containsOnlyInvalidatedChange()) {
-            myMap.remove(key);
-            return;
-          }
-          else if (valueContainer.containsCachedMergedData()) {
-            valueContainer.setNeedsCompacting(true);
-          }
-        }
-        myMap.merge(key, valueContainer);
+      if (myReadOnly || !valueContainer.isDirty()) {
+        return;
       }
+
+      if (myKeyIsUniqueForIndexedFile) {
+        if (valueContainer.containsOnlyInvalidatedChange()) {
+          myMap.remove(key);
+          return;
+        }
+
+        //RC: afaicu, this is done just to ensure we do NOT use append-changes branch in a .merge().
+        //    Append-changes is useless in keyIsUniqueForFile case because there is always <=1 (inputId, value) entry in
+        //    ValueContainer, and at this point container could contain only 1 update change that container has changes (isDirty) and those changes are not removals
+        //    (!containsOnlyInvalidatedChange) which (for keyIsUniqueForFile) implies there is 1 and only 1 added change
+        if (valueContainer.containsCachedMergedData()) {
+          valueContainer.setNeedsCompacting(true);
+        }
+      }
+      myMap.merge(key, valueContainer);
     }
     catch (IOException e) {
       throw new RuntimeException(e);
@@ -206,6 +214,8 @@ public class MapIndexStorage<Key, Value> implements IndexStorage<Key, Value>, Me
   @Override
   public void flush() throws IOException {
     if (!myMap.isClosed()) {
+      //TODO RC: inefficiency: we do need to _store_ all cached data -- but we don't want to clear the cache!
+      //         With current implementation we get empty cache every time the flush() is called.
       clearCachedMappings();
       if (myMap.isDirty()) myMap.force();
     }
@@ -299,6 +309,7 @@ public class MapIndexStorage<Key, Value> implements IndexStorage<Key, Value>, Me
 
   private void updateSingleValueDirectly(Key key, int inputId, Value newValue) throws IOException {
     assert myKeyIsUniqueForIndexedFile;
+
     ChangeTrackingValueContainer<Value> cached = readIfCached(key);
 
     if (cached != null) {
@@ -307,24 +318,26 @@ public class MapIndexStorage<Key, Value> implements IndexStorage<Key, Value>, Me
       return;
     }
 
-    ChangeTrackingValueContainer<Value> valueContainer = new ChangeTrackingValueContainer<>(null);
+    // do not pollute the cache with keys unique to indexed file
+    UpdatableValueContainer<Value> valueContainer = new ValueContainerImpl<>();
     valueContainer.addValue(inputId, newValue);
-    myMap.merge(key, valueContainer);
+    myMap.put(key, valueContainer);
   }
 
   private void putSingleValueDirectly(Key key, int inputId, Value value) throws IOException {
     assert myKeyIsUniqueForIndexedFile;
-    ChangeTrackingValueContainer<Value> cached;
-    cached = readIfCached(key);
+
+    ChangeTrackingValueContainer<Value> cached = readIfCached(key);
 
     if (cached != null) {
       cached.addValue(inputId, value);
       return;
     }
+
     // do not pollute the cache with keys unique to indexed file
-    ChangeTrackingValueContainer<Value> valueContainer = new ChangeTrackingValueContainer<>(null);
+    UpdatableValueContainer<Value> valueContainer = new ValueContainerImpl<>();
     valueContainer.addValue(inputId, value);
-    myMap.merge(key, valueContainer);
+    myMap.put(key, valueContainer);
   }
 
   private @Nullable ChangeTrackingValueContainer<Value> readIfCached(Key key) {

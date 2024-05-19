@@ -13,6 +13,7 @@ import com.intellij.util.Processor;
 import com.intellij.util.containers.CollectionFactory;
 import com.intellij.util.containers.hash.EqualityPolicy;
 import com.intellij.util.io.IOUtil;
+import com.intellij.util.io.Unmappable;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -33,7 +34,9 @@ import java.util.function.BiPredicate;
  * Construct with {@link DurableMapFactory}, not with constructor
  */
 @ApiStatus.Internal
-public class DurableMapOverAppendOnlyLog<K, V> implements DurableMap<K, V> {
+public class DurableMapOverAppendOnlyLog<K, V> implements DurableMap<K, V>, Unmappable {
+
+  public static final int DATA_FORMAT_VERSION = 1;
 
   //TODO RC: current implementation is almost single-threaded -- all the operations, including (potential) IO, happen
   //         under keyHashToIdMap's lock. The only reason for that is an attempt to avoid storing repeating (key,value)
@@ -88,9 +91,9 @@ public class DurableMapOverAppendOnlyLog<K, V> implements DurableMap<K, V> {
     int foundRecordId = keyHashToIdMap.lookup(adjustedHash, recordId -> {
       long logRecordId = convertStoredIdToLogId(recordId);
       return keyValuesLog.read(logRecordId, recordBuffer -> {
-        //TODO RC: in this case we don't need to read value at all -- regardless of key matching
-        Entry<K, V> entry = entryExternalizer.readIfKeyMatch(recordBuffer, key);
-        return entry != null;
+        
+        K recordKey = entryExternalizer.readKey(recordBuffer);
+        return recordKey != null;
       });
     });
 
@@ -132,28 +135,37 @@ public class DurableMapOverAppendOnlyLog<K, V> implements DurableMap<K, V> {
     //Abstraction break: synchronize on keyHashToIdMap because we know keyHashToIdMap uses this-monitor to synchronize
     //    itself
     synchronized (keyHashToIdMap) {
-      Ref<Entry<K, V>> resultRef = new Ref<>();
+      Ref<Boolean> valueIsSameRef = new Ref<>(Boolean.FALSE);
       int foundRecordId = keyHashToIdMap.lookup(
         adjustedHash,
         candidateRecordId -> {
           long logRecordId = convertStoredIdToLogId(candidateRecordId);
-          Entry<K, V> entry = readEntryIfKeyMatch(logRecordId, key);
-          if (entry == null) {
-            return false; // [record.key != key] => hash collision => look further
+          if (valueEquality != null) {
+            Entry<K, V> entryWithSameKey = readEntryIfKeyMatch(logRecordId, key);
+            if (entryWithSameKey == null) {
+              return false; // [record.key != key] => hash collision => look further
+            }
+
+            boolean valueIsSame = valuesEqualNullSafe(value, entryWithSameKey.value());
+            valueIsSameRef.set(valueIsSame);
           }
-          if (nullSafeEquals(value, entry.value())) {
-            //record with key existed, and with the same value
-            // => just return, don't store entry ref -- we already know both key & value
-            return true;
+          else {
+            //without valueEquality we don't use .value at all -> don't need to read it then
+            K candidateKey = readKey(logRecordId);
+            if (candidateKey == null
+                || !keyEquality.isEqual(key, candidateKey)) {
+              return false; // [record.key != key] => hash collision => look further
+            }
+
+            valueIsSameRef.set(Boolean.FALSE);
           }
-          //record with key exists, but with different value
-          resultRef.set(entry);
+
           return true;
         }
       );
 
       boolean keyRecordExists = (foundRecordId != DurableIntToMultiIntMap.NO_VALUE);
-      boolean valueIsSame = resultRef.isNull();
+      boolean valueIsSame = valueIsSameRef.get();
 
       //Check is value differ from current value -- we don't need to append the log with the same (key,value)
       // again and again
@@ -190,13 +202,16 @@ public class DurableMapOverAppendOnlyLog<K, V> implements DurableMap<K, V> {
 
   @Override
   public boolean processKeys(@NotNull Processor<? super K> processor) throws IOException {
-    Set<K> alreadyProcessed = CollectionFactory.createSmallMemoryFootprintSet();
     //Keys listed via .forEach() are non-unique -- having 2 entries (key, value1), (key, value2) same key be listed twice.
-    //MAYBE RC: Having alreadyProcessed set is expensive for large maps, better have .forEachKey() method
-    //          in DurableIntToMultiIntMap
-    //TODO RC: forEachEntry() reads & deserializes both key and value -- but we don't need values here, only keys are needed.
-    //         Specialize method so it reads only keys?
-    return forEachEntry((key, value) -> {
+    Set<K> alreadyProcessed = CollectionFactory.createSmallMemoryFootprintSet();
+    //MAYBE RC: Having alreadyProcessed set is expensive for large maps?
+    return keyHashToIdMap.forEach((keyHash, recordId) -> {
+      K key = readKey(convertStoredIdToLogId(recordId));
+      if (key == null) {
+        throw new AssertionError(
+          "(keyHash: " + keyHash + ", recordId: " + recordId + "): key can't be null, removed records must NOT be in keyHashToIdMap"
+        );
+      }
       if (alreadyProcessed.add(key)) {
         return processor.process(key);
       }
@@ -295,18 +310,42 @@ public class DurableMapOverAppendOnlyLog<K, V> implements DurableMap<K, V> {
   @Override
   public void close() throws IOException {
     ExceptionUtil.runAllAndRethrowAllExceptions(
-      IOException.class,
-      () -> new IOException("Can't close " + keyValuesLog + "/" + keyHashToIdMap),
+      IOException.class, () -> new IOException("Can't close " + keyValuesLog + "/" + keyHashToIdMap),
+
       keyValuesLog::close,
       keyHashToIdMap::close
     );
   }
 
   @Override
+  public void closeAndUnsafelyUnmap() throws IOException {
+    ExceptionUtil.runAllAndRethrowAllExceptions(
+      IOException.class, () -> new IOException("Can't closeAndClean " + keyValuesLog + "/" + keyHashToIdMap),
+
+      () -> {
+        if (keyValuesLog instanceof Unmappable unmappable) {
+          unmappable.closeAndUnsafelyUnmap();
+        }
+        else {
+          keyValuesLog.close();
+        }
+      },
+      () -> {
+        if (keyHashToIdMap instanceof Unmappable unmappable) {
+          unmappable.closeAndUnsafelyUnmap();
+        }
+        else {
+          keyHashToIdMap.close();
+        }
+      }
+    );
+  }
+
+  @Override
   public void closeAndClean() throws IOException {
     ExceptionUtil.runAllAndRethrowAllExceptions(
-      IOException.class,
-      () -> new IOException("Can't closeAndClean " + keyValuesLog + "/" + keyHashToIdMap),
+      IOException.class, () -> new IOException("Can't closeAndClean " + keyValuesLog + "/" + keyHashToIdMap),
+
       keyValuesLog::closeAndClean,
       keyHashToIdMap::closeAndClean
     );
@@ -319,21 +358,25 @@ public class DurableMapOverAppendOnlyLog<K, V> implements DurableMap<K, V> {
 
   // ============================= infrastructure: ============================================================================ //
 
-  private static int convertLogIdToStoredId(long logRecordId) {
-    int storeId = (int)(logRecordId);
-    if (storeId != logRecordId) {
-      throw new IllegalStateException("logRecordId(=" + logRecordId + ") doesn't fit into int32");
+  //logRecordId (long): id of record in AppendOnlyLog
+  //storedId    (int):  id stored (as value) in the keyHashToIdMap
+  
+  static int convertLogIdToStoredId(long logRecordId) {
+    int intStoredId = (int)logRecordId;
+    if (intStoredId != logRecordId) {
+      throw new AssertionError("Overflow: logRecordId(=" + logRecordId + ") > MAX_INT(" + Integer.MAX_VALUE + ")");
     }
-    return storeId;
+    return intStoredId;
   }
 
-  private static long convertStoredIdToLogId(int storedRecordId) {
-    return storedRecordId;
+  static long convertStoredIdToLogId(int storedRecordId) {
+    //noinspection RedundantCast
+    return (long)storedRecordId;
   }
 
   /** valueDescriptor is expected to NOT process null values, so we compare null values separately */
-  private boolean nullSafeEquals(@Nullable V value,
-                                 @Nullable V anotherValue) {
+  private boolean valuesEqualNullSafe(@Nullable V value,
+                                      @Nullable V anotherValue) {
     if ((anotherValue == null && value == null)) {
       return true;
     }
@@ -360,6 +403,11 @@ public class DurableMapOverAppendOnlyLog<K, V> implements DurableMap<K, V> {
 
   private Entry<K, V> readEntry(long logRecordId) throws IOException {
     return keyValuesLog.read(logRecordId, entryExternalizer::read);
+  }
+
+  /** @return a key from record(logRecordId), or null, if the record is deleted */
+  private @Nullable K readKey(long logRecordId) throws IOException {
+    return keyValuesLog.read(logRecordId, entryExternalizer::readKey);
   }
 
   private long appendEntry(@NotNull K key,

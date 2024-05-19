@@ -678,21 +678,21 @@ com.intellij.ide.wizard.StepWithSubSteps
 - a:isLast():Z
 com.intellij.ide.workspace.ImportedProjectSettings
 - a:applyTo(com.intellij.openapi.project.Project,kotlin.coroutines.Continuation):java.lang.Object
-com.intellij.ide.workspace.Subproject
-- a:getModules():java.util.List
+*:com.intellij.ide.workspace.Subproject
+- a:getHandler():com.intellij.ide.workspace.SubprojectHandler
 - a:getName():java.lang.String
 - a:getProjectPath():java.lang.String
 - a:getWorkspace():com.intellij.openapi.project.Project
-- a:removeSubproject():V
-com.intellij.ide.workspace.SubprojectHandler
-- sf:Companion:com.intellij.ide.workspace.SubprojectHandler$Companion
+*:com.intellij.ide.workspace.SubprojectHandler
+- *sf:Companion:com.intellij.ide.workspace.SubprojectHandler$Companion
 - a:canImportFromFile(com.intellij.openapi.project.Project,com.intellij.openapi.vfs.VirtualFile):Z
-- a:getSubprojectFor(com.intellij.openapi.module.Module):com.intellij.ide.workspace.Subproject
+- a:getSubprojectIcon():javax.swing.Icon
 - a:getSubprojects(com.intellij.openapi.project.Project):java.util.List
-- a:importFromFile(com.intellij.openapi.project.Project,com.intellij.openapi.vfs.VirtualFile,kotlin.coroutines.Continuation):java.lang.Object
 - a:importFromProject(com.intellij.openapi.project.Project,Z):com.intellij.ide.workspace.ImportedProjectSettings
+- a:removeSubprojects(java.util.List):V
 - suppressGenericImportFor(com.intellij.openapi.module.Module):Z
-f:com.intellij.ide.workspace.SubprojectHandler$Companion
+*f:com.intellij.ide.workspace.SubprojectHandler$Companion
+- f:getAllSubprojects(com.intellij.openapi.project.Project):java.util.List
 - f:getEP_NAME():com.intellij.openapi.extensions.ExtensionPointName
 com.intellij.ide.workspace.WorkspaceSettingsImporter
 - sf:Companion:com.intellij.ide.workspace.WorkspaceSettingsImporter$Companion
@@ -1430,7 +1430,6 @@ c:com.intellij.openapi.actionSystem.PlatformCoreDataKeys
 - sf:PSI_ELEMENT_ARRAY:com.intellij.openapi.actionSystem.DataKey
 - sf:SELECTED_ITEM:com.intellij.openapi.actionSystem.DataKey
 - sf:SELECTED_ITEMS:com.intellij.openapi.actionSystem.DataKey
-- sf:SLOW_DATA_PROVIDERS:com.intellij.openapi.actionSystem.DataKey
 - <init>():V
 com.intellij.openapi.actionSystem.SeparatorAction
 com.intellij.openapi.application.ApplicationActivationListener
@@ -2235,9 +2234,6 @@ com.intellij.openapi.ui.popup.JBPopup
 com.intellij.openapi.ui.popup.JBPopupListener
 - beforeShown(com.intellij.openapi.ui.popup.LightweightWindowEvent):V
 - onClosed(com.intellij.openapi.ui.popup.LightweightWindowEvent):V
-c:com.intellij.openapi.ui.popup.JBPopupListener$Adapter
-- com.intellij.openapi.ui.popup.JBPopupListener
-- <init>():V
 c:com.intellij.openapi.ui.popup.LightweightWindowEvent
 - <init>(com.intellij.openapi.ui.popup.LightweightWindow):V
 - <init>(com.intellij.openapi.ui.popup.LightweightWindow,Z):V
@@ -2294,7 +2290,6 @@ f:com.intellij.openapi.util.registry.RegistryKeyBean$Companion
 com.intellij.openapi.vcs.FilePath
 - a:getCharset():java.nio.charset.Charset
 - a:getCharset(com.intellij.openapi.project.Project):java.nio.charset.Charset
-- a:getDocument():com.intellij.openapi.editor.Document
 - a:getFileType():com.intellij.openapi.fileTypes.FileType
 - a:getIOFile():java.io.File
 - a:getName():java.lang.String
@@ -2303,11 +2298,9 @@ com.intellij.openapi.vcs.FilePath
 - a:getPresentableUrl():java.lang.String
 - a:getVirtualFile():com.intellij.openapi.vfs.VirtualFile
 - a:getVirtualFileParent():com.intellij.openapi.vfs.VirtualFile
-- a:hardRefresh():V
 - a:isDirectory():Z
 - a:isNonLocal():Z
 - a:isUnder(com.intellij.openapi.vcs.FilePath,Z):Z
-- a:refresh():V
 c:com.intellij.openapi.vcs.LocalFilePath
 - com.intellij.openapi.vcs.FilePath
 - <init>(java.lang.String,Z):V
@@ -2317,7 +2310,6 @@ c:com.intellij.openapi.vcs.LocalFilePath
 - p:findFile(java.lang.String):com.intellij.openapi.vfs.VirtualFile
 - getCharset():java.nio.charset.Charset
 - getCharset(com.intellij.openapi.project.Project):java.nio.charset.Charset
-- getDocument():com.intellij.openapi.editor.Document
 - getFileType():com.intellij.openapi.fileTypes.FileType
 - getIOFile():java.io.File
 - getName():java.lang.String
@@ -2327,12 +2319,10 @@ c:com.intellij.openapi.vcs.LocalFilePath
 - getPresentableUrl():java.lang.String
 - getVirtualFile():com.intellij.openapi.vfs.VirtualFile
 - getVirtualFileParent():com.intellij.openapi.vfs.VirtualFile
-- hardRefresh():V
 - hashCode():I
 - isDirectory():Z
 - isNonLocal():Z
 - isUnder(com.intellij.openapi.vcs.FilePath,Z):Z
-- refresh():V
 - toString():java.lang.String
 c:com.intellij.openapi.vcs.UrlFilePath
 - com.intellij.openapi.vcs.LocalFilePath
@@ -2699,12 +2689,13 @@ c:com.intellij.projectImport.ProjectAttachProcessor
 - beforeDetach(com.intellij.openapi.module.Module):V
 - sf:canAttachToProject():Z
 - getActionText(com.intellij.openapi.project.Project):java.lang.String
+- getDefaultOptionIndex():I
 - getDescription(com.intellij.openapi.project.Project):java.lang.String
-- sf:getProcessor():com.intellij.projectImport.ProjectAttachProcessor
-- isEnabled():Z
+- sf:getProcessor(com.intellij.openapi.project.Project):com.intellij.projectImport.ProjectAttachProcessor
+- isEnabled(com.intellij.openapi.project.Project):Z
 f:com.intellij.projectImport.ProjectAttachProcessor$Companion
 - f:canAttachToProject():Z
-- f:getProcessor():com.intellij.projectImport.ProjectAttachProcessor
+- f:getProcessor(com.intellij.openapi.project.Project):com.intellij.projectImport.ProjectAttachProcessor
 com.intellij.projectImport.ProjectOpenedCallback
 - a:projectOpened(com.intellij.openapi.project.Project,com.intellij.openapi.module.Module):V
 c:com.intellij.ui.AnimatedIcon

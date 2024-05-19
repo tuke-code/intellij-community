@@ -15,7 +15,7 @@ import org.jetbrains.kotlin.idea.base.codeInsight.hasMain
 import org.jetbrains.kotlin.psi.KtClassOrObject
 import org.jetbrains.kotlin.psi.KtNamedFunction
 
-class KotlinMainMethodProvider: JavaMainMethodProvider {
+class KotlinMainMethodProvider : JavaMainMethodProvider {
     override fun isApplicable(clazz: PsiClass): Boolean {
         return clazz is KtLightClassBase
     }
@@ -50,6 +50,6 @@ class KotlinMainMethodProvider: JavaMainMethodProvider {
             }
 
             val classOrObject = lightClassBase?.kotlinOrigin ?: return@runReadAction null
-            mainFunctionDetector.findMain(classOrObject)?.toLightMethods()?.firstOrNull()
+            mainFunctionDetector.findMain(classOrObject)?.toLightMethods()?.firstOrNull() // если разрешить в dumb mode стреляет тут
         }
 }

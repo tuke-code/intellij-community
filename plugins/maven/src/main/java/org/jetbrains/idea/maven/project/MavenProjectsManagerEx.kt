@@ -229,25 +229,12 @@ open class MavenProjectsManagerEx(project: Project, private val cs: CoroutineSco
                                            filesToUpdate: List<VirtualFile>,
                                            filesToDelete: List<VirtualFile>) {
 
-    val lockSucceed = importMutex.tryLock()
-    try {
-      if (MavenLog.LOG.isDebugEnabled) {
-        MavenLog.LOG.debug("Update maven requested. lock=${lockSucceed}, coroutines dump: ${dumpCoroutines()}")
-      }
-      if (lockSucceed) {
-        withContext(tracer.span("updateMavenProjects")) {
-          MavenLog.LOG.warn("updateMavenProjects started: $spec ${filesToUpdate.size} ${filesToDelete.size} ${myProject.name}")
-          doUpdateMavenProjects(spec, filesToUpdate, filesToDelete)
-          MavenLog.LOG.warn("updateMavenProjects finished: $spec ${filesToUpdate.size} ${filesToDelete.size} ${myProject.name}")
-        }
-      }
-      else {
-        MavenLog.LOG.info("Maven import already is in progress")
-      }
-    }
-    finally {
-      if (lockSucceed) {
-        importMutex.unlock()
+    updateMavenProjectsUnderLock {
+      return@updateMavenProjectsUnderLock withContext(tracer.span("updateMavenProjects")) {
+        MavenLog.LOG.warn("updateMavenProjects started: $spec ${filesToUpdate.size} ${filesToDelete.size} ${myProject.name}")
+        doUpdateMavenProjects(spec, filesToUpdate, filesToDelete)
+        MavenLog.LOG.warn("updateMavenProjects finished: $spec ${filesToUpdate.size} ${filesToDelete.size} ${myProject.name}")
+        return@withContext emptyList<Module>()
       }
     }
   }
@@ -307,13 +294,25 @@ open class MavenProjectsManagerEx(project: Project, private val cs: CoroutineSco
 
   private suspend fun updateAllMavenProjects(spec: MavenSyncSpec,
                                              modelsProvider: IdeModifiableModelsProvider?): List<Module> {
-    return importMutex.withLock {
+    return updateMavenProjectsUnderLock {
       withContext(tracer.span("updateAllMavenProjects")) {
         MavenLog.LOG.warn("updateAllMavenProjects started: $spec ${myProject.name}")
         val result = doUpdateAllMavenProjects(spec, modelsProvider)
         MavenLog.LOG.warn("updateAllMavenProjects finished: $spec ${myProject.name}")
         result
       }
+    }
+  }
+
+  private suspend fun <T> updateMavenProjectsUnderLock(update: suspend () -> List<T>): List<T> {
+    val time = System.currentTimeMillis();
+    if (MavenLog.LOG.isDebugEnabled) {
+      MavenLog.LOG.debug("Update maven requested in $time. Coroutines dump: ${dumpCoroutines()}")
+    }
+
+    importMutex.withLock {
+      MavenLog.LOG.debug("Update maven started.Time = $time")
+      return update()
     }
   }
 
@@ -446,9 +445,9 @@ open class MavenProjectsManagerEx(project: Project, private val cs: CoroutineSco
 
   }
 
-  private suspend fun MavenProjectsManagerEx.resolveMavenProjects(syncActivity: StructuredIdeActivity,
-                                                                  projectsToResolve: Collection<MavenProject>,
-                                                                  spec: MavenSyncSpec): MavenProjectResolutionResult {
+  private suspend fun resolveMavenProjects(syncActivity: StructuredIdeActivity,
+                                           projectsToResolve: Collection<MavenProject>,
+                                           spec: MavenSyncSpec): MavenProjectResolutionResult {
     logDebug("importModules started: ${projectsToResolve.size}")
     val resolver = MavenProjectResolver(project)
     val resolutionResult = withBackgroundProgressTraced(myProject, MavenProjectBundle.message("maven.resolving"), true) {

@@ -26,6 +26,7 @@ import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.platform.backend.navigation.NavigationRequest
 import com.intellij.platform.backend.navigation.NavigationRequests
 import com.intellij.platform.navbar.NavBarItemPresentation
+import com.intellij.platform.navbar.NavBarItemPresentationData
 import com.intellij.platform.navbar.backend.NavBarItem
 import com.intellij.pom.Navigatable
 import com.intellij.problems.WolfTheProblemSolver
@@ -54,16 +55,13 @@ open class DefaultNavBarItem<out T>(val data: T) : NavBarItem {
     val text: String = fromOldExtensions { ext -> ext.getPresentableText(data, false) } ?: getText(false)
     val popupText: String = fromOldExtensions { ext -> ext.getPresentableText(data, true) } ?: getText(true)
 
-    val textAttributes = getTextAttributes()
-
-    val hasContainingFile = (data as? PsiElement)?.containingFile != null
-
-    return NavBarItemPresentation(
+    return NavBarItemPresentationData(
       icon,
       text,
       popupText,
-      textAttributes,
-      hasContainingFile
+      textAttributes = getTextAttributes(),
+      hasContainingFile = data is PsiElement && data.containingFile != null,
+      isModuleContentRoot = data is PsiDirectory && data.isModuleContentRoot()
     )
   }
 

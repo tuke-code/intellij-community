@@ -9,6 +9,7 @@ import kotlinx.collections.immutable.persistentMapOf
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.serialization.Serializable
+import org.jetbrains.intellij.build.productRunner.IntellijProductRunner
 import org.jetbrains.jps.model.module.JpsModule
 import java.nio.file.Files
 import java.nio.file.Path
@@ -139,6 +140,10 @@ interface BuildContext : CompilationContext {
   suspend fun buildJar(targetFile: Path, sources: List<Source>, compress: Boolean = false)
 
   fun checkDistributionBuildNumber()
+
+  suspend fun cleanupJarCache()
+
+  suspend fun createProductRunner(additionalPluginModules: List<String> = emptyList()): IntellijProductRunner
 }
 
 suspend inline fun <T> BuildContext.executeStep(spanBuilder: SpanBuilder,
@@ -177,13 +182,13 @@ sealed interface DistFileContent {
   fun readAsStringForDebug(): String
 }
 
-internal data class LocalDistFileContent(@JvmField val file: Path) : DistFileContent {
+data class LocalDistFileContent(@JvmField val file: Path) : DistFileContent {
   override fun readAsStringForDebug() = Files.newInputStream(file).readNBytes(1024).toString(Charsets.UTF_8)
 
   override fun toString(): String = "LocalDistFileContent(file=$file)"
 }
 
-internal data class InMemoryDistFileContent(@JvmField val data: ByteArray) : DistFileContent {
+data class InMemoryDistFileContent(@JvmField val data: ByteArray) : DistFileContent {
   override fun readAsStringForDebug(): String = String(data, 0, data.size.coerceAtMost(1024), Charsets.UTF_8)
 
   override fun equals(other: Any?): Boolean {

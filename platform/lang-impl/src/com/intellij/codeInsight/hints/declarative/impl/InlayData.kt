@@ -24,10 +24,8 @@ data class InlayData(
   val providerId: String,
   val disabled: Boolean,
   val payloads: List<InlayPayload>?,
-  /**
-   * Just for debugging purposes
-   */
-  val providerClass: Class<*>,
+  val providerClass: Class<*>, // Just for debugging purposes
+  val sourceId: String,
 ) {
 
   class Externalizer : VersionedExternalizer<InlayData> {
@@ -35,7 +33,7 @@ data class InlayData(
 
     companion object {
       // increment on format changed
-      private const val SERDE_VERSION = 0
+      private const val SERDE_VERSION = 2
     }
 
     override fun serdeVersion(): Int = SERDE_VERSION + treeExternalizer.serdeVersion()
@@ -49,6 +47,7 @@ data class InlayData(
       output.writeBoolean(inlayData.disabled)
       writePayloads(output, inlayData.payloads)
       writeProviderClass(output, inlayData.providerClass)
+      writeSourceId(output, inlayData.sourceId)
     }
 
     override fun read(input: DataInput): InlayData {
@@ -60,7 +59,8 @@ data class InlayData(
       val disabled: Boolean             = input.readBoolean()
       val payloads: List<InlayPayload>? = readPayloads(input)
       val providerClass: Class<*>       = readProviderClass(input)
-      return InlayData(position, tooltip, hasBackground, tree, providerId, disabled, payloads, providerClass)
+      val sourceId: String              = readSourceId(input)
+      return InlayData(position, tooltip, hasBackground, tree, providerId, disabled, payloads, providerClass, sourceId)
     }
 
     private fun writePosition(output: DataOutput, position: InlayPosition) {
@@ -154,5 +154,12 @@ data class InlayData(
       readUTF(input) // TODO: remove when format changed
       return ZombieInlayHintsProvider::class.java
     }
+
+    private fun writeSourceId(output: DataOutput, sourceId: String) {
+      writeUTF(output, sourceId)
+    }
+
+    private fun readSourceId(input: DataInput): String
+      = readUTF(input)
   }
 }

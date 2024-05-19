@@ -211,6 +211,10 @@ public final class HighlightUtil {
     boolean convertible = TypeConversionUtil.areTypesConvertible(operandType, checkType);
     boolean primitiveInPatternsEnabled = PsiUtil.isAvailable(JavaFeature.PRIMITIVE_TYPES_IN_PATTERNS, expression);
     if (((operandIsPrimitive || checkIsPrimitive) && !primitiveInPatternsEnabled) || !convertible) {
+      if (!convertible && IncompleteModelUtil.isIncompleteModel(expression) &&
+          IncompleteModelUtil.isPotentiallyConvertible(checkType, operand)) {
+        return;
+      }
       String message = JavaErrorBundle.message("inconvertible.type.cast", JavaHighlightUtil.formatType(operandType), JavaHighlightUtil
         .formatType(checkType));
       HighlightInfo.Builder info =
@@ -328,6 +332,9 @@ public final class HighlightUtil {
     if (operandType != null &&
         !TypeConversionUtil.areTypesConvertible(operandType, castType, PsiUtil.getLanguageLevel(expression)) &&
         !RedundantCastUtil.isInPolymorphicCall(expression)) {
+      if (IncompleteModelUtil.isIncompleteModel(expression) && IncompleteModelUtil.isPotentiallyConvertible(castType, operand)) {
+        return null;
+      }
       String message = JavaErrorBundle.message("inconvertible.type.cast", JavaHighlightUtil.formatType(operandType), JavaHighlightUtil
         .formatType(castType));
       return HighlightInfo.newHighlightInfo(HighlightInfoType.ERROR).range(expression).descriptionAndTooltip(message);
@@ -428,6 +435,9 @@ public final class HighlightUtil {
       IElementType opSign = TypeConversionUtil.convertEQtoOperation(sign);
       PsiType type = TypeConversionUtil.calcTypeForBinaryExpression(lType, rType, opSign, true);
       if (type == null || lType == null || TypeConversionUtil.areTypesConvertible(type, lType)) {
+        return null;
+      }
+      if (IncompleteModelUtil.isIncompleteModel(assignment) && IncompleteModelUtil.isPotentiallyConvertible(lType, rExpr)) {
         return null;
       }
       highlightInfo = createIncompatibleTypeHighlightInfo(lType, type, assignment.getTextRange(), 0);
@@ -587,6 +597,10 @@ public final class HighlightUtil {
       rType = expression.getType();
     }
     if (lType == null || lType == PsiTypes.nullType()) {
+      return null;
+    }
+    if (expression != null && IncompleteModelUtil.isIncompleteModel(expression) &&
+        IncompleteModelUtil.isPotentiallyConvertible(lType, expression)) {
       return null;
     }
     HighlightInfo.Builder highlightInfo = createIncompatibleTypeHighlightInfo(lType, rType, textRange, navigationShift);
@@ -919,6 +933,11 @@ public final class HighlightUtil {
     HighlightInfoType highlightType = getUnhandledExceptionHighlightType(element);
     if (highlightType == null) return null;
 
+    if (IncompleteModelUtil.isIncompleteModel(element)) {
+      unhandled = ContainerUtil.filter(unhandled, type -> !IncompleteModelUtil.isUnresolvedClassType(type));
+      if (unhandled.isEmpty()) return null;
+    }
+
     TextRange textRange = computeRange(element);
     String description = getUnhandledExceptionsDescriptor(unhandled);
     HighlightInfo.Builder info = HighlightInfo.newHighlightInfo(highlightType).range(textRange).descriptionAndTooltip(description);
@@ -1240,17 +1259,6 @@ public final class HighlightUtil {
     }
 
     return null;
-  }
-
-  /**
-   * @deprecated use {@link #checkLiteralExpressionParsingError(PsiLiteralExpression, LanguageLevel, PsiFile, Ref)}
-   */
-  @Deprecated(forRemoval = true)
-  public static HighlightInfo checkLiteralExpressionParsingError(@NotNull PsiLiteralExpression expression,
-                                                                 @NotNull LanguageLevel level,
-                                                                 @Nullable PsiFile file) {
-    HighlightInfo.Builder builder = checkLiteralExpressionParsingError(expression, level, file, null);
-    return builder == null ? null : builder.create();
   }
 
   public static HighlightInfo.Builder checkLiteralExpressionParsingError(@NotNull PsiLiteralExpression expression,
@@ -1668,8 +1676,11 @@ public final class HighlightUtil {
     return null;
   }
 
-  @NotNull
+  @Nullable
   private static HighlightInfo.Builder createMustBeBooleanInfo(@NotNull PsiExpression expr, @Nullable PsiType type) {
+    if (type == null && IncompleteModelUtil.isIncompleteModel(expr) && IncompleteModelUtil.mayHaveUnknownTypeDueToPendingReference(expr)) {
+      return null;
+    }
     HighlightInfo.Builder info = createIncompatibleTypeHighlightInfo(PsiTypes.booleanType(), type, expr.getTextRange(), 0);
     if (expr instanceof PsiMethodCallExpression methodCall) {
       PsiMethod method = methodCall.resolveMethod();
@@ -2319,6 +2330,7 @@ public final class HighlightUtil {
     PsiElementFactory factory = JavaPsiFacade.getElementFactory(processor.getProject());
     PsiClassType processorType = factory.createTypeByFQClassName(CommonClassNames.JAVA_LANG_STRING_TEMPLATE_PROCESSOR, processor.getResolveScope());
     if (!TypeConversionUtil.isAssignable(processorType, type)) {
+      if (IncompleteModelUtil.isIncompleteModel(templateExpression) && IncompleteModelUtil.isPotentiallyConvertible(processorType, processor)) return null;
       return createIncompatibleTypeHighlightInfo(processorType, type, processor.getTextRange(), 0);
     }
 
@@ -2348,6 +2360,7 @@ public final class HighlightUtil {
     PsiElementFactory factory = JavaPsiFacade.getElementFactory(resource.getProject());
     PsiClassType autoCloseable = factory.createTypeByFQClassName(CommonClassNames.JAVA_LANG_AUTO_CLOSEABLE, resource.getResolveScope());
     if (TypeConversionUtil.isAssignable(autoCloseable, type)) return null;
+    if (IncompleteModelUtil.isIncompleteModel(resource) && IncompleteModelUtil.isPotentiallyConvertible(autoCloseable, type, resource)) return null;
 
     return createIncompatibleTypeHighlightInfo(autoCloseable, type, resource.getTextRange(), 0);
   }
@@ -2681,6 +2694,9 @@ public final class HighlightUtil {
             // The problem is already reported on the initializer
             return null;
           }
+        }
+        if (IncompleteModelUtil.isIncompleteModel(containingFile)) {
+          return null;
         }
         String canonicalText = componentType.getCanonicalText();
         String description = JavaErrorBundle.message("unknown.class", canonicalText);
@@ -3418,6 +3434,7 @@ public final class HighlightUtil {
     PsiElementFactory factory = JavaPsiFacade.getElementFactory(context.getProject());
     PsiClassType throwable = factory.createTypeByFQClassName(CommonClassNames.JAVA_LANG_THROWABLE, context.getResolveScope());
     if (!TypeConversionUtil.isAssignable(throwable, type)) {
+      if (IncompleteModelUtil.isIncompleteModel(context) && IncompleteModelUtil.isPotentiallyConvertible(throwable, type, context)) return null;
       HighlightInfo.Builder highlightInfo = createIncompatibleTypeHighlightInfo(throwable, type, context.getTextRange(), 0);
       if (addCastIntention && TypeConversionUtil.areTypesConvertible(type, throwable)) {
         if (context instanceof PsiExpression) {
@@ -3485,6 +3502,7 @@ public final class HighlightUtil {
       }
       else {
         description = JavaErrorBundle.message("cannot.resolve.symbol", refName.getText());
+        boolean definitelyIncorrect = false;
         if (ref instanceof PsiReferenceExpression expression) {
           PsiExpression qualifierExpression = expression.getQualifierExpression();
           if (qualifierExpression != null &&
@@ -3492,10 +3510,14 @@ public final class HighlightUtil {
               !primitiveType.equals(PsiTypes.nullType()) && !primitiveType.equals(PsiTypes.voidType())) {
             description = JavaErrorBundle.message("cannot.access.member.on.type", qualifierExpression.getText(),
                                                   primitiveType.getPresentableText(false));
+            definitelyIncorrect = true;
           }
-        }
-        if (!JavaImplicitClassIndex.getInstance().getElements(ref.getQualifiedName(), ref.getProject(), ref.getResolveScope()).isEmpty()) {
+        } else if (!JavaImplicitClassIndex.getInstance().getElements(ref.getQualifiedName(), ref.getProject(), ref.getResolveScope()).isEmpty()) {
           description = JavaErrorBundle.message("implicit.class.can.not.be.referenced", ref.getText());
+          definitelyIncorrect = true;
+        }
+        if (!definitelyIncorrect && IncompleteModelUtil.isIncompleteModel(containingFile) && IncompleteModelUtil.canBePendingReference(ref)) {
+          return IncompleteModelUtil.getPendingReferenceHighlightInfo(refName);
         }
       }
 

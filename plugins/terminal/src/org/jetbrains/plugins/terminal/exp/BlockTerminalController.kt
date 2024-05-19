@@ -28,14 +28,44 @@ internal class BlockTerminalController(
   private val promptController: TerminalPromptController,
   private val selectionController: TerminalSelectionController,
   private val focusModel: TerminalFocusModel
-) : ShellCommandListener {
+) {
   private val listeners: MutableList<BlockTerminalControllerListener> = CopyOnWriteArrayList()
 
   var searchSession: BlockTerminalSearchSession? = null
     private set
 
   init {
-    session.addCommandListener(this)
+    session.addCommandListener(object: ShellCommandListener {
+      override fun initialized() {
+        finishCommandBlock(exitCode = 0)
+      }
+
+      override fun shellInfoReceived(rawShellInfo: String) {
+        thisLogger().info("Started shell info: $rawShellInfo")
+        ApplicationManager.getApplication().executeOnPooledThread {
+          TerminalShellInfoStatistics.getLoggableShellInfo(rawShellInfo)?.let {
+            TerminalUsageTriggerCollector.triggerLocalShellStarted(project, session.shellIntegration.shellType.toString(), it)
+          }
+        }
+      }
+
+      override fun commandFinished(event: CommandFinishedEvent) {
+        finishCommandBlock(event.exitCode)
+        TerminalUsageTriggerCollector.triggerCommandFinished(project, event.command, event.exitCode, event.duration)
+      }
+    })
+    session.commandManager.commandExecutionManager.addListener(object : ShellCommandSentListener {
+      override fun userCommandSent(userCommand: String) {
+        invokeLaterIfNeeded(getDisposed(), ModalityState.any()) {
+          // Since `commandFinished` event leads to sending the next user command and
+          // finishing the previous command block, and these actions occur in an unspecified order,
+          // we need `doWhenNextBlockCanBeStarted` to ensure that the previous block is finished.
+          outputController.doWhenNextBlockCanBeStarted {
+            startCommandBlock(userCommand)
+          }
+        }
+      }
+    })
 
     // Show initial terminal output (prior to the first prompt) in a separate block.
     // `initialized` event will finish the block.
@@ -55,10 +85,7 @@ internal class BlockTerminalController(
       outputController.insertEmptyLine()
     }
     else {
-      session.commandManager.sendCommandToExecute(command)
-      outputController.doWhenNextBlockCanBeStarted {
-        startCommandBlock(command)
-      }
+      session.commandManager.sendCommandToExecute(command) // will trigger `userCommandSent`
     }
     // report event even if it is an empty command, because it will be reported as a separate command type
     TerminalUsageTriggerCollector.triggerCommandStarted(project, command, isBlockTerminal = true)
@@ -80,24 +107,6 @@ internal class BlockTerminalController(
     session.model.isCommandRunning = true
 
     TerminalUsageLocalStorage.getInstance().recordCommandExecuted(session.shellIntegration.shellType.toString())
-  }
-
-  override fun shellInfoReceived(rawShellInfo: String) {
-    thisLogger().info("Started shell info: $rawShellInfo")
-    ApplicationManager.getApplication().executeOnPooledThread {
-      TerminalShellInfoStatistics.getLoggableShellInfo(rawShellInfo)?.let {
-        TerminalUsageTriggerCollector.triggerLocalShellStarted(project, session.shellIntegration.shellType.toString(), it)
-      }
-    }
-  }
-
-  override fun initialized() {
-    finishCommandBlock(exitCode = 0)
-  }
-
-  override fun commandFinished(event: CommandFinishedEvent) {
-    finishCommandBlock(event.exitCode)
-    TerminalUsageTriggerCollector.triggerCommandFinished(project, event.command, event.exitCode, event.duration)
   }
 
   private fun finishCommandBlock(exitCode: Int) {

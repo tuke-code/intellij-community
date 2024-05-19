@@ -7,16 +7,19 @@ import com.intellij.diagnostic.enableCoroutineDump
 import com.intellij.diagnostic.logs.DebugLogLevel
 import com.intellij.diagnostic.logs.LogCategory
 import com.intellij.diagnostic.logs.LogLevelConfigurationManager
+import com.intellij.ide.IdeEventQueue
 import com.intellij.ide.impl.ProjectUtil
 import com.intellij.ide.plugins.PluginManagerCore
 import com.intellij.notification.Notification
 import com.intellij.notification.NotificationType
 import com.intellij.notification.Notifications
 import com.intellij.openapi.application.*
+import com.intellij.openapi.application.impl.LaterInvocator
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.extensions.PluginId
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.ex.ProjectManagerEx
+import com.intellij.openapi.rd.util.adviseSuspendPreserveClientId
 import com.intellij.openapi.rd.util.setSuspendPreserveClientId
 import com.intellij.openapi.ui.isFocusAncestor
 import com.intellij.openapi.util.SystemInfoRt
@@ -37,6 +40,7 @@ import com.jetbrains.rd.util.lifetime.EternalLifetime
 import com.jetbrains.rd.util.lifetime.Lifetime
 import com.jetbrains.rd.util.reactive.viewNotNull
 import com.jetbrains.rd.util.threading.asRdScheduler
+import com.jetbrains.rd.util.threading.coroutines.asCoroutineDispatcher
 import com.jetbrains.rd.util.threading.coroutines.launch
 import kotlinx.coroutines.*
 import org.jetbrains.annotations.ApiStatus
@@ -163,7 +167,9 @@ open class DistributedTestHost(coroutineScope: CoroutineScope) {
           testMethod.invoke(testClassObject)
 
           // Advice for processing events
-          session.runNextAction.setSuspendPreserveClientId { _, actionTitle ->
+          session.runNextAction.setSuspendPreserveClientId { _, parameters ->
+            val actionTitle = parameters.title
+            val actionParameters = parameters.parameters
             val queue = map[actionTitle] ?: error("There is no Action with name '$actionTitle', something went terribly wrong")
             val action = queue.remove()
             val timeout = action.timeout
@@ -177,8 +183,6 @@ open class DistributedTestHost(coroutineScope: CoroutineScope) {
                   requestFocus(actionTitle)
                 }
 
-                showNotification("${session.agentInfo.id}: $actionTitle")
-
                 val agentContext = when (session.agentInfo.agentType) {
                   RdAgentType.HOST -> HostAgentContextImpl(session.agentInfo, protocol)
                   RdAgentType.CLIENT -> ClientAgentContextImpl(session.agentInfo, protocol)
@@ -186,7 +190,7 @@ open class DistributedTestHost(coroutineScope: CoroutineScope) {
                 }
 
                 val result = runLogged(actionTitle, timeout) {
-                  action.action(agentContext)
+                  action.action(agentContext, actionParameters)
                 }
 
                 // Assert state
@@ -197,9 +201,6 @@ open class DistributedTestHost(coroutineScope: CoroutineScope) {
             }
             catch (ex: Throwable) {
               LOG.warn("${session.agentInfo.id}: ${actionTitle.let { "'$it' " }}hasn't finished successfully", ex)
-              if (!app.isHeadlessEnvironment && isNotRdHost) {
-                makeScreenshot(actionTitle)
-              }
               throw ex
             }
           }
@@ -235,10 +236,21 @@ open class DistributedTestHost(coroutineScope: CoroutineScope) {
           }
         }
 
-        // causes problems if not scheduled on ui thread
-        session.closeProjectIfOpened.setSuspendPreserveClientId { _, _ ->
+        suspend fun leaveAllModals() {
           withContext(Dispatchers.EDT + ModalityState.any().asContextElement() + NonCancellable) {
-            ProjectManagerEx.getOpenProjects().forEach { waitProjectInitialisedOrDisposed(it) }
+            LaterInvocator.forceLeaveAllModals()
+            IdeEventQueue.getInstance().flushQueue()
+          }
+        }
+
+        session.forceLeaveAllModals.setSuspendPreserveClientId(handlerScheduler = Dispatchers.Default.asRdScheduler) { _, _ ->
+          leaveAllModals()
+        }
+
+        session.closeProjectIfOpened.setSuspendPreserveClientId(handlerScheduler = Dispatchers.Default.asRdScheduler) { _, _ ->
+          leaveAllModals()
+          ProjectManagerEx.getOpenProjects().forEach { waitProjectInitialisedOrDisposed(it) }
+          withContext(Dispatchers.EDT + NonCancellable) {
             ProjectManagerEx.getInstanceEx().closeAndDisposeAllProjects(checkCanClose = false)
           }
         }
@@ -246,7 +258,7 @@ open class DistributedTestHost(coroutineScope: CoroutineScope) {
          * Includes closing the project
          */
         session.exitApp.adviseOn(lifetime, Dispatchers.Default.asRdScheduler) {
-          lifetime.launch(Dispatchers.EDT + ModalityState.any().asContextElement() + NonCancellable) {
+          lifetime.launch(Dispatchers.EDT + NonCancellable) {
             LOG.info("Exiting the application...")
             app.exit(/* force = */ false, /* exitConfirmed = */ true, /* restart = */ false)
           }
@@ -272,8 +284,8 @@ open class DistributedTestHost(coroutineScope: CoroutineScope) {
           ProjectManagerEx.getOpenProjects().map { it.isInitialized }.all { true }
         }
 
-        session.showNotification.advise(lifetime) { actionTitle ->
-          showNotification("${session.agentInfo.id}: $actionTitle")
+        session.showNotification.adviseSuspendPreserveClientId(lifetime, Dispatchers.Default.asRdScheduler.asCoroutineDispatcher) { notificationText ->
+          showNotification(notificationText)
         }
 
         // Initialize loggers

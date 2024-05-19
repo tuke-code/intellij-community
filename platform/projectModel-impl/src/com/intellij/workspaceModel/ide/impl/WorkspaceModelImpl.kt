@@ -50,15 +50,16 @@ open class WorkspaceModelImpl(private val project: Project, private val cs: Coro
   final override val entityStorage: VersionedEntityStorageImpl
   private val unloadedEntitiesStorage: VersionedEntityStorageImpl
 
-  // replay = 1 is needed to send the very first state when the subscription fo the flow happens.
-  //   otherwise, the flow won't be emitted till the first update. Since we don't update the workspace model really often,
-  //   this may cause some unwanted delays for subscribers.
-  // This is used in the [subscribe] method, where we send the first version of the storage
-  //   right after the subscription.
-  // However, this means that this flow will keep two storages in the flow: the old and the new. This should be okay
-  //   since the storage is an effective structure, however, if this causes memory problems, we can switch to
-  //   replay = 0. In this case, no extra storage will be saved, but the event will be emitted after the first
-  //   update of the WorkspaceModel, what is probably also okay.
+  /** replay = 1 is needed to send the very first state when the subscription fo the flow happens.
+       otherwise, the flow won't be emitted till the first update. Since we don't update the workspace model really often,
+       this may cause some unwanted delays for subscribers.
+     This is used in the [subscribe] method, where we send the first version of the storage
+       right after the subscription.
+     However, this means that this flow will keep two storages in the flow: the old and the new. This should be okay
+       since the storage is an effective structure, however, if this causes memory problems, we can switch to
+       replay = 0. In this case, no extra storage will be saved, but the event will be emitted after the first
+       update of the WorkspaceModel, what is probably also okay.
+  */
   private val updatesFlow = MutableSharedFlow<VersionedStorageChange>(replay = 1)
 
   private val virtualFileManager: VirtualFileUrlManager = IdeVirtualFileUrlManagerImpl()
@@ -412,8 +413,10 @@ open class WorkspaceModelImpl(private val project: Project, private val cs: Coro
     ApplicationManager.getApplication().assertWriteAccessAllowed()
     if (project.isDisposed) return
 
-    logErrorOnEventHandling {
-      project.messageBus.syncPublisher(WorkspaceModelTopics.CHANGED).beforeChanged(change)
+    onBeforeChangedTimeMs.addMeasuredTime {
+      logErrorOnEventHandling {
+        project.messageBus.syncPublisher(WorkspaceModelTopics.CHANGED).beforeChanged(change)
+      }
     }
   }
 
@@ -429,8 +432,10 @@ open class WorkspaceModelImpl(private val project: Project, private val cs: Coro
     // We emit async changes before running other listeners under write action
     cs.launch { updatesFlow.emit(change) }
 
-    logErrorOnEventHandling {
-      project.messageBus.syncPublisher(WorkspaceModelTopics.CHANGED).changed(change)
+    onChangedTimeMs.addMeasuredTime { // Measure only the time of WorkspaceModelChangeListener
+      logErrorOnEventHandling {
+        project.messageBus.syncPublisher(WorkspaceModelTopics.CHANGED).changed(change)
+      }
     }
   }
 
@@ -507,6 +512,9 @@ open class WorkspaceModelImpl(private val project: Project, private val cs: Coro
     private val fullReplaceProjectModelTimeMs = MillisecondsMeasurer()
     private val initializeBridgesTimeMs = MillisecondsMeasurer()
 
+    private val onBeforeChangedTimeMs = MillisecondsMeasurer()
+    private val onChangedTimeMs = MillisecondsMeasurer()
+
     /**
      * This setup is in static part because meters will not be collected if the same instrument (gauge, counter ...) are registered more than once.
      * In that case WARN by OpenTelemetry will be logged 'Instrument XYZ has recorded multiple values for the same attributes.'
@@ -527,6 +535,8 @@ open class WorkspaceModelImpl(private val project: Project, private val cs: Coro
       val replaceProjectModelTimeCounter = meter.counterBuilder("workspaceModel.replace.project.model.ms").buildObserver()
       val fullReplaceProjectModelTimeCounter = meter.counterBuilder("workspaceModel.full.replace.project.model.ms").buildObserver()
       val initializeBridgesTimeCounter = meter.counterBuilder("workspaceModel.init.bridges.ms").buildObserver()
+      val onBeforeChangedTimeCounter = meter.counterBuilder("workspaceModel.on.before.changed.ms").buildObserver()
+      val onChangedTimeCounter = meter.counterBuilder("workspaceModel.on.changed.ms").buildObserver()
 
       meter.batchCallback(
         {
@@ -546,12 +556,16 @@ open class WorkspaceModelImpl(private val project: Project, private val cs: Coro
           replaceProjectModelTimeCounter.record(replaceProjectModelTimeMs.asMilliseconds())
           fullReplaceProjectModelTimeCounter.record(fullReplaceProjectModelTimeMs.asMilliseconds())
           initializeBridgesTimeCounter.record(initializeBridgesTimeMs.asMilliseconds())
+
+          onBeforeChangedTimeCounter.record(onBeforeChangedTimeMs.asMilliseconds())
+          onChangedTimeCounter.record(onChangedTimeMs.asMilliseconds())
         },
         loadingTotalCounter, loadingFromCacheCounter, updatesTimesCounter,
         updateTimePreciseCounter, preHandlersTimeCounter, collectChangesTimeCounter,
         initializingTimeCounter, toSnapshotTimeCounter, totalUpdatesTimeCounter,
         checkRecursiveUpdateTimeCounter, updateUnloadedEntitiesTimeCounter,
-        replaceProjectModelTimeCounter, fullReplaceProjectModelTimeCounter, initializeBridgesTimeCounter
+        replaceProjectModelTimeCounter, fullReplaceProjectModelTimeCounter, initializeBridgesTimeCounter,
+        onBeforeChangedTimeCounter, onChangedTimeCounter,
       )
     }
 

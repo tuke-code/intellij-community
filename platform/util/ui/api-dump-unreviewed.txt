@@ -380,6 +380,8 @@ f:com.intellij.icons.AllIcons$FileTypes
 - sf:Archive:javax.swing.Icon
 - sf:Aspectj:javax.swing.Icon
 - sf:Config:javax.swing.Icon
+- sf:Contexts:javax.swing.Icon
+- sf:ContextsModifier:javax.swing.Icon
 - sf:Css:javax.swing.Icon
 - sf:Custom:javax.swing.Icon
 - sf:Diagram:javax.swing.Icon
@@ -702,6 +704,44 @@ f:com.intellij.icons.AllIcons$Language
 f:com.intellij.icons.AllIcons$Linux
 - sf:Linux:javax.swing.Icon
 - <init>():V
+f:com.intellij.icons.AllIcons$Linux$Theme
+- <init>():V
+f:com.intellij.icons.AllIcons$Linux$Theme$Gnome
+- sf:Close:javax.swing.Icon
+- sf:CloseHover:javax.swing.Icon
+- sf:CloseInactive:javax.swing.Icon
+- sf:ClosePressed:javax.swing.Icon
+- sf:Maximize:javax.swing.Icon
+- sf:MaximizeHover:javax.swing.Icon
+- sf:MaximizeInactive:javax.swing.Icon
+- sf:MaximizePressed:javax.swing.Icon
+- sf:Minimize:javax.swing.Icon
+- sf:MinimizeHover:javax.swing.Icon
+- sf:MinimizeInactive:javax.swing.Icon
+- sf:MinimizePressed:javax.swing.Icon
+- sf:Restore:javax.swing.Icon
+- sf:RestoreHover:javax.swing.Icon
+- sf:RestoreInactive:javax.swing.Icon
+- sf:RestorePressed:javax.swing.Icon
+- <init>():V
+f:com.intellij.icons.AllIcons$Linux$Theme$Kde
+- sf:Close:javax.swing.Icon
+- sf:CloseHover:javax.swing.Icon
+- sf:CloseInactive:javax.swing.Icon
+- sf:ClosePressed:javax.swing.Icon
+- sf:Maximize:javax.swing.Icon
+- sf:MaximizeHover:javax.swing.Icon
+- sf:MaximizeInactive:javax.swing.Icon
+- sf:MaximizePressed:javax.swing.Icon
+- sf:Minimize:javax.swing.Icon
+- sf:MinimizeHover:javax.swing.Icon
+- sf:MinimizeInactive:javax.swing.Icon
+- sf:MinimizePressed:javax.swing.Icon
+- sf:Restore:javax.swing.Icon
+- sf:RestoreHover:javax.swing.Icon
+- sf:RestoreInactive:javax.swing.Icon
+- sf:RestorePressed:javax.swing.Icon
+- <init>():V
 f:com.intellij.icons.AllIcons$Mac
 - sf:AppIconOk512:javax.swing.Icon
 - <init>():V
@@ -979,6 +1019,7 @@ f:com.intellij.icons.AllIcons$Providers
 - sf:Couchbase:javax.swing.Icon
 - sf:DB2:javax.swing.Icon
 - sf:Databricks:javax.swing.Icon
+- sf:Denodo:javax.swing.Icon
 - sf:DocumentDB:javax.swing.Icon
 - sf:DuckDB:javax.swing.Icon
 - sf:DynamoDB:javax.swing.Icon
@@ -1197,7 +1238,6 @@ f:com.intellij.icons.AllIcons$Vcs
 - sf:Patch_file:javax.swing.Icon
 - sf:Push:javax.swing.Icon
 - sf:Remove:javax.swing.Icon
-- sf:Shelve:javax.swing.Icon
 - sf:ShelveSilent:javax.swing.Icon
 - sf:ShowUnversionedFiles:javax.swing.Icon
 - sf:Unshelve:javax.swing.Icon
@@ -1520,8 +1560,6 @@ com.intellij.ui.BackgroundSupplier
 c:com.intellij.ui.BooleanTableCellEditor
 - javax.swing.DefaultCellEditor
 - <init>():V
-- <init>(Z):V
-- getCellEditorValue():java.lang.Object
 - getTableCellEditorComponent(javax.swing.JTable,java.lang.Object,Z,I,I):java.awt.Component
 f:com.intellij.ui.CachingPainter
 - <init>():V
@@ -4495,7 +4533,6 @@ f:com.intellij.util.ui.JBUI$CurrentTheme$RunWidget
 - sf:RUNNING_BACKGROUND:java.awt.Color
 - sf:RUNNING_ICON_COLOR:java.awt.Color
 - sf:RUN_ICON_COLOR:java.awt.Color
-- sf:SEPARATOR:java.awt.Color
 - sf:STOP_BACKGROUND:java.awt.Color
 - <init>():V
 - s:actionButtonWidth():I
@@ -4960,9 +4997,7 @@ f:com.intellij.util.ui.StartupUiUtil
 - f:isJreHiDPI(com.intellij.ui.scale.ScaleContext):Z
 - sf:isJreHiDPI(java.awt.Component):Z
 - sf:isUnderDarcula():Z
-- sf:isUnderDefaultMacTheme():Z
 - sf:isUnderIntelliJLaF():Z
-- sf:isUnderWin10LookAndFeel():Z
 - sf:isWaylandToolkit():Z
 - sf:isXToolkit():Z
 - f:pump():V

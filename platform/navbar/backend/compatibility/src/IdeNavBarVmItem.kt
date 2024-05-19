@@ -3,9 +3,9 @@ package com.intellij.platform.navbar.backend.compatibility
 
 import com.intellij.model.Pointer
 import com.intellij.openapi.application.readAction
-import com.intellij.platform.navbar.NavBarItemPresentation
+import com.intellij.platform.navbar.NavBarItemExpandResult
+import com.intellij.platform.navbar.NavBarItemPresentationData
 import com.intellij.platform.navbar.NavBarVmItem
-import com.intellij.platform.navbar.NavBarVmItem.ItemExpandResult
 import com.intellij.platform.navbar.backend.NavBarItem
 import com.intellij.platform.navbar.backend.impl.children
 import com.intellij.util.concurrency.ThreadingAssertions
@@ -21,9 +21,7 @@ class IdeNavBarVmItem @RequiresReadLock constructor(
 
   val pointer: Pointer<out NavBarItem> = item.createPointer()
 
-  override val presentation: NavBarItemPresentation = item.presentation()
-
-  override val isModuleContentRoot: Boolean = item.isModuleContentRoot()
+  override val presentation: NavBarItemPresentationData = item.presentation() as NavBarItemPresentationData
 
   override suspend fun children(): List<NavBarVmItem>? {
     return fetch {
@@ -31,9 +29,9 @@ class IdeNavBarVmItem @RequiresReadLock constructor(
     }
   }
 
-  override suspend fun expand(): ItemExpandResult? {
+  override suspend fun expand(): NavBarItemExpandResult? {
     return fetch {
-      ItemExpandResult(childItems(), navigateOnClick())
+      NavBarItemExpandResult(childItems(), navigateOnClick())
     }
   }
 

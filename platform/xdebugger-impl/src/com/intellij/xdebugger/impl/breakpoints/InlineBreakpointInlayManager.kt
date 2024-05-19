@@ -17,7 +17,7 @@ import com.intellij.openapi.util.registry.Registry
 import com.intellij.openapi.util.registry.RegistryValue
 import com.intellij.openapi.util.registry.RegistryValueListener
 import com.intellij.openapi.vfs.VirtualFile
-import com.intellij.platform.util.coroutines.namedChildScope
+import com.intellij.platform.util.coroutines.childScope
 import com.intellij.psi.PsiDocumentManager
 import com.intellij.util.DocumentUtil
 import com.intellij.util.concurrency.annotations.RequiresReadLock
@@ -42,8 +42,8 @@ import java.util.concurrent.atomic.AtomicLong
 internal class InlineBreakpointInlayManager(private val project: Project, parentScope: CoroutineScope) {
 
   @OptIn(ExperimentalCoroutinesApi::class)
-  private val scope = parentScope.namedChildScope("InlineBreakpoints",
-                                                  if (Registry.`is`(LIMIT_REDRAW_JOBS_COUNT_KEY))
+  private val scope = parentScope.childScope("InlineBreakpoints",
+                                             if (Registry.`is`(LIMIT_REDRAW_JOBS_COUNT_KEY))
                                                     Dispatchers.Default.limitedParallelism (1)
                                                   else
                                                     Dispatchers.Default)
@@ -283,8 +283,7 @@ internal class InlineBreakpointInlayManager(private val project: Project, parent
     val variants =
       if (breakpointTypes.isNotEmpty()) {
         XDebuggerUtilImpl.getLineBreakpointVariantsSync(project, breakpointTypes, linePosition)
-          // No need to show "all" variant in case of the inline breakpoints approach, it's useful only for the popup based one.
-          .filter { !it.isMultiVariant }
+          .filter { it.shouldUseAsInlineVariant() }
       }
       else {
         emptyList()
@@ -294,6 +293,7 @@ internal class InlineBreakpointInlayManager(private val project: Project, parent
     // to the offset of that non-whitespace character.
     // Any breakpoint offset from the lines below the current line is normalized to the end of this line to prevent inlay migration (like IDEA-348719).
     val lineRange = DocumentUtil.getLineStartIndentedOffset(document, line)..document.getLineEndOffset(line)
+    assert(!lineRange.isEmpty())
 
     if (!shouldAlwaysShowAllInlays() &&
         breakpoints.size == 1 &&

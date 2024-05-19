@@ -3,6 +3,7 @@
 
 package com.intellij.ui.tabs.impl
 
+import com.intellij.concurrency.ContextAwareRunnable
 import com.intellij.icons.AllIcons
 import com.intellij.ide.ui.UISettings
 import com.intellij.ide.ui.UISettings.Companion.getInstance
@@ -59,7 +60,6 @@ import com.intellij.util.concurrency.annotations.RequiresEdt
 import com.intellij.util.containers.ContainerUtil
 import com.intellij.util.ui.*
 import com.intellij.util.ui.update.lazyUiDisposable
-import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.ApiStatus.Internal
 import org.jetbrains.annotations.Nls
 import org.jetbrains.annotations.NonNls
@@ -402,7 +402,7 @@ open class JBTabsImpl(
   private fun setRecentlyActive() {
     relayoutAlarm.cancelAllRequests()
     isRecentlyActive = true
-    relayoutAlarm.addRequest({
+    relayoutAlarm.addRequest(ContextAwareRunnable {
                                isRecentlyActive = false
                                relayout(false, false)
                              }, RELAYOUT_DELAY)
@@ -523,10 +523,6 @@ open class JBTabsImpl(
   protected open fun createMultiRowLayout(): MultiRowLayout = WrapMultiRowLayout(tabs = this, showPinnedTabsSeparately = false)
 
   protected open fun createSingleRowLayout(): SingleRowLayout = ScrollableSingleRowLayout(this)
-
-  @Deprecated("override {@link JBTabsImpl#createMultiRowLayout()} instead", ReplaceWith("createMultiRowLayout()"))
-  @ApiStatus.ScheduledForRemoval
-  protected open fun createTableLayout(): MultiRowLayout = createMultiRowLayout()
 
   override fun setNavigationActionBinding(prevActionId: String, nextActionId: String) {
     nextAction?.reconnect(nextActionId)
@@ -3174,11 +3170,6 @@ open class JBTabsImpl(
     override fun selectAllAccessibleSelection() {
       // can't do
     }
-  }
-
-  @Deprecated("Not used.")
-  @ApiStatus.ScheduledForRemoval
-  fun dispose() {
   }
 }
 

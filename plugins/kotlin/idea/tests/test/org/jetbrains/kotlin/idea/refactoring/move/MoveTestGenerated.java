@@ -194,6 +194,16 @@ public abstract class MoveTestGenerated extends AbstractMoveTest {
             runTest("testData/refactoring/moveFile/kotlin/moveMultipleFiles/moveMultipleFiles.test");
         }
 
+        @TestMetadata("kotlin/moveObject/moveObject.test")
+        public void testKotlin_moveObject_MoveObject() throws Exception {
+            runTest("testData/refactoring/moveFile/kotlin/moveObject/moveObject.test");
+        }
+
+        @TestMetadata("kotlin/moveUnaryOperator/moveUnaryOperator.test")
+        public void testKotlin_moveUnaryOperator_MoveUnaryOperator() throws Exception {
+            runTest("testData/refactoring/moveFile/kotlin/moveUnaryOperator/moveUnaryOperator.test");
+        }
+
         @TestMetadata("kotlin/packageWithQuotation/packageWithQuotation.test")
         public void testKotlin_packageWithQuotation_PackageWithQuotation() throws Exception {
             runTest("testData/refactoring/moveFile/kotlin/packageWithQuotation/packageWithQuotation.test");

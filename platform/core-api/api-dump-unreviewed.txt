@@ -7,7 +7,6 @@ c:com.intellij.DynamicBundle
 - s:findLanguageBundle():com.intellij.DynamicBundle$LanguageBundleEP
 - s:getBundle(java.lang.String):java.util.ResourceBundle
 - s:getBundle(java.lang.String,java.lang.Class):java.util.ResourceBundle
-- p:getBundle(Z):java.util.ResourceBundle
 - s:getLocale():java.util.Locale
 - s:getPluginBundle(com.intellij.openapi.extensions.PluginDescriptor):java.util.ResourceBundle
 - s:getResourceBundle(java.lang.ClassLoader,java.lang.String):java.util.ResourceBundle
@@ -257,6 +256,7 @@ e:com.intellij.formatting.FormattingMode
 - s:valueOf(java.lang.String):com.intellij.formatting.FormattingMode
 - s:values():com.intellij.formatting.FormattingMode[]
 com.intellij.ide.ConsentOptionsProvider
+- a:isActivatedWithFreeLicense():Z
 - a:isEAP():Z
 - a:isSendingUsageStatsAllowed():Z
 - a:setSendingUsageStatsAllowed(Z):V
@@ -650,11 +650,12 @@ e:com.intellij.lang.ParserDefinition$SpaceRequirements
 com.intellij.lang.PsiBuilder
 - com.intellij.lang.SyntaxTreeBuilder
 - com.intellij.openapi.util.UserDataHolder
-- com.intellij.openapi.util.UserDataHolderUnprotected
 - a:getLightTree():com.intellij.util.diff.FlyweightCapableTreeStructure
 - a:getProject():com.intellij.openapi.project.Project
 - a:getTreeBuilt():com.intellij.lang.ASTNode
+- getUserDataUnprotected(com.intellij.openapi.util.Key):java.lang.Object
 - a:mark():com.intellij.lang.PsiBuilder$Marker
+- putUserDataUnprotected(com.intellij.openapi.util.Key,java.lang.Object):V
 com.intellij.lang.PsiBuilder$Marker
 - com.intellij.lang.SyntaxTreeBuilder$Marker
 - a:doneBefore(com.intellij.psi.tree.IElementType,com.intellij.lang.PsiBuilder$Marker):V
@@ -2578,11 +2579,14 @@ e:com.intellij.openapi.project.DumbModeBlockedFunctionality
 - sf:FindUsages:com.intellij.openapi.project.DumbModeBlockedFunctionality
 - sf:FrameworkDetection:com.intellij.openapi.project.DumbModeBlockedFunctionality
 - sf:GlobalInspectionContext:com.intellij.openapi.project.DumbModeBlockedFunctionality
+- sf:GotoBeanDeclarations:com.intellij.openapi.project.DumbModeBlockedFunctionality
 - sf:GotoClass:com.intellij.openapi.project.DumbModeBlockedFunctionality
 - sf:GotoDeclaration:com.intellij.openapi.project.DumbModeBlockedFunctionality
 - sf:GotoDeclarationOnly:com.intellij.openapi.project.DumbModeBlockedFunctionality
 - sf:GotoDeclarationOrUsage:com.intellij.openapi.project.DumbModeBlockedFunctionality
+- sf:GotoEventPublisher:com.intellij.openapi.project.DumbModeBlockedFunctionality
 - sf:GotoImplementations:com.intellij.openapi.project.DumbModeBlockedFunctionality
+- sf:GotoInjectionPoints:com.intellij.openapi.project.DumbModeBlockedFunctionality
 - sf:GotoSuperMethod:com.intellij.openapi.project.DumbModeBlockedFunctionality
 - sf:GotoTarget:com.intellij.openapi.project.DumbModeBlockedFunctionality
 - sf:GotoTypeDeclaration:com.intellij.openapi.project.DumbModeBlockedFunctionality
@@ -2595,6 +2599,7 @@ e:com.intellij.openapi.project.DumbModeBlockedFunctionality
 - sf:LineProfiler:com.intellij.openapi.project.DumbModeBlockedFunctionality
 - sf:MemberInplaceRenamer:com.intellij.openapi.project.DumbModeBlockedFunctionality
 - sf:MultipleActionIds:com.intellij.openapi.project.DumbModeBlockedFunctionality
+- sf:OpenInHTTPClient:com.intellij.openapi.project.DumbModeBlockedFunctionality
 - sf:Other:com.intellij.openapi.project.DumbModeBlockedFunctionality
 - sf:PackageDependencies:com.intellij.openapi.project.DumbModeBlockedFunctionality
 - sf:PostCommitCheck:com.intellij.openapi.project.DumbModeBlockedFunctionality
@@ -2922,6 +2927,7 @@ c:com.intellij.openapi.util.SimpleModificationTracker
 - incModificationCount():V
 com.intellij.openapi.util.registry.RegistryManager
 - sf:Companion:com.intellij.openapi.util.registry.RegistryManager$Companion
+- *a:awaitRegistryLoad(kotlin.coroutines.Continuation):java.lang.Object
 - a:get(java.lang.String):com.intellij.openapi.util.registry.RegistryValue
 - s:getInstance():com.intellij.openapi.util.registry.RegistryManager
 - a:intValue(java.lang.String):I
@@ -3370,6 +3376,7 @@ a:com.intellij.openapi.vfs.WritingAccessProvider
 - requestWriting(com.intellij.openapi.vfs.VirtualFile[]):java.util.Collection
 a:com.intellij.openapi.vfs.encoding.EncodingManager
 - com.intellij.openapi.vfs.encoding.EncodingRegistry
+- sf:PROP_DEFAULT_FILES_ENCODING:java.lang.String
 - sf:PROP_NATIVE2ASCII_SWITCH:java.lang.String
 - sf:PROP_PROPERTIES_FILES_ENCODING:java.lang.String
 - <init>():V

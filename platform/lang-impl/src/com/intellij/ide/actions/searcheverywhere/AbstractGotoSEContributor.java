@@ -2,7 +2,10 @@
 package com.intellij.ide.actions.searcheverywhere;
 
 import com.intellij.codeInsight.navigation.NavigationUtil;
-import com.intellij.ide.actions.*;
+import com.intellij.ide.actions.GotoActionBase;
+import com.intellij.ide.actions.OpenInRightSplitAction;
+import com.intellij.ide.actions.QualifiedNameProviderUtil;
+import com.intellij.ide.actions.SearchEverywherePsiRenderer;
 import com.intellij.ide.plugins.DynamicPluginListener;
 import com.intellij.ide.plugins.IdeaPluginDescriptor;
 import com.intellij.ide.util.EditSourceUtil;
@@ -69,6 +72,7 @@ public abstract class AbstractGotoSEContributor implements WeightedSearchEverywh
 
   private final GlobalSearchScope myEverywhereScope;
   private final GlobalSearchScope myProjectScope;
+  protected boolean isScopeDefaultAndAutoSet = true;
 
   protected final SmartPsiElementPointer<PsiElement> myPsiContext;
 
@@ -77,24 +81,17 @@ public abstract class AbstractGotoSEContributor implements WeightedSearchEverywh
     PsiElement context = GotoActionBase.getPsiContext(event);
     myPsiContext = context != null ? SmartPointerManager.getInstance(myProject).createSmartPsiElementPointer(context) : null;
 
-    GlobalSearchScope everywhereScope = SearchEverywhereClassifier.EP_Manager.getEverywhereScope(myProject);
-    if (everywhereScope == null) {
-      everywhereScope = GlobalSearchScope.everythingScope(myProject);
-    }
-    myEverywhereScope = everywhereScope;
+    myEverywhereScope = GlobalSearchScope.everythingScope(myProject);
 
     List<ScopeDescriptor> scopeDescriptors = createScopes();
 
-    GlobalSearchScope projectScope = SearchEverywhereClassifier.EP_Manager.getProjectScope(myProject);
-    if (projectScope == null) {
-      projectScope = GlobalSearchScope.projectScope(myProject);
-      if (myEverywhereScope.equals(projectScope)) {
-        // just get the second scope, i.e. Attached Directories in DataGrip
-        ScopeDescriptor secondScope = JBIterable.from(scopeDescriptors)
-          .filter(o -> !o.scopeEquals(this.myEverywhereScope) && !o.scopeEquals(null))
-          .first();
-        projectScope = secondScope != null ? (GlobalSearchScope) secondScope.getScope() : this.myEverywhereScope;
-      }
+    GlobalSearchScope projectScope = GlobalSearchScope.projectScope(myProject);
+    if (myEverywhereScope.equals(projectScope)) {
+      // just get the second scope, i.e. Attached Directories in DataGrip
+      ScopeDescriptor secondScope = JBIterable.from(scopeDescriptors)
+        .filter(o -> !o.scopeEquals(this.myEverywhereScope) && !o.scopeEquals(null))
+        .first();
+      projectScope = secondScope != null ? (GlobalSearchScope)secondScope.getScope() : this.myEverywhereScope;
     }
     myProjectScope = projectScope;
     myScopeDescriptor = getInitialSelectedScope(scopeDescriptors);
@@ -185,6 +182,11 @@ public abstract class AbstractGotoSEContributor implements WeightedSearchEverywh
         if (!canToggleEverywhere) return false;
         return myScopeDescriptor.scopeEquals(myEverywhereScope) ||
                myScopeDescriptor.scopeEquals(myProjectScope);
+      }
+
+      @Override
+      public void setScopeIsDefaultAndAutoSet(boolean scopeDefaultAndAutoSet) {
+        isScopeDefaultAndAutoSet = scopeDefaultAndAutoSet;
       }
     });
     result.add(new PreviewAction());
@@ -292,6 +294,8 @@ public abstract class AbstractGotoSEContributor implements WeightedSearchEverywh
   public void setScope(ScopeDescriptor scope) {
     setSelectedScope(scope);
   }
+
+  protected boolean isEverywhere() { return myScopeDescriptor.scopeEquals(myEverywhereScope); }
 
   @Override
   public List<ScopeDescriptor> getSupportedScopes() {

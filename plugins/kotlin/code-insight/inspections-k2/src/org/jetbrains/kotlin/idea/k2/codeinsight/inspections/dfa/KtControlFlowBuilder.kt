@@ -35,6 +35,7 @@ import com.siyeh.ig.psiutils.TypeUtils
 import org.jetbrains.kotlin.KtNodeTypes
 import org.jetbrains.kotlin.analysis.api.KtAnalysisSession
 import org.jetbrains.kotlin.analysis.api.analyze
+import org.jetbrains.kotlin.analysis.api.base.KtConstantValue
 import org.jetbrains.kotlin.analysis.api.calls.*
 import org.jetbrains.kotlin.analysis.api.components.KtConstantEvaluationMode
 import org.jetbrains.kotlin.analysis.api.contracts.description.KtContractCallsInPlaceContractEffectDeclaration
@@ -156,6 +157,7 @@ class KtControlFlowBuilder(val factory: DfaValueFactory, val context: KtExpressi
     context(KtAnalysisSession)
     private fun processConstant(expr: KtExpression?): Boolean {
         val constantValue = expr?.evaluate(KtConstantEvaluationMode.CONSTANT_EXPRESSION_EVALUATION) ?: return false
+        if (constantValue is KtConstantValue.KtErrorConstantValue) return false
         val value = constantValue.value
         val ktType = when(value) {
             is Boolean -> builtinTypes.BOOLEAN
@@ -939,22 +941,18 @@ class KtControlFlowBuilder(val factory: DfaValueFactory, val context: KtExpressi
             }
 
             is KtWhenConditionIsPattern -> {
-                if (dfVar != null) {
-                    addInstruction(JvmPushInstruction(dfVar, null))
-                    val type = getTypeCheckDfType(condition.typeReference)
-                    if (type == DfType.TOP) {
-                        pushUnknown()
-                    } else {
-                        addInstruction(PushValueInstruction(type))
-                        if (condition.isNegated) {
-                            addInstruction(InstanceofInstruction(null, false))
-                            addInstruction(NotInstruction(KotlinWhenConditionAnchor(condition)))
-                        } else {
-                            addInstruction(InstanceofInstruction(KotlinWhenConditionAnchor(condition), false))
-                        }
-                    }
-                } else {
+                val type = getTypeCheckDfType(condition.typeReference)
+                if (dfVar == null || type == DfType.TOP) {
                     pushUnknown()
+                } else {
+                    addInstruction(JvmPushInstruction(dfVar, null))
+                    addInstruction(PushValueInstruction(type))
+                    if (condition.isNegated) {
+                        addInstruction(InstanceofInstruction(null, false))
+                        addInstruction(NotInstruction(KotlinWhenConditionAnchor(condition)))
+                    } else {
+                        addInstruction(InstanceofInstruction(KotlinWhenConditionAnchor(condition), false))
+                    }
                 }
             }
 

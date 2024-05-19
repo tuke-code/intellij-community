@@ -1,7 +1,8 @@
 // Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.platform.navbar.frontend.vm.impl
 
-import com.intellij.platform.navbar.NavBarItemPresentation
+import com.intellij.platform.navbar.NavBarItemExpandResultData
+import com.intellij.platform.navbar.NavBarItemPresentationData
 import com.intellij.platform.navbar.NavBarVmItem
 import com.intellij.platform.navbar.frontend.vm.NavBarItemVm
 import com.intellij.platform.navbar.frontend.vm.NavBarPopupVm
@@ -174,9 +175,7 @@ class NavBarVmImpl(
     val item: NavBarVmItem,
   ) : NavBarItemVm {
 
-    override val presentation: NavBarItemPresentation get() = item.presentation
-
-    override val isModuleContentRoot: Boolean get() = item.isModuleContentRoot
+    override val presentation: NavBarItemPresentationData get() = item.presentation as NavBarItemPresentationData
 
     override val isFirst: Boolean get() = index == 0
 
@@ -214,7 +213,7 @@ private sealed interface ExpandResult {
 private suspend fun autoExpand(child: NavBarVmItem): ExpandResult? {
   var expanded = emptyList<NavBarVmItem>()
   var currentItem = child
-  var (children, navigateOnClick) = currentItem.expand() ?: return null
+  var (children, navigateOnClick) = currentItem.expand() as NavBarItemExpandResultData? ?: return null
 
   if (children.isEmpty() || navigateOnClick) {
     return ExpandResult.NavigateTo(currentItem)
@@ -246,7 +245,7 @@ private suspend fun autoExpand(child: NavBarVmItem): ExpandResult? {
           // Performing auto-expand, keeping invariant
           expanded = expanded + currentItem
           currentItem = children.single()
-          val fetch = currentItem.expand() ?: return null
+          val fetch = currentItem.expand() as NavBarItemExpandResultData? ?: return null
           children = fetch.children
           navigateOnClick = fetch.navigateOnClick
         }

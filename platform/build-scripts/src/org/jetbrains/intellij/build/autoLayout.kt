@@ -2,7 +2,12 @@
 package org.jetbrains.intellij.build
 
 import com.intellij.util.xml.dom.readXmlAsModel
-import org.jetbrains.intellij.build.impl.*
+import org.jetbrains.intellij.build.impl.JarPackager
+import org.jetbrains.intellij.build.impl.ModuleItem
+import org.jetbrains.intellij.build.impl.PlatformLayout
+import org.jetbrains.intellij.build.impl.PluginLayout
+
+private const val VERIFIER_MODULE = "intellij.platform.commercial.verifier"
 
 internal suspend fun inferModuleSources(
   layout: PluginLayout,
@@ -10,48 +15,27 @@ internal suspend fun inferModuleSources(
   platformLayout: PlatformLayout,
   helper: JarPackagerDependencyHelper,
   jarPackager: JarPackager,
-  moduleOutputPatcher: ModuleOutputPatcher,
-  jarsWithSearchableOptions: SearchableOptionSetDescriptor?,
+  searchableOptionSet: SearchableOptionSetDescriptor?,
   context: BuildContext,
 ) {
   // for now, check only direct dependencies of the main plugin module
-  val childPrefix = "${layout.mainModule}."
+  val childPrefix = "${layout.mainModule.removeSuffix(".plugin")}."
   for (name in helper.getModuleDependencies(layout.mainModule)) {
-    if ((!name.startsWith(childPrefix) && name != "intellij.platform.commercial.verifier") || addedModules.contains(name)) {
+    if ((!name.startsWith(childPrefix) && name != VERIFIER_MODULE)) {
+      continue
+    }
+
+    if (!addedModules.add(name)) {
       continue
     }
 
     val moduleItem = ModuleItem(moduleName = name, relativeOutputFile = layout.getMainJarName(), reason = "<- ${layout.mainModule}")
-    addedModules.add(name)
-    if (platformLayout.includedModules.contains(moduleItem)) {
+    if (isIncludedIntoAnotherPlugin(platformLayout = platformLayout, moduleItem = moduleItem, context = context, layout = layout, moduleName = name)) {
       continue
     }
 
-    jarPackager.computeSourcesForModule(item = moduleItem, moduleOutputPatcher = moduleOutputPatcher, layout = layout, searchableOptionSetDescriptor = jarsWithSearchableOptions)
+    jarPackager.computeSourcesForModule(item = moduleItem, layout = layout, searchableOptionSet = searchableOptionSet)
   }
-
-  if (layout.mainModule == "intellij.pycharm.ds.remoteInterpreter") {
-    // todo PyCharm team why this module is being incorrectly published
-    return
-  }
-
-  // check content
-  helper.readPluginContentFromDescriptor(context.findRequiredModule(layout.mainModule))
-    .filterNot { !addedModules.add(it) }
-    .forEach { moduleName ->
-      val descriptor = readXmlAsModel(context.findFileInModuleSources(moduleName, "$moduleName.xml")!!)
-      jarPackager.computeSourcesForModule(
-        item = ModuleItem(
-          moduleName = moduleName,
-          // relative path with `/` is always packed by dev-mode, so, we don't need to fix resolving for now and can improve it later
-          relativeOutputFile = if (descriptor.getAttributeValue("package") == null) "modules/$moduleName.jar" else layout.getMainJarName(),
-          reason = "<- ${layout.mainModule} (plugin content)",
-        ),
-        moduleOutputPatcher = moduleOutputPatcher,
-        layout = layout,
-        searchableOptionSetDescriptor = jarsWithSearchableOptions,
-      )
-    }
 
   // check verifier in all included modules
   val effectiveIncludedNonMainModules = LinkedHashSet<String>(layout.includedModules.size + addedModules.size)
@@ -60,18 +44,54 @@ internal suspend fun inferModuleSources(
   effectiveIncludedNonMainModules.addAll(addedModules)
   for (moduleName in effectiveIncludedNonMainModules) {
     for (name in helper.getModuleDependencies(moduleName)) {
-      if (name != "intellij.platform.commercial.verifier" || addedModules.contains(name)) {
+      if (name != VERIFIER_MODULE || addedModules.contains(name)) {
         continue
       }
 
       val moduleItem = ModuleItem(moduleName = name, relativeOutputFile = layout.getMainJarName(), reason = "<- ${layout.mainModule}")
       addedModules.add(name)
-      jarPackager.computeSourcesForModule(
-        item = moduleItem,
-        moduleOutputPatcher = moduleOutputPatcher,
-        layout = layout,
-        searchableOptionSetDescriptor = jarsWithSearchableOptions,
-      )
+      jarPackager.computeSourcesForModule(item = moduleItem, layout = layout, searchableOptionSet = searchableOptionSet)
     }
   }
+}
+
+internal suspend fun computeModuleSourcesByContent(
+  helper: JarPackagerDependencyHelper,
+  context: BuildContext,
+  layout: PluginLayout,
+  addedModules: MutableSet<String>,
+  jarPackager: JarPackager,
+  searchableOptionSet: SearchableOptionSetDescriptor?
+) {
+  for (moduleName in helper.readPluginContentFromDescriptor(context.findRequiredModule(layout.mainModule), jarPackager.moduleOutputPatcher)) {
+    // CWM plugin is overcomplicated without any valid reason - it must be refactored
+    if (moduleName == "intellij.cwm.plugin.driver" || !addedModules.add(moduleName)) {
+      continue
+    }
+
+    val module = context.findRequiredModule(moduleName)
+    val descriptor = readXmlAsModel(context.findFileInModuleSources(module, "$moduleName.xml")!!)
+    val useSeparateJar = descriptor.getAttributeValue("package") == null || helper.isPluginModulePackedIntoSeparateJar(module, layout)
+    jarPackager.computeSourcesForModule(
+      item = ModuleItem(
+        moduleName = moduleName,
+        // relative path with `/` is always packed by dev-mode, so, we don't need to fix resolving for now and can improve it later
+        relativeOutputFile = if (useSeparateJar) "modules/$moduleName.jar" else layout.getMainJarName(),
+        reason = "<- ${layout.mainModule} (plugin content)",
+      ),
+      layout = layout,
+      searchableOptionSet = searchableOptionSet,
+    )
+  }
+}
+
+private fun isIncludedIntoAnotherPlugin(platformLayout: PlatformLayout, moduleItem: ModuleItem, context: BuildContext, layout: PluginLayout, moduleName: String): Boolean {
+  if (moduleName == VERIFIER_MODULE) {
+    return false
+  }
+
+  return platformLayout.includedModules.contains(moduleItem) ||
+         context.productProperties.productLayout.pluginLayouts.any { otherPluginLayout ->
+           otherPluginLayout !== layout && otherPluginLayout.includedModules.any { it.moduleName == moduleName }
+         }
 }

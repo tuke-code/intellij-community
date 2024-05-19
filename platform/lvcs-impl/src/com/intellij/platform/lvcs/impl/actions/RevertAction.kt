@@ -1,4 +1,4 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.platform.lvcs.impl.actions
 
 import com.intellij.history.core.LocalHistoryFacade
@@ -11,7 +11,11 @@ import com.intellij.platform.lvcs.impl.USE_OLD_CONTENT
 import com.intellij.platform.lvcs.impl.operations.createReverter
 import com.intellij.platform.lvcs.impl.statistics.LocalHistoryCounter
 
-class RevertAction : ChangeSetSelectionAction() {
+internal class RevertAction : ChangeSetSelectionAction() {
+
+  override fun isEnabled(changeSetSelection: ChangeSetSelection): Boolean {
+    return changeSetSelection.rightItem == null || changeSetSelection.leftItem == changeSetSelection.rightItem
+  }
 
   override fun actionPerformed(project: Project,
                                facade: LocalHistoryFacade,

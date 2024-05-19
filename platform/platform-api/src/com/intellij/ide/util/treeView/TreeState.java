@@ -3,7 +3,6 @@ package com.intellij.ide.util.treeView;
 
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.progress.EmptyProgressIndicator;
-import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.progress.Progressive;
 import com.intellij.openapi.util.*;
@@ -498,6 +497,9 @@ public final class TreeState implements JDOMExternalizable {
 
   public void applyTo(@NotNull JTree tree, @Nullable Object root) {
     LOG.debug(new IllegalStateException("restore paths"));
+    if (tree instanceof @NotNull Tree jbTree) {
+      jbTree.fireTreeStateRestoreStarted();
+    }
     applyCachedPresentation(tree);
     if (visit(tree)) return; // AsyncTreeModel#accept
     if (root == null) return;
@@ -521,8 +523,11 @@ public final class TreeState implements JDOMExternalizable {
   }
 
   private void applyCachedPresentation(@NotNull JTree tree) {
-    if (myPresentationData != null && tree instanceof CachedTreePresentationSupport jbTree) {
-      jbTree.setCachedPresentation(myPresentationData.createTree());
+    if (myPresentationData != null && tree instanceof CachedTreePresentationSupport cps) {
+      cps.setCachedPresentation(myPresentationData.createTree());
+      if (tree instanceof @NotNull Tree jbTree) {
+        jbTree.fireTreeStateCachedStateRestored();
+      }
     }
   }
 
@@ -721,7 +726,7 @@ public final class TreeState implements JDOMExternalizable {
   private Promise<List<TreePath>> expand(@NotNull JTree tree) {
     if (TreeUtil.isBulkExpandCollapseSupported(tree) && tree instanceof Tree jbTree && Registry.is("ide.tree.bulk.expand.tree.state", false)) {
       var promise = new AsyncPromise<List<TreePath>>();
-      var bulkExpandVisitor = new BulkExpandVisitor(myExpandedPaths);
+      var bulkExpandVisitor = new MultiplePathsVisitor(myExpandedPaths);
       TreeUtil.promiseVisit(tree, bulkExpandVisitor).onProcessed(lastPathFound -> {
         jbTree.expandPaths(bulkExpandVisitor.pathsFound);
         promise.setResult(bulkExpandVisitor.pathsFound);
@@ -729,12 +734,26 @@ public final class TreeState implements JDOMExternalizable {
       return promise;
     }
     else {
-      return TreeUtil.promiseExpand(tree, myExpandedPaths.stream().map(elements -> new Visitor(elements)));
+      if (myPresentationData == null) {
+        return TreeUtil.promiseExpand(tree, myExpandedPaths.stream().map(elements -> new SinglePathVisitor(elements)));
+      }
+      else {
+        // If we have cached presentation data, then everything is already shown and expanded,
+        // and if the user collapses one of those nodes, we don't want to expand it again here,
+        // as that looks and feels weird.
+        // So instead, only load these nodes so they can replace the cached ones.
+        var promise = new AsyncPromise<List<TreePath>>();
+        var visitor = new MultiplePathsVisitor(myExpandedPaths);
+        TreeUtil.promiseVisit(tree, visitor).onProcessed(lastPathFound -> {
+          promise.setResult(visitor.pathsFound);
+        });
+        return promise;
+      }
     }
   }
 
   private Promise<List<TreePath>> select(@NotNull JTree tree) {
-    return TreeUtil.promiseSelect(tree, mySelectedPaths.stream().map(elements -> new Visitor(elements)));
+    return TreeUtil.promiseSelect(tree, mySelectedPaths.stream().map(elements -> new SinglePathVisitor(elements)));
   }
 
   private boolean visit(@NotNull JTree tree) {
@@ -746,6 +765,9 @@ public final class TreeState implements JDOMExternalizable {
       if (LOG.isDebugEnabled() && expanded != null) {
         LOG.debug("Expanded " + expanded.size() + " paths in " + (System.currentTimeMillis() - started) + " ms");
       }
+      if (tree instanceof @NotNull Tree jbTree) {
+        jbTree.fireTreeStateRestoreFinished();
+      }
       clearCachedPresentation(tree);
       if (isSelectionNeeded(expanded, tree, promise)) {
         select(tree).onProcessed(selected -> promise.setResult(null));
@@ -754,10 +776,10 @@ public final class TreeState implements JDOMExternalizable {
     return true;
   }
 
-  private static final class Visitor implements TreeVisitor {
+  private static final class SinglePathVisitor implements TreeVisitor {
     private final PathElement[] elements;
 
-    Visitor(PathElement[] elements) {
+    SinglePathVisitor(PathElement[] elements) {
       this.elements = elements;
     }
 
@@ -775,7 +797,7 @@ public final class TreeState implements JDOMExternalizable {
     }
   }
 
-  private static final class BulkExpandVisitor implements TreeVisitor {
+  private static final class MultiplePathsVisitor implements TreeVisitor {
 
     private static final class PathMatchState {
 
@@ -816,7 +838,7 @@ public final class TreeState implements JDOMExternalizable {
     private final List<PathMatchState> matchStates = new ArrayList<>();
     private final List<TreePath> pathsFound = new ArrayList<>();
 
-    BulkExpandVisitor(List<PathElement[]> paths) {
+    MultiplePathsVisitor(List<PathElement[]> paths) {
       for (PathElement[] path : paths) {
         matchStates.add(new PathMatchState(path));
       }

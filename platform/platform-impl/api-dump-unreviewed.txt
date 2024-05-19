@@ -3168,44 +3168,6 @@ f:com.intellij.execution.filters.ShowTextPopupHyperlinkInfo
 - com.intellij.execution.filters.HyperlinkInfo
 - <init>(java.lang.String,java.lang.String):V
 - navigate(com.intellij.openapi.project.Project):V
-*f:com.intellij.execution.ijent.IjentChildProcessAdapter
-- java.lang.Process
-- com.intellij.execution.process.SelfKiller
-- <init>(kotlinx.coroutines.CoroutineScope,com.intellij.platform.ijent.IjentId,com.intellij.platform.ijent.IjentChildProcess):V
-- destroy():V
-- destroyForcibly():java.lang.Process
-- exitValue():I
-- getErrorStream():java.io.InputStream
-- getInputStream():java.io.InputStream
-- getOutputStream():java.io.OutputStream
-- isAlive():Z
-- onExit():java.util.concurrent.CompletableFuture
-- pid():J
-- supportsNormalTermination():Z
-- toString():java.lang.String
-- tryDestroyGracefully():Z
-- waitFor():I
-- waitFor(J,java.util.concurrent.TimeUnit):Z
-f:com.intellij.execution.ijent.IjentChildPtyProcessAdapter
-- com.pty4j.PtyProcess
-- com.intellij.execution.process.SelfKiller
-- <init>(kotlinx.coroutines.CoroutineScope,com.intellij.platform.ijent.IjentId,com.intellij.platform.ijent.IjentChildProcess):V
-- destroy():V
-- destroyForcibly():java.lang.Process
-- exitValue():I
-- getErrorStream():java.io.InputStream
-- getInputStream():java.io.InputStream
-- getOutputStream():java.io.OutputStream
-- getWinSize():com.pty4j.WinSize
-- isAlive():Z
-- onExit():java.util.concurrent.CompletableFuture
-- pid():J
-- setWinSize(com.pty4j.WinSize):V
-- supportsNormalTermination():Z
-- toString():java.lang.String
-- tryDestroyGracefully():Z
-- waitFor():I
-- waitFor(J,java.util.concurrent.TimeUnit):Z
 f:com.intellij.execution.impl.ConsoleViewUtil
 - sf:EDITOR_IS_CONSOLE_HISTORY_VIEW:com.intellij.openapi.util.Key
 - <init>():V
@@ -3422,7 +3384,7 @@ a:com.intellij.externalDependencies.ExternalDependenciesManager
 - s:getInstance(com.intellij.openapi.project.Project):com.intellij.externalDependencies.ExternalDependenciesManager
 - a:setAllDependencies(java.util.List):V
 com.intellij.externalDependencies.ProjectExternalDependency
-c:com.intellij.externalDependencies.impl.DependencyOnPluginState
+f:com.intellij.externalDependencies.impl.DependencyOnPluginState
 - myId:java.lang.String
 - myMaxVersion:java.lang.String
 - myMinVersion:java.lang.String
@@ -4165,7 +4127,6 @@ f:com.intellij.ide.SystemLanguage
 - f:doChooseLanguage(java.util.List):V
 - sf:getInstance():com.intellij.ide.SystemLanguage
 - f:getLocale():java.util.Locale
-- f:needInstallPlugin():Z
 f:com.intellij.ide.SystemLanguage$Companion
 - f:getInstance():com.intellij.ide.SystemLanguage
 f:com.intellij.ide.TooltipEvent
@@ -4625,13 +4586,6 @@ f:com.intellij.ide.actions.EditSourceInNewWindowAction
 - actionPerformed(com.intellij.openapi.actionSystem.AnActionEvent):V
 - getActionUpdateThread():com.intellij.openapi.actionSystem.ActionUpdateThread
 - update(com.intellij.openapi.actionSystem.AnActionEvent):V
-f:com.intellij.ide.actions.EnableNewUiAction
-- com.intellij.openapi.actionSystem.AnAction
-- com.intellij.openapi.project.DumbAware
-- <init>():V
-- actionPerformed(com.intellij.openapi.actionSystem.AnActionEvent):V
-- getActionUpdateThread():com.intellij.openapi.actionSystem.ActionUpdateThread
-- update(com.intellij.openapi.actionSystem.AnActionEvent):V
 f:com.intellij.ide.actions.ExitAction
 - com.intellij.openapi.actionSystem.AnAction
 - com.intellij.ide.lightEdit.LightEditCompatible
@@ -4936,7 +4890,6 @@ f:com.intellij.ide.actions.QuickChangeLookAndFeel
 - <init>():V
 - s:switchLafAndUpdateUI(com.intellij.ide.ui.LafManager,com.intellij.ide.ui.laf.UIThemeLookAndFeelInfo,Z):V
 - s:switchLafAndUpdateUI(com.intellij.ide.ui.LafManager,javax.swing.UIManager$LookAndFeelInfo,Z):V
-- s:switchLafAndUpdateUI(com.intellij.ide.ui.LafManager,javax.swing.UIManager$LookAndFeelInfo,Z,Z):V
 f:com.intellij.ide.actions.QuickChangeSchemesAction
 - com.intellij.ide.actions.QuickSwitchSchemeAction
 - com.intellij.openapi.project.DumbAware
@@ -5368,7 +5321,6 @@ f:com.intellij.ide.actions.SuggestAutomaticVfsRecoveryDialog$Companion
 f:com.intellij.ide.actions.Switcher
 - com.intellij.ide.actions.BaseSwitcherAction
 - sf:INSTANCE:com.intellij.ide.actions.Switcher
-- sf:createAndShowSwitcher(com.intellij.openapi.actionSystem.AnActionEvent,java.lang.String,Z,com.intellij.openapi.vfs.VirtualFile[]):com.intellij.ide.actions.Switcher$SwitcherPanel
 - f:getSWITCHER_KEY():com.intellij.openapi.util.Key
 f:com.intellij.ide.actions.Switcher$SwitcherPanel
 - com.intellij.util.ui.components.BorderLayoutPanel
@@ -8930,34 +8882,16 @@ f:com.intellij.ide.projectWizard.NewProjectWizardConstants$Language
 - sf:RUBY:java.lang.String
 - sf:RUST:java.lang.String
 - sf:SCALA:java.lang.String
-f:com.intellij.ide.settings.json.ComponentDescriptor
-- <init>(java.lang.String,java.lang.Class,com.intellij.openapi.extensions.PluginDescriptor,com.intellij.openapi.components.State):V
-- f:collectFieldInfo():java.util.List
-- f:component1():java.lang.String
-- f:component2():java.lang.Class
-- f:component3():com.intellij.openapi.extensions.PluginDescriptor
-- f:component4():com.intellij.openapi.components.State
-- f:copy(java.lang.String,java.lang.Class,com.intellij.openapi.extensions.PluginDescriptor,com.intellij.openapi.components.State):com.intellij.ide.settings.json.ComponentDescriptor
-- bs:copy$default(com.intellij.ide.settings.json.ComponentDescriptor,java.lang.String,java.lang.Class,com.intellij.openapi.extensions.PluginDescriptor,com.intellij.openapi.components.State,I,java.lang.Object):com.intellij.ide.settings.json.ComponentDescriptor
-- equals(java.lang.Object):Z
-- f:findStorage():com.intellij.openapi.components.Storage
-- f:getAClass():java.lang.Class
-- f:getCategoryString():java.lang.String
-- f:getName():java.lang.String
-- f:getPluginDescriptor():com.intellij.openapi.extensions.PluginDescriptor
-- f:getRoamingTypeString():java.lang.String
-- f:getState():com.intellij.openapi.components.State
-- hashCode():I
-- toString():java.lang.String
-f:com.intellij.ide.settings.json.JsonSettingsModel
-- sf:Companion:com.intellij.ide.settings.json.JsonSettingsModel$Companion
+*f:com.intellij.ide.settings.json.JsonSettingsModel
+- *sf:Companion:com.intellij.ide.settings.json.JsonSettingsModel$Companion
 - <init>(java.util.Map):V
+- f:getPluginId(java.lang.String):java.lang.String
 - f:getPropertyMap():java.util.Map
-f:com.intellij.ide.settings.json.JsonSettingsModel$Companion
+*f:com.intellij.ide.settings.json.JsonSettingsModel$Companion
+- f:componentToSettingsModel(com.intellij.ide.settings.json.JsonSettingsModel$ComponentModel):com.intellij.ide.settings.json.JsonSettingsModel
 - f:getInstance():com.intellij.ide.settings.json.JsonSettingsModel
-- f:jsonDataToModel(com.intellij.ide.settings.json.JsonSettingsModel$ComponentModel):com.intellij.ide.settings.json.JsonSettingsModel
-f:com.intellij.ide.settings.json.JsonSettingsModel$ComponentInfo
-- sf:Companion:com.intellij.ide.settings.json.JsonSettingsModel$ComponentInfo$Companion
+*f:com.intellij.ide.settings.json.JsonSettingsModel$ComponentInfo
+- *sf:Companion:com.intellij.ide.settings.json.JsonSettingsModel$ComponentInfo$Companion
 - <init>(java.lang.String,java.lang.String,java.lang.String,java.lang.String,java.lang.String,java.util.List):V
 - b:<init>(java.lang.String,java.lang.String,java.lang.String,java.lang.String,java.lang.String,java.util.List,I,kotlin.jvm.internal.DefaultConstructorMarker):V
 - f:component1():java.lang.String
@@ -8978,7 +8912,7 @@ f:com.intellij.ide.settings.json.JsonSettingsModel$ComponentInfo
 - f:getStorage():java.lang.String
 - hashCode():I
 - toString():java.lang.String
-f:com.intellij.ide.settings.json.JsonSettingsModel$ComponentInfo$$serializer
+*f:com.intellij.ide.settings.json.JsonSettingsModel$ComponentInfo$$serializer
 - kotlinx.serialization.internal.GeneratedSerializer
 - sf:INSTANCE:com.intellij.ide.settings.json.JsonSettingsModel$ComponentInfo$$serializer
 - childSerializers():kotlinx.serialization.KSerializer[]
@@ -8986,10 +8920,10 @@ f:com.intellij.ide.settings.json.JsonSettingsModel$ComponentInfo$$serializer
 - getDescriptor():kotlinx.serialization.descriptors.SerialDescriptor
 - serialize(kotlinx.serialization.encoding.Encoder,com.intellij.ide.settings.json.JsonSettingsModel$ComponentInfo):V
 - typeParametersSerializers():kotlinx.serialization.KSerializer[]
-f:com.intellij.ide.settings.json.JsonSettingsModel$ComponentInfo$Companion
+*f:com.intellij.ide.settings.json.JsonSettingsModel$ComponentInfo$Companion
 - f:serializer():kotlinx.serialization.KSerializer
-f:com.intellij.ide.settings.json.JsonSettingsModel$ComponentModel
-- sf:Companion:com.intellij.ide.settings.json.JsonSettingsModel$ComponentModel$Companion
+*f:com.intellij.ide.settings.json.JsonSettingsModel$ComponentModel
+- *sf:Companion:com.intellij.ide.settings.json.JsonSettingsModel$ComponentModel$Companion
 - <init>():V
 - <init>(java.util.List):V
 - b:<init>(java.util.List,I,kotlin.jvm.internal.DefaultConstructorMarker):V
@@ -9000,7 +8934,7 @@ f:com.intellij.ide.settings.json.JsonSettingsModel$ComponentModel
 - f:getComponents():java.util.List
 - hashCode():I
 - toString():java.lang.String
-f:com.intellij.ide.settings.json.JsonSettingsModel$ComponentModel$$serializer
+*f:com.intellij.ide.settings.json.JsonSettingsModel$ComponentModel$$serializer
 - kotlinx.serialization.internal.GeneratedSerializer
 - sf:INSTANCE:com.intellij.ide.settings.json.JsonSettingsModel$ComponentModel$$serializer
 - childSerializers():kotlinx.serialization.KSerializer[]
@@ -9008,10 +8942,10 @@ f:com.intellij.ide.settings.json.JsonSettingsModel$ComponentModel$$serializer
 - getDescriptor():kotlinx.serialization.descriptors.SerialDescriptor
 - serialize(kotlinx.serialization.encoding.Encoder,com.intellij.ide.settings.json.JsonSettingsModel$ComponentModel):V
 - typeParametersSerializers():kotlinx.serialization.KSerializer[]
-f:com.intellij.ide.settings.json.JsonSettingsModel$ComponentModel$Companion
+*f:com.intellij.ide.settings.json.JsonSettingsModel$ComponentModel$Companion
 - f:serializer():kotlinx.serialization.KSerializer
-f:com.intellij.ide.settings.json.JsonSettingsModel$ComponentPropertyInfo
-- sf:Companion:com.intellij.ide.settings.json.JsonSettingsModel$ComponentPropertyInfo$Companion
+*f:com.intellij.ide.settings.json.JsonSettingsModel$ComponentPropertyInfo
+- *sf:Companion:com.intellij.ide.settings.json.JsonSettingsModel$ComponentPropertyInfo$Companion
 - <init>(java.lang.String,java.lang.String,com.intellij.ide.settings.json.JsonSettingsModel$PropertyType,java.lang.String,java.util.List):V
 - b:<init>(java.lang.String,java.lang.String,com.intellij.ide.settings.json.JsonSettingsModel$PropertyType,java.lang.String,java.util.List,I,kotlin.jvm.internal.DefaultConstructorMarker):V
 - f:component1():java.lang.String
@@ -9029,7 +8963,7 @@ f:com.intellij.ide.settings.json.JsonSettingsModel$ComponentPropertyInfo
 - f:getVariants():java.util.List
 - hashCode():I
 - toString():java.lang.String
-f:com.intellij.ide.settings.json.JsonSettingsModel$ComponentPropertyInfo$$serializer
+*f:com.intellij.ide.settings.json.JsonSettingsModel$ComponentPropertyInfo$$serializer
 - kotlinx.serialization.internal.GeneratedSerializer
 - sf:INSTANCE:com.intellij.ide.settings.json.JsonSettingsModel$ComponentPropertyInfo$$serializer
 - childSerializers():kotlinx.serialization.KSerializer[]
@@ -9037,29 +8971,33 @@ f:com.intellij.ide.settings.json.JsonSettingsModel$ComponentPropertyInfo$$serial
 - getDescriptor():kotlinx.serialization.descriptors.SerialDescriptor
 - serialize(kotlinx.serialization.encoding.Encoder,com.intellij.ide.settings.json.JsonSettingsModel$ComponentPropertyInfo):V
 - typeParametersSerializers():kotlinx.serialization.KSerializer[]
-f:com.intellij.ide.settings.json.JsonSettingsModel$ComponentPropertyInfo$Companion
+*f:com.intellij.ide.settings.json.JsonSettingsModel$ComponentPropertyInfo$Companion
 - f:serializer():kotlinx.serialization.KSerializer
-f:com.intellij.ide.settings.json.JsonSettingsModel$PropertyDescriptor
-- <init>(java.lang.String,java.lang.String,com.intellij.ide.settings.json.JsonSettingsModel$PropertyType,java.lang.String,java.lang.String,java.util.List):V
-- b:<init>(java.lang.String,java.lang.String,com.intellij.ide.settings.json.JsonSettingsModel$PropertyType,java.lang.String,java.lang.String,java.util.List,I,kotlin.jvm.internal.DefaultConstructorMarker):V
+*f:com.intellij.ide.settings.json.JsonSettingsModel$PropertyDescriptor
+- <init>(java.lang.String,java.lang.String,java.lang.String,com.intellij.ide.settings.json.JsonSettingsModel$PropertyType,java.lang.String,java.lang.String,java.util.List,java.lang.Object):V
+- b:<init>(java.lang.String,java.lang.String,java.lang.String,com.intellij.ide.settings.json.JsonSettingsModel$PropertyType,java.lang.String,java.lang.String,java.util.List,java.lang.Object,I,kotlin.jvm.internal.DefaultConstructorMarker):V
 - f:component1():java.lang.String
 - f:component2():java.lang.String
-- f:component3():com.intellij.ide.settings.json.JsonSettingsModel$PropertyType
-- f:component4():java.lang.String
+- f:component3():java.lang.String
+- f:component4():com.intellij.ide.settings.json.JsonSettingsModel$PropertyType
 - f:component5():java.lang.String
-- f:component6():java.util.List
-- f:copy(java.lang.String,java.lang.String,com.intellij.ide.settings.json.JsonSettingsModel$PropertyType,java.lang.String,java.lang.String,java.util.List):com.intellij.ide.settings.json.JsonSettingsModel$PropertyDescriptor
-- bs:copy$default(com.intellij.ide.settings.json.JsonSettingsModel$PropertyDescriptor,java.lang.String,java.lang.String,com.intellij.ide.settings.json.JsonSettingsModel$PropertyType,java.lang.String,java.lang.String,java.util.List,I,java.lang.Object):com.intellij.ide.settings.json.JsonSettingsModel$PropertyDescriptor
+- f:component6():java.lang.String
+- f:component7():java.util.List
+- f:component8():java.lang.Object
+- f:copy(java.lang.String,java.lang.String,java.lang.String,com.intellij.ide.settings.json.JsonSettingsModel$PropertyType,java.lang.String,java.lang.String,java.util.List,java.lang.Object):com.intellij.ide.settings.json.JsonSettingsModel$PropertyDescriptor
+- bs:copy$default(com.intellij.ide.settings.json.JsonSettingsModel$PropertyDescriptor,java.lang.String,java.lang.String,java.lang.String,com.intellij.ide.settings.json.JsonSettingsModel$PropertyType,java.lang.String,java.lang.String,java.util.List,java.lang.Object,I,java.lang.Object):com.intellij.ide.settings.json.JsonSettingsModel$PropertyDescriptor
 - equals(java.lang.Object):Z
 - f:getComponentName():java.lang.String
 - f:getMapTo():java.lang.String
 - f:getName():java.lang.String
+- f:getPluginId():java.lang.String
 - f:getStorage():java.lang.String
 - f:getType():com.intellij.ide.settings.json.JsonSettingsModel$PropertyType
+- f:getValue():java.lang.Object
 - f:getVariants():java.util.List
 - hashCode():I
 - toString():java.lang.String
-e:com.intellij.ide.settings.json.JsonSettingsModel$PropertyType
+*e:com.intellij.ide.settings.json.JsonSettingsModel$PropertyType
 - java.lang.Enum
 - sf:Boolean:com.intellij.ide.settings.json.JsonSettingsModel$PropertyType
 - sf:Enum:com.intellij.ide.settings.json.JsonSettingsModel$PropertyType
@@ -9071,8 +9009,8 @@ e:com.intellij.ide.settings.json.JsonSettingsModel$PropertyType
 - s:getEntries():kotlin.enums.EnumEntries
 - s:valueOf(java.lang.String):com.intellij.ide.settings.json.JsonSettingsModel$PropertyType
 - s:values():com.intellij.ide.settings.json.JsonSettingsModel$PropertyType[]
-f:com.intellij.ide.settings.json.JsonSettingsModel$VariantInfo
-- sf:Companion:com.intellij.ide.settings.json.JsonSettingsModel$VariantInfo$Companion
+*f:com.intellij.ide.settings.json.JsonSettingsModel$VariantInfo
+- *sf:Companion:com.intellij.ide.settings.json.JsonSettingsModel$VariantInfo$Companion
 - <init>(java.lang.String,java.lang.String):V
 - b:<init>(java.lang.String,java.lang.String,I,kotlin.jvm.internal.DefaultConstructorMarker):V
 - f:component1():java.lang.String
@@ -9084,7 +9022,7 @@ f:com.intellij.ide.settings.json.JsonSettingsModel$VariantInfo
 - f:getValue():java.lang.String
 - hashCode():I
 - toString():java.lang.String
-f:com.intellij.ide.settings.json.JsonSettingsModel$VariantInfo$$serializer
+*f:com.intellij.ide.settings.json.JsonSettingsModel$VariantInfo$$serializer
 - kotlinx.serialization.internal.GeneratedSerializer
 - sf:INSTANCE:com.intellij.ide.settings.json.JsonSettingsModel$VariantInfo$$serializer
 - childSerializers():kotlinx.serialization.KSerializer[]
@@ -9092,29 +9030,7 @@ f:com.intellij.ide.settings.json.JsonSettingsModel$VariantInfo$$serializer
 - getDescriptor():kotlinx.serialization.descriptors.SerialDescriptor
 - serialize(kotlinx.serialization.encoding.Encoder,com.intellij.ide.settings.json.JsonSettingsModel$VariantInfo):V
 - typeParametersSerializers():kotlinx.serialization.KSerializer[]
-f:com.intellij.ide.settings.json.JsonSettingsModel$VariantInfo$Companion
-- f:serializer():kotlinx.serialization.KSerializer
-f:com.intellij.ide.settings.json.JsonSettingsModel$WhiteList
-- sf:Companion:com.intellij.ide.settings.json.JsonSettingsModel$WhiteList$Companion
-- <init>():V
-- <init>(java.util.List):V
-- b:<init>(java.util.List,I,kotlin.jvm.internal.DefaultConstructorMarker):V
-- f:component1():java.util.List
-- f:copy(java.util.List):com.intellij.ide.settings.json.JsonSettingsModel$WhiteList
-- bs:copy$default(com.intellij.ide.settings.json.JsonSettingsModel$WhiteList,java.util.List,I,java.lang.Object):com.intellij.ide.settings.json.JsonSettingsModel$WhiteList
-- equals(java.lang.Object):Z
-- f:getProperties():java.util.List
-- hashCode():I
-- toString():java.lang.String
-f:com.intellij.ide.settings.json.JsonSettingsModel$WhiteList$$serializer
-- kotlinx.serialization.internal.GeneratedSerializer
-- sf:INSTANCE:com.intellij.ide.settings.json.JsonSettingsModel$WhiteList$$serializer
-- childSerializers():kotlinx.serialization.KSerializer[]
-- deserialize(kotlinx.serialization.encoding.Decoder):com.intellij.ide.settings.json.JsonSettingsModel$WhiteList
-- getDescriptor():kotlinx.serialization.descriptors.SerialDescriptor
-- serialize(kotlinx.serialization.encoding.Encoder,com.intellij.ide.settings.json.JsonSettingsModel$WhiteList):V
-- typeParametersSerializers():kotlinx.serialization.KSerializer[]
-f:com.intellij.ide.settings.json.JsonSettingsModel$WhiteList$Companion
+*f:com.intellij.ide.settings.json.JsonSettingsModel$VariantInfo$Companion
 - f:serializer():kotlinx.serialization.KSerializer
 f:com.intellij.ide.settings.json.SettingsInspectorKt
 - sf:buildComponentModel():com.intellij.ide.settings.json.JsonSettingsModel$ComponentModel
@@ -10977,14 +10893,11 @@ f:com.intellij.ide.wizard.RootNewProjectWizardStep
 - getPropertyGraph():com.intellij.openapi.observable.properties.PropertyGraph
 - setKeywords(com.intellij.ide.wizard.NewProjectWizardStep$Keywords):V
 f:com.intellij.ide.wizard.UIWizardUtil
-- sf:chain(com.intellij.ide.wizard.NewProjectWizardStep,kotlin.jvm.functions.Function1):com.intellij.ide.wizard.NewProjectWizardStep
 - sf:chain(com.intellij.ide.wizard.NewProjectWizardStep,kotlin.jvm.functions.Function1,kotlin.jvm.functions.Function1):com.intellij.ide.wizard.NewProjectWizardStep
 - sf:chain(com.intellij.ide.wizard.NewProjectWizardStep,kotlin.jvm.functions.Function1,kotlin.jvm.functions.Function1,kotlin.jvm.functions.Function1):com.intellij.ide.wizard.NewProjectWizardStep
-- sf:chain(com.intellij.ide.wizard.NewProjectWizardStep,kotlin.jvm.functions.Function1,kotlin.jvm.functions.Function1,kotlin.jvm.functions.Function1,kotlin.jvm.functions.Function1):com.intellij.ide.wizard.NewProjectWizardStep
 - sf:getProjectOrDefault(com.intellij.ide.util.projectWizard.WizardContext):com.intellij.openapi.project.Project
 - sf:setMinimumWidthForAllRowLabels(com.intellij.openapi.ui.DialogPanel,I):V
 - *sf:setupProjectSafe(com.intellij.ide.wizard.NewProjectWizardStep,com.intellij.openapi.project.Project,java.lang.String,kotlin.jvm.functions.Function0):V
-- sf:stepSequence(com.intellij.ide.wizard.NewProjectWizardStep,com.intellij.ide.wizard.NewProjectWizardStep[]):com.intellij.ide.wizard.NewProjectWizardStep
 - sf:withVisualPadding(com.intellij.openapi.ui.DialogPanel,Z):com.intellij.openapi.ui.DialogPanel
 - bs:withVisualPadding$default(com.intellij.openapi.ui.DialogPanel,Z,I,java.lang.Object):com.intellij.openapi.ui.DialogPanel
 a:com.intellij.ide.wizard.comment.CommentNewProjectWizardStep
@@ -12781,7 +12694,6 @@ f:com.intellij.openapi.command.impl.DummyProject
 - getBaseDir():com.intellij.openapi.vfs.VirtualFile
 - getBasePath():java.lang.String
 - getComponent(java.lang.Class):java.lang.Object
-- getCoroutineScope():kotlinx.coroutines.CoroutineScope
 - getDisposed():com.intellij.openapi.util.Condition
 - getExtensionArea():com.intellij.openapi.extensions.ExtensionsArea
 - s:getInstance():com.intellij.openapi.project.Project
@@ -12922,6 +12834,23 @@ a:com.intellij.openapi.editor.EditorLinePainter
 - sf:EP_NAME:com.intellij.openapi.extensions.ExtensionPointName
 - <init>():V
 - a:getLineExtensions(com.intellij.openapi.project.Project,com.intellij.openapi.vfs.VirtualFile,I):java.util.Collection
+f:com.intellij.openapi.editor.FileDropEvent
+- <init>(com.intellij.openapi.project.Project,java.awt.datatransfer.Transferable,java.util.Collection,com.intellij.openapi.editor.Editor):V
+- f:getEditor():com.intellij.openapi.editor.Editor
+- f:getFiles():java.util.Collection
+- f:getProject():com.intellij.openapi.project.Project
+- f:getTransferable():java.awt.datatransfer.Transferable
+- toString():java.lang.String
+com.intellij.openapi.editor.FileDropHandler
+- a:handleDrop(com.intellij.openapi.editor.FileDropEvent,kotlin.coroutines.Continuation):java.lang.Object
+f:com.intellij.openapi.editor.FileDropManager
+- <init>(com.intellij.openapi.project.Project,kotlinx.coroutines.CoroutineScope):V
+- f:handleDrop(java.awt.datatransfer.Transferable,com.intellij.openapi.editor.Editor,com.intellij.openapi.fileEditor.impl.EditorWindow,kotlin.coroutines.Continuation):java.lang.Object
+- f:openFilesInTab(com.intellij.openapi.editor.Editor,java.util.List,com.intellij.openapi.fileEditor.impl.EditorWindow):V
+- bs:openFilesInTab$default(com.intellij.openapi.editor.FileDropManager,com.intellij.openapi.editor.Editor,java.util.List,com.intellij.openapi.fileEditor.impl.EditorWindow,I,java.lang.Object):V
+- f:scheduleDrop(java.awt.datatransfer.Transferable,com.intellij.openapi.editor.Editor,com.intellij.openapi.fileEditor.impl.EditorWindow):V
+f:com.intellij.openapi.editor.FileDropManagerKt
+- sf:containsFileDropTargets(java.awt.datatransfer.DataFlavor[]):Z
 f:com.intellij.openapi.editor.LineExtensionInfo
 - <init>(java.lang.String,com.intellij.openapi.editor.markup.TextAttributes):V
 - <init>(java.lang.String,java.awt.Color,com.intellij.openapi.editor.markup.EffectType,java.awt.Color,I):V
@@ -14819,6 +14748,7 @@ f:com.intellij.openapi.editor.impl.SettingsImpl
 - isInsertParenthesesAutomatically():Z
 - isLeadingWhitespaceShown():Z
 - isLineMarkerAreaShown():Z
+- isLineNumbersAfterIcons():Z
 - isLineNumbersShown():Z
 - isMouseClickSelectionHonorsCamelWords():Z
 - isPaintSoftWraps():Z
@@ -14865,6 +14795,7 @@ f:com.intellij.openapi.editor.impl.SettingsImpl
 - setLeadingWhitespaceShown(Z):V
 - setLineCursorWidth(I):V
 - setLineMarkerAreaShown(Z):V
+- setLineNumbersAfterIcons(Z):V
 - setLineNumbersShown(Z):V
 - setLineNumerationType(com.intellij.openapi.editor.EditorSettings$LineNumerationType):V
 - setMouseClickSelectionHonorsCamelWords(Z):V
@@ -15736,7 +15667,6 @@ f:com.intellij.openapi.fileChooser.ex.LocalFsFinder$FileChooserFilter
 - isAccepted(com.intellij.openapi.fileChooser.ex.FileLookup$LookupFile):Z
 f:com.intellij.openapi.fileChooser.ex.LocalFsFinder$IoFile
 - com.intellij.openapi.fileChooser.ex.FileLookup$LookupFile
-- <init>(java.io.File):V
 - <init>(java.nio.file.Path):V
 - equals(java.lang.Object):Z
 - exists():Z
@@ -16819,11 +16749,9 @@ c:com.intellij.openapi.fileEditor.impl.text.EditorHighlighterUpdater
 - f:updateHighlighters():V
 c:com.intellij.openapi.fileEditor.impl.text.FileDropHandler
 - com.intellij.openapi.editor.EditorDropHandler
-- sf:Companion:com.intellij.openapi.fileEditor.impl.text.FileDropHandler$Companion
 - <init>(com.intellij.openapi.editor.Editor):V
 - canHandleDrop(java.awt.datatransfer.DataFlavor[]):Z
 - handleDrop(java.awt.datatransfer.Transferable,com.intellij.openapi.project.Project,com.intellij.openapi.fileEditor.impl.EditorWindow):V
-f:com.intellij.openapi.fileEditor.impl.text.FileDropHandler$Companion
 f:com.intellij.openapi.fileEditor.impl.text.LargeFileEditorProvider
 - com.intellij.openapi.fileEditor.impl.text.TextEditorProvider
 - <init>():V
@@ -18410,7 +18338,6 @@ c:com.intellij.openapi.ui.FrameWrapper
 - f:setLocation(java.awt.Point):V
 - f:setOnCloseHandler(java.util.function.BooleanSupplier):V
 - setPreferredFocusedComponent(javax.swing.JComponent):V
-- f:setProject(com.intellij.openapi.project.Project):V
 - f:setSize(java.awt.Dimension):V
 - f:setTitle(java.lang.String):V
 - show():V
@@ -25037,7 +24964,6 @@ f:com.intellij.ui.ColorPicker
 - insertUpdate(javax.swing.event.DocumentEvent):V
 - removeUpdate(javax.swing.event.DocumentEvent):V
 - saveRecentColors():V
-- s:showColorPickerPopup(com.intellij.openapi.project.Project,java.awt.Color,com.intellij.openapi.editor.Editor,com.intellij.ui.picker.ColorListener):V
 - s:showColorPickerPopup(com.intellij.openapi.project.Project,java.awt.Color,com.intellij.ui.picker.ColorListener):V
 - s:showColorPickerPopup(com.intellij.openapi.project.Project,java.awt.Color,com.intellij.ui.picker.ColorListener,com.intellij.ui.awt.RelativePoint):V
 - s:showColorPickerPopup(com.intellij.openapi.project.Project,java.awt.Color,com.intellij.ui.picker.ColorListener,com.intellij.ui.awt.RelativePoint,Z):V
@@ -29087,6 +29013,7 @@ c:com.intellij.ui.popup.AbstractPopup
 - p:afterShow():V
 - p:afterShowSync():V
 - p:beforeShow():Z
+- p:calculateSizeForPack(Z,Z):java.awt.Dimension
 - canClose():Z
 - canShow():Z
 - f:cancel():V
@@ -29238,6 +29165,7 @@ c:com.intellij.ui.popup.ActionPopupStep
 f:com.intellij.ui.popup.BalloonPopupBuilderImpl
 - com.intellij.openapi.ui.popup.BalloonBuilder
 - <init>(java.util.Map,javax.swing.JComponent):V
+- <init>(javax.swing.JComponent):V
 - createBalloon():com.intellij.openapi.ui.popup.Balloon
 - setAnimationCycle(I):com.intellij.openapi.ui.popup.BalloonBuilder
 - setBlockClicksThroughBalloon(Z):com.intellij.openapi.ui.popup.BalloonBuilder
@@ -30434,7 +30362,6 @@ a:com.intellij.util.concurrency.Invoker
 f:com.intellij.util.concurrency.Invoker$Background
 - com.intellij.util.concurrency.Invoker
 - <init>(com.intellij.openapi.Disposable,I):V
-- dispose():V
 - isValidThread():Z
 f:com.intellij.util.concurrency.Invoker$EDT
 - com.intellij.util.concurrency.Invoker

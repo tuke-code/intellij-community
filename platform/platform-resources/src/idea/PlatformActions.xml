@@ -193,8 +193,6 @@
             use-shortcut-of="Find" />
 
     <action id="RunAnything" icon="AllIcons.Actions.Run_anything" class="com.intellij.ide.actions.runAnything.RunAnythingAction"/>
-    <action id="EnableNewUi" class="com.intellij.ide.actions.EnableNewUiAction" icon="AllIcons.Actions.EnableNewUi"/>
-    <action id="DisableNewUi" class="com.intellij.ide.actions.DisableNewUiAction"/>
 
     <action id="SmartSelect" class="com.intellij.ide.actions.SmartSelect" use-shortcut-of="EditorSelectWord"/>
     <action id="SmartUnSelect" class="com.intellij.ide.actions.SmartUnSelect" use-shortcut-of="EditorUnSelectWord"/>
@@ -1329,6 +1327,7 @@
           <abbreviation value="metal"/>
         </action>
         <action id="RulerGuide" internal="true" class="com.intellij.internal.rulerguide.RulerGuideAction"/>
+        <action id="ShowHideDebugInfoInUi" internal="true" class="com.intellij.ide.actions.ShowHideDebugInfoInUiAction"/>
         <separator/>
         <action id="AddTestProcessAction" internal="true" class="com.intellij.openapi.wm.impl.status.AddTestProcessAction"/>
         <action id="AddRandomNamesTestProcessAction" internal="true" class="com.intellij.openapi.wm.impl.status.AddRandomNamesTestProcessAction"/>
@@ -1605,6 +1604,7 @@
 
     <group id="EditorStickyLinesSettings" popup="true" searchable="false">
       <action id="EditorStickyConfigure" class="com.intellij.openapi.editor.impl.stickyLines.StickyLinesConfigureAction"/>
+      <action id="EditorStickyLinesDisableForLang" class="com.intellij.openapi.editor.impl.stickyLines.StickyLinesDisableForLangAction"/>
       <action id="EditorStickyLinesDisable" class="com.intellij.openapi.editor.impl.stickyLines.StickyLinesSettingsDisableAction"/>
     </group>
 
@@ -1637,9 +1637,6 @@
       <reference id="ChangeLaf"/>
       <reference id="ChangeKeymap"/>
       <reference id="ChangeView"/>
-      <separator/>
-      <reference id="EnableNewUi"/>
-      <reference id="DisableNewUi"/>
     </group>
 
     <action id="CheckSuggestedPlugins" class="com.intellij.openapi.updateSettings.impl.pluginsAdvertisement.CheckSuggestedPluginsAction"/>
