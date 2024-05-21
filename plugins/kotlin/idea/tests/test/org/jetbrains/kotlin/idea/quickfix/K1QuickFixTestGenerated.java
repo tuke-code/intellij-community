@@ -1937,21 +1937,6 @@ public abstract class K1QuickFixTestGenerated extends AbstractK1QuickFixTest {
             runTest("testData/quickfix/addTypeAnnotationToValueParameter/annotationWithArrayLiteralString.kt");
         }
 
-        @TestMetadata("annotationWithVarargArrayLiteralDouble.kt")
-        public void testAnnotationWithVarargArrayLiteralDouble() throws Exception {
-            runTest("testData/quickfix/addTypeAnnotationToValueParameter/annotationWithVarargArrayLiteralDouble.kt");
-        }
-
-        @TestMetadata("annotationWithVarargArrayLiteralInt.kt")
-        public void testAnnotationWithVarargArrayLiteralInt() throws Exception {
-            runTest("testData/quickfix/addTypeAnnotationToValueParameter/annotationWithVarargArrayLiteralInt.kt");
-        }
-
-        @TestMetadata("annotationWithVarargArrayLiteralString.kt")
-        public void testAnnotationWithVarargArrayLiteralString() throws Exception {
-            runTest("testData/quickfix/addTypeAnnotationToValueParameter/annotationWithVarargArrayLiteralString.kt");
-        }
-
         @TestMetadata("annotationWithVarargDoubleArray.kt")
         public void testAnnotationWithVarargDoubleArray() throws Exception {
             runTest("testData/quickfix/addTypeAnnotationToValueParameter/annotationWithVarargDoubleArray.kt");
@@ -9364,6 +9349,11 @@ public abstract class K1QuickFixTestGenerated extends AbstractK1QuickFixTest {
     public static class InsertDelegationCall extends AbstractK1QuickFixTest {
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+        }
+
+        @TestMetadata("cyclicCallDefaultParam.kt")
+        public void testCyclicCallDefaultParam() throws Exception {
+            runTest("testData/quickfix/insertDelegationCall/cyclicCallDefaultParam.kt");
         }
 
         @TestMetadata("nonApplicableInsertSuper.kt")

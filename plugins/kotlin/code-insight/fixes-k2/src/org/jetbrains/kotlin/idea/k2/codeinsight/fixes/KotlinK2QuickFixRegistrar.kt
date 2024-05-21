@@ -92,6 +92,8 @@ class KotlinK2QuickFixRegistrar : KotlinQuickFixRegistrar() {
         registerFactory(ChangeToStarProjectionFixFactory.uncheckedCastFactory)
         registerFactory(ChangeToStarProjectionFixFactory.cannotCheckForErased)
         registerFactory(AddStarProjectionsFixFactory.addStarProjectionsFixFactory)
+        registerFactory(AddTypeAnnotationToValueParameterFixFactory.addTypeAnnotationToValueParameterFixFactory)
+        registerFactory(ChangeToFunctionInvocationFixFactory.changeToFunctionInvocationFixFactory)
     }
 
     private val addAbstract = KtQuickFixesListBuilder.registerPsiQuickFix {
@@ -115,6 +117,18 @@ class KotlinK2QuickFixRegistrar : KotlinQuickFixRegistrar() {
         registerFactory(MakeTypeParameterReifiedAndFunctionInlineFixFactory.cannotCheckForErasedFactory)
         registerFactory(AddInlineToFunctionFixFactories.illegalInlineParameterModifierFactory)
         registerPsiQuickFixes(KtFirDiagnostic.ReifiedTypeParameterNoInline::class, AddModifierFix.addInlineToFunctionWithReified)
+    }
+
+    private val changeToLabeledReturn = KtQuickFixesListBuilder.registerPsiQuickFix {
+        registerFactory(ChangeToLabeledReturnFixFactory.nullForNonnullType)
+        registerFactory(ChangeToLabeledReturnFixFactory.returnNotAllowed)
+        registerFactory(ChangeToLabeledReturnFixFactory.returnTypeMismatch)
+    }
+
+    private val insertDelegationCall = KtQuickFixesListBuilder.registerPsiQuickFix {
+        registerFactory(InsertDelegationCallFixFactory.primaryConstructorDelegationCallExpected)
+        registerFactory(InsertDelegationCallFixFactory.explicitDelegationCallRequiredSuper)
+        registerFactory(InsertDelegationCallFixFactory.explicitDelegationCallRequiredThis)
     }
 
     private val propertyInitialization = KtQuickFixesListBuilder.registerPsiQuickFix {
@@ -364,6 +378,8 @@ class KotlinK2QuickFixRegistrar : KotlinQuickFixRegistrar() {
         addAbstract,
         addFinal,
         addInline,
+        changeToLabeledReturn,
+        insertDelegationCall,
         propertyInitialization,
         overrides,
         imports,

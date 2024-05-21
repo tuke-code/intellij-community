@@ -247,6 +247,8 @@ object CommunityLibraryLicenses {
     LibraryLicense(name = "batik", libraryName = "batik-transcoder", url = "https://xmlgraphics.apache.org/batik/")
       .apache("https://xmlgraphics.apache.org/batik/license.html")
       .suppliedByOrganizations("The Apache Software Foundation"),
+    LibraryLicense(name = "bifurcan", libraryName = "io.lacuna:bifurcan", url = "https://github.com/lacuna/bifurcan")
+      .mit("https://github.com/lacuna/bifurcan/blob/master/LICENSE"),
     LibraryLicense(libraryName = "blockmap",
                    url = "https://github.com/JetBrains/plugin-blockmap-patches")
       .apache("https://github.com/JetBrains/plugin-blockmap-patches/blob/master/LICENSE"),
@@ -1227,6 +1229,9 @@ object CommunityLibraryLicenses {
     jetbrainsLibrary("git-learning-project"),
     jetbrainsLibrary("intellij.remoterobot.remote.fixtures"),
     jetbrainsLibrary("intellij.remoterobot.robot.server.core"),
+    jetbrainsLibrary("jetbrains.fleet.kernel"),
+    jetbrainsLibrary("jetbrains.fleet.rpc"),
+    jetbrainsLibrary("jetbrains.fleet.rpc.server"),
     jetbrainsLibrary("jetbrains.intellij.deps.rwmutex.idea"),
     jetbrainsLibrary("jshell-frontend"),
     jetbrainsLibrary("jvm-native-trusted-roots"),

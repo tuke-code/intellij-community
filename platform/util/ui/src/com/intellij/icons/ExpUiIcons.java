@@ -19,6 +19,7 @@ public final class ExpUiIcons {
   public static final class Actions {
     /** 16x16 */ public static final @NotNull Icon AddFile = load("expui/actions/addFile.svg", 796641725, 2);
     /** 16x16 */ public static final @NotNull Icon BuildAutoReloadChanges = load("expui/actions/buildAutoReloadChanges.svg", -1677381169, 2);
+    /** 16x16 */ public static final @NotNull Icon Checked = load("expui/actions/checked.svg", -628299474, 2);
     /** 16x16 */ public static final @NotNull Icon ClearCash = load("expui/actions/clearCash.svg", 1918690860, 2);
     /** 16x16 */ public static final @NotNull Icon Deploy = load("expui/actions/deploy.svg", -1442797042, 2);
     /** 16x16 */ public static final @NotNull Icon DiagramDiff = load("expui/actions/diagramDiff.svg", 1667322407, 2);
@@ -172,6 +173,7 @@ public final class ExpUiIcons {
     /** 16x16 */ public static final @NotNull Icon CwmScreenInBrowserOn = load("expui/codeWithMe/cwmScreenInBrowserOn.svg", 522769420, 2);
     /** 16x16 */ public static final @NotNull Icon CwmScreenOff = load("expui/codeWithMe/cwmScreenOff.svg", 1209105362, 2);
     /** 16x16 */ public static final @NotNull Icon CwmScreenOn = load("expui/codeWithMe/cwmScreenOn.svg", 2032381401, 2);
+    /** 16x16 */ public static final @NotNull Icon CwmShare = load("expui/codeWithMe/cwmShare.svg", -1525682652, 2);
     /** 11x11 */ public static final @NotNull Icon CwmSharingAvatarOn = load("expui/codeWithMe/cwmSharingAvatarOn.svg", 104822006, 2);
     /** 16x16 */ public static final @NotNull Icon CwmUsers = load("expui/codeWithMe/cwmUsers.svg", 374429727, 2);
     /** 20x20 */ public static final @NotNull Icon CwmUsers_20x20 = load("expui/codeWithMe/cwmUsers@20x20.svg", 1716201367, 2);

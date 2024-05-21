@@ -14149,12 +14149,13 @@ f:com.intellij.openapi.editor.impl.EditorEmbeddedComponentManager$ResizePolicy
 - s:none():com.intellij.openapi.editor.impl.EditorEmbeddedComponentManager$ResizePolicy
 f:com.intellij.openapi.editor.impl.EditorFactoryImpl
 - com.intellij.openapi.editor.EditorFactory
-- <init>():V
+- sf:Companion:com.intellij.openapi.editor.impl.EditorFactoryImpl$Companion
+- <init>(kotlinx.coroutines.CoroutineScope):V
 - addEditorFactoryListener(com.intellij.openapi.editor.event.EditorFactoryListener):V
 - addEditorFactoryListener(com.intellij.openapi.editor.event.EditorFactoryListener,com.intellij.openapi.Disposable):V
 - createDocument(java.lang.CharSequence):com.intellij.openapi.editor.Document
-- createDocument(java.lang.CharSequence,Z,Z):com.intellij.openapi.editor.Document
-- createDocument(Z):com.intellij.openapi.editor.Document
+- f:createDocument(java.lang.CharSequence,Z,Z):com.intellij.openapi.editor.Document
+- f:createDocument(Z):com.intellij.openapi.editor.Document
 - createDocument(C[]):com.intellij.openapi.editor.Document
 - createEditor(com.intellij.openapi.editor.Document):com.intellij.openapi.editor.Editor
 - createEditor(com.intellij.openapi.editor.Document,com.intellij.openapi.project.Project):com.intellij.openapi.editor.Editor
@@ -14167,12 +14168,14 @@ f:com.intellij.openapi.editor.impl.EditorFactoryImpl
 - createViewer(com.intellij.openapi.editor.Document,com.intellij.openapi.project.Project,com.intellij.openapi.editor.EditorKind):com.intellij.openapi.editor.Editor
 - editors(com.intellij.openapi.editor.Document,com.intellij.openapi.project.Project):java.util.stream.Stream
 - getAllEditors():com.intellij.openapi.editor.Editor[]
+- getEditorList():java.util.List
 - getEventMulticaster():com.intellij.openapi.editor.event.EditorEventMulticaster
 - refreshAllEditors():V
 - releaseEditor(com.intellij.openapi.editor.Editor):V
 - removeEditorFactoryListener(com.intellij.openapi.editor.event.EditorFactoryListener):V
-- s:throwNotReleasedError(com.intellij.openapi.editor.Editor):V
-- validateEditorsAreReleased(com.intellij.openapi.project.Project,Z):V
+- f:validateEditorsAreReleased(com.intellij.openapi.project.Project,Z):V
+f:com.intellij.openapi.editor.impl.EditorFactoryImpl$Companion
+- f:throwNotReleasedError(com.intellij.openapi.editor.Editor):V
 f:com.intellij.openapi.editor.impl.EditorFilteringMarkupModelEx
 - com.intellij.openapi.editor.ex.MarkupModelEx
 - addLineHighlighter(I,I,com.intellij.openapi.editor.markup.TextAttributes):com.intellij.openapi.editor.markup.RangeHighlighter
@@ -16033,7 +16036,6 @@ f:com.intellij.openapi.fileEditor.impl.DockableEditorTabbedContainer
 c:com.intellij.openapi.fileEditor.impl.EditorComposite
 - com.intellij.openapi.Disposable
 - com.intellij.openapi.fileEditor.FileEditorComposite
-- sf:Companion:com.intellij.openapi.fileEditor.impl.EditorComposite$Companion
 - f:addBottomComponent(com.intellij.openapi.fileEditor.FileEditor,javax.swing.JComponent):V
 - f:addEditor(com.intellij.openapi.fileEditor.FileEditor,com.intellij.openapi.fileEditor.FileEditorProvider):V
 - f:addListener(com.intellij.openapi.fileEditor.impl.EditorCompositeListener,com.intellij.openapi.Disposable):V
@@ -16051,11 +16053,9 @@ c:com.intellij.openapi.fileEditor.impl.EditorComposite
 - getPreferredFocusedComponent():javax.swing.JComponent
 - f:getProviders():com.intellij.openapi.fileEditor.FileEditorProvider[]
 - f:getSelectedEditor():com.intellij.openapi.fileEditor.FileEditor
-- pf:getSelectedEditorWithProviderMutable():kotlinx.coroutines.flow.MutableStateFlow
 - f:getSelectedWithProvider():com.intellij.openapi.fileEditor.ex.FileEditorWithProvider
 - getTabs():com.intellij.ui.tabs.JBTabs
 - f:getTopComponents(com.intellij.openapi.fileEditor.FileEditor):java.util.List
-- sf:isEditorComposite(java.awt.Component):Z
 - f:isModified():Z
 - f:isPinned():Z
 - isPreview():Z
@@ -16068,9 +16068,6 @@ c:com.intellij.openapi.fileEditor.impl.EditorComposite
 - f:setSelectedEditor(com.intellij.openapi.fileEditor.FileEditor):V
 - setSelectedEditor(com.intellij.openapi.fileEditor.ex.FileEditorWithProvider):V
 - f:setSelectedEditor(java.lang.String):V
-f:com.intellij.openapi.fileEditor.impl.EditorComposite$Companion
-- f:isEditorComposite(java.awt.Component):Z
-- f:retrofit(com.intellij.openapi.fileEditor.FileEditorComposite):com.intellij.openapi.util.Pair
 c:com.intellij.openapi.fileEditor.impl.EditorEmptyTextPainter
 - <init>():V
 - p:advertiseActions(javax.swing.JComponent,com.intellij.util.ui.UIUtil$TextPainter):V
@@ -16221,7 +16218,6 @@ c:com.intellij.openapi.fileEditor.impl.EditorsSplitters
 - bs:closeAllFiles$default(com.intellij.openapi.fileEditor.impl.EditorsSplitters,Z,I,java.lang.Object):V
 - f:closeFile(com.intellij.openapi.vfs.VirtualFile,Z):V
 - f:containsWindow(com.intellij.openapi.fileEditor.impl.EditorWindow):Z
-- f:findEditorComposites(com.intellij.openapi.vfs.VirtualFile):java.util.List
 - sf:focusDefaultComponentInSplittersIfPresent(com.intellij.openapi.project.Project):Z
 - f:getAllComposites():java.util.List
 - f:getAllComposites(com.intellij.openapi.vfs.VirtualFile):java.util.List
@@ -16723,30 +16719,10 @@ f:com.intellij.openapi.fileEditor.impl.tabActions.related.RelatedFilesTabMoreAct
 - getActionUpdateThread():com.intellij.openapi.actionSystem.ActionUpdateThread
 - f:getMaxCount():I
 - update(com.intellij.openapi.actionSystem.AnActionEvent):V
-f:com.intellij.openapi.fileEditor.impl.text.AsyncEditorLoader
-- sf:ASYNC_LOADER:com.intellij.openapi.util.Key
-- sf:Companion:com.intellij.openapi.fileEditor.impl.text.AsyncEditorLoader$Companion
-- f:coroutineScope:kotlinx.coroutines.CoroutineScope
-- f:getEditorState(com.intellij.openapi.fileEditor.FileEditorStateLevel,com.intellij.openapi.editor.Editor):com.intellij.openapi.fileEditor.impl.text.TextEditorState
-- sf:isEditorLoaded(com.intellij.openapi.editor.Editor):Z
-- f:isLoaded():Z
-- sf:performWhenLoaded(com.intellij.openapi.editor.Editor,java.lang.Runnable):V
-- f:setEditorState(com.intellij.openapi.fileEditor.impl.text.TextEditorState,Z,com.intellij.openapi.editor.ex.EditorEx):V
-f:com.intellij.openapi.fileEditor.impl.text.AsyncEditorLoader$Companion
-- f:isEditorLoaded(com.intellij.openapi.editor.Editor):Z
-- f:performWhenLoaded(com.intellij.openapi.editor.Editor,java.lang.Runnable):V
 com.intellij.openapi.fileEditor.impl.text.CodeFoldingState
 - a:equals(java.lang.Object):Z
 - a:hashCode():I
 - a:setToEditor(com.intellij.openapi.editor.Editor):V
-c:com.intellij.openapi.fileEditor.impl.text.EditorHighlighterUpdater
-- pf:editor:com.intellij.openapi.editor.ex.EditorEx
-- pf:project:com.intellij.openapi.project.Project
-- <init>(com.intellij.openapi.project.Project,com.intellij.openapi.Disposable,com.intellij.openapi.editor.ex.EditorEx,com.intellij.openapi.vfs.VirtualFile):V
-- <init>(com.intellij.openapi.project.Project,com.intellij.openapi.Disposable,com.intellij.util.messages.SimpleMessageBusConnection,com.intellij.openapi.editor.ex.EditorEx,com.intellij.openapi.vfs.VirtualFile,com.intellij.openapi.fileEditor.impl.text.AsyncEditorLoader):V
-- p:createHighlighter(Z):com.intellij.openapi.editor.highlighter.EditorHighlighter
-- p:setupHighlighter(com.intellij.openapi.editor.highlighter.EditorHighlighter):V
-- f:updateHighlighters():V
 c:com.intellij.openapi.fileEditor.impl.text.FileDropHandler
 - com.intellij.openapi.editor.EditorDropHandler
 - <init>(com.intellij.openapi.editor.Editor):V
