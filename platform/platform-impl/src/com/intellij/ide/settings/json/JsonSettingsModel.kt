@@ -56,7 +56,9 @@ class JsonSettingsModel(val propertyMap: Map<String, PropertyDescriptor>) {
     val properties: List<ComponentPropertyInfo> = emptyList()
   ) {
     fun getKey(): String? =
-      if (name != null && pluginId != null) "${pluginId}:${scope}:${name}" else null
+      getNormalizedName()?.let { normalized-> pluginId?.let { "${pluginId}:${scope}:${normalized}" }}
+
+    private fun getNormalizedName() = name?.let { normalizeComponentName(it) }
   }
 
   @VisibleForTesting
@@ -78,7 +80,14 @@ class JsonSettingsModel(val propertyMap: Map<String, PropertyDescriptor>) {
     val mapTo: String,
     val variants: List<VariantInfo> = emptyList(),
     val value: Any? = null
-  )
+  ) {
+    fun getMappedValue(): String? =
+      (value as? String)?.let { str ->
+        variants.find { it.value == str }?.mapTo ?: value
+      }
+
+    fun getControllerKey(): String = "${pluginId}:app:${normalizeComponentName(componentName)}.${mapTo}"
+  }
 
   @Serializable
   data class VariantInfo (
@@ -100,6 +109,8 @@ class JsonSettingsModel(val propertyMap: Map<String, PropertyDescriptor>) {
 
   companion object {
     val instance: JsonSettingsModel by lazy { componentToSettingsModel(loadFromJson()) }
+
+    private fun normalizeComponentName(name: String) = name.replace('.', '-')
 
     private fun loadFromJson(): ComponentModel {
       return JsonSettingsModel::class.java.getResourceAsStream("/settings/ide-settings-model.json")?.let { input ->
@@ -124,7 +135,7 @@ class JsonSettingsModel(val propertyMap: Map<String, PropertyDescriptor>) {
     }
 
     private fun jsonDataToPropertyDescriptor(componentInfo: ComponentInfo, propertyInfo: ComponentPropertyInfo): PropertyDescriptor? {
-      return if (componentInfo.name != null && componentInfo.storage != null) {
+      return if (componentInfo.name != null && componentInfo.storage != null && componentInfo.pluginId != null) {
         PropertyDescriptor(componentInfo.pluginId, componentInfo.name, propertyInfo.name, propertyInfo.type, componentInfo.storage,
                            propertyInfo.mapTo ?: propertyInfo.name, propertyInfo.variants)
       }

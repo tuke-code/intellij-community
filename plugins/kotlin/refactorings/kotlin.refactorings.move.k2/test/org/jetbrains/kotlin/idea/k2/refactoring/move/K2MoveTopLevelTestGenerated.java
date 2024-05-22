@@ -183,6 +183,11 @@ public class K2MoveTopLevelTestGenerated extends AbstractK2MoveTopLevelTest {
         runTest("../../idea/tests/testData/refactoring/moveTopLevel/kotlin/moveClassToNewFileAndQuotePackage/moveClassToNewFileAndQuotePackage.test");
     }
 
+    @TestMetadata("kotlin/moveClassToPackageFqnConstructor/moveClassToPackageFqnConstructor.test")
+    public void testKotlin_moveClassToPackageFqnConstructor_MoveClassToPackageFqnConstructor() throws Exception {
+        runTest("../../idea/tests/testData/refactoring/moveTopLevel/kotlin/moveClassToPackageFqnConstructor/moveClassToPackageFqnConstructor.test");
+    }
+
     @TestMetadata("kotlin/moveClassToPackage/moveClassToPackage.test")
     public void testKotlin_moveClassToPackage_MoveClassToPackage() throws Exception {
         runTest("../../idea/tests/testData/refactoring/moveTopLevel/kotlin/moveClassToPackage/moveClassToPackage.test");
@@ -196,6 +201,11 @@ public class K2MoveTopLevelTestGenerated extends AbstractK2MoveTopLevelTest {
     @TestMetadata("kotlin/moveClassWithLongFunction/moveClassWithLongFunction.test")
     public void testKotlin_moveClassWithLongFunction_MoveClassWithLongFunction() throws Exception {
         runTest("../../idea/tests/testData/refactoring/moveTopLevel/kotlin/moveClassWithLongFunction/moveClassWithLongFunction.test");
+    }
+
+    @TestMetadata("kotlin/moveEscapedKeyword/moveEscapedKeyword.test")
+    public void testKotlin_moveEscapedKeyword_MoveEscapedKeyword() throws Exception {
+        runTest("../../idea/tests/testData/refactoring/moveTopLevel/kotlin/moveEscapedKeyword/moveEscapedKeyword.test");
     }
 
     @TestMetadata("kotlin/moveExtensionFunctionToFil/moveExtensionFunctionToFil.test")

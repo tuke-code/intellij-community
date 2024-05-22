@@ -89,7 +89,6 @@ c:com.intellij.execution.ui.ConsoleViewContentType
 - sf:LOG_VERBOSE_OUTPUT_KEY:com.intellij.openapi.editor.colors.TextAttributesKey
 - sf:LOG_WARNING_OUTPUT:com.intellij.execution.ui.ConsoleViewContentType
 - sf:LOG_WARNING_OUTPUT_KEY:com.intellij.openapi.editor.colors.TextAttributesKey
-- sf:NON_INTERACTIVE_USER_INPUT:com.intellij.execution.ui.ConsoleViewContentType
 - sf:NORMAL_OUTPUT:com.intellij.execution.ui.ConsoleViewContentType
 - sf:NORMAL_OUTPUT_KEY:com.intellij.openapi.editor.colors.TextAttributesKey
 - sf:OUTPUT_TYPES:com.intellij.execution.ui.ConsoleViewContentType[]
@@ -686,7 +685,7 @@ com.intellij.ide.workspace.ImportedProjectSettings
 - a:getWorkspace():com.intellij.openapi.project.Project
 *:com.intellij.ide.workspace.SubprojectHandler
 - *sf:Companion:com.intellij.ide.workspace.SubprojectHandler$Companion
-- a:canImportFromFile(com.intellij.openapi.project.Project,com.intellij.openapi.vfs.VirtualFile):Z
+- a:canImportFromFile(com.intellij.openapi.vfs.VirtualFile):Z
 - a:getSubprojectIcon():javax.swing.Icon
 - a:getSubprojects(com.intellij.openapi.project.Project):java.util.List
 - a:importFromProject(com.intellij.openapi.project.Project,Z):com.intellij.ide.workspace.ImportedProjectSettings
@@ -2692,11 +2691,11 @@ c:com.intellij.projectImport.ProjectAttachProcessor
 - getActionText(com.intellij.openapi.project.Project):java.lang.String
 - getDefaultOptionIndex():I
 - getDescription(com.intellij.openapi.project.Project):java.lang.String
-- sf:getProcessor(com.intellij.openapi.project.Project):com.intellij.projectImport.ProjectAttachProcessor
-- isEnabled(com.intellij.openapi.project.Project):Z
+- sf:getProcessor(com.intellij.openapi.project.Project,java.nio.file.Path):com.intellij.projectImport.ProjectAttachProcessor
+- isEnabled(com.intellij.openapi.project.Project,java.nio.file.Path):Z
 f:com.intellij.projectImport.ProjectAttachProcessor$Companion
 - f:canAttachToProject():Z
-- f:getProcessor(com.intellij.openapi.project.Project):com.intellij.projectImport.ProjectAttachProcessor
+- f:getProcessor(com.intellij.openapi.project.Project,java.nio.file.Path):com.intellij.projectImport.ProjectAttachProcessor
 com.intellij.projectImport.ProjectOpenedCallback
 - a:projectOpened(com.intellij.openapi.project.Project,com.intellij.openapi.module.Module):V
 c:com.intellij.ui.AnimatedIcon

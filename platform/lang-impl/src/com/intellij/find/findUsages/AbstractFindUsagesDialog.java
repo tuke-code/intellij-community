@@ -57,6 +57,7 @@ public abstract class AbstractFindUsagesDialog extends DialogWrapper {
     super(project, true);
     myProject = project;
     myFindUsagesOptions = findUsagesOptions;
+    findUsagesOptions.resetTemporarilySetSearchScope();
     myToShowInNewTab = toShowInNewTab;
     myIsShowInNewTabEnabled = !mustOpenInNewTab && UsageViewContentManager.getInstance(myProject).getReusableContentsCount() > 0;
     myIsShowInNewTabVisible = !isSingleFile;
@@ -146,9 +147,18 @@ public abstract class AbstractFindUsagesDialog extends DialogWrapper {
   }
 
   public void calcFindUsagesOptions(FindUsagesOptions options) {
-    options.searchScope = myScopeCombo == null || myScopeCombo.getSelectedScope() == null
-                          ? GlobalSearchScope.allScope(myProject)
-                          : myScopeCombo.getSelectedScope();
+    var noUserSelectedScope = myScopeCombo == null || myScopeCombo.getSelectedScope() == null;
+    if (noUserSelectedScope) {
+      // Temporarily reset the scope and restore it the next time the dialog is shown.
+      // This is done for always-local scopes like searching for a private member usage.
+      // In this case the scope chooser isn't shown, but we don't want to change the scope permanently,
+      // otherwise it'll look like the settings are reset without any user action.
+      options.setSearchScopeTemporarily(GlobalSearchScope.allScope(myProject));
+    }
+    else {
+      options.searchScope = myScopeCombo.getSelectedScope();
+      FindSettings.getInstance().setDefaultScopeName(options.searchScope.getDisplayName());
+    }
 
     options.isSearchForTextOccurrences = isToChange(myCbToSearchForTextOccurrences) && isSelected(myCbToSearchForTextOccurrences);
   }
@@ -275,7 +285,7 @@ public abstract class AbstractFindUsagesDialog extends DialogWrapper {
   private JComponent createSearchScopePanel() {
     if (isInFileOnly()) return null;
     JPanel optionsPanel = new JPanel(new BorderLayout());
-    String scope = myFindUsagesOptions.searchScope.getDisplayName();
+    String scope = FindSettings.getInstance().getDefaultScopeName();
     myScopeCombo = new ScopeChooserCombo(myProject, mySearchInLibrariesAvailable, true, scope);
     Disposer.register(myDisposable, myScopeCombo);
     optionsPanel.add(myScopeCombo, BorderLayout.CENTER);

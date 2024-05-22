@@ -12607,21 +12607,6 @@ f:com.intellij.formatting.ExcludedFileFormattingRestriction
 com.intellij.formatting.FormattingModelBuilderEx
 - com.intellij.formatting.FormattingModelBuilder
 - getIndentOptionsToUse(com.intellij.psi.PsiFile,com.intellij.formatting.FormatTextRanges,com.intellij.psi.codeStyle.CodeStyleSettings):com.intellij.psi.codeStyle.CommonCodeStyleSettings$IndentOptions
-f:com.intellij.formatting.FormattingProgressTask
-- com.intellij.util.SequentialModalProgressTask
-- com.intellij.formatting.FormattingProgressCallback
-- <init>(com.intellij.openapi.project.Project,com.intellij.psi.PsiFile,com.intellij.openapi.editor.Document):V
-- afterApplyingChange(com.intellij.formatting.LeafBlockWrapper):V
-- afterProcessingBlock(com.intellij.formatting.LeafBlockWrapper):V
-- afterWrappingBlock(com.intellij.formatting.LeafBlockWrapper):V
-- beforeApplyingFormatChanges(java.util.Collection):V
-- cancelled():V
-- onCancel():V
-- onThrowable(java.lang.Throwable):V
-f:com.intellij.formatting.FormattingProgressTaskFactory
-- com.intellij.formatting.FormattingProgressCallbackFactory
-- <init>():V
-- createProgressCallback(com.intellij.openapi.project.Project,com.intellij.psi.PsiFile,com.intellij.openapi.editor.Document):com.intellij.formatting.FormattingProgressCallback
 f:com.intellij.formatting.alignment.AlignmentInColumnsConfig
 - <init>(com.intellij.psi.tree.TokenSet,com.intellij.psi.tree.TokenSet,com.intellij.psi.tree.TokenSet,com.intellij.psi.tree.TokenSet,com.intellij.psi.tree.TokenSet):V
 - getCommentTokenTypes():com.intellij.psi.tree.TokenSet
@@ -12747,12 +12732,6 @@ f:com.intellij.formatting.contextConfiguration.ConfigureCodeStyleOnSelectedFragm
 f:com.intellij.formatting.contextConfiguration.SelectedTextFormatter
 - <init>(com.intellij.openapi.project.Project,com.intellij.openapi.editor.Editor,com.intellij.psi.PsiFile):V
 - restoreSelectedText():V
-c:com.intellij.formatting.service.FormattingUiNotificationService
-- com.intellij.formatting.service.FormattingNotificationService
-- <init>(com.intellij.openapi.project.Project):V
-- reportError(java.lang.String,java.lang.String,java.lang.String):V
-- reportError(java.lang.String,java.lang.String,java.lang.String,com.intellij.openapi.actionSystem.AnAction[]):V
-- reportErrorAndNavigate(java.lang.String,java.lang.String,java.lang.String,com.intellij.formatting.FormattingContext,I):V
 f:com.intellij.formatting.service.PostQuickFixTaskServiceImpl
 - <init>():V
 - runOrRegisterPostQuickFixTask(java.util.List,kotlin.jvm.functions.Function0):V
@@ -21423,46 +21402,9 @@ f:com.intellij.openapi.projectRoots.impl.JdkFinderImpl
 - <init>():V
 - defaultJavaLocation():java.lang.String
 - suggestHomePaths():java.util.List
-c:com.intellij.openapi.projectRoots.impl.LegacyProjectJdkTableDelegate
-- com.intellij.openapi.components.PersistentStateComponent
-- addNewSdk(com.intellij.openapi.projectRoots.Sdk):V
-- createSdk(java.lang.String,com.intellij.openapi.projectRoots.SdkTypeId,java.lang.String):com.intellij.openapi.projectRoots.Sdk
-- findSdkByName(java.lang.String):com.intellij.openapi.projectRoots.Sdk
-- getAllSdks():java.util.List
-- getState():org.jdom.Element
-- loadState(org.jdom.Element):V
-- removeSdk(com.intellij.openapi.projectRoots.Sdk):V
-- saveOnDisk():V
-- updateSdk(com.intellij.openapi.projectRoots.Sdk,com.intellij.openapi.projectRoots.Sdk):V
-c:com.intellij.openapi.projectRoots.impl.MockSdk
-- com.intellij.openapi.projectRoots.Sdk
-- com.intellij.openapi.projectRoots.SdkModificator
-- <init>(java.lang.String,java.lang.String,java.lang.String,com.intellij.util.containers.MultiMap,com.intellij.openapi.projectRoots.SdkTypeId):V
-- addRoot(com.intellij.openapi.vfs.VirtualFile,com.intellij.openapi.roots.OrderRootType):V
-- clone():com.intellij.openapi.projectRoots.Sdk
-- commitChanges():V
-- getHomeDirectory():com.intellij.openapi.vfs.VirtualFile
-- getHomePath():java.lang.String
-- getName():java.lang.String
-- getRootProvider():com.intellij.openapi.roots.RootProvider
-- getRoots(com.intellij.openapi.roots.OrderRootType):com.intellij.openapi.vfs.VirtualFile[]
-- getSdkAdditionalData():com.intellij.openapi.projectRoots.SdkAdditionalData
-- getSdkModificator():com.intellij.openapi.projectRoots.SdkModificator
-- getSdkType():com.intellij.openapi.projectRoots.SdkTypeId
-- getUserData(com.intellij.openapi.util.Key):java.lang.Object
-- getVersionString():java.lang.String
-- isWritable():Z
-- putUserData(com.intellij.openapi.util.Key,java.lang.Object):V
-- removeAllRoots():V
-- removeRoot(com.intellij.openapi.vfs.VirtualFile,com.intellij.openapi.roots.OrderRootType):V
-- removeRoots(com.intellij.openapi.roots.OrderRootType):V
-- setHomePath(java.lang.String):V
-- setName(java.lang.String):V
-- setSdkAdditionalData(com.intellij.openapi.projectRoots.SdkAdditionalData):V
-- setVersionString(java.lang.String):V
-- toString():java.lang.String
 c:com.intellij.openapi.projectRoots.impl.ProjectJdkTableImpl
 - com.intellij.openapi.projectRoots.ProjectJdkTable
+- sf:Companion:com.intellij.openapi.projectRoots.impl.ProjectJdkTableImpl$Companion
 - <init>():V
 - addJdk(com.intellij.openapi.projectRoots.Sdk):V
 - createSdk(java.lang.String,com.intellij.openapi.projectRoots.SdkTypeId):com.intellij.openapi.projectRoots.Sdk
@@ -21475,6 +21417,7 @@ c:com.intellij.openapi.projectRoots.impl.ProjectJdkTableImpl
 - removeJdk(com.intellij.openapi.projectRoots.Sdk):V
 - saveOnDisk():V
 - updateJdk(com.intellij.openapi.projectRoots.Sdk,com.intellij.openapi.projectRoots.Sdk):V
+f:com.intellij.openapi.projectRoots.impl.ProjectJdkTableImpl$Companion
 f:com.intellij.openapi.projectRoots.impl.SdkConfigurationUtil
 - s:addSdk(com.intellij.openapi.projectRoots.Sdk):V
 - s:configureDirectoryProjectSdk(com.intellij.openapi.project.Project,java.util.Comparator,com.intellij.openapi.projectRoots.SdkType[]):V

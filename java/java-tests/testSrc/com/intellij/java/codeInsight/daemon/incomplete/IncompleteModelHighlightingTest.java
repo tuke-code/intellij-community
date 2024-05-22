@@ -2,6 +2,8 @@
 package com.intellij.java.codeInsight.daemon.incomplete;
 
 import com.intellij.codeInsight.daemon.LightDaemonAnalyzerTestCase;
+import com.intellij.codeInspection.unneededThrows.RedundantThrowsDeclarationLocalInspection;
+import com.intellij.codeInspection.unusedImport.UnusedImportInspection;
 import com.intellij.openapi.application.WriteAction;
 import com.intellij.openapi.project.IncompleteDependenciesService;
 
@@ -15,12 +17,10 @@ public final class IncompleteModelHighlightingTest extends LightDaemonAnalyzerTe
   }
 
   private void doTest(String fileName) {
+    enableInspectionTools(new UnusedImportInspection(), new RedundantThrowsDeclarationLocalInspection());
     IncompleteDependenciesService service = getProject().getService(IncompleteDependenciesService.class);
     try (var ignored = asAutoCloseable(WriteAction.compute(() -> service.enterIncompleteState()))) {
       doTest(BASE_PATH + "/" + fileName, true, true);
-    }
-    catch (Exception e) {
-      throw new RuntimeException(e);
     }
   }
   

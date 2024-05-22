@@ -6731,7 +6731,8 @@ f:com.intellij.ide.impl.ProjectUtil
 - f:confirmLoadingFromRemotePath(java.lang.String,java.lang.String,java.lang.String):Z
 - f:confirmOpenOrAttachProject():I
 - f:confirmOpenOrAttachProject(com.intellij.openapi.project.Project):I
-- bs:confirmOpenOrAttachProject$default(com.intellij.ide.impl.ProjectUtil,com.intellij.openapi.project.Project,I,java.lang.Object):I
+- f:confirmOpenOrAttachProject(com.intellij.openapi.project.Project,java.nio.file.Path):I
+- bs:confirmOpenOrAttachProject$default(com.intellij.ide.impl.ProjectUtil,com.intellij.openapi.project.Project,java.nio.file.Path,I,java.lang.Object):I
 - sf:findAndFocusExistingProjectForPath(java.nio.file.Path):com.intellij.openapi.project.Project
 - f:findProject(java.nio.file.Path):com.intellij.openapi.project.Project
 - sf:focusProjectWindow(com.intellij.openapi.project.Project,Z):V
@@ -8988,7 +8989,9 @@ f:com.intellij.ide.projectWizard.NewProjectWizardConstants$Language
 - bs:copy$default(com.intellij.ide.settings.json.JsonSettingsModel$PropertyDescriptor,java.lang.String,java.lang.String,java.lang.String,com.intellij.ide.settings.json.JsonSettingsModel$PropertyType,java.lang.String,java.lang.String,java.util.List,java.lang.Object,I,java.lang.Object):com.intellij.ide.settings.json.JsonSettingsModel$PropertyDescriptor
 - equals(java.lang.Object):Z
 - f:getComponentName():java.lang.String
+- f:getControllerKey():java.lang.String
 - f:getMapTo():java.lang.String
+- f:getMappedValue():java.lang.String
 - f:getName():java.lang.String
 - f:getPluginId():java.lang.String
 - f:getStorage():java.lang.String
