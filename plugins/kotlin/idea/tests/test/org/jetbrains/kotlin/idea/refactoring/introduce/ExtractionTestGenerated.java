@@ -868,6 +868,11 @@ public abstract class ExtractionTestGenerated extends AbstractExtractionTest {
                 KotlinTestUtils.runTest(this::doExtractFunctionTest, this, testDataFilePath);
             }
 
+            @TestMetadata("approximatedReturnType.kt")
+            public void testApproximatedReturnType() throws Exception {
+                runTest("testData/refactoring/extractFunction/basic/approximatedReturnType.kt");
+            }
+
             @TestMetadata("callWithLambdaArgument.kt")
             public void testCallWithLambdaArgument() throws Exception {
                 runTest("testData/refactoring/extractFunction/basic/callWithLambdaArgument.kt");
@@ -3235,6 +3240,11 @@ public abstract class ExtractionTestGenerated extends AbstractExtractionTest {
                 runTest("testData/refactoring/introduceProperty/extractWithParams.kt");
             }
 
+            @TestMetadata("fromTopLevel.kt")
+            public void testFromTopLevel() throws Exception {
+                runTest("testData/refactoring/introduceProperty/fromTopLevel.kt");
+            }
+
             @TestMetadata("functionalType.kt")
             public void testFunctionalType() throws Exception {
                 runTest("testData/refactoring/introduceProperty/functionalType.kt");
@@ -3417,6 +3427,11 @@ public abstract class ExtractionTestGenerated extends AbstractExtractionTest {
             public void testSingleEntrySuffix() throws Exception {
                 runTest("testData/refactoring/introduceParameter/stringTemplates/singleEntrySuffix.kt");
             }
+
+            @TestMetadata("singleEntrySuffixSingle.kt")
+            public void testSingleEntrySuffixSingle() throws Exception {
+                runTest("testData/refactoring/introduceParameter/stringTemplates/singleEntrySuffixSingle.kt");
+            }
         }
 
         @RunWith(JUnit3RunnerWithInners.class)
@@ -3444,6 +3459,11 @@ public abstract class ExtractionTestGenerated extends AbstractExtractionTest {
             @TestMetadata("avoidFunDuplicatingParameters.kt")
             public void testAvoidFunDuplicatingParameters() throws Exception {
                 runTest("testData/refactoring/introduceParameter/avoidFunDuplicatingParameters.kt");
+            }
+
+            @TestMetadata("callableReferenceInParenthesis.kt")
+            public void testCallableReferenceInParenthesis() throws Exception {
+                runTest("testData/refactoring/introduceParameter/callableReferenceInParenthesis.kt");
             }
 
             @TestMetadata("callableReferenceToShorten.kt")
@@ -4440,6 +4460,11 @@ public abstract class ExtractionTestGenerated extends AbstractExtractionTest {
             @TestMetadata("extractWithNameClash.kt")
             public void testExtractWithNameClash() throws Exception {
                 runTest("testData/refactoring/introduceConstant/extractWithNameClash.kt");
+            }
+
+            @TestMetadata("onlyCurrentOccurrence.kt")
+            public void testOnlyCurrentOccurrence() throws Exception {
+                runTest("testData/refactoring/introduceConstant/onlyCurrentOccurrence.kt");
             }
         }
     }

@@ -2,6 +2,7 @@ package com.intellij.driver.sdk.ui.components
 
 import com.intellij.driver.client.Remote
 import com.intellij.driver.model.OnDispatcher
+import com.intellij.driver.model.RemoteMouseButton
 import com.intellij.driver.sdk.Document
 import com.intellij.driver.sdk.Editor
 import com.intellij.driver.sdk.logicalPosition
@@ -30,7 +31,7 @@ class JEditorUiComponent(data: ComponentData) : UiComponent(data) {
     get() = editor.getCaretModel().getLogicalPosition()
 
   fun selectAndDrag(from: Point, to: Point, delayMs: Int) {
-    robotService.robot.selectAndDrag(component, to, from, delayMs)
+    robot.selectAndDrag(component, to, from, delayMs)
   }
 
   var text: String
@@ -44,7 +45,14 @@ class JEditorUiComponent(data: ComponentData) : UiComponent(data) {
   fun getCaretLine() = caretPosition.getLine() + 1
   fun getCaretColumn() = caretPosition.getColumn() + 1
 
-
+  fun clickOn(text: String, button: RemoteMouseButton) {
+    val o = this.text.indexOf(text) + text.length / 2
+    driver.withContext(OnDispatcher.EDT) {
+      val p = editor.offsetToVisualPosition(o)
+      val point = editor.visualPositionToXY(p)
+      robot.click(component, point, button, 1)
+    }
+  }
 
   fun setCaretPosition(line: Int, column: Int) {
     click()

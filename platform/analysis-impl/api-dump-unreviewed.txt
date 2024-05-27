@@ -1104,7 +1104,6 @@ f:com.intellij.codeInsight.intention.impl.config.IntentionActionWrapper
 - com.intellij.codeInsight.intention.IntentionAction
 - com.intellij.codeInsight.intention.IntentionActionDelegate
 - com.intellij.openapi.actionSystem.ShortcutProvider
-- com.intellij.openapi.project.PossiblyDumbAware
 - java.lang.Comparable
 - <init>(com.intellij.codeInsight.intention.IntentionActionBean):V
 - compareTo(com.intellij.codeInsight.intention.IntentionAction):I
@@ -1121,7 +1120,6 @@ f:com.intellij.codeInsight.intention.impl.config.IntentionActionWrapper
 - invoke(com.intellij.openapi.project.Project,com.intellij.openapi.editor.Editor,com.intellij.psi.PsiFile):V
 - isApplicable(java.util.Collection):Z
 - isAvailable(com.intellij.openapi.project.Project,com.intellij.openapi.editor.Editor,com.intellij.psi.PsiFile):Z
-- isDumbAware():Z
 - startInWriteAction():Z
 - toString():java.lang.String
 c:com.intellij.codeInsight.intention.impl.config.LazyEditor
@@ -1637,7 +1635,6 @@ c:com.intellij.codeInsight.template.impl.TemplateStateBase
 - getEditor():com.intellij.openapi.editor.Editor
 - p:getPredefinedVariableValues():java.util.Map
 - getProperties():java.util.Map
-- p:getSegments():com.intellij.codeInsight.template.impl.TemplateSegments
 - p:getSelectionBeforeTemplate():java.lang.String
 - p:getTemplate():com.intellij.codeInsight.template.impl.TemplateBase
 - getVariableValue(java.lang.String):com.intellij.codeInsight.template.TextResult
@@ -1645,7 +1642,6 @@ c:com.intellij.codeInsight.template.impl.TemplateStateBase
 - p:setDocument(com.intellij.openapi.editor.Document):V
 - p:setEditor(com.intellij.openapi.editor.Editor):V
 - p:setPredefinedVariableValues(java.util.Map):V
-- p:setSegments(com.intellij.codeInsight.template.impl.TemplateSegments):V
 - p:setTemplate(com.intellij.codeInsight.template.impl.TemplateBase):V
 f:com.intellij.codeInsight.template.impl.TemplateSubstitutionContext
 - getDocument():com.intellij.openapi.editor.Document
@@ -2318,7 +2314,6 @@ c:com.intellij.codeInspection.dataFlow.memory.DfaMemoryStateImpl
 - equals(java.lang.Object):Z
 - p:filterDfTypeOnAssignment(com.intellij.codeInspection.dataFlow.value.DfaVariableValue,com.intellij.codeInspection.dataFlow.types.DfType):com.intellij.codeInspection.dataFlow.types.DfType
 - flushFields():V
-- flushFields(com.intellij.codeInspection.dataFlow.memory.DfaMemoryStateImpl$QualifierStatusMap):V
 - flushFieldsQualifiedBy(java.util.Set):V
 - flushVariable(com.intellij.codeInspection.dataFlow.value.DfaVariableValue):V
 - flushVariable(com.intellij.codeInspection.dataFlow.value.DfaVariableValue,Z):V
@@ -2380,30 +2375,16 @@ f:com.intellij.codeInspection.dataFlow.memory.DistinctPairSet$DistinctPair
 - hashCode():I
 - isOrdered():Z
 - toString():java.lang.String
-f:com.intellij.codeInspection.dataFlow.memory.EqClass
-- java.lang.Comparable
+com.intellij.codeInspection.dataFlow.memory.EqClass
 - java.lang.Iterable
-- sf:CANONICAL_VARIABLE_COMPARATOR:java.util.Comparator
-- <init>(com.intellij.codeInspection.dataFlow.memory.EqClass):V
-- <init>(com.intellij.codeInspection.dataFlow.value.DfaValueFactory):V
-- add(I):V
-- add(I[]):V
-- asList():java.util.List
-- compareTo(com.intellij.codeInspection.dataFlow.memory.SortedIntSet):I
-- contains(I):Z
-- containsAll(com.intellij.codeInspection.dataFlow.memory.SortedIntSet):Z
-- equals(java.lang.Object):Z
-- forValues(java.util.function.IntConsumer):V
-- get(I):I
-- getCanonicalVariable():com.intellij.codeInspection.dataFlow.value.DfaVariableValue
-- getVariable(I):com.intellij.codeInspection.dataFlow.value.DfaVariableValue
-- hashCode():I
+- a:asList():java.util.List
+- a:contains(com.intellij.codeInspection.dataFlow.value.DfaValue):Z
+- a:containsAll(com.intellij.codeInspection.dataFlow.memory.EqClass):Z
+- a:getCanonicalVariable():com.intellij.codeInspection.dataFlow.value.DfaVariableValue
+- a:getVariable(I):com.intellij.codeInspection.dataFlow.value.DfaVariableValue
 - isEmpty():Z
-- iterator():java.util.Iterator
-- remove(I):V
-- removeValue(I):V
-- size():I
-- toString():java.lang.String
+- a:iterator():java.util.Iterator
+- a:size():I
 e:com.intellij.codeInspection.dataFlow.rangeSet.LongRangeBinOp
 - java.lang.Enum
 - sf:AND:com.intellij.codeInspection.dataFlow.rangeSet.LongRangeBinOp

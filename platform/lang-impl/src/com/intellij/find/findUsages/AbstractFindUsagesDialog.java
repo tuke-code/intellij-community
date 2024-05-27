@@ -3,6 +3,7 @@ package com.intellij.find.findUsages;
 
 import com.intellij.find.FindBundle;
 import com.intellij.find.FindSettings;
+import com.intellij.find.impl.FindSettingsImpl;
 import com.intellij.ide.util.scopeChooser.ScopeChooserCombo;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.DialogWrapper;
@@ -26,6 +27,7 @@ import org.jetbrains.annotations.Nullable;
 import javax.swing.*;
 import javax.swing.border.Border;
 import java.awt.*;
+import java.util.Objects;
 
 public abstract class AbstractFindUsagesDialog extends DialogWrapper {
   private final Project myProject;
@@ -57,7 +59,6 @@ public abstract class AbstractFindUsagesDialog extends DialogWrapper {
     super(project, true);
     myProject = project;
     myFindUsagesOptions = findUsagesOptions;
-    findUsagesOptions.resetTemporarilySetSearchScope();
     myToShowInNewTab = toShowInNewTab;
     myIsShowInNewTabEnabled = !mustOpenInNewTab && UsageViewContentManager.getInstance(myProject).getReusableContentsCount() > 0;
     myIsShowInNewTabVisible = !isSingleFile;
@@ -149,11 +150,9 @@ public abstract class AbstractFindUsagesDialog extends DialogWrapper {
   public void calcFindUsagesOptions(FindUsagesOptions options) {
     var noUserSelectedScope = myScopeCombo == null || myScopeCombo.getSelectedScope() == null;
     if (noUserSelectedScope) {
-      // Temporarily reset the scope and restore it the next time the dialog is shown.
-      // This is done for always-local scopes like searching for a private member usage.
-      // In this case the scope chooser isn't shown, but we don't want to change the scope permanently,
-      // otherwise it'll look like the settings are reset without any user action.
-      options.setSearchScopeTemporarily(GlobalSearchScope.allScope(myProject));
+      // This happens when the dialog doesn't even have a scope combo box, e.g., when searching for usages of a private method.
+      // In this case we use the "All" scope, and we don't save it, as it doesn't make any sense.
+      options.searchScope = GlobalSearchScope.allScope(myProject);
     }
     else {
       options.searchScope = myScopeCombo.getSelectedScope();
@@ -286,6 +285,11 @@ public abstract class AbstractFindUsagesDialog extends DialogWrapper {
     if (isInFileOnly()) return null;
     JPanel optionsPanel = new JPanel(new BorderLayout());
     String scope = FindSettings.getInstance().getDefaultScopeName();
+    // The default name means we have to fall back to whatever the default scope is set in FindUsagesOptions.
+    // (The default name itself doesn't correspond to any real scope name anyway.)
+    if (Objects.equals(scope, FindSettingsImpl.getDefaultSearchScope())) {
+      scope = FindUsagesOptions.getDefaultScope(myProject).getDisplayName();
+    }
     myScopeCombo = new ScopeChooserCombo(myProject, mySearchInLibrariesAvailable, true, scope);
     Disposer.register(myDisposable, myScopeCombo);
     optionsPanel.add(myScopeCombo, BorderLayout.CENTER);

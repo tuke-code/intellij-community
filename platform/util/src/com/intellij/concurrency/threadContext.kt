@@ -89,6 +89,7 @@ private inline fun currentThreadContextOrFallback(getter: (CoroutineContext?) ->
   if (!useImplicitBlockingContext) {
     return tlCoroutineContext.get().context
   }
+  @OptIn(InternalCoroutinesApi::class)
   val suspendingContext = IntellijCoroutines.currentThreadCoroutineContext()
   val (snapshot, overridingContext) = tlCoroutineContext.get()
   if (suspendingContext === snapshot) {
@@ -212,6 +213,7 @@ private fun isKnownViolator() : Boolean {
   return VIOLATORS.any { badTrace -> stackTrace.any { it.startsWith(badTrace) } }
 }
 
+private val shouldWarnAccidentalCancellation = SystemProperties.getBooleanProperty("ide.warn.accidental.cancellation", false)
 
 /**
  * In the IntelliJ codebase, there are some areas that are not supposed to meet [com.intellij.openapi.progress.ProcessCanceledException],
@@ -233,12 +235,13 @@ private fun isKnownViolator() : Boolean {
  *   that are checked for cancellation.
  */
 internal fun warnAccidentalCancellation() {
-  if (!SystemProperties.getBooleanProperty("ide.warn.accidental.cancellation", false)) {
+  if (!shouldWarnAccidentalCancellation) {
     return
   }
   if (Cancellation.isInNonCancelableSection()) {
     return
   }
+  @OptIn(InternalCoroutinesApi::class)
   val kotlinCoroutineContext = IntellijCoroutines.currentThreadCoroutineContext()
   val (snapshot, _) = tlCoroutineContext.get()
   if (snapshot === kotlinCoroutineContext) {
@@ -262,6 +265,7 @@ If this behavior is unexpected, please consult the documentation for com.intelli
  */
 fun resetThreadContext(): AccessToken {
   return withThreadLocal(tlCoroutineContext) { _ ->
+    @OptIn(InternalCoroutinesApi::class)
     val currentSnapshot = IntellijCoroutines.currentThreadCoroutineContext()
     InstalledThreadContext(currentSnapshot, null)
   }
@@ -308,6 +312,7 @@ fun <T> escapeCancellation(job: Job, action: () -> T): T {
  */
 fun installThreadContext(coroutineContext: CoroutineContext, replace: Boolean = false): AccessToken {
   return withThreadLocal(tlCoroutineContext) { previousContext ->
+    @OptIn(InternalCoroutinesApi::class)
     val currentSnapshot = IntellijCoroutines.currentThreadCoroutineContext()
     if (!replace && previousContext.snapshot === currentSnapshot && previousContext.context != null) {
       LOG.error("Thread context was already set: $previousContext. \n Most likely, you are using 'runBlocking' instead of 'runBlockingCancellable' somewhere in the asynchronous stack.")

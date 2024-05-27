@@ -140,9 +140,6 @@ object CodeWithMeClientDownloader {
     }
   }
 
-  private const val buildNumberPattern = """[0-9]{3}\.(([0-9]+(\.[0-9]+)?)|SNAPSHOT)"""
-  val buildNumberRegex = Regex(buildNumberPattern)
-
   private fun getClientDistributionName(clientBuildVersion: String) = when {
     clientBuildVersion.contains("SNAPSHOT") -> "JetBrainsClient"
     VersionComparatorUtil.compare(clientBuildVersion, "211.6167") < 0 -> "IntelliJClient"
@@ -151,7 +148,9 @@ object CodeWithMeClientDownloader {
   }
 
   fun createSessionInfo(clientBuildVersion: String, jreBuild: String?, unattendedMode: Boolean): JetBrainsClientDownloadInfo {
-    val isSnapshot = "SNAPSHOT" in clientBuildVersion
+    val buildNumber = requireNotNull(BuildNumber.fromStringOrNull(clientBuildVersion)) { "Invalid build version: $clientBuildVersion" }
+
+    val isSnapshot = buildNumber.isSnapshot
     if (isSnapshot) {
       LOG.warn("Thin client download from sources may result in failure due to different sources on host and client, " +
                "don't forget to update your locally built archive")
@@ -165,7 +164,7 @@ object CodeWithMeClientDownloader {
       jreBuild ?: error("JRE build number must be passed for client build number < $clientBuildVersion")
     }
 
-    val hostBuildNumber = buildNumberRegex.find(clientBuildVersion)!!.value
+    val hostBuildNumber = buildNumber.asStringWithoutProductCode()
 
     val platformSuffix = if (jreBuildToDownload != null) when {
       SystemInfo.isLinux && CpuArch.isIntel64() -> "-no-jbr.tar.gz"
@@ -248,7 +247,7 @@ object CodeWithMeClientDownloader {
       }
     }
     finally {
-      Files.delete(tempFile)
+      Files.deleteIfExists(tempFile)
     }
   }
 

@@ -39,9 +39,16 @@ public class ThreadBlockedMonitor {
   private ScheduledFuture<?> myTask;
   private final DebugProcessImpl myProcess;
 
+  protected @Nullable InvocationWatcherNewImpl myInvocationWatching = null;
+  private boolean myIsInResumeAllMode = false;
+
   public ThreadBlockedMonitor(DebugProcessImpl process, Disposable disposable) {
     myProcess = process;
     Disposer.register(disposable, this::cancelTask);
+  }
+
+  static boolean isNewSuspendAllInvocationWatcher() {
+    return Registry.is("debugger.new.invocation.watcher");
   }
 
   static int getSingleThreadedEvaluationThreshold() {
@@ -49,13 +56,18 @@ public class ThreadBlockedMonitor {
   }
 
   @Nullable
-  public InvocationWatcher startInvokeWatching(int invokePolicy,
-                                               @Nullable ThreadReferenceProxyImpl thread,
-                                               @NotNull SuspendContextImpl context) {
+  protected InvocationWatcher startInvokeWatching(int invokePolicy,
+                                                  @Nullable ThreadReferenceProxyImpl thread,
+                                                  @NotNull SuspendContextImpl context) {
     if (thread != null && getSingleThreadedEvaluationThreshold() > 0 &&
         context.getSuspendPolicy() == EventRequest.SUSPEND_ALL &&
         BitUtil.isSet(invokePolicy, ObjectReference.INVOKE_SINGLE_THREADED)) {
-      return new InvocationWatcher(myProcess, thread);
+      if (isNewSuspendAllInvocationWatcher()) {
+        return new InvocationWatcherNewImpl(this, thread, context);
+      }
+      else {
+        return new InvocationWatcherOldImpl(this, thread);
+      }
     }
     return null;
   }
@@ -161,20 +173,116 @@ public class ThreadBlockedMonitor {
     });
   }
 
-  public static final class InvocationWatcher {
+  protected boolean isInResumeAllMode() {
+    return myInvocationWatching != null;
+  }
+
+  protected interface InvocationWatcher {
+    void invocationFinished();
+  }
+
+  protected static final class InvocationWatcherNewImpl implements InvocationWatcher {
     private final AtomicBoolean myObsolete = new AtomicBoolean();
     private final AtomicBoolean myAllResumed = new AtomicBoolean();
     private final Future myTask;
-    private final ThreadReferenceProxyImpl myThread;
-    private final DebugProcessImpl myProcess;
+    private final @NotNull ThreadReferenceProxyImpl myThread;
+    final SuspendContextImpl mySuspendAllContext;
+    private final @NotNull DebugProcessImpl myProcess;
+    private final @NotNull ThreadBlockedMonitor myThreadBlockedMonitor;
 
-    private InvocationWatcher(DebugProcessImpl process, @NotNull ThreadReferenceProxyImpl thread) {
-      myProcess = process;
+    private InvocationWatcherNewImpl(@NotNull ThreadBlockedMonitor threadBlockedMonitor, @NotNull ThreadReferenceProxyImpl thread,
+                                     @NotNull SuspendContextImpl suspendAllContext) {
+      myThreadBlockedMonitor = threadBlockedMonitor;
+      myProcess = threadBlockedMonitor.myProcess;
+      myThread = thread;
+      mySuspendAllContext = suspendAllContext;
+      myTask = JobScheduler.getScheduler().schedule(this::checkInvocation, getSingleThreadedEvaluationThreshold(), TimeUnit.MILLISECONDS);
+    }
+
+    @Override
+    public void invocationFinished() {
+      myObsolete.set(true);
+      if (myTask.isDone() && myAllResumed.get()) {
+        myProcess.getManagerThread().pushBack(new DebuggerCommandImpl() {
+          @Override
+          protected void action() {
+            // suspend all threads but the current one (which should be suspended already)
+            myThread.getVirtualMachine().getVirtualMachine().suspend();
+            LOG.warn("Long invocation on " + myThread + " has been finished");
+            myThreadBlockedMonitor.myInvocationWatching = null;
+            DebuggerUtilsAsync.resume(myThread.getThreadReference());
+            Set<ThreadReferenceProxyImpl> resumedThreads = mySuspendAllContext.myResumedThreads;
+            if (resumedThreads != null) {
+              for (ThreadReferenceProxyImpl thread : resumedThreads) {
+                DebuggerUtilsAsync.resume(thread.getThreadReference());
+              }
+            }
+          }
+        });
+      }
+      else {
+        myTask.cancel(true);
+      }
+    }
+
+    private void checkInvocation() {
+      myProcess.getManagerThread().schedule(new DebuggerCommandImpl() {
+        @Override
+        protected void action() {
+          if (myObsolete.get()) return;
+          VirtualMachine virtualMachine = myThread.getVirtualMachine().getVirtualMachine();
+          virtualMachine.suspend();
+          try {
+            if (myObsolete.get()) return;
+            if (myThreadBlockedMonitor.myInvocationWatching != null) {
+              LOG.error("Another invocation on suspend-all thread " + myThread + " (" + mySuspendAllContext +
+                        ") while the previous one was not over yet " + myThreadBlockedMonitor.myInvocationWatching.mySuspendAllContext);
+              return;
+            }
+            ThreadReference threadReference = myThread.getThreadReference();
+            LOG.warn("Resume other threads because long invocation detected on " + myThread);
+            myThreadBlockedMonitor.myInvocationWatching = InvocationWatcherNewImpl.this;
+            myAllResumed.set(true);
+            // resume all but this, this one is already resumed under evaluation
+            threadReference.suspend();
+            Set<ThreadReferenceProxyImpl> resumedThreads = mySuspendAllContext.myResumedThreads;
+            if (resumedThreads != null) {
+              for (ThreadReferenceProxyImpl thread : resumedThreads) {
+                thread.getThreadReference().suspend();
+              }
+            }
+            DebuggerUtilsAsync.resume(virtualMachine);
+            if (threadReference.suspendCount() != 1) {
+              Set<SuspendContextImpl> suspendingContexts = SuspendManagerUtil.getSuspendingContexts(myProcess.getSuspendManager(), myThread);
+              LOG.warn("Blocked thread detected during invocation on " + myThread + ": " + suspendingContexts);
+            }
+          }
+          finally {
+            DebuggerUtilsAsync.resume(virtualMachine);
+          }
+        }
+      });
+    }
+  }
+
+
+  protected static final class InvocationWatcherOldImpl implements InvocationWatcher {
+    private final AtomicBoolean myObsolete = new AtomicBoolean();
+    private final AtomicBoolean myAllResumed = new AtomicBoolean();
+    private final Future myTask;
+    private final @NotNull ThreadReferenceProxyImpl myThread;
+    private final @NotNull DebugProcessImpl myProcess;
+    private final @NotNull ThreadBlockedMonitor myThreadBlockedMonitor;
+
+    private InvocationWatcherOldImpl(@NotNull ThreadBlockedMonitor threadBlockedMonitor, @NotNull ThreadReferenceProxyImpl thread) {
+      myThreadBlockedMonitor = threadBlockedMonitor;
+      myProcess = threadBlockedMonitor.myProcess;
       myThread = thread;
       myTask = JobScheduler.getScheduler().schedule(this::checkInvocation, getSingleThreadedEvaluationThreshold(), TimeUnit.MILLISECONDS);
     }
 
-    void invocationFinished() {
+    @Override
+    public void invocationFinished() {
       myObsolete.set(true);
       if (myTask.isDone() && myAllResumed.get()) {
         myProcess.getManagerThread().pushBack(new DebuggerCommandImpl() {
@@ -183,7 +291,7 @@ public class ThreadBlockedMonitor {
             // suspend all threads but the current one (which should be suspended already
             myThread.getVirtualMachine().getVirtualMachine().suspend();
             LOG.warn("Long invocation on " + myThread + " has been finished");
-            myProcess.mySuspendAllInvocation.decrementAndGet();
+            myThreadBlockedMonitor.myIsInResumeAllMode = false;
             DebuggerUtilsAsync.resume(myThread.getThreadReference());
           }
         });
@@ -202,14 +310,14 @@ public class ThreadBlockedMonitor {
           virtualMachine.suspend();
           try {
             if (myObsolete.get()) return;
+            if (myThreadBlockedMonitor.myIsInResumeAllMode) {
+              LOG.error("Another invocation on suspend-all thread while the previous one was not over yet");
+              return;
+            }
             ThreadReference threadReference = myThread.getThreadReference();
             if (threadReference.suspendCount() == 1) { // extra check for invocation in progress
               // resume all but this
               LOG.warn("Resume other threads because long invocation detected on " + myThread);
-              int number = myProcess.mySuspendAllInvocation.getAndIncrement();
-              if (number != 0) {
-                LOG.error("Parallel suspend all invocations: " + (number + 1));
-              }
               myAllResumed.set(true);
               threadReference.suspend();
               DebuggerUtilsAsync.resume(virtualMachine);

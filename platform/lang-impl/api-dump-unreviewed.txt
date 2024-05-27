@@ -5408,14 +5408,19 @@ f:com.intellij.codeInsight.folding.impl.CodeFoldingManagerImpl
 - buildInitialFoldings(com.intellij.openapi.editor.Editor):V
 - dispose():V
 - findFoldRegion(com.intellij.openapi.editor.Editor,I,I):com.intellij.openapi.editor.FoldRegion
+- s:getAsyncExpandStatusMap(com.intellij.openapi.editor.Editor):java.util.Map
 - getFoldRegionsAtOffset(com.intellij.openapi.editor.Editor,I):com.intellij.openapi.editor.FoldRegion[]
+- s:isAsyncFoldingUpdater(com.intellij.openapi.editor.Editor):Z
 - isCollapsedByDefault(com.intellij.openapi.editor.FoldRegion):java.lang.Boolean
+- s:markAsAsyncFoldingUpdater(com.intellij.openapi.editor.Editor):V
 - markForUpdate(com.intellij.openapi.editor.FoldRegion):V
+- markUpdated(com.intellij.openapi.editor.FoldRegion):V
 - readFoldingState(org.jdom.Element,com.intellij.openapi.editor.Document):com.intellij.openapi.fileEditor.impl.text.CodeFoldingState
 - releaseFoldings(com.intellij.openapi.editor.Editor):V
 - restoreFoldingState(com.intellij.openapi.editor.Editor,com.intellij.openapi.fileEditor.impl.text.CodeFoldingState):V
 - saveFoldingState(com.intellij.openapi.editor.Editor):com.intellij.openapi.fileEditor.impl.text.CodeFoldingState
 - scheduleAsyncFoldingUpdate(com.intellij.openapi.editor.Editor):V
+- s:setAsyncExpandStatusMap(com.intellij.openapi.editor.Editor,java.util.Map):V
 - updateFoldRegions(com.intellij.openapi.editor.Editor):V
 - updateFoldRegions(com.intellij.openapi.editor.Editor,Z):V
 - updateFoldRegionsAsync(com.intellij.openapi.editor.Editor,Z):java.lang.Runnable
@@ -7486,7 +7491,6 @@ f:com.intellij.codeInsight.intention.impl.IntentionActionAsAction
 f:com.intellij.codeInsight.intention.impl.IntentionActionWithTextCaching
 - com.intellij.codeInsight.intention.IntentionActionDelegate
 - com.intellij.openapi.actionSystem.ShortcutProvider
-- com.intellij.openapi.project.PossiblyDumbAware
 - java.lang.Comparable
 - <init>(com.intellij.codeInsight.intention.IntentionAction):V
 - compareTo(com.intellij.codeInsight.intention.impl.IntentionActionWithTextCaching):I
@@ -7502,7 +7506,6 @@ f:com.intellij.codeInsight.intention.impl.IntentionActionWithTextCaching
 - getText():java.lang.String
 - getToolId():java.lang.String
 - hashCode():I
-- isDumbAware():Z
 - isSelectable():Z
 - isShowIcon():Z
 - toString():java.lang.String
@@ -7878,9 +7881,6 @@ f:com.intellij.codeInsight.intention.impl.preview.IntentionPreviewPopupUpdatePro
 f:com.intellij.codeInsight.intention.impl.preview.IntentionPreviewUnsupportedOperationException
 - java.lang.UnsupportedOperationException
 - <init>():V
-f:com.intellij.codeInsight.intention.impl.preview.PreviewHandler
-- <init>(com.intellij.openapi.project.Project,com.intellij.openapi.ui.popup.ListPopup,java.lang.Class,java.util.function.Function):V
-- showInitially():V
 com.intellij.codeInsight.lookup.LookupActionProvider
 - sf:EP_NAME:com.intellij.openapi.extensions.ExtensionPointName
 - a:fillActions(com.intellij.codeInsight.lookup.LookupElement,com.intellij.codeInsight.lookup.Lookup,com.intellij.util.Consumer):V
@@ -20541,6 +20541,7 @@ pf:com.intellij.openapi.editor.actions.FindWordAtCaretAction$Handler
 - isEnabledForCaret(com.intellij.openapi.editor.Editor,com.intellij.openapi.editor.Caret,com.intellij.openapi.actionSystem.DataContext):Z
 f:com.intellij.openapi.editor.actions.FlipCommaIntention
 - com.intellij.modcommand.PsiUpdateModCommandAction
+- com.intellij.openapi.project.DumbAware
 - <init>():V
 - getFamilyName():java.lang.String
 com.intellij.openapi.editor.actions.FlipCommaIntention$Flipper

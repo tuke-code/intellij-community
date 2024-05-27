@@ -61,22 +61,19 @@ abstract class KotlinLightMultiplatformCodeInsightFixtureTestCase : KotlinLightC
         return TestProjectFiles(allFiles, mainFile)
     }
 
-    private var isKotlinK2KmpEnabledBeforeTest: Boolean? = null
-
     override fun setUp() {
         super.setUp()
 
-        Registry.get("kotlin.k2.kmp.enabled").let { registryValue ->
-            isKotlinK2KmpEnabledBeforeTest = registryValue.asBoolean()
-            registryValue.setValue(true)
-        }
+        Registry.get("kotlin.k2.kmp.enabled").setValue(true, testRootDisposable)
+
+        // sync is necessary to detect unexpected disappearances of library files
+        VfsTestUtil.syncRefresh()
     }
 
     override fun tearDown() {
         runAll(
             { KotlinMultiPlatformProjectDescriptor.cleanupSourceRoots() },
             { KotlinSdkType.removeKotlinSdkInTests() },
-            { Registry.get("kotlin.k2.kmp.enabled").setValue(isKotlinK2KmpEnabledBeforeTest == true) },
             { super.tearDown() },
         )
     }

@@ -1,16 +1,12 @@
 // Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.kotlin.idea.k2.codeinsight.fixes
 
-import com.intellij.modcommand.ActionContext
-import com.intellij.modcommand.ModPsiUpdater
 import com.intellij.psi.PsiElement
 import org.jetbrains.kotlin.analysis.api.KtAnalysisSession
-import org.jetbrains.kotlin.analysis.api.fir.diagnostics.KtFirDiagnostic
+import org.jetbrains.kotlin.analysis.api.fir.diagnostics.KaFirDiagnostic
 import org.jetbrains.kotlin.analysis.api.symbols.KtFunctionSymbol
-import org.jetbrains.kotlin.idea.base.resources.KotlinBundle
-import org.jetbrains.kotlin.idea.codeinsight.api.applicable.intentions.KotlinPsiUpdateModCommandAction
 import org.jetbrains.kotlin.idea.codeinsight.api.applicators.fixes.KotlinQuickFixFactory
-import org.jetbrains.kotlin.idea.codeinsight.utils.ChangeToLabeledReturnUtils
+import org.jetbrains.kotlin.idea.quickfix.ChangeToLabeledReturnFix
 import org.jetbrains.kotlin.idea.references.mainReference
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.psi.*
@@ -21,17 +17,17 @@ import org.jetbrains.kotlin.renderer.render
 
 internal object ChangeToLabeledReturnFixFactory {
 
-    val nullForNonnullType = KotlinQuickFixFactory.ModCommandBased { diagnostic: KtFirDiagnostic.NullForNonnullType ->
+    val nullForNonnullType = KotlinQuickFixFactory.ModCommandBased { diagnostic: KaFirDiagnostic.NullForNonnullType ->
         val returnExpression = getLambdaReturnExpression(diagnostic.psi) ?: return@ModCommandBased emptyList()
         getQuickFix(returnExpression)
     }
 
-    val returnNotAllowed = KotlinQuickFixFactory.ModCommandBased { diagnostic: KtFirDiagnostic.ReturnNotAllowed ->
+    val returnNotAllowed = KotlinQuickFixFactory.ModCommandBased { diagnostic: KaFirDiagnostic.ReturnNotAllowed ->
         val returnExpression = diagnostic.psi
         getQuickFix(returnExpression)
     }
 
-    val returnTypeMismatch = KotlinQuickFixFactory.ModCommandBased { diagnostic: KtFirDiagnostic.ReturnTypeMismatch ->
+    val returnTypeMismatch = KotlinQuickFixFactory.ModCommandBased { diagnostic: KaFirDiagnostic.ReturnTypeMismatch ->
         val returnExpression = getLambdaReturnExpression(diagnostic.psi) ?: return@ModCommandBased emptyList()
         getQuickFix(returnExpression)
     }
@@ -76,26 +72,5 @@ internal object ChangeToLabeledReturnFixFactory {
         val returnType = returnExpression.returnedExpression?.getKtType() ?: return null
         if (!returnType.isSubTypeOf(lambdaReturnType)) return null
         return returnExpression
-    }
-
-    private class ChangeToLabeledReturnFix(
-        element: KtReturnExpression,
-        private val labeledReturn: String,
-    ) : KotlinPsiUpdateModCommandAction.ElementBased<KtReturnExpression, Unit>(element, Unit) {
-
-        override fun invoke(
-            actionContext: ActionContext,
-            element: KtReturnExpression,
-            elementContext: Unit,
-            updater: ModPsiUpdater,
-        ) = ChangeToLabeledReturnUtils.applyTo(actionContext.project, element, labeledReturn)
-
-        override fun getFamilyName(): String = KotlinBundle.message("fix.change.to.labeled.return.family")
-
-        override fun getActionName(
-            actionContext: ActionContext,
-            element: KtReturnExpression,
-            elementContext: Unit,
-        ): String = KotlinBundle.message("fix.change.to.labeled.return.text", labeledReturn)
     }
 }

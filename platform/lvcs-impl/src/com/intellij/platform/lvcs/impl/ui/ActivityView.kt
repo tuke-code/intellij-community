@@ -18,7 +18,6 @@ import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.FrameWrapper
-import com.intellij.openapi.ui.getPreferredFocusedComponent
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.util.NlsContexts
 import com.intellij.openapi.util.registry.Registry
@@ -32,10 +31,7 @@ import com.intellij.platform.lvcs.impl.statistics.LocalHistoryCounter
 import com.intellij.platform.lvcs.impl.ui.SingleFileActivityDiffPreview.Companion.DIFF_PLACE
 import com.intellij.platform.util.coroutines.childScope
 import com.intellij.ui.*
-import com.intellij.ui.components.JBPanel
-import com.intellij.ui.components.JBTextArea
-import com.intellij.ui.components.ProgressBarLoadingDecorator
-import com.intellij.ui.components.TextComponentEmptyText
+import com.intellij.ui.components.*
 import com.intellij.ui.content.ContentFactory
 import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.ProportionKey
@@ -49,8 +45,10 @@ import java.awt.BorderLayout
 import java.awt.Component
 import java.awt.event.KeyEvent
 import javax.swing.JComponent
+import javax.swing.JPanel
 import javax.swing.ScrollPaneConstants
 import javax.swing.event.DocumentEvent
+import javax.swing.text.JTextComponent
 
 class ActivityView(private val project: Project, gateway: IdeaGateway, val activityScope: ActivityScope,
                    private val isFrameDiffPreview: Boolean = false) :
@@ -63,7 +61,7 @@ class ActivityView(private val project: Project, gateway: IdeaGateway, val activ
   private val activityList = ActivityList { model.activityProvider.getPresentation(it) }.apply {
     updateEmptyText(true)
   }
-  private val searchField = if (model.isScopeFilterSupported || model.isActivityFilterSupported) createSearchField() else null
+  private val searchField = createSearchField()
   private val changesBrowser = createChangesBrowser()
   private val frameDiffPreview = if (isFrameDiffPreview) createFrameDiffPreview(changesBrowser) else null
   private val editorDiffPreview = if (frameDiffPreview == null) createEditorDiffPreview(changesBrowser) else null
@@ -82,8 +80,8 @@ class ActivityView(private val project: Project, gateway: IdeaGateway, val activ
     val toolbarComponent = BorderLayoutPanel()
     frameDiffPreview?.setToolbarVerticalSizeReferent(toolbarComponent)
 
-    val filterProgress = searchField?.let { field ->
-      object : ProgressBarLoadingDecorator(field, this@ActivityView, 500) {
+    val filterProgress = searchField.let { field ->
+      object : ProgressBarLoadingDecorator(field.containerComponent, this@ActivityView, 500) {
         override fun isOnTop() = false
       }.also {
         toolbarComponent.add(it.component, BorderLayout.CENTER)
@@ -130,11 +128,11 @@ class ActivityView(private val project: Project, gateway: IdeaGateway, val activ
         progressStripe.stopLoading()
       }
       override fun onFilteringStarted() {
-        filterProgress?.startLoading(false)
+        filterProgress.startLoading(false)
         activityList.updateEmptyText(true)
       }
       override fun onFilteringStopped(result: Set<ActivityItem>?) {
-        filterProgress?.stopLoading()
+        filterProgress.stopLoading()
         activityList.setVisibleItems(result)
         activityList.updateEmptyText(false)
       }
@@ -143,7 +141,7 @@ class ActivityView(private val project: Project, gateway: IdeaGateway, val activ
     isFocusCycleRoot = true
     focusTraversalPolicy = object: ComponentsListFocusTraversalPolicy() {
       override fun getOrderedComponents(): List<Component> {
-        return listOfNotNull(activityList, changesBrowser?.preferredFocusedComponent, searchField?.textArea,
+        return listOfNotNull(activityList, changesBrowser?.preferredFocusedComponent, searchField.textComponent,
                              frameDiffPreview?.preferredFocusedComponent)
       }
     }
@@ -180,12 +178,12 @@ class ActivityView(private val project: Project, gateway: IdeaGateway, val activ
     if (changesBrowser != null) {
       val diffPreview = MultiFileActivityDiffPreview(activityScope, changesBrowser.viewer, this@ActivityView)
       changesBrowser.setShowDiffActionPreview(diffPreview)
-      if (model.isActivityFilterSupported) diffPreview.addListener(DiffRequestProcessorListener(::updateDiffEditorSearch), this@ActivityView)
+      if (model.filterKind == FilterKind.CONTENT) diffPreview.addListener(DiffRequestProcessorListener(::updateDiffEditorSearch), this@ActivityView)
       return diffPreview
     }
 
     val diffPreview = SingleFileActivityDiffPreview(project, model, this@ActivityView)
-    if (model.isActivityFilterSupported) diffPreview.addListener(DiffRequestProcessorListener(::updateDiffEditorSearch), this@ActivityView)
+    if (model.filterKind == FilterKind.CONTENT) diffPreview.addListener(DiffRequestProcessorListener(::updateDiffEditorSearch), this@ActivityView)
     return diffPreview
   }
 
@@ -197,42 +195,45 @@ class ActivityView(private val project: Project, gateway: IdeaGateway, val activ
       SingleFileActivityDiffPreview.createViewer(project, model)
     }
     Disposer.register(this, diffViewer.disposable)
-    if (model.isActivityFilterSupported && diffViewer is DiffRequestProcessor) {
+    if (model.filterKind == FilterKind.CONTENT && diffViewer is DiffRequestProcessor) {
       diffViewer.addListener(DiffRequestProcessorListener(::updateDiffEditorSearch), this@ActivityView)
     }
     return diffViewer
   }
 
-  private fun createSearchField(): SearchTextArea {
-    val textArea = JBTextArea()
-    textArea.emptyText.text = if (model.isScopeFilterSupported) LocalHistoryBundle.message("activity.filter.empty.text.fileName")
-    else if (model.isActivityFilterSupported) LocalHistoryBundle.message("activity.filter.empty.text.content")
-    else ""
-    TextComponentEmptyText.setupPlaceholderVisibility(textArea)
+  private fun createSearchField(): SearchFieldComponent {
+    val searchField = when (model.filterKind) {
+      FilterKind.FILE -> SearchFieldComponent.SingleLine().also { field ->
+        field.textComponent.emptyText.text = LocalHistoryBundle.message("activity.filter.empty.text.fileName")
+      }
+      FilterKind.CONTENT -> SearchFieldComponent.MultiLine().also { field ->
+        field.containerComponent.setBorder(JBUI.Borders.compound(IdeBorderFactory.createBorder(SideBorder.RIGHT),
+                                                              field.containerComponent.border))
+        field.textComponent.emptyText.text = LocalHistoryBundle.message("activity.filter.empty.text.content")
 
-    val searchTextArea = SearchTextArea(textArea, true)
-    searchTextArea.setBorder(JBUI.Borders.compound(IdeBorderFactory.createBorder(SideBorder.RIGHT), searchTextArea.border))
-
-    dumbAwareAction { selectNextOccurence(true) }.registerCustomShortcutSet(Utils.shortcutSetOf(
-      Utils.shortcutsOf(IdeActions.ACTION_FIND_NEXT) + Utils.shortcutsOf(IdeActions.ACTION_EDITOR_MOVE_CARET_DOWN)
-    ), searchTextArea)
-    dumbAwareAction { selectNextOccurence(false) }.registerCustomShortcutSet(Utils.shortcutSetOf(
-      Utils.shortcutsOf(IdeActions.ACTION_FIND_PREVIOUS) + Utils.shortcutsOf(IdeActions.ACTION_EDITOR_MOVE_CARET_UP)
-    ), searchTextArea)
+        dumbAwareAction { selectNextOccurence(true) }.registerCustomShortcutSet(Utils.shortcutSetOf(
+          Utils.shortcutsOf(IdeActions.ACTION_FIND_NEXT) + Utils.shortcutsOf(IdeActions.ACTION_EDITOR_MOVE_CARET_DOWN)
+        ), field.containerComponent)
+        dumbAwareAction { selectNextOccurence(false) }.registerCustomShortcutSet(Utils.shortcutSetOf(
+          Utils.shortcutsOf(IdeActions.ACTION_FIND_PREVIOUS) + Utils.shortcutsOf(IdeActions.ACTION_EDITOR_MOVE_CARET_UP)
+        ), field.containerComponent)
+      }
+    }
+    TextComponentEmptyText.setupPlaceholderVisibility(searchField.textComponent)
     dumbAwareAction {
-      IdeFocusManager.getInstance(project).requestFocus(searchTextArea.textArea, true)
+      IdeFocusManager.getInstance(project).requestFocus(searchField.textComponent, true)
     }.registerCustomShortcutSet(Utils.shortcutSetOf(Utils.shortcutsOf(IdeActions.ACTION_FIND)), activityList)
     dumbAwareAction {
-      searchTextArea.textArea.text = ""
+      searchField.textComponent.text = ""
       IdeFocusManager.getInstance(project).requestFocus(activityList, true)
-    }.registerCustomShortcutSet(CustomShortcutSet(KeyEvent.VK_ESCAPE), searchTextArea.textArea)
-    searchTextArea.textArea.document.addDocumentListener(object : DocumentAdapter() {
+    }.registerCustomShortcutSet(CustomShortcutSet(KeyEvent.VK_ESCAPE), searchField.textComponent)
+    searchField.textComponent.document.addDocumentListener(object : DocumentAdapter() {
       override fun textChanged(e: DocumentEvent) {
         if (!model.isFilterSet) LocalHistoryCounter.logFilterUsed(activityScope)
-        model.setFilter(searchTextArea.textArea.getText())
+        model.setFilter(searchField.textComponent.text)
       }
     })
-    return searchTextArea
+    return searchField
   }
 
   private fun getDiffComponent(): JComponent? {
@@ -243,11 +244,10 @@ class ActivityView(private val project: Project, gateway: IdeaGateway, val activ
   }
 
   private fun updateDiffEditorSearch() {
-    if (searchField == null) return
     val diffComponent = getDiffComponent() ?: return
     val editor = FileHistoryDialog.findLeftEditor(diffComponent) ?: return
 
-    FileHistoryDialog.updateEditorSearch(project, searchField, editor)
+    FileHistoryDialog.updateEditorSearch(project, searchField.textComponent, editor)
   }
 
   private fun selectNextOccurence(forward: Boolean) {
@@ -371,5 +371,19 @@ class ActivityService(val coroutineScope: CoroutineScope)
 private fun dumbAwareAction(runnable: () -> Unit): DumbAwareAction {
   return object : DumbAwareAction() {
     override fun actionPerformed(e: AnActionEvent) = runnable()
+  }
+}
+
+private sealed interface SearchFieldComponent {
+  val containerComponent: JPanel
+  val textComponent: JTextComponent
+  class SingleLine: SearchFieldComponent {
+    override val containerComponent = SearchTextField("Lvcs.FileFilter.History")
+    override val textComponent: JBTextField get() = containerComponent.textEditor
+  }
+  class MultiLine: SearchFieldComponent {
+    private val textArea = JBTextArea()
+    override val containerComponent = SearchTextArea(textArea, true)
+    override val textComponent = textArea
   }
 }

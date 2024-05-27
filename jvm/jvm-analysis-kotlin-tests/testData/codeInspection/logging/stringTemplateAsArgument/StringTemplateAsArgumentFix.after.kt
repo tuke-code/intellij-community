@@ -5,16 +5,6 @@ import java.lang.RuntimeException
 class StringTemplateAsArgumentFix {
   private val loggerSlf4J = LoggerFactory.getLogger()
 
-  val x = 1
-  val y = 2
-
-  fun testWithEscape() {
-      loggerSlf4J.debug("{}\n{}", x, y)
-      loggerSlf4J.debug("{}\t{}", x, y)
-      loggerSlf4J.debug("{}\"{}", x, y)
-      loggerSlf4J.debug("{}\${}", x, y)
-  }
-
   fun testLoggerSlf4J() {
       val variable1 = "test"
       val variable2 = 1
@@ -24,7 +14,7 @@ class StringTemplateAsArgumentFix {
       loggerSlf4J.info("variable1: {}", variable1)
       loggerSlf4J.info("variable1: {}", variable1)
       loggerSlf4J.info("variable1: {}", variable1)
-      loggerSlf4J.info("variable1: $variable1", RuntimeException())
+      loggerSlf4J.info("variable1: {}", variable1, RuntimeException())
       loggerSlf4J.info("{} variable1: {}", 1, variable1)
       loggerSlf4J.info("{} variable1: {} {} variable1: {}", 1, variable1, 2, variable1)
       loggerSlf4J.info("{} variable1: {} {} variable1: {} {}", 1, variable1, 2, variable1, 3)

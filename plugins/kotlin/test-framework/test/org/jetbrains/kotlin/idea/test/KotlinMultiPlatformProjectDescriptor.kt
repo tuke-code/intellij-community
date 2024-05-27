@@ -28,12 +28,13 @@ import org.jetbrains.kotlin.platform.konan.NativePlatforms
 
 /**
  * The project is created with the following module structure:
+ * ```
  * Common --- Js
  *       \--- Jvm
  *       \--- Native --- MinGW
  *                  \--- Linux --- LinuxX64
  *                            \--- LinuxArm64
- *
+ * ```
  * Standard library and kotlinx-coroutines-core of fixed versions are added to all modules.
  *
  * Apple targets require a Mac host and therefore are not included in the test project.
@@ -212,7 +213,8 @@ object KotlinMultiPlatformProjectDescriptor : KotlinLightProjectDescriptor() {
     }
 
     private fun createLibraryFromCoordinates(project: Project, dependency: KmpAwareLibraryDependency): Library {
-        val dependencyRoot = KmpLightFixtureDependencyDownloader.resolveDependency(dependency)?.toFile()
+        val transformedLibrariesRoot = KotlinTestDirectoriesHolder.transformedKmpLibrariesRoot
+        val dependencyRoot = KmpLightFixtureDependencyDownloader.resolveDependency(dependency, transformedLibrariesRoot)?.toFile()
             ?: error("Unable to download library ${dependency.coordinates}")
         return ConfigLibraryUtil.addProjectLibrary(project = project, name = dependency.coordinates.toString()) {
             addRoot(dependencyRoot, OrderRootType.CLASSES)

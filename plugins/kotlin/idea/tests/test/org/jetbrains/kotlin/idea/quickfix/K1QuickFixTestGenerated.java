@@ -5227,6 +5227,11 @@ public abstract class K1QuickFixTestGenerated extends AbstractK1QuickFixTest {
                         runTest("testData/quickfix/createFromUsage/createFunction/call/simple/insideIfConditionWithNegation.kt");
                     }
 
+                    @TestMetadata("insideWhen.kt")
+                    public void testInsideWhen() throws Exception {
+                        runTest("testData/quickfix/createFromUsage/createFunction/call/simple/insideWhen.kt");
+                    }
+
                     @TestMetadata("kt10983.kt")
                     public void testKt10983() throws Exception {
                         runTest("testData/quickfix/createFromUsage/createFunction/call/simple/kt10983.kt");
@@ -17711,6 +17716,11 @@ public abstract class K1QuickFixTestGenerated extends AbstractK1QuickFixTest {
             @TestMetadata("funInvWithoutParentheses.kt")
             public void testFunInvWithoutParentheses() throws Exception {
                 runTest("testData/quickfix/variables/changeToFunctionInvocation/funInvWithoutParentheses.kt");
+            }
+
+            @TestMetadata("genericFunction.kt")
+            public void testGenericFunction() throws Exception {
+                runTest("testData/quickfix/variables/changeToFunctionInvocation/genericFunction.kt");
             }
 
             @TestMetadata("inStringTemplate.kt")

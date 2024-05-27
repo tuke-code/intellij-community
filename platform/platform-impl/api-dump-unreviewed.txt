@@ -4122,13 +4122,6 @@ c:com.intellij.ide.ReopenProjectAction
 - isRemoved():Z
 - setProjectGroup(com.intellij.ide.ProjectGroup):V
 - update(com.intellij.openapi.actionSystem.AnActionEvent):V
-f:com.intellij.ide.SystemLanguage
-- sf:Companion:com.intellij.ide.SystemLanguage$Companion
-- f:doChooseLanguage(java.util.List):V
-- sf:getInstance():com.intellij.ide.SystemLanguage
-- f:getLocale():java.util.Locale
-f:com.intellij.ide.SystemLanguage$Companion
-- f:getInstance():com.intellij.ide.SystemLanguage
 f:com.intellij.ide.TooltipEvent
 - <init>(java.awt.event.InputEvent,Z,com.intellij.openapi.actionSystem.AnAction,com.intellij.openapi.actionSystem.AnActionEvent):V
 - getAction():com.intellij.openapi.actionSystem.AnAction
@@ -6621,7 +6614,7 @@ f:com.intellij.ide.gdpr.EndUserAgreement
 - s:loadContent(java.lang.String,java.nio.file.Path):com.intellij.ide.gdpr.EndUserAgreement$Document
 - s:setAccepted(com.intellij.ide.gdpr.EndUserAgreement$Document):V
 - s:updateActiveDocumentName(java.lang.String):V
-- s:updateCachedContentToLatestBundledVersion():Z
+- s:updateCachedContentToLatestBundledVersion():V
 - s:updateContent(java.lang.String,java.lang.String):V
 f:com.intellij.ide.gdpr.EndUserAgreement$Document
 - <init>(java.lang.String,java.lang.String):V
@@ -8891,6 +8884,7 @@ f:com.intellij.ide.projectWizard.NewProjectWizardConstants$Language
 *f:com.intellij.ide.settings.json.JsonSettingsModel$Companion
 - f:componentToSettingsModel(com.intellij.ide.settings.json.JsonSettingsModel$ComponentModel):com.intellij.ide.settings.json.JsonSettingsModel
 - f:getInstance():com.intellij.ide.settings.json.JsonSettingsModel
+- f:toJsonName(java.lang.String):java.lang.String
 *f:com.intellij.ide.settings.json.JsonSettingsModel$ComponentInfo
 - *sf:Companion:com.intellij.ide.settings.json.JsonSettingsModel$ComponentInfo$Companion
 - <init>(java.lang.String,java.lang.String,java.lang.String,java.lang.String,java.lang.String,java.util.List):V
@@ -8989,7 +8983,6 @@ f:com.intellij.ide.projectWizard.NewProjectWizardConstants$Language
 - bs:copy$default(com.intellij.ide.settings.json.JsonSettingsModel$PropertyDescriptor,java.lang.String,java.lang.String,java.lang.String,com.intellij.ide.settings.json.JsonSettingsModel$PropertyType,java.lang.String,java.lang.String,java.util.List,java.lang.Object,I,java.lang.Object):com.intellij.ide.settings.json.JsonSettingsModel$PropertyDescriptor
 - equals(java.lang.Object):Z
 - f:getComponentName():java.lang.String
-- f:getControllerKey():java.lang.String
 - f:getMapTo():java.lang.String
 - f:getMappedValue():java.lang.String
 - f:getName():java.lang.String
@@ -11309,6 +11302,7 @@ f:com.intellij.internal.statistic.collectors.fus.actions.persistence.ActionsEven
 - sf:DUMB_START:com.intellij.internal.statistic.eventLog.events.BooleanEventField
 - sf:ERROR:com.intellij.internal.statistic.eventLog.events.ClassEventField
 - sf:GROUP:com.intellij.internal.statistic.eventLog.EventLogGroup
+- sf:INCOMPLETE_DEPENDENCIES_MODE:com.intellij.internal.statistic.eventLog.events.EnumEventField
 - sf:INSTANCE:com.intellij.internal.statistic.collectors.fus.actions.persistence.ActionsEventLogGroup
 - sf:IS_SUBMENU:com.intellij.internal.statistic.eventLog.events.BooleanEventField
 - sf:LOOKUP_ACTIVE:com.intellij.internal.statistic.eventLog.events.BooleanEventField

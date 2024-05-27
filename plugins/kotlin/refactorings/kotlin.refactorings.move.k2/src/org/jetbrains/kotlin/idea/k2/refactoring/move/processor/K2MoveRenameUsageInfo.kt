@@ -13,12 +13,14 @@ import com.intellij.refactoring.move.moveMembers.MoveMembersOptions
 import com.intellij.refactoring.move.moveMembers.MoveMembersProcessor
 import com.intellij.refactoring.util.MoveRenameUsageInfo
 import com.intellij.usageView.UsageInfo
-import org.jetbrains.kotlin.analysis.api.KtAllowAnalysisFromWriteAction
-import org.jetbrains.kotlin.analysis.api.KtAllowAnalysisOnEdt
+import org.jetbrains.kotlin.analysis.api.KaAllowAnalysisFromWriteAction
+import org.jetbrains.kotlin.analysis.api.KaAllowAnalysisOnEdt
 import org.jetbrains.kotlin.analysis.api.analyze
 import org.jetbrains.kotlin.analysis.api.lifetime.allowAnalysisFromWriteAction
 import org.jetbrains.kotlin.analysis.api.lifetime.allowAnalysisOnEdt
 import org.jetbrains.kotlin.analysis.api.symbols.KtCallableSymbol
+import org.jetbrains.kotlin.analysis.api.symbols.KtClassKind
+import org.jetbrains.kotlin.analysis.api.symbols.KtClassOrObjectSymbol
 import org.jetbrains.kotlin.analysis.api.symbols.KtConstructorSymbol
 import org.jetbrains.kotlin.analysis.api.symbols.KtPropertySymbol
 import org.jetbrains.kotlin.analysis.api.symbols.markers.KtSymbolWithMembers
@@ -129,7 +131,7 @@ sealed class K2MoveRenameUsageInfo(
         referencedElement: PsiNamedElement,
         val isInternal: Boolean
     ) : K2MoveRenameUsageInfo(element, reference, referencedElement) {
-        @OptIn(KtAllowAnalysisOnEdt::class)
+        @OptIn(KaAllowAnalysisOnEdt::class)
         override fun isUpdatable(): Boolean = allowAnalysisOnEdt {
             val refExpr = element as KtSimpleNameExpression
             if (refExpr is KtEnumEntrySuperclassReferenceExpression) return false
@@ -137,12 +139,18 @@ sealed class K2MoveRenameUsageInfo(
             if (refExpr.isUnqualifiable()) return true
             analyze(refExpr) {
                 val resolvedSymbol = refExpr.mainReference.resolveToSymbol()
+                if (resolvedSymbol is KtClassOrObjectSymbol && resolvedSymbol.classKind == KtClassKind.COMPANION_OBJECT) return true
                 if (resolvedSymbol is KtConstructorSymbol) return true
                 val containingSymbol = resolvedSymbol?.getContainingSymbol()
                 if (containingSymbol == null) return true // top levels are static
+                if (containingSymbol is KtClassOrObjectSymbol) {
+                    when (containingSymbol.classKind) {
+                        KtClassKind.OBJECT, KtClassKind.COMPANION_OBJECT, KtClassKind.ENUM_CLASS -> return true
+                        else -> { }
+                    }
+                }
                 if (containingSymbol is KtSymbolWithMembers) {
-                    val staticScope = containingSymbol.getStaticMemberScope()
-                    return resolvedSymbol in staticScope.getAllSymbols()
+                    if (resolvedSymbol in containingSymbol.getStaticMemberScope().getAllSymbols()) return true
                 }
                 return false
             }
@@ -227,7 +235,7 @@ sealed class K2MoveRenameUsageInfo(
          * In [markInternalUsages] we marked all internal usages, but some of these usages don't need to be updated.
          * Like, for example, instance methods.
          */
-        @OptIn(KtAllowAnalysisFromWriteAction::class)
+        @OptIn(KaAllowAnalysisFromWriteAction::class)
         fun unMarkNonUpdatableUsages(containing: KtElement) = allowAnalysisFromWriteAction {
             containing.forEachDescendantOfType<KtSimpleNameExpression> { refExpr ->
                 val usageInfo = refExpr.internalUsageInfo ?: return@forEachDescendantOfType

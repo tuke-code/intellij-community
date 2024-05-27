@@ -7,7 +7,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.text.StringUtil
 import com.intellij.psi.*
 import com.intellij.psi.util.PsiTreeUtil
-import org.jetbrains.kotlin.analysis.api.KtAllowAnalysisOnEdt
+import org.jetbrains.kotlin.analysis.api.KaAllowAnalysisOnEdt
 import org.jetbrains.kotlin.builtins.jvm.JavaToKotlinClassMap
 import org.jetbrains.kotlin.idea.KotlinLanguage
 import org.jetbrains.kotlin.idea.references.KtSimpleNameReference
@@ -173,7 +173,7 @@ abstract class KotlinUastElementFactory(project: Project) : UastElementFactory {
         }
     }
 
-    @OptIn(KtAllowAnalysisOnEdt::class)
+    @OptIn(KaAllowAnalysisOnEdt::class)
     protected abstract fun moveLambdaOutsideParenthesis(methodCall: KtCallExpression)
 
     override fun createQualifiedReference(qualifiedName: String, context: PsiElement?): UQualifiedReferenceExpression? {
@@ -294,6 +294,10 @@ abstract class KotlinUastElementFactory(project: Project) : UastElementFactory {
 
     override fun createNullLiteral(context: PsiElement?): ULiteralExpression {
         return psiFactory(context).createExpression("null").toUElementOfType()!!
+    }
+
+    override fun createComment(text: String, context: PsiElement?): UComment {
+        return psiFactory(context).createComment(text).toUElementOfType()!!
     }
 
     /*override*/ fun createIntLiteral(value: Int, context: PsiElement?): ULiteralExpression {

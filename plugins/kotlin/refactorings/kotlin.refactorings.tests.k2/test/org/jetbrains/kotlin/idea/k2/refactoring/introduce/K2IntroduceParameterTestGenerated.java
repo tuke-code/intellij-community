@@ -156,6 +156,11 @@ public abstract class K2IntroduceParameterTestGenerated extends AbstractK2Introd
         public void testSingleEntrySuffix() throws Exception {
             runTest("../../idea/tests/testData/refactoring/introduceParameter/stringTemplates/singleEntrySuffix.kt");
         }
+
+        @TestMetadata("singleEntrySuffixSingle.kt")
+        public void testSingleEntrySuffixSingle() throws Exception {
+            runTest("../../idea/tests/testData/refactoring/introduceParameter/stringTemplates/singleEntrySuffixSingle.kt");
+        }
     }
 
     @RunWith(JUnit3RunnerWithInners.class)
@@ -183,6 +188,11 @@ public abstract class K2IntroduceParameterTestGenerated extends AbstractK2Introd
         @TestMetadata("avoidFunDuplicatingParameters.kt")
         public void testAvoidFunDuplicatingParameters() throws Exception {
             runTest("../../idea/tests/testData/refactoring/introduceParameter/avoidFunDuplicatingParameters.kt");
+        }
+
+        @TestMetadata("callableReferenceInParenthesis.kt")
+        public void testCallableReferenceInParenthesis() throws Exception {
+            runTest("../../idea/tests/testData/refactoring/introduceParameter/callableReferenceInParenthesis.kt");
         }
 
         @TestMetadata("callableReferenceToShorten.kt")

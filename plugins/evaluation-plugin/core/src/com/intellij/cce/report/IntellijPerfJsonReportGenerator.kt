@@ -1,6 +1,7 @@
 // Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.cce.report
 
+import com.google.gson.GsonBuilder
 import com.intellij.cce.metric.MetricInfo
 import com.intellij.cce.util.isUnderTeamCity
 import com.intellij.openapi.diagnostic.logger
@@ -35,7 +36,7 @@ class IntellijPerfJsonReportGenerator(
 
 
       val metricsDto = PerformanceMetricsDto
-        .create(projectName = "completion_#lang#_#model#_#os#", //#**# will be used in TC builds, pls don't change it
+        .create(projectName = "#feature#_#lang#_#model#_#os#", //#**# will be used in TC builds, pls don't change it
                 projectURL = "",
                 projectDescription = "",
                 methodName = "",
@@ -58,6 +59,12 @@ class IntellijPerfJsonReportGenerator(
     private const val metricsInfoName = "metrics.performance.json"
     private val LOG = logger<IntellijPerfJsonReportGenerator>()
   }
+
+  private val gson = GsonBuilder().apply {
+    setPrettyPrinting()
+    disableHtmlEscaping()
+    serializeSpecialFloatingPointValues()
+  }.create()
 }
 
 private fun MetricInfo.toPerfMetric(namePrefix: String = "") = PerformanceMetrics.newCounter(
@@ -96,12 +103,12 @@ private class TeamCityReportHelper : ReportHelper {
 
   override fun createBuildInfo(): CIServerBuildInfo {
     return CIServerBuildInfo(
-      buildId = "\$teamcity.build.id\$",
-      typeId = "\$teamcity.buildType.id\$",
-      configName = "\$teamcity.buildConfName\$",
-      buildNumber = "\$teamcity.buildNumber\$",
-      branchName = "\$teamcity.build.branch\$",
-      url = "\$teamcity.buildUrl\$",
+      buildId = "#teamcity.build.id#",
+      typeId = "#teamcity.buildType.id#",
+      configName = "#teamcity.buildConfName#",
+      buildNumber = "#teamcity.buildNumber#",
+      branchName = "#teamcity.build.branch#",
+      url = "#teamcity.buildUrl#",
       isPersonal = false,
       timestamp = ZonedDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)
     )

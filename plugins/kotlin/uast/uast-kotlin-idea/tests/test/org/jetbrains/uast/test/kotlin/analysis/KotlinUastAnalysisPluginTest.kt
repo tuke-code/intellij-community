@@ -1,4 +1,4 @@
-// Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
+// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.uast.test.kotlin.analysis
 
 import junit.framework.TestCase
@@ -16,6 +16,8 @@ import kotlin.test.assertTrue as kAssertTrue
 import kotlin.test.fail as kFail
 
 class KotlinUastAnalysisPluginTest : KotlinLightCodeInsightFixtureTestCase() {
+    override fun isFirPlugin(): Boolean = false
+
     fun `test dataflow not null`() = doTest("""
         fun dataFlowNotNull(b: Boolean) {
             val a = if (b) null else "hello"

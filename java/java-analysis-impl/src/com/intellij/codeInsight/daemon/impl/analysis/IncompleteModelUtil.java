@@ -6,8 +6,6 @@ import com.intellij.codeInsight.daemon.impl.HighlightInfo;
 import com.intellij.codeInsight.daemon.impl.HighlightInfoType;
 import com.intellij.openapi.project.IncompleteDependenciesService;
 import com.intellij.psi.*;
-import com.intellij.psi.augment.PsiAugmentProvider;
-import com.intellij.psi.util.CachedValuesManager;
 import com.intellij.psi.util.PsiUtil;
 import com.siyeh.ig.psiutils.ClassUtils;
 import org.jetbrains.annotations.Contract;
@@ -82,24 +80,32 @@ final class IncompleteModelUtil {
    */
   @Contract("null -> false")
   static boolean hasUnresolvedComponent(@Nullable PsiType psiType) {
+    return hasUnresolvedComponentRecursively(psiType, new HashSet<>());
+  }
+
+  private static boolean hasUnresolvedComponentRecursively(@Nullable PsiType psiType, @NotNull HashSet<PsiClass> visited) {
     if (psiType == null) return false;
     PsiType type = psiType.getDeepComponentType();
     if (isUnresolvedClassType(psiType)) {
       return true;
     }
     if (type instanceof PsiClassType classType) {
+      PsiClass psiClass = PsiUtil.resolveClassInClassTypeOnly(classType);
+      if (psiClass != null && !visited.add(psiClass)) {
+        return false;
+      }
       for (PsiType parameter : classType.getParameters()) {
-        if (hasUnresolvedComponent(parameter)) {
+        if (hasUnresolvedComponentRecursively(parameter, visited)) {
           return true;
         }
       }
     }
     if (type instanceof PsiWildcardType wildcardType) {
-      return hasUnresolvedComponent(wildcardType.getBound());
+      return hasUnresolvedComponentRecursively(wildcardType.getBound(), visited);
     }
     if (type instanceof PsiCapturedWildcardType capturedWildcardType) {
-      return hasUnresolvedComponent(capturedWildcardType.getLowerBound()) ||
-             hasUnresolvedComponent(capturedWildcardType.getUpperBound());
+      return hasUnresolvedComponentRecursively(capturedWildcardType.getLowerBound(), visited) ||
+             hasUnresolvedComponentRecursively(capturedWildcardType.getUpperBound(), visited);
     }
     return false;
   }
@@ -171,7 +177,7 @@ final class IncompleteModelUtil {
    */
   static boolean mayHaveUnknownTypeDueToPendingReference(@NotNull PsiExpression expression) {
     PsiType type = expression.getType();
-    if (type != null) {
+    if (type != null && !(type instanceof PsiMethodReferenceType)) {
       return hasUnresolvedComponent(type);
     }
     expression = PsiUtil.skipParenthesizedExprDown(expression);
@@ -192,8 +198,9 @@ final class IncompleteModelUtil {
    * @return list of import statements that potentially import the given unresolved reference
    */
   static List<PsiImportStatementBase> getPotentialImports(@NotNull PsiJavaCodeReferenceElement ref) {
-    if (ref.getParent() instanceof PsiImportStatementBase) return List.of();
-    boolean call = ref.getParent() instanceof PsiMethodCallExpression;
+    PsiElement parent = ref.getParent();
+    if (parent instanceof PsiImportStatementBase || ref.isQualified()) return List.of();
+    boolean maybeClass = canBeClass(ref); 
     if (!(ref.getContainingFile() instanceof PsiJavaFile file)) return List.of();
     PsiImportList list = file.getImportList();
     List<PsiImportStatementBase> imports = new ArrayList<>();
@@ -208,12 +215,20 @@ final class IncompleteModelUtil {
           if (reference.resolve() != null) continue;
         }
         // Unqualified method call cannot be imported using non-static import
-        if (statement instanceof PsiImportStaticStatement || !call) {
+        if (maybeClass || statement instanceof PsiImportStaticStatement) {
           imports.add(statement);
         }
       }
     }
     return imports;
+  }
+
+  private static boolean canBeClass(@NotNull PsiJavaCodeReferenceElement ref) {
+    PsiElement parent = ref.getParent();
+    if (parent instanceof PsiMethodCallExpression) return false;
+    if (!(ref instanceof PsiReferenceExpression)) return true;
+    if (parent instanceof PsiReferenceExpression parentRef && parentRef.getQualifierExpression() == ref) return true;
+    return false;
   }
 
   /**
@@ -238,9 +253,6 @@ final class IncompleteModelUtil {
         if (qualifierTarget == null && canBePendingReference(qualifierRef)) {
           return true;
         }
-        if (qualifierTarget instanceof PsiClass psiClass && canBeAugmented(psiClass)) {
-          return true;
-        }
         if (qualifierTarget instanceof PsiClass cls && isHierarchyResolved(cls)) {
           return false;
         } 
@@ -263,11 +275,5 @@ final class IncompleteModelUtil {
   static HighlightInfo.@NotNull Builder getPendingReferenceHighlightInfo(@NotNull PsiElement elementToHighlight) {
     return HighlightInfo.newHighlightInfo(HighlightInfoType.PENDING_REFERENCE).range(elementToHighlight)
       .descriptionAndTooltip(JavaErrorBundle.message("incomplete.project.state.pending.reference"));
-  }
-
-  static boolean canBeAugmented(@Nullable PsiClass targetClass) {
-    if (targetClass == null) return false;
-    return CachedValuesManager.getProjectPsiDependentCache(targetClass,
-                                                           psiClass -> PsiAugmentProvider.canBeAugmentedForIncompleteMode(psiClass));
   }
 }

@@ -142,9 +142,7 @@
 - a:toString():java.lang.String
 *f:com.intellij.platform.workspace.storage.VersionedEntityStorageKt
 - sf:orderToRemoveReplaceAdd(java.util.Collection):java.util.List
-*a:com.intellij.platform.workspace.storage.VersionedStorageChange
-- java.util.EventObject
-- <init>(com.intellij.platform.workspace.storage.VersionedEntityStorage):V
+*:com.intellij.platform.workspace.storage.VersionedStorageChange
 - a:getAllChanges():kotlin.sequences.Sequence
 - a:getChanges(java.lang.Class):java.util.List
 - a:getStorageAfter():com.intellij.platform.workspace.storage.ImmutableEntityStorage
@@ -353,8 +351,6 @@ f:com.intellij.platform.workspace.storage.impl.cache.CachedValue
 f:com.intellij.platform.workspace.storage.impl.cache.ChangeOnVersionedChange
 - <init>(kotlin.sequences.Sequence):V
 - getSize():I
-f:com.intellij.platform.workspace.storage.impl.cache.TracedSnapshotCacheKt
-- sf:cache():com.intellij.platform.workspace.storage.impl.cache.TracedSnapshotCache
 f:com.intellij.platform.workspace.storage.impl.containers.MutableWorkspaceCollectionsKt
 - sf:toMutableWorkspaceList(java.util.Collection):com.intellij.platform.workspace.storage.impl.containers.MutableWorkspaceList
 - sf:toMutableWorkspaceSet(java.util.Collection):com.intellij.platform.workspace.storage.impl.containers.MutableWorkspaceSet
@@ -410,9 +406,6 @@ f:com.intellij.platform.workspace.storage.impl.indices.VirtualFileIndex$MutableV
 - com.intellij.platform.workspace.storage.url.MutableVirtualFileUrlIndex
 - sf:Companion:com.intellij.platform.workspace.storage.impl.indices.VirtualFileIndex$MutableVirtualFileIndex$Companion
 - index(com.intellij.platform.workspace.storage.WorkspaceEntity$Builder,java.lang.String,com.intellij.platform.workspace.storage.url.VirtualFileUrl):V
-- setEntityId2JarDir(com.intellij.platform.workspace.storage.impl.containers.BidirectionalLongMultiMap):V
-- setEntityId2VirtualFileUrl(it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap):V
-- setVfu2EntityId(it.unimi.dsi.fastutil.objects.Object2ObjectOpenCustomHashMap):V
 - f:toImmutable():com.intellij.platform.workspace.storage.impl.indices.VirtualFileIndex
 f:com.intellij.platform.workspace.storage.impl.indices.VirtualFileIndex$MutableVirtualFileIndex$Companion
 com.intellij.platform.workspace.storage.impl.indices.WorkspaceMutableIndex

@@ -1,7 +1,7 @@
 // Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.platform.feedback.localization
 
-import com.intellij.DynamicBundle
+import com.intellij.l10n.LocalizationUtil
 import com.intellij.openapi.components.*
 import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.project.ProjectManager
@@ -36,7 +36,7 @@ class LocalizationFeedbackService(private val coroutineScope: CoroutineScope) : 
   private fun getCurrentSessionTime() = (System.currentTimeMillis() - application.startTime - application.idleTime).coerceAtLeast(0)
 
   fun getLanguagePack() =
-    DynamicBundle.findLanguageBundle()?.pluginDescriptor?.let { it.pluginId.idString to it.version } ?: ("none" to "none")
+    LocalizationUtil.findLanguageBundle()?.pluginDescriptor?.let { it.pluginId.idString to it.version } ?: ("none" to "none")
 
   fun isEnabled() = (PlatformUtils.isRider() && application.isEAP) || isTesting()
 
