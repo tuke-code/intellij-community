@@ -16,6 +16,7 @@
 - sf:BACKEND:com.intellij.platform.runtime.product.ProductMode
 - sf:FRONTEND:com.intellij.platform.runtime.product.ProductMode
 - sf:LOCAL_IDE:com.intellij.platform.runtime.product.ProductMode
+- sf:NOVA:com.intellij.platform.runtime.product.ProductMode
 - getId():java.lang.String
 - s:valueOf(java.lang.String):com.intellij.platform.runtime.product.ProductMode
 - s:values():com.intellij.platform.runtime.product.ProductMode[]
@@ -38,7 +39,6 @@
 - getImportance():com.intellij.platform.runtime.product.ModuleImportance
 - getModuleId():com.intellij.platform.runtime.repository.RuntimeModuleId
 - resolve(com.intellij.platform.runtime.repository.RuntimeModuleRepository):com.intellij.platform.runtime.product.IncludedRuntimeModule
-- toString():java.lang.String
 *f:com.intellij.platform.runtime.product.serialization.RawProductModules
 - f:getBundledPluginMainModules():java.util.List
 - f:getIncludedFrom():java.util.List

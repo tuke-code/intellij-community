@@ -3,10 +3,11 @@
 package org.jetbrains.kotlin.idea.k2.refactoring.move;
 
 import com.intellij.testFramework.TestDataPath;
+import org.jetbrains.kotlin.idea.base.plugin.KotlinPluginMode;
+import org.jetbrains.kotlin.idea.base.test.TestRoot;
 import org.jetbrains.kotlin.idea.test.JUnit3RunnerWithInners;
 import org.jetbrains.kotlin.idea.test.KotlinTestUtils;
 import org.jetbrains.kotlin.test.TestMetadata;
-import org.jetbrains.kotlin.idea.base.test.TestRoot;
 import org.junit.runner.RunWith;
 
 /**
@@ -19,6 +20,12 @@ import org.junit.runner.RunWith;
 @RunWith(JUnit3RunnerWithInners.class)
 @TestMetadata("../../idea/tests/testData/refactoring/moveTopLevel")
 public class K2MoveTopLevelTestGenerated extends AbstractK2MoveTopLevelTest {
+    @java.lang.Override
+    @org.jetbrains.annotations.NotNull
+    public final KotlinPluginMode getPluginMode() {
+        return KotlinPluginMode.K2;
+    }
+
     private void runTest(String testDataFilePath) throws Exception {
         KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
     }
@@ -151,6 +158,11 @@ public class K2MoveTopLevelTestGenerated extends AbstractK2MoveTopLevelTest {
     @TestMetadata("kotlin/implicitInvokeCalls/differentTarget/differentTarget.test")
     public void testKotlin_implicitInvokeCalls_differentTarget_DifferentTarget() throws Exception {
         runTest("../../idea/tests/testData/refactoring/moveTopLevel/kotlin/implicitInvokeCalls/differentTarget/differentTarget.test");
+    }
+
+    @TestMetadata("kotlin/innerReferenceWithoutQualifier/innerReferenceWithoutQualifier.test")
+    public void testKotlin_innerReferenceWithoutQualifier_InnerReferenceWithoutQualifier() throws Exception {
+        runTest("../../idea/tests/testData/refactoring/moveTopLevel/kotlin/innerReferenceWithoutQualifier/innerReferenceWithoutQualifier.test");
     }
 
     @TestMetadata("kotlin/internalReferences/internalReferences.test")
@@ -356,6 +368,11 @@ public class K2MoveTopLevelTestGenerated extends AbstractK2MoveTopLevelTest {
     @TestMetadata("kotlin/protectedMemberUsageWithThis/protectedMemberUsageWithThis.test")
     public void testKotlin_protectedMemberUsageWithThis_ProtectedMemberUsageWithThis() throws Exception {
         runTest("../../idea/tests/testData/refactoring/moveTopLevel/kotlin/protectedMemberUsageWithThis/protectedMemberUsageWithThis.test");
+    }
+
+    @TestMetadata("kotlin/protectedMembersExternalJavaRefs/protectedMembersExternalJavaRefs.test")
+    public void testKotlin_protectedMembersExternalJavaRefs_ProtectedMembersExternalJavaRefs() throws Exception {
+        runTest("../../idea/tests/testData/refactoring/moveTopLevel/kotlin/protectedMembersExternalJavaRefs/protectedMembersExternalJavaRefs.test");
     }
 
     @TestMetadata("kotlin/protectedMembersExternalRefs/protectedMembersExternalRefs.test")

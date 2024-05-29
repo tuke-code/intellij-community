@@ -18,6 +18,11 @@ fun Finder.editor(@Language("xpath") xpath: String? = null): JEditorUiComponent 
            JEditorUiComponent::class.java)
 }
 
+fun Finder.codeEditor(@Language("xpath") xpath: String? = null): JEditorUiComponent {
+  return x(xpath ?: "//div[@class='EditorWindowTopComponent']//div[@class='EditorComponentImpl']",
+           JEditorUiComponent::class.java)
+}
+
 fun Finder.editor(@Language("xpath") xpath: String? = null, action: JEditorUiComponent.() -> Unit) {
   x(xpath ?: "//div[@class='EditorComponentImpl']", JEditorUiComponent::class.java).action()
 }

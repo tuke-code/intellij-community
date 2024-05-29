@@ -54,6 +54,7 @@ public final class MultiRoutingFileSystemProvider
    * @param function      A function that either defines a new backend, or deletes an existing one by returning {@code null}.
    *                      The function gets as the first argument {@link #myLocalProvider} and gets as the second the previous filesystem
    *                      assigned to the root, if it has been assigned.
+   *                      <b>Note:</b> the function may be called more than once.
    */
   public static void computeBackend(
     @NotNull FileSystemProvider provider,
@@ -144,9 +145,17 @@ public final class MultiRoutingFileSystemProvider
       path2 = null;
     }
 
+    if (!path1.isAbsolute()) {
+      path1 = path1.toAbsolutePath();
+    }
+
     FileSystemProvider provider1 = myFileSystem.getBackend(path1.getRoot().toString()).provider();
     if (path2 == null) {
       return provider1;
+    }
+
+    if (!path2.isAbsolute()) {
+      path2 = path2.toAbsolutePath();
     }
 
     FileSystemProvider provider2 = myFileSystem.getBackend(path2.getRoot().toString()).provider();

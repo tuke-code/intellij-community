@@ -27,6 +27,7 @@ import com.intellij.openapi.vcs.changes.VcsEditorTabFilesManager
 import com.intellij.openapi.vcs.changes.ui.TreeHandlerEditorDiffPreview
 import com.intellij.openapi.wm.IdeFocusManager
 import com.intellij.platform.lvcs.impl.*
+import com.intellij.platform.lvcs.impl.settings.ActivityViewApplicationSettings
 import com.intellij.platform.lvcs.impl.statistics.LocalHistoryCounter
 import com.intellij.platform.lvcs.impl.ui.SingleFileActivityDiffPreview.Companion.DIFF_PLACE
 import com.intellij.platform.util.coroutines.childScope
@@ -41,6 +42,7 @@ import com.intellij.util.ui.table.ComponentsListFocusTraversalPolicy
 import com.intellij.vcs.ui.ProgressStripe
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.cancel
+import org.jetbrains.annotations.ApiStatus
 import java.awt.BorderLayout
 import java.awt.Component
 import java.awt.event.KeyEvent
@@ -50,13 +52,15 @@ import javax.swing.ScrollPaneConstants
 import javax.swing.event.DocumentEvent
 import javax.swing.text.JTextComponent
 
+@ApiStatus.Internal
 class ActivityView(private val project: Project, gateway: IdeaGateway, val activityScope: ActivityScope,
                    private val isFrameDiffPreview: Boolean = false) :
   JBPanel<ActivityView>(BorderLayout()), DataProvider, Disposable {
 
   private val coroutineScope = project.service<ActivityService>().coroutineScope.childScope("ActivityView")
+  private val settings = service<ActivityViewApplicationSettings>()
 
-  private val model = ActivityViewModel(project, gateway, activityScope, coroutineScope)
+  private val model = ActivityViewModel(project, gateway, activityScope, currentDiffMode, coroutineScope)
 
   private val activityList = ActivityList { model.activityProvider.getPresentation(it) }.apply {
     updateEmptyText(true)
@@ -67,6 +71,9 @@ class ActivityView(private val project: Project, gateway: IdeaGateway, val activ
   private val editorDiffPreview = if (frameDiffPreview == null) createEditorDiffPreview(changesBrowser) else null
 
   private val changesSplitter: TwoKeySplitter
+
+  private val currentDiffMode get() = if (isSwitchingDiffModeAllowed) settings.diffMode else DirectoryDiffMode.WithNext
+  private val isSwitchingDiffModeAllowed get() = activityScope != ActivityScope.Recent
 
   init {
     PopupHandler.installPopupMenu(activityList, "ActivityView.Popup", "ActivityView.Popup")
@@ -104,7 +111,9 @@ class ActivityView(private val project: Project, gateway: IdeaGateway, val activ
     changesSplitter.firstComponent = mainComponent
     changesSplitter.secondComponent = changesBrowser
 
-    val diffSplitter = OnePixelSplitter(false, "lvcs.diff.splitter.horizontal", 0.2f)
+    val diffSplitter = OnePixelSplitter(false,
+                                        if (changesBrowser != null) "lvcs.diff.with.changes.splitter.horizontal" else "lvcs.diff.with.list.splitter.horizontal",
+                                        if (changesBrowser != null) 0.4f else 0.2f)
     diffSplitter.firstComponent = changesSplitter
     diffSplitter.secondComponent = frameDiffPreview?.component
 
@@ -114,6 +123,7 @@ class ActivityView(private val project: Project, gateway: IdeaGateway, val activ
       override fun onSelectionChanged(selection: ActivitySelection) {
         model.setSelection(selection)
       }
+
       override fun onEnter(): Boolean = showDiff()
       override fun onDoubleClick(): Boolean = showDiff()
     }, this)
@@ -122,24 +132,35 @@ class ActivityView(private val project: Project, gateway: IdeaGateway, val activ
         activityList.updateEmptyText(true)
         progressStripe.startLoading()
       }
+
       override fun onItemsLoadingStopped(data: ActivityData) {
         activityList.setData(data)
         activityList.updateEmptyText(false)
         progressStripe.stopLoading()
       }
+
       override fun onFilteringStarted() {
         filterProgress.startLoading(false)
         activityList.updateEmptyText(true)
       }
+
       override fun onFilteringStopped(result: Set<ActivityItem>?) {
         filterProgress.stopLoading()
         activityList.setVisibleItems(result)
         activityList.updateEmptyText(false)
       }
     }, this)
+    if (isSwitchingDiffModeAllowed) {
+      settings.addListener(object : ActivityViewApplicationSettings.Listener {
+        override fun settingsChanged() {
+          model.diffMode = settings.diffMode
+        }
+      }, this)
+    }
+    model.diffMode = currentDiffMode
 
     isFocusCycleRoot = true
-    focusTraversalPolicy = object: ComponentsListFocusTraversalPolicy() {
+    focusTraversalPolicy = object : ComponentsListFocusTraversalPolicy() {
       override fun getOrderedComponents(): List<Component> {
         return listOfNotNull(activityList, changesBrowser?.preferredFocusedComponent, searchField.textComponent,
                              frameDiffPreview?.preferredFocusedComponent)
@@ -151,6 +172,7 @@ class ActivityView(private val project: Project, gateway: IdeaGateway, val activ
     if (ActivityViewDataKeys.SELECTION.`is`(dataId)) return activityList.selection
     if (ActivityViewDataKeys.SCOPE.`is`(dataId)) return activityScope
     if (EditorTabDiffPreviewManager.EDITOR_TAB_DIFF_PREVIEW.`is`(dataId)) return editorDiffPreview
+    if (ActivityViewDataKeys.DIRECTORY_DIFF_MODE.`is`(dataId)) return model.diffMode
     return null
   }
 
@@ -159,17 +181,17 @@ class ActivityView(private val project: Project, gateway: IdeaGateway, val activ
   private fun createChangesBrowser(): ActivityChangesBrowser? {
     if (model.isSingleDiffSupported) return null
 
-    val changesBrowser = ActivityChangesBrowser(project)
+    val changesBrowser = ActivityChangesBrowser(project, isSwitchingDiffModeAllowed)
     model.addListener(object : ActivityModelListener {
       override fun onDiffDataLoadingStarted() {
-        changesBrowser.updateEmptyText(true)
+        changesBrowser.loadingStarted()
       }
+
       override fun onDiffDataLoadingStopped(diffData: ActivityDiffData?) {
-        changesBrowser.updateEmptyText(false)
-        changesBrowser.diffData = diffData
+        changesBrowser.loadingFinished(diffData)
       }
     }, changesBrowser)
-    changesBrowser.updateEmptyText(true)
+    changesBrowser.loadingStarted()
     Disposer.register(this, changesBrowser)
     return changesBrowser
   }
@@ -208,7 +230,7 @@ class ActivityView(private val project: Project, gateway: IdeaGateway, val activ
       }
       FilterKind.CONTENT -> SearchFieldComponent.MultiLine().also { field ->
         field.containerComponent.setBorder(JBUI.Borders.compound(IdeBorderFactory.createBorder(SideBorder.RIGHT),
-                                                              field.containerComponent.border))
+                                                                 field.containerComponent.border))
         field.textComponent.emptyText.text = LocalHistoryBundle.message("activity.filter.empty.text.content")
 
         dumbAwareAction { selectNextOccurence(true) }.registerCustomShortcutSet(Utils.shortcutSetOf(
@@ -276,16 +298,6 @@ class ActivityView(private val project: Project, gateway: IdeaGateway, val activ
       return LocalHistoryBundle.message("activity.list.empty.text.recent")
     }
     return LocalHistoryBundle.message("activity.list.empty.text.in.scope", activityScope.presentableName)
-  }
-
-  private fun ActivityChangesBrowser.updateEmptyText(isLoading: Boolean) = viewer.setEmptyText(getBrowserEmptyText(isLoading))
-
-  private fun getBrowserEmptyText(isLoading: Boolean): @NlsContexts.StatusText String {
-    if (isLoading) return LocalHistoryBundle.message("activity.empty.text.loading")
-    if (model.selection?.selectedItems.isNullOrEmpty()) {
-      return LocalHistoryBundle.message("activity.browser.empty.text.no.selection")
-    }
-    return LocalHistoryBundle.message("activity.browser.empty.text")
   }
 
   internal fun showDiff(): Boolean {
@@ -366,7 +378,7 @@ class ActivityView(private val project: Project, gateway: IdeaGateway, val activ
 }
 
 @Service(Service.Level.PROJECT)
-class ActivityService(val coroutineScope: CoroutineScope)
+internal class ActivityService(val coroutineScope: CoroutineScope)
 
 private fun dumbAwareAction(runnable: () -> Unit): DumbAwareAction {
   return object : DumbAwareAction() {
@@ -377,11 +389,13 @@ private fun dumbAwareAction(runnable: () -> Unit): DumbAwareAction {
 private sealed interface SearchFieldComponent {
   val containerComponent: JPanel
   val textComponent: JTextComponent
-  class SingleLine: SearchFieldComponent {
+
+  class SingleLine : SearchFieldComponent {
     override val containerComponent = SearchTextField("Lvcs.FileFilter.History")
     override val textComponent: JBTextField get() = containerComponent.textEditor
   }
-  class MultiLine: SearchFieldComponent {
+
+  class MultiLine : SearchFieldComponent {
     private val textArea = JBTextArea()
     override val containerComponent = SearchTextArea(textArea, true)
     override val textComponent = textArea

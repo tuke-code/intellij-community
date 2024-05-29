@@ -3,10 +3,11 @@
 package org.jetbrains.kotlin.idea.k2.refactoring.bindToElement;
 
 import com.intellij.testFramework.TestDataPath;
+import org.jetbrains.kotlin.idea.base.plugin.KotlinPluginMode;
+import org.jetbrains.kotlin.idea.base.test.TestRoot;
 import org.jetbrains.kotlin.idea.test.JUnit3RunnerWithInners;
 import org.jetbrains.kotlin.idea.test.KotlinTestUtils;
 import org.jetbrains.kotlin.test.TestMetadata;
-import org.jetbrains.kotlin.idea.base.test.TestRoot;
 import org.junit.runner.RunWith;
 
 /**
@@ -24,6 +25,12 @@ public abstract class K2BindToElementTestGenerated extends AbstractK2BindToEleme
         @RunWith(JUnit3RunnerWithInners.class)
         @TestMetadata("../../idea/tests/testData/refactoring/bindToFqn/annotationCall")
         public static class AnnotationCall extends AbstractK2BindToElementTest {
+            @java.lang.Override
+            @org.jetbrains.annotations.NotNull
+            public final KotlinPluginMode getPluginMode() {
+                return KotlinPluginMode.K2;
+            }
+
             private void runTest(String testDataFilePath) throws Exception {
                 KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
@@ -47,6 +54,12 @@ public abstract class K2BindToElementTestGenerated extends AbstractK2BindToEleme
         @RunWith(JUnit3RunnerWithInners.class)
         @TestMetadata("../../idea/tests/testData/refactoring/bindToFqn/annotationReference")
         public static class AnnotationReference extends AbstractK2BindToElementTest {
+            @java.lang.Override
+            @org.jetbrains.annotations.NotNull
+            public final KotlinPluginMode getPluginMode() {
+                return KotlinPluginMode.K2;
+            }
+
             private void runTest(String testDataFilePath) throws Exception {
                 KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
@@ -70,6 +83,12 @@ public abstract class K2BindToElementTestGenerated extends AbstractK2BindToEleme
         @RunWith(JUnit3RunnerWithInners.class)
         @TestMetadata("../../idea/tests/testData/refactoring/bindToFqn/callOnCompanionObject")
         public static class CallOnCompanionObject extends AbstractK2BindToElementTest {
+            @java.lang.Override
+            @org.jetbrains.annotations.NotNull
+            public final KotlinPluginMode getPluginMode() {
+                return KotlinPluginMode.K2;
+            }
+
             private void runTest(String testDataFilePath) throws Exception {
                 KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
@@ -93,6 +112,12 @@ public abstract class K2BindToElementTestGenerated extends AbstractK2BindToEleme
         @RunWith(JUnit3RunnerWithInners.class)
         @TestMetadata("../../idea/tests/testData/refactoring/bindToFqn/callOnObject")
         public static class CallOnObject extends AbstractK2BindToElementTest {
+            @java.lang.Override
+            @org.jetbrains.annotations.NotNull
+            public final KotlinPluginMode getPluginMode() {
+                return KotlinPluginMode.K2;
+            }
+
             private void runTest(String testDataFilePath) throws Exception {
                 KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
@@ -116,6 +141,12 @@ public abstract class K2BindToElementTestGenerated extends AbstractK2BindToEleme
         @RunWith(JUnit3RunnerWithInners.class)
         @TestMetadata("../../idea/tests/testData/refactoring/bindToFqn/constructorCall")
         public static class ConstructorCall extends AbstractK2BindToElementTest {
+            @java.lang.Override
+            @org.jetbrains.annotations.NotNull
+            public final KotlinPluginMode getPluginMode() {
+                return KotlinPluginMode.K2;
+            }
+
             private void runTest(String testDataFilePath) throws Exception {
                 KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
@@ -159,6 +190,12 @@ public abstract class K2BindToElementTestGenerated extends AbstractK2BindToEleme
         @RunWith(JUnit3RunnerWithInners.class)
         @TestMetadata("../../idea/tests/testData/refactoring/bindToFqn/delegatedSuperTypeReference")
         public static class DelegatedSuperTypeReference extends AbstractK2BindToElementTest {
+            @java.lang.Override
+            @org.jetbrains.annotations.NotNull
+            public final KotlinPluginMode getPluginMode() {
+                return KotlinPluginMode.K2;
+            }
+
             private void runTest(String testDataFilePath) throws Exception {
                 KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
@@ -182,6 +219,12 @@ public abstract class K2BindToElementTestGenerated extends AbstractK2BindToEleme
         @RunWith(JUnit3RunnerWithInners.class)
         @TestMetadata("../../idea/tests/testData/refactoring/bindToFqn/importReference")
         public static class ImportReference extends AbstractK2BindToElementTest {
+            @java.lang.Override
+            @org.jetbrains.annotations.NotNull
+            public final KotlinPluginMode getPluginMode() {
+                return KotlinPluginMode.K2;
+            }
+
             private void runTest(String testDataFilePath) throws Exception {
                 KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
@@ -200,6 +243,12 @@ public abstract class K2BindToElementTestGenerated extends AbstractK2BindToEleme
         @RunWith(JUnit3RunnerWithInners.class)
         @TestMetadata("../../idea/tests/testData/refactoring/bindToFqn/objectProperty")
         public static class ObjectProperty extends AbstractK2BindToElementTest {
+            @java.lang.Override
+            @org.jetbrains.annotations.NotNull
+            public final KotlinPluginMode getPluginMode() {
+                return KotlinPluginMode.K2;
+            }
+
             private void runTest(String testDataFilePath) throws Exception {
                 KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
@@ -223,6 +272,12 @@ public abstract class K2BindToElementTestGenerated extends AbstractK2BindToEleme
         @RunWith(JUnit3RunnerWithInners.class)
         @TestMetadata("../../idea/tests/testData/refactoring/bindToFqn/propertyTypeReference")
         public static class PropertyTypeReference extends AbstractK2BindToElementTest {
+            @java.lang.Override
+            @org.jetbrains.annotations.NotNull
+            public final KotlinPluginMode getPluginMode() {
+                return KotlinPluginMode.K2;
+            }
+
             private void runTest(String testDataFilePath) throws Exception {
                 KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
@@ -256,6 +311,12 @@ public abstract class K2BindToElementTestGenerated extends AbstractK2BindToEleme
         @RunWith(JUnit3RunnerWithInners.class)
         @TestMetadata("../../idea/tests/testData/refactoring/bindToFqn/returnTypeReference")
         public static class ReturnTypeReference extends AbstractK2BindToElementTest {
+            @java.lang.Override
+            @org.jetbrains.annotations.NotNull
+            public final KotlinPluginMode getPluginMode() {
+                return KotlinPluginMode.K2;
+            }
+
             private void runTest(String testDataFilePath) throws Exception {
                 KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
@@ -279,6 +340,12 @@ public abstract class K2BindToElementTestGenerated extends AbstractK2BindToEleme
         @RunWith(JUnit3RunnerWithInners.class)
         @TestMetadata("../../idea/tests/testData/refactoring/bindToFqn/superTypeCall")
         public static class SuperTypeCall extends AbstractK2BindToElementTest {
+            @java.lang.Override
+            @org.jetbrains.annotations.NotNull
+            public final KotlinPluginMode getPluginMode() {
+                return KotlinPluginMode.K2;
+            }
+
             private void runTest(String testDataFilePath) throws Exception {
                 KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
@@ -302,6 +369,12 @@ public abstract class K2BindToElementTestGenerated extends AbstractK2BindToEleme
         @RunWith(JUnit3RunnerWithInners.class)
         @TestMetadata("../../idea/tests/testData/refactoring/bindToFqn/superTypeReference")
         public static class SuperTypeReference extends AbstractK2BindToElementTest {
+            @java.lang.Override
+            @org.jetbrains.annotations.NotNull
+            public final KotlinPluginMode getPluginMode() {
+                return KotlinPluginMode.K2;
+            }
+
             private void runTest(String testDataFilePath) throws Exception {
                 KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
@@ -325,6 +398,12 @@ public abstract class K2BindToElementTestGenerated extends AbstractK2BindToEleme
         @RunWith(JUnit3RunnerWithInners.class)
         @TestMetadata("../../idea/tests/testData/refactoring/bindToFqn/topLevelFunctionCall")
         public static class TopLevelFunctionCall extends AbstractK2BindToElementTest {
+            @java.lang.Override
+            @org.jetbrains.annotations.NotNull
+            public final KotlinPluginMode getPluginMode() {
+                return KotlinPluginMode.K2;
+            }
+
             private void runTest(String testDataFilePath) throws Exception {
                 KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
@@ -348,6 +427,12 @@ public abstract class K2BindToElementTestGenerated extends AbstractK2BindToEleme
         @RunWith(JUnit3RunnerWithInners.class)
         @TestMetadata("../../idea/tests/testData/refactoring/bindToFqn/topLevelProperty")
         public static class TopLevelProperty extends AbstractK2BindToElementTest {
+            @java.lang.Override
+            @org.jetbrains.annotations.NotNull
+            public final KotlinPluginMode getPluginMode() {
+                return KotlinPluginMode.K2;
+            }
+
             private void runTest(String testDataFilePath) throws Exception {
                 KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
@@ -376,6 +461,12 @@ public abstract class K2BindToElementTestGenerated extends AbstractK2BindToEleme
         @RunWith(JUnit3RunnerWithInners.class)
         @TestMetadata("../../idea/tests/testData/refactoring/bindToFqn/typeArgs")
         public static class TypeArgs extends AbstractK2BindToElementTest {
+            @java.lang.Override
+            @org.jetbrains.annotations.NotNull
+            public final KotlinPluginMode getPluginMode() {
+                return KotlinPluginMode.K2;
+            }
+
             private void runTest(String testDataFilePath) throws Exception {
                 KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
@@ -403,6 +494,12 @@ public abstract class K2BindToElementTestGenerated extends AbstractK2BindToEleme
         @RunWith(JUnit3RunnerWithInners.class)
         @TestMetadata("../../idea/tests/testData/refactoring/bindToElement/callableMemberReference")
         public static class CallableMemberReference extends AbstractK2BindToElementTest {
+            @java.lang.Override
+            @org.jetbrains.annotations.NotNull
+            public final KotlinPluginMode getPluginMode() {
+                return KotlinPluginMode.K2;
+            }
+
             private void runTest(String testDataFilePath) throws Exception {
                 KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
@@ -441,6 +538,12 @@ public abstract class K2BindToElementTestGenerated extends AbstractK2BindToEleme
         @RunWith(JUnit3RunnerWithInners.class)
         @TestMetadata("../../idea/tests/testData/refactoring/bindToElement/callableTopLevelReference")
         public static class CallableTopLevelReference extends AbstractK2BindToElementTest {
+            @java.lang.Override
+            @org.jetbrains.annotations.NotNull
+            public final KotlinPluginMode getPluginMode() {
+                return KotlinPluginMode.K2;
+            }
+
             private void runTest(String testDataFilePath) throws Exception {
                 KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
@@ -474,6 +577,12 @@ public abstract class K2BindToElementTestGenerated extends AbstractK2BindToEleme
         @RunWith(JUnit3RunnerWithInners.class)
         @TestMetadata("../../idea/tests/testData/refactoring/bindToElement/docReference")
         public static class DocReference extends AbstractK2BindToElementTest {
+            @java.lang.Override
+            @org.jetbrains.annotations.NotNull
+            public final KotlinPluginMode getPluginMode() {
+                return KotlinPluginMode.K2;
+            }
+
             private void runTest(String testDataFilePath) throws Exception {
                 KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
@@ -497,6 +606,12 @@ public abstract class K2BindToElementTestGenerated extends AbstractK2BindToEleme
         @RunWith(JUnit3RunnerWithInners.class)
         @TestMetadata("../../idea/tests/testData/refactoring/bindToElement/extensionFunctionCall")
         public static class ExtensionFunctionCall extends AbstractK2BindToElementTest {
+            @java.lang.Override
+            @org.jetbrains.annotations.NotNull
+            public final KotlinPluginMode getPluginMode() {
+                return KotlinPluginMode.K2;
+            }
+
             private void runTest(String testDataFilePath) throws Exception {
                 KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
@@ -535,6 +650,12 @@ public abstract class K2BindToElementTestGenerated extends AbstractK2BindToEleme
         @RunWith(JUnit3RunnerWithInners.class)
         @TestMetadata("../../idea/tests/testData/refactoring/bindToElement/extensionProperty")
         public static class ExtensionProperty extends AbstractK2BindToElementTest {
+            @java.lang.Override
+            @org.jetbrains.annotations.NotNull
+            public final KotlinPluginMode getPluginMode() {
+                return KotlinPluginMode.K2;
+            }
+
             private void runTest(String testDataFilePath) throws Exception {
                 KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
@@ -578,6 +699,12 @@ public abstract class K2BindToElementTestGenerated extends AbstractK2BindToEleme
         @RunWith(JUnit3RunnerWithInners.class)
         @TestMetadata("../../idea/tests/testData/refactoring/bindToElement/extensionVariableAccessCall")
         public static class ExtensionVariableAccessCall extends AbstractK2BindToElementTest {
+            @java.lang.Override
+            @org.jetbrains.annotations.NotNull
+            public final KotlinPluginMode getPluginMode() {
+                return KotlinPluginMode.K2;
+            }
+
             private void runTest(String testDataFilePath) throws Exception {
                 KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
@@ -614,23 +741,31 @@ public abstract class K2BindToElementTestGenerated extends AbstractK2BindToEleme
         }
 
         @RunWith(JUnit3RunnerWithInners.class)
-        @TestMetadata("../../idea/tests/testData/refactoring/bindToElement/instanceFunctionCall")
-        public static class InstanceFunctionCall extends AbstractK2BindToElementTest {
+        @TestMetadata("../../idea/tests/testData/refactoring/bindToElement/operationReference")
+        public static class OperationReference extends AbstractK2BindToElementTest {
+            @java.lang.Override
+            @org.jetbrains.annotations.NotNull
+            public final KotlinPluginMode getPluginMode() {
+                return KotlinPluginMode.K2;
+            }
+
             private void runTest(String testDataFilePath) throws Exception {
                 KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
 
             @TestMetadata("Operator.kt")
             public void testOperator() throws Exception {
-                runTest("../../idea/tests/testData/refactoring/bindToElement/instanceFunctionCall/Operator.kt");
+                runTest("../../idea/tests/testData/refactoring/bindToElement/operationReference/Operator.kt");
             }
-        }
 
-        @RunWith(JUnit3RunnerWithInners.class)
-        @TestMetadata("../../idea/tests/testData/refactoring/bindToElement/operationReference")
-        public static class OperationReference extends AbstractK2BindToElementTest {
-            private void runTest(String testDataFilePath) throws Exception {
-                KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+            @TestMetadata("OperatorOverride.kt")
+            public void testOperatorOverride() throws Exception {
+                runTest("../../idea/tests/testData/refactoring/bindToElement/operationReference/OperatorOverride.kt");
+            }
+
+            @TestMetadata("Override.kt")
+            public void testOverride() throws Exception {
+                runTest("../../idea/tests/testData/refactoring/bindToElement/operationReference/Override.kt");
             }
 
             @TestMetadata("RootPkg.kt")
@@ -642,11 +777,22 @@ public abstract class K2BindToElementTestGenerated extends AbstractK2BindToEleme
             public void testUnQualified() throws Exception {
                 runTest("../../idea/tests/testData/refactoring/bindToElement/operationReference/UnQualified.kt");
             }
+
+            @TestMetadata("WithRegularCall.kt")
+            public void testWithRegularCall() throws Exception {
+                runTest("../../idea/tests/testData/refactoring/bindToElement/operationReference/WithRegularCall.kt");
+            }
         }
 
         @RunWith(JUnit3RunnerWithInners.class)
         @TestMetadata("../../idea/tests/testData/refactoring/bindToElement/topLevelFunctionCall")
         public static class TopLevelFunctionCall extends AbstractK2BindToElementTest {
+            @java.lang.Override
+            @org.jetbrains.annotations.NotNull
+            public final KotlinPluginMode getPluginMode() {
+                return KotlinPluginMode.K2;
+            }
+
             private void runTest(String testDataFilePath) throws Exception {
                 KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
