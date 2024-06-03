@@ -426,7 +426,17 @@ class J2KNullityInferrer {
         private boolean processParameter(@NotNull PsiParameter parameter, @NotNull PsiReferenceExpression expr, PsiElement parent) {
             if (PsiUtil.isAccessedForWriting(expr)) return true;
 
-            if (parent instanceof PsiBinaryExpression binOp) {
+            if (parent instanceof PsiThrowStatement) {
+                registerNotNullAnnotation(parameter);
+                return true;
+            } else if (parent instanceof PsiSynchronizedStatement) {
+                registerNotNullAnnotation(parameter);
+                return true;
+            } else if (parent instanceof PsiArrayAccessExpression) {
+                // For both array and index expressions
+                registerNotNullAnnotation(parameter);
+                return true;
+            } else if (parent instanceof PsiBinaryExpression binOp) {
                 PsiExpression opposite = null;
                 final PsiExpression lOperand = binOp.getLOperand();
                 final PsiExpression rOperand = binOp.getROperand();
@@ -490,7 +500,9 @@ class J2KNullityInferrer {
                             final PsiParameter[] parameters = resolvedMethod.getParameterList().getParameters();
                             if (idx < parameters.length) { //not vararg
                                 final PsiParameter resolvedToParam = parameters[idx];
-                                if (isNotNull(resolvedToParam) && !resolvedToParam.isVarArgs()) {
+                                boolean isArray = parameter.getType() instanceof PsiArrayType;
+                                if (isNotNull(resolvedToParam) || (isArray && !parameter.isVarArgs() && resolvedToParam.isVarArgs())) {
+                                    // In the case of varargs in Kotlin, the spread operator needs to be applied to a not-null array
                                     registerNotNullAnnotation(parameter);
                                     return true;
                                 }

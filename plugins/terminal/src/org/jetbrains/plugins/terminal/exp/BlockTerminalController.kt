@@ -15,9 +15,8 @@ import com.intellij.openapi.util.Disposer
 import com.intellij.util.concurrency.annotations.RequiresEdt
 import com.jediterm.core.util.TermSize
 import org.jetbrains.plugins.terminal.exp.BlockTerminalSearchSession.Companion.isSearchInBlock
-import org.jetbrains.plugins.terminal.exp.TerminalOutputModel.TerminalOutputListener
-import org.jetbrains.plugins.terminal.exp.prompt.PromptRenderingInfo
 import org.jetbrains.plugins.terminal.exp.prompt.TerminalPromptController
+import org.jetbrains.plugins.terminal.exp.prompt.TerminalPromptRenderingInfo
 import org.jetbrains.plugins.terminal.fus.TerminalShellInfoStatistics
 import org.jetbrains.plugins.terminal.fus.TerminalUsageTriggerCollector
 import java.util.concurrent.CopyOnWriteArrayList
@@ -55,7 +54,7 @@ internal class BlockTerminalController(
         TerminalUsageTriggerCollector.triggerCommandFinished(project, event.command, event.exitCode, event.duration)
       }
     })
-    session.commandManager.commandExecutionManager.addListener(object : ShellCommandSentListener {
+    session.commandExecutionManager.addListener(object : ShellCommandSentListener {
       override fun userCommandSent(userCommand: String) {
         invokeLaterIfNeeded(getDisposed(), ModalityState.any()) {
           // If `userCommandSent` is triggered by the `commandFinished` event,
@@ -63,7 +62,7 @@ internal class BlockTerminalController(
           // both listen to `commandFinished` event, so they are called in an
           // unspecified order). Use `doWhenNextBlockCanBeStarted` to fix the race.
           outputController.doWhenNextBlockCanBeStarted {
-            startCommandBlock(userCommand, promptController.model.promptRenderingInfo)
+            startCommandBlock(userCommand, promptController.model.renderingInfo)
           }
         }
       }
@@ -86,7 +85,7 @@ internal class BlockTerminalController(
       outputController.insertEmptyLine()
     }
     else {
-      session.commandManager.sendCommandToExecute(command) // will trigger `userCommandSent`
+      session.commandExecutionManager.sendCommandToExecute(command) // will trigger `userCommandSent`
       TerminalUsageLocalStorage.getInstance().recordCommandExecuted(session.shellIntegration.shellType.toString())
     }
     // report event even if it is an empty command, because it will be reported as a separate command type
@@ -94,13 +93,13 @@ internal class BlockTerminalController(
   }
 
   @RequiresEdt(generateAssertion = false)
-  private fun startCommandBlock(command: String?, prompt: PromptRenderingInfo?) {
+  private fun startCommandBlock(command: String?, prompt: TerminalPromptRenderingInfo?) {
     outputController.startCommandBlock(command, prompt)
     // Hide the prompt only when the new block is created, so it will look like the prompt is replaced with a block atomically.
     // If the command is finished very fast, the prompt will be shown back before repainting.
     // So it will look like it was not hidden at all.
     val disposable = Disposer.newDisposable(session)
-    outputController.outputModel.addListener(object : TerminalOutputListener {
+    outputController.outputModel.addListener(object : TerminalOutputModelListener {
       override fun blockCreated(block: CommandBlock) {
         promptController.promptIsVisible = false
         Disposer.dispose(disposable)

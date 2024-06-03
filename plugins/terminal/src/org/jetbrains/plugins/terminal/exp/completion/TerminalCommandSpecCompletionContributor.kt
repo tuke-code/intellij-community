@@ -11,11 +11,12 @@ import com.intellij.openapi.util.TextRange
 import com.intellij.openapi.util.text.StringUtil
 import com.intellij.terminal.completion.ShellCommandSpecCompletion
 import com.intellij.terminal.completion.spec.ShellCompletionSuggestion
+import org.jetbrains.plugins.terminal.action.TerminalCommandCompletionAction
 import org.jetbrains.plugins.terminal.block.completion.spec.ShellDataGenerators.availableCommandsGenerator
 import org.jetbrains.plugins.terminal.block.completion.spec.ShellDataGenerators.fileSuggestionsGenerator
 import org.jetbrains.plugins.terminal.block.completion.spec.impl.ShellDataGeneratorsExecutorImpl
-import org.jetbrains.plugins.terminal.block.completion.spec.impl.ShellRuntimeContextProviderImpl
 import org.jetbrains.plugins.terminal.block.completion.spec.impl.ShellEnvBasedGenerators.aliasesGenerator
+import org.jetbrains.plugins.terminal.block.completion.spec.impl.ShellRuntimeContextProviderImpl
 import org.jetbrains.plugins.terminal.exp.BlockTerminalSession
 import org.jetbrains.plugins.terminal.exp.TerminalDataContextUtils.terminalPromptModel
 import org.jetbrains.plugins.terminal.exp.completion.TerminalCompletionUtil.findIconForSuggestion
@@ -37,11 +38,13 @@ internal class TerminalCommandSpecCompletionContributor : CompletionContributor(
         parameters.completionType != CompletionType.BASIC) {
       return
     }
+    if (parameters.editor.getUserData(TerminalCommandCompletionAction.SUPPRESS_COMPLETION) == true) {
+      result.stopHere()
+      return
+    }
+
     val shellSupport = TerminalShellSupport.findByShellType(session.shellIntegration.shellType) ?: return
     val context = TerminalCompletionContext(session, runtimeContextProvider, generatorsExecutor, shellSupport, parameters)
-
-    val prefix = result.prefixMatcher.prefix.substringAfterLast(File.separatorChar) // take last part if it is a file path
-    val resultSet = result.withPrefixMatcher(PlainPrefixMatcher(prefix, true))
 
     val document = parameters.editor.document
     val caretOffset = parameters.editor.caretModel.offset
@@ -51,10 +54,18 @@ internal class TerminalCommandSpecCompletionContributor : CompletionContributor(
       tokens + ""  // user inserted space after the last token, so add empty incomplete token as last
     }
     else tokens
+    if (allTokens.isEmpty()) {
+      return
+    }
 
     val suggestions = runBlockingCancellable {
       computeSuggestions(allTokens, context)
     }
+
+    val prefixReplacementIndex = suggestions.firstOrNull()?.prefixReplacementIndex ?: 0
+    val prefix = allTokens.last().substring(prefixReplacementIndex)
+    val resultSet = result.withPrefixMatcher(PlainPrefixMatcher(prefix, true))
+
     val elements = suggestions.map { it.toLookupElement() }
     resultSet.addAllElements(elements)
 
@@ -79,7 +90,7 @@ internal class TerminalCommandSpecCompletionContributor : CompletionContributor(
     if (arguments.isEmpty()) {
       val commands = context.generatorsExecutor.execute(runtimeContext, availableCommandsGenerator())
       val files = context.generatorsExecutor.execute(runtimeContext, fileSuggestionsGenerator())
-      return commands + files
+      return commands + files.filter { !it.isHidden }
     }
     else {
       val commandVariants = if (command.endsWith(".exe")) listOf(command.removeSuffix(".exe"), command) else listOf(command)
@@ -89,7 +100,7 @@ internal class TerminalCommandSpecCompletionContributor : CompletionContributor(
         // Suggest file names if there is nothing to suggest, and completion is invoked manually.
         // But not for PowerShell, here it would be better to fall back to shell-based completion
         !context.parameters.isAutoPopup && context.session.shellIntegration.shellType != ShellType.POWERSHELL -> {
-          context.generatorsExecutor.execute(runtimeContext, fileSuggestionsGenerator())
+          context.generatorsExecutor.execute(runtimeContext, fileSuggestionsGenerator()).filter { !it.isHidden }
         }
         else -> emptyList()
       }

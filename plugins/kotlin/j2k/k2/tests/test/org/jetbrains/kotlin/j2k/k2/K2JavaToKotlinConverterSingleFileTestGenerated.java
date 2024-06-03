@@ -5141,6 +5141,11 @@ public abstract class K2JavaToKotlinConverterSingleFileTestGenerated extends Abs
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
 
+        @TestMetadata("arrayAccess.java")
+        public void testArrayAccess() throws Exception {
+            runTest("../../shared/tests/testData/newJ2k/nullability/arrayAccess.java");
+        }
+
         @TestMetadata("autoNotNull.java")
         public void testAutoNotNull() throws Exception {
             runTest("../../shared/tests/testData/newJ2k/nullability/autoNotNull.java");
@@ -5329,6 +5334,16 @@ public abstract class K2JavaToKotlinConverterSingleFileTestGenerated extends Abs
         @TestMetadata("ParameterComparedWithNull.java")
         public void testParameterComparedWithNull() throws Exception {
             runTest("../../shared/tests/testData/newJ2k/nullability/ParameterComparedWithNull.java");
+        }
+
+        @TestMetadata("synchronized.java")
+        public void testSynchronized() throws Exception {
+            runTest("../../shared/tests/testData/newJ2k/nullability/synchronized.java");
+        }
+
+        @TestMetadata("throw.java")
+        public void testThrow() throws Exception {
+            runTest("../../shared/tests/testData/newJ2k/nullability/throw.java");
         }
 
         @TestMetadata("VariableAssignedWithNull.java")
@@ -5698,6 +5713,11 @@ public abstract class K2JavaToKotlinConverterSingleFileTestGenerated extends Abs
         @TestMetadata("SmartcastImpossible.java")
         public void testSmartcastImpossible() throws Exception {
             runTest("../../shared/tests/testData/newJ2k/postProcessing/SmartcastImpossible.java");
+        }
+
+        @TestMetadata("SmartcastInsideLambda.java")
+        public void testSmartcastInsideLambda() throws Exception {
+            runTest("../../shared/tests/testData/newJ2k/postProcessing/SmartcastInsideLambda.java");
         }
 
         @TestMetadata("SortModifiers.java")

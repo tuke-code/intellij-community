@@ -25,7 +25,7 @@ internal class SimpleTerminalController(
   private val terminalModel: TerminalModel
     get() = session.model
 
-  private val outputModel: TerminalOutputModel = TerminalOutputModel(editor)
+  private val outputModel: TerminalOutputModel = TerminalOutputModelImpl(editor)
   private val selectionModel = TerminalSelectionModel(outputModel)  // fake model, that won't be changed
   private val caretModel: TerminalCaretModel = TerminalCaretModel(session, outputModel, editor, parentDisposable = this)
   private val caretPainter: TerminalCaretPainter = TerminalCaretPainter(caretModel, outputModel, selectionModel, editor)
@@ -120,7 +120,7 @@ internal class SimpleTerminalController(
 
   private fun updateEditor(content: TextWithHighlightings) {
     document.setText(content.text)
-    editor.highlighter = TerminalTextHighlighter(AllHighlightingsSnapshot(editor.document, content.highlightings))
+    editor.highlighter = TerminalTextHighlighter(TerminalOutputHighlightingsSnapshot(editor.document, content.highlightings))
 
     val line = terminalModel.historyLinesCount + terminalModel.cursorY - 1
     editor.caretModel.moveToLogicalPosition(LogicalPosition(line, terminalModel.cursorX))

@@ -56,7 +56,9 @@ interface SettingsService {
 
   val jbAccount: IPropertyView<JBAccountInfoService.JBAData?>
 
-  val isSyncEnabled: IPropertyView<Boolean>
+  val isSyncEnabled: Boolean
+
+  val hasDataToSync: IPropertyView<Boolean>
 
   val doClose: ISignal<Unit>
 
@@ -155,11 +157,14 @@ class SettingsServiceImpl(private val coroutineScope: CoroutineScope) : Settings
   }
 
   // override val isSyncEnabled = jbAccount.compose(unloggedSyncHide()) { account, reg -> !reg || account != null }
-  override val isSyncEnabled = jbAccount.compose(getSyncService().syncState) { account, state -> account != null && state == SyncService.SYNC_STATE.LOGGED }
+  override val hasDataToSync = Property(false)
+  //override val hasDataToSync = jbAccount.compose(getSyncService().syncState) { account, state -> account != null && state == SyncService.SYNC_STATE.LOGGED }
+
+  override val isSyncEnabled = System.getProperty("import.settings.sync.enabled").toBoolean()
 
   init {
     if (useMockDataForStartupWizard) {
-      jbAccount.set(JBAccountInfoService.JBAData("Aleksey Ivanovskii", "alex.ivanovskii", "alex.ivanovskii@gmail.com"))
+      jbAccount.set(JBAccountInfoService.JBAData("Aleksey Ivanovskii", "alex.ivanovskii", "alex.ivanovskii@gmail.com", "Alex Ivanovskii"))
     }
   }
 }
