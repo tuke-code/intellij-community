@@ -1,4 +1,4 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.codeInsight.highlighting;
 
 import com.intellij.codeInsight.CodeInsightSettings;
@@ -9,6 +9,7 @@ import com.intellij.codeInsight.daemon.impl.IdentifierHighlighterPassFactory;
 import com.intellij.codeInsight.template.Template;
 import com.intellij.codeInsight.template.TemplateEditingAdapter;
 import com.intellij.codeInsight.template.TemplateManager;
+import com.intellij.codeInsight.template.impl.TemplateManagerUtilBase;
 import com.intellij.find.EditorSearchSession;
 import com.intellij.find.FindManager;
 import com.intellij.find.FindModel;
@@ -36,7 +37,6 @@ import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.util.Key;
 import com.intellij.openapi.util.ProperTextRange;
 import com.intellij.openapi.util.TextRange;
-import com.intellij.openapi.util.registry.Registry;
 import com.intellij.psi.PsiDocumentManager;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.util.PsiUtilBase;
@@ -131,8 +131,9 @@ final class BackgroundHighlighter {
           clearBraces(project, ((TextEditor)oldEditor).getEditor(), alarm);
         }
         FileEditor newEditor = e.getNewEditor();
-        if (newEditor instanceof TextEditor) {
-          updateHighlighted(project, ((TextEditor)newEditor).getEditor(), alarm);
+        if (newEditor instanceof TextEditor textEditor) {
+          updateHighlighted(project, textEditor.getEditor(), alarm);
+          highlightSelection(project, textEditor.getEditor());
         }
       }
     });
@@ -160,9 +161,6 @@ final class BackgroundHighlighter {
   }
 
   private static void highlightSelection(@NotNull Project project, @NotNull Editor editor) {
-    if (!Registry.is("editor.highlight.selected.text.occurrences") || !CodeInsightSettings.getInstance().HIGHLIGHT_IDENTIFIER_UNDER_CARET) {
-      return;
-    }
     ThreadingAssertions.assertEventDispatchThread();
     Document document = editor.getDocument();
     long stamp = document.getModificationStamp();
@@ -179,6 +177,12 @@ final class BackgroundHighlighter {
       for (RangeHighlighter highlighter : oldHighlighters) {
         markupModel.removeHighlighter(highlighter);
       }
+    }
+    if (!editor.getSettings().isHighlightSelectionOccurrences()) {
+      return;
+    }
+    if (TemplateManagerUtilBase.getTemplateState(editor) != null) {
+      return; // don't highlight selected text when template is active
     }
     CaretModel caretModel = editor.getCaretModel();
     if (caretModel.getCaretCount() > 1) {

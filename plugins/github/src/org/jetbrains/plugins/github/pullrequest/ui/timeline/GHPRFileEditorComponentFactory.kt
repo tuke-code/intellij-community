@@ -43,7 +43,6 @@ import org.jetbrains.plugins.github.pullrequest.ui.details.model.GHPRDetailsFull
 import org.jetbrains.plugins.github.pullrequest.ui.emoji.GHReactionsComponentFactory
 import org.jetbrains.plugins.github.pullrequest.ui.emoji.GHReactionsPickerComponentFactory
 import org.jetbrains.plugins.github.ui.component.GHHtmlErrorPanel
-import javax.swing.Action
 import javax.swing.JComponent
 import javax.swing.JLabel
 import javax.swing.JPanel
@@ -69,7 +68,14 @@ internal class GHPRFileEditorComponentFactory(private val timelineVm: GHPRTimeli
 
     val progressAndErrorPanel = JPanel(ListLayout.vertical(0, ListLayout.Alignment.CENTER)).apply {
       isOpaque = false
-      val errorPanel = ErrorStatusPanelFactory.create(cs, timelineVm.loadingError, ErrorPresenter())
+      val errorPanel = ErrorStatusPanelFactory.create(cs, timelineVm.loadingError, ErrorStatusPresenter.simple(
+        GithubBundle.message("pull.request.timeline.cannot.load"),
+        descriptionProvider = { error ->
+          if (error is GithubAuthenticationException) GithubBundle.message("pull.request.list.error.authorization")
+          else GHHtmlErrorPanel.getLoadingErrorText(error)
+        },
+        actionProvider = timelineVm.loadingErrorHandler::getActionForError
+      ))
 
       val loadingIcon = JLabel(AnimatedIcon.Default()).apply {
         border = CodeReviewTimelineUIUtil.ITEM_BORDER
@@ -210,15 +216,5 @@ internal class GHPRFileEditorComponentFactory(private val timelineVm: GHPRTimeli
       .wrapWith(HtmlChunk.font(ColorUtil.toHex(UIUtil.getContextHelpForeground())))
       .wrapWith("i")
       .toString()
-  }
-
-  private inner class ErrorPresenter : ErrorStatusPresenter.Text<Throwable> {
-    override fun getErrorTitle(error: Throwable): String = GithubBundle.message("pull.request.timeline.cannot.load")
-
-    override fun getErrorDescription(error: Throwable): String =
-      if (error is GithubAuthenticationException) GithubBundle.message("pull.request.list.error.authorization")
-      else GHHtmlErrorPanel.getLoadingErrorText(error)
-
-    override fun getErrorAction(error: Throwable): Action? = timelineVm.loadingErrorHandler.getActionForError(error)
   }
 }

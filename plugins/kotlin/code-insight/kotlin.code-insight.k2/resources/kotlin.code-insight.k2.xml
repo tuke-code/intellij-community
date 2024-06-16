@@ -133,6 +133,11 @@
                  defaultValue="false"
                  restartRequired="true"/>
 
+    <registryKey key="kotlin.k2.kmp.wasm.enabled"
+                 description="Enable KMP support in the K2 mode for WASM platform"
+                 defaultValue="false"
+                 restartRequired="true"/>
+
     <!-- inlay hints -->
     <codeInsight.inlayActionHandler implementationClass="org.jetbrains.kotlin.idea.codeInsight.hints.KotlinFqnDeclarativeInlayActionHandler"
                                     handlerId="kotlin.fqn.class"/>
@@ -211,7 +216,7 @@
       <!--        <option bundle="messages.KotlinBundle"-->
       <!--              optionId="hints.parameters.blacklisted"-->
       <!--              enabledByDefault="false"-->
-      <!--              nameKey="hints.settings.parameters.blacklisted"-->
+      <!--              nameKey="hints.settings.excluded.parameters"-->
       <!--              descriptionKey="inlay.kotlin.parameters.hints.blacklisted"/>-->
     </codeInsight.declarativeInlayProvider>
 
@@ -227,10 +232,16 @@
 
     <vcs.codeVisionLanguageContext language="kotlin"
                                    implementationClass="org.jetbrains.kotlin.idea.codeInsight.hints.KotlinVcsCodeVisionContext"/>
+
+    <callHierarchyProvider
+            language="kotlin"
+            implementationClass="org.jetbrains.kotlin.idea.k2.codeinsight.hierarchy.calls.KotlinCallHierarchyProvider"/>
+    <hierarchy.referenceProcessor implementation="org.jetbrains.kotlin.idea.k2.codeinsight.hierarchy.calls.KotlinCallReferenceProcessor"/>
   </extensions>
   <extensions defaultExtensionNs="org.jetbrains.kotlin">
     <codeinsight.quickfix.registrar implementation="org.jetbrains.kotlin.idea.k2.codeinsight.quickFixes.createFromUsage.K2CreateFromUsageQuickFixesRegistrar"/>
 
     <supportAvailability implementation="org.jetbrains.kotlin.idea.k2.codeinsight.MultiplatformSupportAvailability"/>
+    <supportAvailability implementation="org.jetbrains.kotlin.idea.k2.codeinsight.WasmMultiplatformSupportAvailability"/>
   </extensions>
 </idea-plugin>

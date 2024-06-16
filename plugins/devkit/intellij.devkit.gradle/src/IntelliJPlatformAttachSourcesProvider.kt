@@ -16,14 +16,13 @@ import com.intellij.psi.PsiFile
 import org.jetbrains.idea.devkit.projectRoots.IntelliJPlatformProduct
 import org.jetbrains.plugins.gradle.util.GradleDependencySourceDownloader
 import java.io.File
-import kotlin.io.path.Path
 
 /**
  * Attaches sources to the IntelliJ Platform dependencies in projects using IntelliJ Platform Gradle Plugin 2.x.
  * Some IDEs, like IntelliJ IDEA Ultimate or PhpStorm, don't provide sources for artifacts published to IntelliJ Repository.
  * To handle such a case, IntelliJ IDEA Community sources are attached.
  */
-class IntelliJPlatformAttachSourcesProvider : AttachSourcesProvider {
+internal class IntelliJPlatformAttachSourcesProvider : AttachSourcesProvider {
 
   override fun getActions(orderEntries: MutableList<out LibraryOrderEntry>, psiFile: PsiFile): List<AttachSourcesAction> {
     // Search for a product that matches any of the entry coordinates. Return both product and coordinates, to refer to the same version.
@@ -31,6 +30,7 @@ class IntelliJPlatformAttachSourcesProvider : AttachSourcesProvider {
       it.library?.getMavenCoordinates()
     }.firstNotNullOfOrNull { coordinates ->
       val product = IntelliJPlatformProduct.fromMavenCoordinates(coordinates.groupId, coordinates.artifactId)
+                    ?: IntelliJPlatformProduct.fromCdnCoordinates(coordinates.groupId, coordinates.artifactId)
       if (product == null) {
         return@firstNotNullOfOrNull null
       }

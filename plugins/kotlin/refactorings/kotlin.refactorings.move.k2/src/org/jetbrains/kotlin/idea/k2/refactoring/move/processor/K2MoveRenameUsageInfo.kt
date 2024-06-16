@@ -16,12 +16,8 @@ import com.intellij.usageView.UsageInfo
 import org.jetbrains.kotlin.analysis.api.analyze
 import org.jetbrains.kotlin.analysis.api.permissions.KaAllowAnalysisOnEdt
 import org.jetbrains.kotlin.analysis.api.permissions.allowAnalysisOnEdt
-import org.jetbrains.kotlin.analysis.api.symbols.KtCallableSymbol
-import org.jetbrains.kotlin.analysis.api.symbols.KtClassKind
-import org.jetbrains.kotlin.analysis.api.symbols.KtClassOrObjectSymbol
-import org.jetbrains.kotlin.analysis.api.symbols.KtConstructorSymbol
-import org.jetbrains.kotlin.analysis.api.symbols.KtPropertySymbol
-import org.jetbrains.kotlin.analysis.api.symbols.markers.KtSymbolWithMembers
+import org.jetbrains.kotlin.analysis.api.symbols.*
+import org.jetbrains.kotlin.analysis.api.symbols.markers.KaSymbolWithMembers
 import org.jetbrains.kotlin.analysis.api.types.KtFunctionalType
 import org.jetbrains.kotlin.asJava.toLightElements
 import org.jetbrains.kotlin.idea.base.analysis.api.utils.shortenReferences
@@ -34,7 +30,6 @@ import org.jetbrains.kotlin.idea.references.mainReference
 import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.psi.psiUtil.collectDescendantsOfType
 import org.jetbrains.kotlin.psi.psiUtil.forEachDescendantOfType
-import org.jetbrains.kotlin.psi.psiUtil.getQualifiedElementOrCallableRef
 
 /**
  * A usage from the K2 move refactoring. Not all usages need to be updated, some are only used for conflict checking.
@@ -139,7 +134,7 @@ sealed class K2MoveRenameUsageInfo(
             if (refExpr.isSuperOrThisExpr()) return false
             if (refExpr.parentOfType<KtImportDirective>(withSelf = false) != null) return true
             if (refExpr.isUnqualifiable()) return true
-            val refChain = refExpr.getQualifiedElementOrCallableRef()
+            val refChain = (refExpr.getTopmostParentQualifiedExpressionForReceiver() ?: refExpr)
                 .collectDescendantsOfType<KtSimpleNameExpression>()
                 .filter { !it.isSuperOrThisExpr() }
             return if (isInternal) {
@@ -151,6 +146,12 @@ sealed class K2MoveRenameUsageInfo(
             }
         }
 
+        private fun KtSimpleNameExpression.getTopmostParentQualifiedExpressionForReceiver(): KtExpression? {
+            return generateSequence<KtExpression>(this) {
+                it.parent as? KtQualifiedExpression ?: it.parent as? KtCallExpression
+            }.lastOrNull()
+        }
+
         private fun KtSimpleNameExpression.isSuperOrThisExpr(): Boolean {
             return this is KtEnumEntrySuperclassReferenceExpression || parent is KtThisExpression || parent is KtSuperExpression
         }
@@ -159,17 +160,18 @@ sealed class K2MoveRenameUsageInfo(
         private fun KtSimpleNameExpression.isNameDeterminantInQualifiedChain(): Boolean = allowAnalysisOnEdt {
             analyze(this) {
                 val resolvedSymbol = mainReference.resolveToSymbol()
-                if (resolvedSymbol is KtClassOrObjectSymbol && resolvedSymbol.classKind == KtClassKind.COMPANION_OBJECT) return true
-                if (resolvedSymbol is KtConstructorSymbol) return true
+                if (resolvedSymbol is KaClassOrObjectSymbol && resolvedSymbol.classKind == KaClassKind.COMPANION_OBJECT) return true
+                if (resolvedSymbol is KaConstructorSymbol) return true
                 val containingSymbol = resolvedSymbol?.getContainingSymbol()
+                if (resolvedSymbol is KaPackageSymbol) return false // ignore packages
                 if (containingSymbol == null) return true // top levels are static
-                if (containingSymbol is KtClassOrObjectSymbol) {
+                if (containingSymbol is KaClassOrObjectSymbol) {
                     when (containingSymbol.classKind) {
-                        KtClassKind.OBJECT, KtClassKind.COMPANION_OBJECT, KtClassKind.ENUM_CLASS -> return true
+                        KaClassKind.OBJECT, KaClassKind.COMPANION_OBJECT, KaClassKind.ENUM_CLASS -> return true
                         else -> {}
                     }
                 }
-                if (containingSymbol is KtSymbolWithMembers) {
+                if (containingSymbol is KaSymbolWithMembers) {
                     if (resolvedSymbol in containingSymbol.getStaticMemberScope().getAllSymbols()) return true
                 }
                 return false
@@ -180,7 +182,7 @@ sealed class K2MoveRenameUsageInfo(
             // example: a.foo() where foo is an extension function
             fun KtSimpleNameExpression.isExtensionReference(): Boolean {
                 return analyze(this) {
-                    val callable = mainReference.resolveToSymbol() as? KtCallableSymbol
+                    val callable = mainReference.resolveToSymbol() as? KaCallableSymbol
                     if (callable?.isExtension == true) return true
                     if (callable is KtPropertySymbol) {
                         val returnType = callable.returnType
@@ -240,6 +242,7 @@ sealed class K2MoveRenameUsageInfo(
          */
         fun markInternalUsages(containing: KtElement) {
             containing.forEachDescendantOfType<KtReferenceExpression> { refExpr ->
+                if (refExpr is KtEnumEntrySuperclassReferenceExpression) return@forEachDescendantOfType
                 val mainReference= refExpr.mainReference
                 if (mainReference is KtConstructorDelegationReference) return@forEachDescendantOfType
                 val resolved = mainReference.resolve() as? PsiNamedElement ?: return@forEachDescendantOfType
@@ -288,7 +291,7 @@ sealed class K2MoveRenameUsageInfo(
                 }
         }
 
-        internal fun retargetUsages(usages: List<K2MoveRenameUsageInfo>, oldToNewMap: Map<KtNamedDeclaration, KtNamedDeclaration>) {
+        internal fun retargetUsages(usages: List<K2MoveRenameUsageInfo>, oldToNewMap: Map<PsiElement, PsiElement>) {
             retargetInternalUsages(oldToNewMap)
             retargetExternalUsages(usages, oldToNewMap)
         }
@@ -299,7 +302,7 @@ sealed class K2MoveRenameUsageInfo(
          */
         private fun restoreInternalUsages(
             containingDecl: KtNamedDeclaration,
-            oldToNewMap: Map<KtNamedDeclaration, KtNamedDeclaration>,
+            oldToNewMap: Map<PsiElement, PsiElement>,
             fromCopy: Boolean
         ): List<UsageInfo> {
             return containingDecl.collectDescendantsOfType<KtReferenceExpression>().mapNotNull { refExpr ->
@@ -339,8 +342,8 @@ sealed class K2MoveRenameUsageInfo(
             shortenUsages(retargetMoveUsages(mapOf(fileCopy to internalUsages), emptyMap()))
         }
 
-        fun retargetInternalUsages(oldToNewMap: Map<KtNamedDeclaration, KtNamedDeclaration>, fromCopy: Boolean = false) {
-            val newDeclarations = oldToNewMap.values.toList()
+        fun retargetInternalUsages(oldToNewMap: Map<PsiElement, PsiElement>, fromCopy: Boolean = false) {
+            val newDeclarations = oldToNewMap.values.toList().filterIsInstance<KtNamedDeclaration>()
             val internalUsages = newDeclarations
                 .flatMap { decl -> restoreInternalUsages(decl, oldToNewMap, fromCopy) }
                 .filterIsInstance<K2MoveRenameUsageInfo>()
@@ -349,7 +352,7 @@ sealed class K2MoveRenameUsageInfo(
             shortenUsages(retargetMoveUsages(internalUsages, oldToNewMap))
         }
 
-        private fun retargetExternalUsages(usages: List<K2MoveRenameUsageInfo>, oldToNewMap: Map<KtNamedDeclaration, KtNamedDeclaration>) {
+        private fun retargetExternalUsages(usages: List<K2MoveRenameUsageInfo>, oldToNewMap: Map<PsiElement, PsiElement>) {
             val externalUsages = usages
                 .filter { it.element != null } // if the element is null, it means that this external usage was moved
                 .groupByFile()
@@ -359,7 +362,7 @@ sealed class K2MoveRenameUsageInfo(
 
         private fun retargetMoveUsages(
             usageInfosByFile: Map<PsiFile, List<K2MoveRenameUsageInfo>>,
-            oldToNewMap: Map<KtNamedDeclaration, KtNamedDeclaration>
+            oldToNewMap: Map<PsiElement, PsiElement>
         ): Map<PsiFile, Map<PsiElement, PsiNamedElement>> {
             return usageInfosByFile.map { (file, usageInfos) ->
                 file to usageInfos.mapNotNull { usageInfo ->
@@ -369,7 +372,7 @@ sealed class K2MoveRenameUsageInfo(
                     val qualifiedReference = if (retargetedReference is KtSimpleNameExpression) {
                         // get top most qualified for shortening if we don't have it already
                         generateSequence<KtElement>(retargetedReference) {
-                            it.parent as? KtQualifiedExpression ?: it.parent as? KtUserType
+                            it.parent as? KtQualifiedExpression ?: it.parent as? KtCallExpression ?: it.parent as? KtUserType
                         }.last()
                     } else retargetedReference
                     if (usageInfo is Source && qualifiedReference != null) {
