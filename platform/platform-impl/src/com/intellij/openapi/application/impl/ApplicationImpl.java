@@ -287,6 +287,12 @@ public final class ApplicationImpl extends ClientAwareComponentManager implement
     LaterInvocator.invokeLater(state, expired, wrapWithRunIntendedWriteAction(r));
   }
 
+  @ApiStatus.Internal
+  @Override
+  public void dispatchCoroutineOnEDT(Runnable runnable, ModalityState state) {
+    LaterInvocator.invokeLater(state, Conditions.alwaysFalse(), myTransactionGuard.wrapCoroutineInvocation(runnable, state));
+  }
+
   @Override
   public void dispose() {
     getThreadingSupport().removeReadActionListener(this);

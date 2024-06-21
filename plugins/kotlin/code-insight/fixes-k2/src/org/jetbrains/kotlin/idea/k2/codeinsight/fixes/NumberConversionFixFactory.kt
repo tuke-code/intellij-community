@@ -1,6 +1,7 @@
 // Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.kotlin.idea.k2.codeinsight.fixes
 
+import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
 import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.fir.diagnostics.KaFirDiagnostic
 import org.jetbrains.kotlin.analysis.api.renderer.types.impl.KaTypeRendererForSource
@@ -26,19 +27,20 @@ internal object NumberConversionFixFactory {
             NumberConversionFix(
                 element = left,
                 elementContext = prepareNumberConversionElementContext(leftType, rightType),
-                conversionType = NumberConversionFix.ConversionType.LEFT_HAND_SIDE
+                actionNameProvider = NumberConversionFix.ActionNameProvider.LEFT_HAND_SIDE,
             ),
 
             NumberConversionFix(
                 element = right,
                 elementContext = prepareNumberConversionElementContext(rightType, leftType),
-                conversionType = NumberConversionFix.ConversionType.RIGHT_HAND_SIDE
+                actionNameProvider = NumberConversionFix.ActionNameProvider.RIGHT_HAND_SIDE,
             ),
         )
     }
 }
 
 context(KaSession)
+@OptIn(KaExperimentalApi::class)
 internal fun prepareNumberConversionElementContext(
     fromType: KaType,
     toType: KaType,

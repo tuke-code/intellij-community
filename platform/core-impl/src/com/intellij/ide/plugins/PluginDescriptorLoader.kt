@@ -346,6 +346,28 @@ private fun CoroutineScope.loadDescriptorsFromProperty(context: DescriptorListLo
   return list
 }
 
+suspend fun loadDescriptors(
+  zipFilePoolDeferred: Deferred<ZipFilePool>,
+  mainClassLoaderDeferred: Deferred<ClassLoader>?,
+): Pair<DescriptorListLoadingContext, PluginLoadingResult> {
+  val isUnitTestMode = PluginManagerCore.isUnitTestMode
+  val isRunningFromSources = PluginManagerCore.isRunningFromSources()
+  val result = DescriptorListLoadingContext(
+    isMissingSubDescriptorIgnored = true,
+    isMissingIncludeIgnored = isUnitTestMode,
+    checkOptionalConfigFileUniqueness = isUnitTestMode || isRunningFromSources,
+  ).use { context ->
+    context to loadDescriptors(
+      context = context,
+      isUnitTestMode = isUnitTestMode,
+      isRunningFromSources = isRunningFromSources,
+      zipFilePoolDeferred = zipFilePoolDeferred,
+      mainClassLoaderDeferred = mainClassLoaderDeferred,
+    )
+  }
+  return result
+}
+
 @Suppress("DeferredIsResult")
 internal fun CoroutineScope.scheduleLoading(
   zipFilePoolDeferred: Deferred<ZipFilePool>,
@@ -353,22 +375,10 @@ internal fun CoroutineScope.scheduleLoading(
   logDeferred: Deferred<Logger>?,
 ): Deferred<PluginSet> {
   val resultDeferred = async(CoroutineName("plugin descriptor loading")) {
-    val isUnitTestMode = PluginManagerCore.isUnitTestMode
-    val isRunningFromSources = PluginManagerCore.isRunningFromSources()
-    val result = DescriptorListLoadingContext(
-      isMissingSubDescriptorIgnored = true,
-      isMissingIncludeIgnored = isUnitTestMode,
-      checkOptionalConfigFileUniqueness = isUnitTestMode || isRunningFromSources,
-    ).use { context ->
-      context to loadDescriptors(
-        context = context,
-        isUnitTestMode = isUnitTestMode,
-        isRunningFromSources = isRunningFromSources,
-        zipFilePoolDeferred = zipFilePoolDeferred,
-        mainClassLoaderDeferred = mainClassLoaderDeferred,
-      )
-    }
-    result
+    loadDescriptors(
+      zipFilePoolDeferred = zipFilePoolDeferred,
+      mainClassLoaderDeferred = mainClassLoaderDeferred,
+    )
   }
   val pluginSetDeferred = async {
     val pair = resultDeferred.await()
@@ -550,13 +560,7 @@ internal fun CoroutineScope.loadPluginDescriptorsImpl(
   customPluginDir: Path,
   bundledPluginDir: Path?,
 ): List<Deferred<IdeaPluginDescriptorImpl?>> {
-  val platformPrefixProperty = PlatformUtils.getPlatformPrefix()
-  val platformPrefix = if (platformPrefixProperty == PlatformUtils.QODANA_PREFIX) {
-    System.getProperty("idea.parent.prefix", PlatformUtils.IDEA_PREFIX)
-  }
-  else {
-    platformPrefixProperty
-  }
+  val platformPrefix = PlatformUtils.getPlatformPrefix()
 
   val result = ArrayList<Deferred<IdeaPluginDescriptorImpl?>>()
   if (isUnitTestMode) {
@@ -1117,6 +1121,27 @@ fun loadDescriptorsFromOtherIde(
           isRunningFromSources = PluginManagerCore.isRunningFromSources(),
           isUnitTestMode = PluginManagerCore.isUnitTestMode,
         )
+      }, isMainProcess()),
+      overrideUseIfCompatible = false,
+      productBuildNumber = context.productBuildNumber(),
+    )
+    result
+  }
+}
+
+suspend fun loadDescriptorsFromCustomPluginDir(customPluginDir: Path, ignoreCompatibility: Boolean = false) : PluginLoadingResult{
+  return DescriptorListLoadingContext(
+    isMissingIncludeIgnored = true,
+    isMissingSubDescriptorIgnored = true
+  ).use { context ->
+    val result = PluginLoadingResult()
+    result.addAll(
+      descriptors = toSequence( coroutineScope {
+        loadDescriptorsFromDir(
+          dir = customPluginDir,
+          context = context,
+          isBundled = ignoreCompatibility,
+          pool = ZipFilePool.POOL ?: NonShareableJavaZipFilePool())
       }, isMainProcess()),
       overrideUseIfCompatible = false,
       productBuildNumber = context.productBuildNumber(),

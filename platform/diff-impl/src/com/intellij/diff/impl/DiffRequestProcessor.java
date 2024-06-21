@@ -7,6 +7,7 @@ import com.intellij.codeInsight.hint.HintUtil;
 import com.intellij.diff.*;
 import com.intellij.diff.FrameDiffTool.DiffViewer;
 import com.intellij.diff.actions.impl.*;
+import com.intellij.diff.editor.DiffViewerVirtualFile;
 import com.intellij.diff.impl.DiffSettingsHolder.DiffSettings;
 import com.intellij.diff.impl.ui.DiffToolChooser;
 import com.intellij.diff.lang.DiffIgnoredRangeProvider;
@@ -90,6 +91,7 @@ import static com.intellij.util.ObjectUtils.chooseNotNull;
  * @see CacheDiffRequestProcessor
  * @see CacheDiffRequestProcessor.Simple
  * @see com.intellij.openapi.vcs.changes.ChangeViewDiffRequestProcessor
+ * @see DiffViewerVirtualFile
  */
 public abstract class DiffRequestProcessor implements DiffEditorViewer, CheckedDisposable {
   private static final Logger LOG = Logger.getInstance(DiffRequestProcessor.class);
@@ -1337,28 +1339,27 @@ public abstract class DiffRequestProcessor implements DiffEditorViewer, CheckedD
 
     @Override
     public void uiDataSnapshot(@NotNull DataSink sink) {
+      sink.set(OpenInEditorAction.AFTER_NAVIGATE_CALLBACK,
+               () -> DiffUtil.minimizeDiffIfOpenedInWindow(DiffRequestProcessor.this.myPanel));
+
+      for (DataProvider provider : Arrays.asList(DiffRequestProcessor.this::getData,
+                                                 myContext.getUserData(DiffUserDataKeys.DATA_PROVIDER),
+                                                 myActiveRequest.getUserData(DiffUserDataKeys.DATA_PROVIDER),
+                                                 myState::getData)) {
+        DataSink.uiDataSnapshot(sink, provider);
+      }
+
       DataProvider contentProvider = DataManagerImpl.getDataProviderEx(myContentPanel.getTargetComponent());
       DataSink.uiDataSnapshot(sink, contentProvider);
 
+      sink.set(CommonDataKeys.PROJECT, myProject);
+      sink.set(DiffDataKeys.DIFF_CONTEXT, myContext);
       sink.set(DiffDataKeys.DIFF_REQUEST, myActiveRequest);
       sink.set(ACTIVE_DIFF_TOOL, myState.getActiveTool());
-      sink.set(CommonDataKeys.PROJECT, myProject);
       sink.set(PlatformCoreDataKeys.HELP_ID,
                myActiveRequest.getUserData(DiffUserDataKeys.HELP_ID) != null
                ? myActiveRequest.getUserData(DiffUserDataKeys.HELP_ID)
                : "reference.dialogs.diff.file");
-      sink.set(DiffDataKeys.DIFF_CONTEXT, myContext);
-
-      DataSink.uiDataSnapshot(sink, myState::getData);
-
-      for (DataProvider provider : Arrays.asList(myActiveRequest.getUserData(DiffUserDataKeys.DATA_PROVIDER),
-                                                 myContext.getUserData(DiffUserDataKeys.DATA_PROVIDER),
-                                                 DiffRequestProcessor.this::getData)) {
-        DataSink.uiDataSnapshot(sink, provider);
-      }
-
-      sink.set(OpenInEditorAction.AFTER_NAVIGATE_CALLBACK,
-               () -> DiffUtil.minimizeDiffIfOpenedInWindow(DiffRequestProcessor.this.myPanel));
     }
   }
 

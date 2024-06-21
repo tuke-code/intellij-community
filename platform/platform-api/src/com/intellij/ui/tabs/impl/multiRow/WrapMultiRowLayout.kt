@@ -5,7 +5,9 @@ package com.intellij.ui.tabs.impl.multiRow
 
 import com.intellij.ui.tabs.TabInfo
 import com.intellij.ui.tabs.impl.JBTabsImpl
+import org.jetbrains.annotations.ApiStatus.Internal
 
+@Internal
 class WrapMultiRowLayout(tabs: JBTabsImpl, showPinnedTabsSeparately: Boolean) : MultiRowLayout(tabs, showPinnedTabsSeparately) {
   override fun splitToRows(data: MultiRowPassInfo): List<TabsRow> {
     val leftmostX = data.toFitRec.x + tabs.titleWrapper.preferredSize.width
@@ -16,7 +18,7 @@ class WrapMultiRowLayout(tabs: JBTabsImpl, showPinnedTabsSeparately: Boolean) : 
     val firstRowWidth = rightmostX - leftmostX
     val getRowMaxLen: (Int) -> Int = { index -> if (index == 0) firstRowWidth else data.toFitRec.width }
 
-    val infos = data.myVisibleInfos
+    val infos = data.visibleInfos
     val rows = mutableListOf<TabsRow>()
     if (showPinnedTabsSeparately) {
       val (pinned, unpinned) = splitToPinnedUnpinned(infos)

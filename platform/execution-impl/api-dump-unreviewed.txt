@@ -1417,8 +1417,8 @@ f:com.intellij.execution.impl.statistics.RunConfigurationUsageTriggerCollector
 - <init>():V
 - getGroup():com.intellij.internal.statistic.eventLog.EventLogGroup
 - s:logProcessFinished(com.intellij.internal.statistic.StructuredIdeActivity,com.intellij.execution.impl.statistics.RunConfigurationUsageTriggerCollector$RunConfigurationFinishType):V
-- s:trigger(com.intellij.openapi.project.Project,com.intellij.execution.configurations.ConfigurationFactory,com.intellij.execution.Executor,com.intellij.execution.configurations.RunConfiguration,Z,Z,Z):com.intellij.internal.statistic.StructuredIdeActivity
-- s:triggerWithParent(com.intellij.internal.statistic.StructuredIdeActivity,com.intellij.openapi.project.Project,com.intellij.execution.configurations.ConfigurationFactory,com.intellij.execution.Executor,com.intellij.execution.configurations.RunConfiguration,Z,Z,Z):com.intellij.internal.statistic.StructuredIdeActivity
+- s:trigger(com.intellij.openapi.project.Project,com.intellij.execution.configurations.ConfigurationFactory,com.intellij.execution.Executor,com.intellij.execution.configurations.RunConfiguration,Z,Z,Z,Z):com.intellij.internal.statistic.StructuredIdeActivity
+- s:triggerWithParent(com.intellij.internal.statistic.StructuredIdeActivity,com.intellij.openapi.project.Project,com.intellij.execution.configurations.ConfigurationFactory,com.intellij.execution.Executor,com.intellij.execution.configurations.RunConfiguration,Z,Z,Z,Z):com.intellij.internal.statistic.StructuredIdeActivity
 f:com.intellij.execution.impl.statistics.RunConfigurationUsageTriggerCollector$RunConfigurationExecutorUtilValidator
 - com.intellij.internal.statistic.eventLog.validator.rules.FUSRule
 - com.intellij.internal.statistic.eventLog.validator.rules.PerformanceCareRule
@@ -1443,9 +1443,11 @@ f:com.intellij.execution.impl.statistics.RunConfigurationUsageTriggerCollector$R
 f:com.intellij.execution.lineMarker.ExecutorAction
 - com.intellij.openapi.actionSystem.ActionGroup
 - com.intellij.openapi.actionSystem.ActionWithDelegate
+- com.intellij.openapi.actionSystem.DataSnapshotProvider
 - sf:Companion:com.intellij.execution.lineMarker.ExecutorAction$Companion
 - b:<init>(com.intellij.openapi.actionSystem.AnAction,com.intellij.execution.Executor,I,kotlin.jvm.internal.DefaultConstructorMarker):V
 - actionPerformed(com.intellij.openapi.actionSystem.AnActionEvent):V
+- dataSnapshot(com.intellij.openapi.actionSystem.DataSink):V
 - equals(java.lang.Object):Z
 - sf:getActionList():java.util.List
 - sf:getActionList(I):java.util.List
@@ -1473,10 +1475,12 @@ c:com.intellij.execution.lineMarker.LineMarkerActionWrapper
 - com.intellij.openapi.actionSystem.ActionGroup
 - com.intellij.codeInsight.intention.PriorityAction
 - com.intellij.openapi.actionSystem.ActionWithDelegate
+- com.intellij.openapi.actionSystem.DataSnapshotProvider
 - sf:LOCATION_WRAPPER:com.intellij.openapi.util.Key
 - pf:myElement:com.intellij.psi.SmartPsiElementPointer
 - <init>(com.intellij.psi.PsiElement,com.intellij.openapi.actionSystem.AnAction):V
 - actionPerformed(com.intellij.openapi.actionSystem.AnActionEvent):V
+- dataSnapshot(com.intellij.openapi.actionSystem.DataSink):V
 - getActionUpdateThread():com.intellij.openapi.actionSystem.ActionUpdateThread
 - getChildren(com.intellij.openapi.actionSystem.AnActionEvent):com.intellij.openapi.actionSystem.AnAction[]
 - getDelegate():com.intellij.openapi.actionSystem.AnAction
@@ -3322,68 +3326,12 @@ f:com.intellij.execution.ui.layout.impl.DockableGridContainerFactory
 - sf:TYPE:java.lang.String
 - <init>():V
 - createContainer(com.intellij.ui.docking.DockableContent):com.intellij.ui.docking.DockContainer
-f:com.intellij.execution.ui.layout.impl.GridCellImpl
-- com.intellij.execution.ui.layout.GridCell
-- <init>(com.intellij.execution.ui.layout.impl.ViewContextEx,com.intellij.execution.ui.layout.impl.GridImpl,com.intellij.execution.ui.layout.impl.GridImpl$Placeholder,com.intellij.execution.ui.layout.PlaceInGrid):V
-- closeOrMinimize(java.awt.event.MouseEvent):V
-- contains(java.awt.Component):Z
-- getContentCount():I
-- getLocation():java.awt.Point
-- getPlaceInGrid():com.intellij.execution.ui.layout.PlaceInGrid
-- getSize():java.awt.Dimension
-- isMinimized(com.intellij.ui.content.Content):Z
-- isValidForCalculateProportions():Z
-- minimize(com.intellij.ui.content.Content):V
-- minimize(com.intellij.ui.content.Content[]):V
-- processAlert(com.intellij.ui.content.Content,Z):V
-- rebuildPopupGroup():V
-- restoreLastUiState():com.intellij.openapi.util.ActionCallback
-- restoreProportions():V
-- saveProportions():V
-- saveUiState():V
-- select(com.intellij.ui.content.Content,Z):com.intellij.openapi.util.ActionCallback
-- setToolbarBefore(Z):V
-- setToolbarHorizontal(Z):V
-- updateSelection(Z):V
-- updateTabPresentation(com.intellij.ui.content.Content):V
-f:com.intellij.execution.ui.layout.impl.GridImpl
-- com.intellij.ui.components.panels.Wrapper
-- com.intellij.execution.ui.layout.Grid
-- com.intellij.openapi.Disposable
-- com.intellij.openapi.actionSystem.DataProvider
-- <init>(com.intellij.execution.ui.layout.impl.ViewContextEx,java.lang.String):V
-- addNotify():V
-- dispose():V
-- findCell(com.intellij.ui.content.Content):com.intellij.execution.ui.layout.impl.GridCellImpl
-- getAttachedContents():java.util.List
-- getCellFor(com.intellij.ui.content.Content):com.intellij.execution.ui.layout.impl.GridCellImpl
-- getContents():java.util.List
-- getData(java.lang.String):java.lang.Object
-- getTab():com.intellij.execution.ui.layout.Tab
-- getTabIndex():com.intellij.execution.ui.layout.Tab
-- isEmpty():Z
-- isMinimized(com.intellij.ui.content.Content):Z
-- minimize(com.intellij.ui.content.Content,com.intellij.execution.ui.layout.CellTransform$Restore):V
-- processAddToUi(Z):V
-- processAlert(com.intellij.ui.content.Content,Z):V
-- processRemoveFromUi():V
-- rebuildTabPopup():V
-- removeNotify():V
-- restoreLastUiState():com.intellij.openapi.util.ActionCallback
-- saveUiState():V
-- select(com.intellij.ui.content.Content,Z):com.intellij.openapi.util.ActionCallback
-- setToolbarBefore(Z):V
-- setToolbarHorizontal(Z):V
-- updateGridUI():Z
-com.intellij.execution.ui.layout.impl.GridImpl$ContentProvider
-- a:getContents():com.intellij.ui.content.Content[]
 c:com.intellij.execution.ui.layout.impl.JBRunnerTabs
 - com.intellij.ui.tabs.impl.SingleHeightTabs
 - com.intellij.execution.ui.layout.impl.JBRunnerTabsBase
 - <init>(com.intellij.openapi.project.Project,com.intellij.openapi.Disposable):V
 - <init>(com.intellij.openapi.project.Project,com.intellij.openapi.actionSystem.ActionManager,com.intellij.openapi.wm.IdeFocusManager,com.intellij.openapi.Disposable):V
 - s:create(com.intellij.openapi.project.Project,com.intellij.openapi.Disposable):com.intellij.execution.ui.layout.impl.JBRunnerTabsBase
-- p:createTabBorder():com.intellij.ui.tabs.JBTabsBorder
 - p:createTabLabel(com.intellij.ui.tabs.TabInfo):com.intellij.ui.tabs.impl.TabLabel
 - p:createTabPainterAdapter():com.intellij.ui.tabs.impl.TabPainterAdapter
 - s:getTabLabelPreferredHeight():I
@@ -3392,7 +3340,7 @@ c:com.intellij.execution.ui.layout.impl.JBRunnerTabs
 - shouldAddToGlobal(java.awt.Point):Z
 - useSmallLabels():Z
 f:com.intellij.execution.ui.layout.impl.JBRunnerTabs$JBRunnerTabsBorder
-- com.intellij.ui.tabs.JBTabsBorder
+- javax.swing.border.Border
 - getEffectiveBorder():java.awt.Insets
 - paintBorder(java.awt.Component,java.awt.Graphics,I,I,I,I):V
 - setSideMask(I):V

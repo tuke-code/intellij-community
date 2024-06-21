@@ -11,7 +11,9 @@ import com.intellij.platform.workspace.storage.WorkspaceEntity
 import com.intellij.platform.workspace.storage.WorkspaceEntityWithSymbolicId
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import org.jetbrains.annotations.ApiStatus
 
+@ApiStatus.Internal
 class EntityTracingLogger {
   /** specifies ID of an entity which changes should be printed to the log */
   private val entityToTrace = System.getProperty("idea.workspace.model.track.entity.id")?.let {
@@ -32,8 +34,8 @@ class EntityTracingLogger {
         WorkspaceModel.getInstance(project).eventLog.collect { event ->
           event.getAllChanges().forEach {
             when (it) {
-              is EntityChange.Added -> printInfo("added", it.entity)
-              is EntityChange.Removed -> printInfo("removed", it.entity)
+              is EntityChange.Added -> printInfo("added", it.newEntity)
+              is EntityChange.Removed -> printInfo("removed", it.oldEntity)
               is EntityChange.Replaced -> {
                 printInfo("replaced from", it.oldEntity)
                 printInfo("replaced to", it.newEntity)

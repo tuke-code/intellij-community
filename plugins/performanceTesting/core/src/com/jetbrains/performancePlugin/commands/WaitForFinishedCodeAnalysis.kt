@@ -4,7 +4,9 @@ import com.intellij.codeInsight.daemon.DaemonCodeAnalyzer
 import com.intellij.codeInsight.daemon.impl.DaemonCodeAnalyzerImpl
 import com.intellij.codeInsight.daemon.impl.TrafficLightRenderer
 import com.intellij.diagnostic.StartUpMeasurer
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.ReadAction
+import com.intellij.openapi.application.ex.ApplicationEx
 import com.intellij.openapi.application.ex.ApplicationManagerEx
 import com.intellij.openapi.application.runReadAction
 import com.intellij.openapi.components.Service
@@ -111,7 +113,11 @@ class ListenerState(val project: Project, val cs: CoroutineScope) {
         locked = false
       }
       else {
-        sessions.forEach { printCodeAnalyzerStatistis(it.key.editor) }
+        //Printing additional information to get information why huglighting was stucked
+        sessions.forEach {
+          printCodeAnalyzerStatistis(it.key.editor)
+          printFileStatus(it.key.editor)
+        }
         LOG.info("Highlighting still in progress: ${sessions.keys.joinToString(separator = ",\n") { it.description }}")
       }
     }
@@ -119,6 +125,9 @@ class ListenerState(val project: Project, val cs: CoroutineScope) {
 
   fun waitAnalysisToFinish() {
     LOG.info("Waiting for code analysis to finish")
+    if ((ApplicationManager.getApplication() as ApplicationEx).isLightEditMode) {
+      return
+    }
     val timeout: Long = 5
     if (highlightingFinishedEverywhere.tryAcquire(timeout, TimeUnit.MINUTES)) {
       highlightingFinishedEverywhere.release()
@@ -245,10 +254,23 @@ class ListenerState(val project: Project, val cs: CoroutineScope) {
         LOG.info("Analyzer status for ${editor.virtualFile.path}\n ${TrafficLightRenderer(project, editor.document).daemonCodeAnalyzerStatus}")
       }
     }
-    catch (throwable: Throwable) {
+    catch (_: Throwable) {
       LOG.warn("Print Analyzer status failed")
     }
   }
+
+  internal fun printFileStatus(editor: Editor) {
+    try {
+      val fileStatus = (DaemonCodeAnalyzerImpl.getInstance(project) as DaemonCodeAnalyzerImpl)
+        .fileStatusMap
+        .toString(editor.document)
+      LOG.info("File status map $fileStatus")
+    }
+    catch (throwable: Throwable) {
+      LOG.warn("Print Analyzer status map failed")
+    }
+  }
+
 }
 
 private class SimpleEditedDocumentsListener(private val project: Project) : BulkAwareDocumentListener.Simple {

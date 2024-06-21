@@ -17,7 +17,7 @@ public class StringTemplateReverseMigrationInspectionTest extends LightJavaCodeI
              class StringTemplateMigration {
                void test() {
                  String name = "World";
-                 String test = STR<caret>."Hello \\{name}!!!";
+                 String test = STR."<caret>Hello \\{name}!!!";
                }
              }""", """
              class StringTemplateMigration {
@@ -27,6 +27,24 @@ public class StringTemplateReverseMigrationInspectionTest extends LightJavaCodeI
                }
              }""");
   }
+  
+  public void testTrailingWhitespace() {
+    doTest("""
+             class TrailingWhitespace {
+               void foo(String name) {
+                   String s = STR.""\"<caret>
+                                        Hello \\{name}
+                                        ""\";
+               }
+             }
+             """, """
+             class TrailingWhitespace {
+               void foo(String name) {
+                   String s = "Hello " + name + "\\n";
+               }
+             }
+             """);
+  }
 
   public void testOverrideStringProcessor() {
     doTest("""
@@ -34,16 +52,16 @@ public class StringTemplateReverseMigrationInspectionTest extends LightJavaCodeI
                public static final String STR = "surprise!";
                void test() {
                  String name = "World";
-                 String test = java.lang.StringTemplate<caret>.STR."Hello \\{name}!!!";
+                 String test = java.lang.StringTemplate.STR."<caret>Hello \\{name}!!!";
                }
                private static class StringTemplate {}
              }""", """
-             class StringTemplateMigration {           
+             class StringTemplateMigration {
                public static final String STR = "surprise!";
                void test() {
                  String name = "World";
                  String test = "Hello " + name + "!!!";
-               }          
+               }
                private static class StringTemplate {}
              }""");
   }
@@ -66,7 +84,7 @@ public class StringTemplateReverseMigrationInspectionTest extends LightJavaCodeI
     doTest("""
              class StringTemplateMigration {
                void test() {
-                 String test = <caret>STR."\\{1 + 2} = number = 12";
+                 String test = STR."<caret>\\{1 + 2} = number = 12";
                }
              }""", """
              class StringTemplateMigration {
@@ -266,7 +284,7 @@ public class StringTemplateReverseMigrationInspectionTest extends LightJavaCodeI
              class StringTemplateMigration {
                void test() {
                  int value = 17;
-                 System.out.println(value + value + value + value);
+                 System.out.println(value + value + "" + value + value);
                }
              }""");
   }
@@ -308,7 +326,7 @@ public class StringTemplateReverseMigrationInspectionTest extends LightJavaCodeI
     doTest("""
              class TextBlock {
                String name = "Java21";
-                        
+             
                String message = STR.""\"
              Hello\\{name}! <caret>Text block "example".
              ""\";
@@ -317,7 +335,7 @@ public class StringTemplateReverseMigrationInspectionTest extends LightJavaCodeI
            """
              class TextBlock {
                String name = "Java21";
-               
+             
                String message = "Hello" + name + "! Text block \\"example\\".\\n";
              }
              """);

@@ -3,7 +3,6 @@ package org.jetbrains.plugins.notebooks.visualization
 import com.intellij.ide.ui.LafManagerListener
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
-import com.intellij.openapi.application.runInEdt
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.editor.EditorKind
 import com.intellij.openapi.editor.FoldRegion
@@ -39,10 +38,9 @@ import kotlin.math.max
 import kotlin.math.min
 
 class NotebookCellInlayManager private constructor(
-  val editor: EditorImpl
+  val editor: EditorImpl,
 ) : Disposable, NotebookIntervalPointerFactory.ChangeListener {
   private val notebookCellLines = NotebookCellLines.get(editor)
-  private val viewportQueue = MergingUpdateQueue("NotebookCellInlayManager Viewport Update", 100, true, null, editor.disposable, null, true)
 
   /** 20 is 1000 / 50, two times faster than the eye refresh rate. Actually, the value has been chosen randomly, without experiments. */
   private val updateQueue = MergingUpdateQueue("NotebookCellInlayManager Interval Update", 20, true, null, editor.disposable, null, true)
@@ -58,6 +56,8 @@ class NotebookCellInlayManager private constructor(
   var changedListener: InlaysChangedListener? = null
 
   private val cellEventListeners = EventDispatcher.create(EditorCellEventListener::class.java)
+
+  private var valid = false
 
   override fun dispose() {}
 
@@ -97,15 +97,9 @@ class NotebookCellInlayManager private constructor(
 
   private fun addViewportChangeListener() {
     editor.scrollPane.viewport.addChangeListener {
-      scheduleUpdatePositions()
-      viewportQueue.queue(object : Update("Viewport change") {
-        override fun run() {
-          if (editor.isDisposed) return
-          _cells.forEach {
-            it.onViewportChange()
-          }
-        }
-      })
+      _cells.forEach {
+        it.onViewportChange()
+      }
     }
   }
 
@@ -130,7 +124,7 @@ class NotebookCellInlayManager private constructor(
 
     editor.foldingModel.addListener(object : FoldingListener {
       override fun onFoldProcessingEnd() {
-        scheduleUpdatePositions()
+        invalidateCells()
       }
     }, editor.disposable)
 
@@ -209,12 +203,6 @@ class NotebookCellInlayManager private constructor(
     startOffset >= region.startOffset && endOffset <= region.endOffset
   }
 
-  private fun scheduleUpdatePositions() {
-    runInEdt {
-      _cells.forEach { cell -> cell.updatePositions() }
-    }
-  }
-
   private fun refreshHighlightersLookAndFeel() {
     for (highlighter in editor.markupModel.allHighlighters) {
       if (highlighter.customRenderer === NotebookCellHighlighterRenderer) {
@@ -239,7 +227,7 @@ class NotebookCellInlayManager private constructor(
   }
 
   private fun createCell(interval: NotebookIntervalPointer) = EditorCell(editor, interval) { cell ->
-    EditorCellView(editor, notebookCellLines, cell).also { Disposer.register(cell, it) }
+    EditorCellView(editor, notebookCellLines, cell, this).also { Disposer.register(cell, it) }
   }.also { Disposer.register(this, it) }
 
   private fun ensureInlaysAndHighlightersExist(matchingCellsBeforeChange: List<NotebookCellLines.Interval>, logicalLines: IntRange) {
@@ -395,7 +383,7 @@ class NotebookCellInlayManager private constructor(
       }
     }
     if (needUpdatePositions) {
-      scheduleUpdatePositions()
+      invalidateCells()
     }
     cellEventListeners.multicaster.onEditorCellEvents(events)
     updateConsequentInlays(start..end)
@@ -407,6 +395,22 @@ class NotebookCellInlayManager private constructor(
 
   fun getCell(index: Int): EditorCell {
     return cells[index]
+  }
+
+  fun invalidateCells() {
+    valid = false
+  }
+
+  fun validateCells() {
+    if (!valid) {
+      _cells.forEach {
+        it.view?.also { view ->
+          view.bounds = view.calculateBounds()
+          view.validate()
+        }
+      }
+      valid = true
+    }
   }
 }
 
@@ -437,10 +441,12 @@ private object NotebookCellHighlighterRenderer : CustomHighlighterRenderer {
   }
 }
 
-private class UpdateInlaysTask(private val manager: NotebookCellInlayManager,
-                               pointers: Collection<NotebookIntervalPointer>? = null,
-                               private var updateAll: Boolean = false,
-                               private var forceUpdate: Boolean = false) : Update(Any()) {
+private class UpdateInlaysTask(
+  private val manager: NotebookCellInlayManager,
+  pointers: Collection<NotebookIntervalPointer>? = null,
+  private var updateAll: Boolean = false,
+  private var forceUpdate: Boolean = false,
+) : Update(Any()) {
   private val pointerSet = pointers?.let { SmartHashSet(pointers) } ?: SmartHashSet()
 
   override fun run() {

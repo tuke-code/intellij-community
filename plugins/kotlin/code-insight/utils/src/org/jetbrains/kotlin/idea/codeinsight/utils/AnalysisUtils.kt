@@ -7,7 +7,10 @@ import org.jetbrains.kotlin.analysis.api.resolution.KaSimpleFunctionCall
 import org.jetbrains.kotlin.analysis.api.resolution.singleFunctionCallOrNull
 import org.jetbrains.kotlin.analysis.api.resolution.symbol
 import org.jetbrains.kotlin.analysis.api.symbols.*
+import org.jetbrains.kotlin.analysis.api.types.KaFunctionalType
 import org.jetbrains.kotlin.builtins.StandardNames
+import org.jetbrains.kotlin.idea.references.KtReference
+import org.jetbrains.kotlin.idea.references.KtSimpleNameReference
 import org.jetbrains.kotlin.idea.references.mainReference
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.psi.*
@@ -22,7 +25,7 @@ fun KtDotQualifiedExpression.isToString(): Boolean {
     if (referenceExpression.getReferencedName() != OperatorNameConventions.TO_STRING.asString()) return false
     return analyze(callExpression) {
         referenceExpression.mainReference.resolveToSymbols().any { symbol ->
-            val functionSymbol = symbol as? KaFunctionSymbol ?: return@any false
+            val functionSymbol = symbol as? KaNamedFunctionSymbol ?: return@any false
             functionSymbol.valueParameters.isEmpty() && functionSymbol.returnType.isString
         }
     }
@@ -70,3 +73,40 @@ fun KtCallExpression.isImplicitInvokeCall(): Boolean? {
     return functionCall is KaSimpleFunctionCall && functionCall.isImplicitInvoke
 }
 
+/**
+ * Returns containing class symbol, if [reference] is a short reference to a companion object. Otherwise, returns null.
+ * For example:
+ * ```
+ * class A {
+ *      companion object {
+ *           fun foo() {}
+ *      }
+ * }
+ *
+ * fun main() {
+ *      A.foo() // symbol for `A`, and not for `A.Companion`, is returned
+ * }
+ * ```
+ */
+context(KaSession)
+fun KtReference.resolveCompanionObjectShortReferenceToContainingClassSymbol(): KaNamedClassOrObjectSymbol? {
+    if (this !is KtSimpleNameReference) return null
+
+    val symbol = this.resolveToSymbol()
+    if (symbol !is KaClassOrObjectSymbol || symbol.classKind != KaClassKind.COMPANION_OBJECT) return null
+
+    // class name reference resolves to companion
+    if (expression.name == symbol.name?.asString()) return null
+
+    val containingSymbol = symbol.containingSymbol as? KaNamedClassOrObjectSymbol
+    return containingSymbol?.takeIf { it.companionObject == symbol }
+}
+
+/**
+ * Checks whether [this] is one of the following:
+ * * extension
+ * * variable having a return type with a receiver
+ */
+context(KaSession)
+fun KaCallableSymbol.canBeUsedAsExtension(): Boolean =
+    isExtension || this is KaVariableLikeSymbol && (returnType as? KaFunctionalType)?.hasReceiver == true

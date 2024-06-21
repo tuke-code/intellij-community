@@ -4,6 +4,7 @@
 
 package com.intellij.configurationStore
 
+import com.intellij.codeWithMe.ClientId
 import com.intellij.configurationStore.statistic.eventLog.FeatureUsageSettingsEvents
 import com.intellij.diagnostic.PluginException
 import com.intellij.ide.impl.runUnderModalProgressIfIsEdt
@@ -30,6 +31,7 @@ import com.intellij.openapi.vfs.newvfs.impl.VfsRootAccess
 import com.intellij.util.ArrayUtilRt
 import com.intellij.util.ResourceUtil
 import com.intellij.util.ThreeState
+import com.intellij.util.application
 import com.intellij.util.concurrency.annotations.RequiresEdt
 import com.intellij.util.messages.MessageBus
 import com.intellij.util.xmlb.SettingsInternalApi
@@ -464,7 +466,12 @@ abstract class ComponentStoreImpl : IComponentStore {
     sessionProducer.setState(component = info.component, componentName = effectiveComponentName, pluginId = info.pluginId, state = state)
   }
 
-  private fun registerComponent(name: String, info: ComponentInfo): ComponentInfo {
+  private fun registerComponent(name: String, info: ComponentInfo): ComponentInfo? {
+    if (info.stateSpec?.perClient == true && !ClientId.isCurrentlyUnderLocalId) {
+      // Register per-client components only for `ClientId.localId`
+      return null
+    }
+
     val existing = components.putIfAbsent(name, info)
     if (existing != null && existing.component !== info.component) {
       LOG.error("Conflicting component name '$name': ${existing.component.javaClass} and ${info.component.javaClass} (componentManager=${storageManager.componentManager})")
@@ -742,20 +749,50 @@ abstract class ComponentStoreImpl : IComponentStore {
     }
   }
 
+  private fun reloadPerClientState(componentClass: Class<out PersistentStateComponent<*>>,
+                                   info: ComponentInfo,
+                                   changedStorages: Set<StateStorage>) {
+    if (ClientId.isCurrentlyUnderLocalId) {
+      throw AssertionError("This method must be called under remote client id")
+    }
+
+    val perClientComponent = (storageManager.componentManager ?: application).getService(componentClass)
+    if (perClientComponent == null || perClientComponent === info.component) {
+      LOG.error("Failed to reload per-client component '${info.stateSpec?.name ?: componentClass.simpleName}: " +
+                "looks like it is not registered as a per-client service " +
+                "(componentManager=${storageManager.componentManager})")
+      return
+    }
+
+    val newInfo = ComponentInfoImpl(info.pluginId, perClientComponent, info.stateSpec)
+    initComponent(info = newInfo, changedStorages = changedStorages.ifEmpty { null }, reloadData = ThreeState.YES)
+  }
+
   final override fun reloadState(componentClass: Class<out PersistentStateComponent<*>>) {
     val stateSpec = getStateSpecOrError(componentClass)
     val info = components.get(stateSpec.name) ?: return
     (info.component as? PersistentStateComponent<*>)?.let {
+      if (stateSpec.perClient && !ClientId.isCurrentlyUnderLocalId) {
+        reloadPerClientState(it.javaClass, info, emptySet())
+        return
+      }
+
       initComponent(info = info, changedStorages = emptySet(), reloadData = ThreeState.YES)
     }
   }
 
   private fun reloadState(componentName: String, changedStorages: Set<StateStorage>): Boolean {
     val info = components.get(componentName) ?: return false
-    if (info.component !is PersistentStateComponent<*>) {
+    val component = info.component
+    if (component !is PersistentStateComponent<*>) {
       return false
     }
 
+    if (info.stateSpec?.perClient == true && !ClientId.isCurrentlyUnderLocalId) {
+      reloadPerClientState(component.javaClass, info, changedStorages)
+      return true
+    }
+    
     val isChangedStoragesEmpty = changedStorages.isEmpty()
     initComponent(info = info, changedStorages = if (isChangedStoragesEmpty) null else changedStorages, reloadData = ThreeState.UNSURE)
     return true

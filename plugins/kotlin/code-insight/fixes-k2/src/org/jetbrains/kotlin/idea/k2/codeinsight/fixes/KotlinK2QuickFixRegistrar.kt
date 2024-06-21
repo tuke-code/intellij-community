@@ -115,6 +115,9 @@ class KotlinK2QuickFixRegistrar : KotlinQuickFixRegistrar() {
         registerFactory(RemoveSupertypeFixFactory.removeSupertypeFixFactory)
         registerFactory(NumberConversionFixFactory.numberConversionFixFactory)
         registerFactory(ChangeToUseSpreadOperatorFixFactory.changeToUseSpreadOperatorFixFactory)
+        registerFactory(ReplacePrimitiveCastWithNumberConversionFixFactory.replacePrimitiveCastWithNumberConversionFixFactory)
+        registerFactory(ChangeAccessorTypeFixFactory.wrongGetterReturnTypeFactory)
+        registerFactory(ChangeAccessorTypeFixFactory.wrongSetterParameterTypeFactory)
     }
 
     private val addAbstract = KtQuickFixesListBuilder.registerPsiQuickFix {
@@ -138,6 +141,12 @@ class KotlinK2QuickFixRegistrar : KotlinQuickFixRegistrar() {
         registerFactory(MakeTypeParameterReifiedAndFunctionInlineFixFactory.cannotCheckForErasedFactory)
         registerFactory(AddInlineToFunctionFixFactories.illegalInlineParameterModifierFactory)
         registerPsiQuickFixes(KaFirDiagnostic.ReifiedTypeParameterNoInline::class, AddModifierFix.addInlineToFunctionWithReified)
+    }
+
+    private val addValVarToConstructorParameter = KtQuickFixesListBuilder.registerPsiQuickFix {
+        registerFactory(AddValVarToConstructorParameterFixFactory.dataClassNotPropertyParameterFactory)
+        registerFactory(AddValVarToConstructorParameterFixFactory.missingValOnAnnotationParameterFactory)
+        registerFactory(AddValVarToConstructorParameterFixFactory.valueClassConstructorNotFinalReadOnlyParameterFactory)
     }
 
     private val changeToLabeledReturn = KtQuickFixesListBuilder.registerPsiQuickFix {
@@ -225,6 +234,10 @@ class KotlinK2QuickFixRegistrar : KotlinQuickFixRegistrar() {
             ChangeVariableMutabilityFix.MUST_BE_INITIALIZED_FACTORY
         )
         registerPsiQuickFixes(KaFirDiagnostic.VolatileOnValue::class, ChangeVariableMutabilityFix.VOLATILE_ON_VALUE_FACTORY)
+        registerPsiQuickFixes(
+            KaFirDiagnostic.ValueClassConstructorNotFinalReadOnlyParameter::class,
+            ChangeVariableMutabilityFix.VALUE_CLASS_CONSTRUCTOR_NOT_FINAL_READ_ONLY_PARAMETER_FACTORY
+        )
     }
 
     private val expressions = KtQuickFixesListBuilder.registerPsiQuickFix {
@@ -247,6 +260,7 @@ class KotlinK2QuickFixRegistrar : KotlinQuickFixRegistrar() {
         registerFactory(TypeMismatchFactories.assignmentTypeMismatch)
         registerFactory(TypeMismatchFactories.initializerTypeMismatch)
         registerFactory(TypeMismatchFactories.smartcastImpossibleFactory)
+        registerFactory(TypeMismatchFactories.conditionTypeMismatchFactory)
 
         registerFactory(WrapWithSafeLetCallFixFactories.forUnsafeCall)
         registerFactory(WrapWithSafeLetCallFixFactories.forUnsafeImplicitInvokeCall)
@@ -419,6 +433,7 @@ class KotlinK2QuickFixRegistrar : KotlinQuickFixRegistrar() {
         addAbstract,
         addFinal,
         addInline,
+        addValVarToConstructorParameter,
         changeToLabeledReturn,
         convertStringToCharLiteral,
         insertDelegationCall,

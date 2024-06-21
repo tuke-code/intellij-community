@@ -402,6 +402,10 @@
                     interface="com.intellij.codeInsight.codeVision.CodeVisionProviderFactory"
                     dynamic="true" />
 
+    <extensionPoint name="codeInsight.codeVision.settings.defaults"
+                    interface="com.intellij.codeInsight.codeVision.settings.CodeVisionSettingsDefaults"
+                    dynamic="true" />
+
     <extensionPoint qualifiedName="com.intellij.codeInsight.daemonBoundCodeVisionProvider"
                     interface="com.intellij.codeInsight.hints.codeVision.DaemonBoundCodeVisionProvider"
                     dynamic="true" />
@@ -662,13 +666,6 @@
     <extensionPoint name="internalHighlightingLayerSupplier" interface="com.intellij.codeInsight.daemon.impl.InternalLayerSupplier" dynamic="true"/>
     <extensionPoint name="commandLineInspectionProjectConfigurator" interface="com.intellij.ide.CommandLineInspectionProjectConfigurator" dynamic="true"/>
     <extensionPoint name="environmentKeyProvider" interface="com.intellij.ide.environment.EnvironmentKeyProvider" dynamic="true"/>
-
-    <extensionPoint qualifiedName="com.intellij.workspace.subprojectHandler"
-                    interface="com.intellij.ide.workspace.SubprojectHandler"
-                    dynamic="true"/>
-    <extensionPoint qualifiedName="com.intellij.workspace.settingsImporter"
-                    interface="com.intellij.ide.workspace.WorkspaceSettingsImporter"
-                    dynamic="true"/>
 
     <extensionPoint name="fileTypeStatisticProvider" interface="com.intellij.internal.statistic.fileTypes.FileTypeStatisticProvider" dynamic="true"/>
     <extensionPoint name="lang.directNavigationProvider" dynamic="true" interface="com.intellij.navigation.DirectNavigationProvider"/>

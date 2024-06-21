@@ -24,6 +24,7 @@ import com.intellij.util.MathUtil
 import com.intellij.util.ui.*
 import com.intellij.util.ui.StartupUiUtil.labelFont
 import com.intellij.util.ui.accessibility.ScreenReader
+import org.jetbrains.annotations.ApiStatus.Internal
 import java.awt.*
 import java.awt.BorderLayout.NORTH
 import java.awt.BorderLayout.SOUTH
@@ -41,7 +42,10 @@ import kotlin.math.max
 import kotlin.math.min
 
 @Suppress("LeakingThis")
-open class TabLabel(@JvmField protected val tabs: JBTabsImpl, val info: TabInfo) : JPanel(/* isDoubleBuffered = */ false), Accessible, DataProvider {
+open class TabLabel @Internal constructor(
+  @JvmField @Internal protected val tabs: JBTabsImpl,
+  val info: TabInfo,
+) : JPanel(/* isDoubleBuffered = */ false), Accessible, DataProvider {
   // if this System property is set to true 'close' button would be shown on the left of text (it's on the right by default)
   @JvmField
   protected val label: SimpleColoredComponent
@@ -50,9 +54,13 @@ open class TabLabel(@JvmField protected val tabs: JBTabsImpl, val info: TabInfo)
   private var overlaidIcon: Icon? = null
 
   @JvmField
+  @Internal
   protected var actionPanel: ActionPanel? = null
   private var isCentered = false
-  private var isCompressionEnabled = false
+
+  @JvmField
+  internal var isCompressionEnabled: Boolean = false
+
   var isForcePaintBorders: Boolean = false
 
   private val labelPlaceholder = Wrapper(/* isDoubleBuffered = */ false)
@@ -313,7 +321,7 @@ open class TabLabel(@JvmField protected val tabs: JBTabsImpl, val info: TabInfo)
         val rightRect = Rectangle(contentRect.x + contentRect.width - width, borderThickness, width, rect.height - 2 * borderThickness)
         paintGradientRect(g2d, rightRect, transparent, tabBg)
       }
-      else if (tabs.effectiveLayout!!.isScrollable && rect.width < preferredSize.width + tabs.tabHGap
+      else if (tabs.effectiveLayout.isScrollable && rect.width < preferredSize.width + tabs.tabHGap
       ) {
         val rightRect = Rectangle(rect.width - width, borderThickness, width, rect.height - 2 * borderThickness)
         paintGradientRect(g2d, rightRect, transparent, tabBg)
@@ -536,10 +544,6 @@ open class TabLabel(@JvmField protected val tabs: JBTabsImpl, val info: TabInfo)
       }
     }
 
-  fun enableCompressionMode(enabled: Boolean) {
-    isCompressionEnabled = enabled
-  }
-
   private fun removeOldActionPanel() {
     actionPanel?.let {
       it.parent.remove(actionPanel)
@@ -735,7 +739,7 @@ open class TabLabel(@JvmField protected val tabs: JBTabsImpl, val info: TabInfo)
       synchronized(parent.treeLock) {
         when {
           !info.isPinned &&
-          tabs.effectiveLayout!!.isScrollable &&
+          tabs.effectiveLayout.isScrollable &&
           (isNewUI() && !isHovered || tabs.isHorizontalTabs) &&
           isShowTabActions && isTabActionsOnTheRight && parent.width < prefWidth -> {
             layoutScrollable(parent)

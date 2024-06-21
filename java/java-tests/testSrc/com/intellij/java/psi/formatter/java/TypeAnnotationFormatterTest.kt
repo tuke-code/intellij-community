@@ -20,6 +20,7 @@ class TypeAnnotationFormatterTest : LightJavaCodeInsightFixtureTestCase() {
 
   override fun setUp() {
     super.setUp()
+    commonSettings.KEEP_LINE_BREAKS = false
     commonSettings.METHOD_ANNOTATION_WRAP = WRAP_ALWAYS
     ModuleRootModificationUtil.updateModel(module, DefaultLightProjectDescriptor::addJetBrainsAnnotations)
   }
@@ -42,13 +43,12 @@ class TypeAnnotationFormatterTest : LightJavaCodeInsightFixtureTestCase() {
 
   fun testImportMix() = doTest()
 
-  fun testSpacesInImportList() {
-    commonSettings.KEEP_LINE_BREAKS = false
-    doTest()
-  }
+  fun testSpacesInImportList() = doTest()
 
-  fun testSpacesInFqnAnnotations() {
-    commonSettings.KEEP_LINE_BREAKS = false
+  fun testSpacesInFqnAnnotations() = doTest()
+
+  fun testKeepLineBreaks() {
+    commonSettings.KEEP_LINE_BREAKS = true
     doTest()
   }
 

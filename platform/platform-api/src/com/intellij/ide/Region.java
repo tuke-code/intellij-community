@@ -9,11 +9,29 @@ import org.jetbrains.annotations.ApiStatus;
  */
 @ApiStatus.Experimental
 public enum Region {
-  NOT_SET,
-  AFRICA,
-  AMERICA,
-  ASIA,
-  CHINA,
-  EUROPE,
-  OTHER // Rest of the World
+  NOT_SET("not_set"),
+  AFRICA("africa"),
+  AMERICAS("americas"),
+  APAC("apac"),
+  CHINA("china"),
+  EUROPE("europe");
+
+  private final String extName;
+
+  Region(String extName) {
+    this.extName = extName;
+  }
+
+  public String externalName() {
+    return extName;
+  }
+
+  public static Region fromExternalName(String extName) {
+    for (Region value : values()) {
+      if (value.extName.equals(extName)) {
+        return value;
+      }
+    }
+    return NOT_SET;
+  }
 }

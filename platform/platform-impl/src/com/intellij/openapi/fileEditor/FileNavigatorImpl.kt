@@ -1,7 +1,8 @@
-// Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.openapi.fileEditor
 
 import com.intellij.ide.DataManager
+import com.intellij.openapi.actionSystem.DataContext
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.fileEditor.ex.FileEditorManagerEx
 import com.intellij.openapi.fileTypes.FileTypeManager
@@ -9,7 +10,9 @@ import com.intellij.openapi.fileTypes.INativeFileType
 import com.intellij.pom.Navigatable
 import com.intellij.util.concurrency.annotations.RequiresEdt
 import org.jetbrains.annotations.ApiStatus
+import org.jetbrains.annotations.ApiStatus.Internal
 
+@Internal
 class FileNavigatorImpl : FileNavigator {
   private val ignoreContextEditor = ThreadLocal<Boolean?>()
 
@@ -29,7 +32,7 @@ class FileNavigatorImpl : FileNavigator {
       return
     }
     else {
-      ProjectFileNavigatorImpl.getInstance(descriptor.project).navigateInProjectView(descriptor.file, requestFocus)
+      ProjectFileNavigatorImpl.getInstance(descriptor.project).scheduleNavigateInProjectView(descriptor.file, requestFocus)
     }
   }
 
@@ -48,16 +51,18 @@ class FileNavigatorImpl : FileNavigator {
   }
 
   override fun navigateInEditor(descriptor: OpenFileDescriptor, requestFocus: Boolean): Boolean {
-    return navigateInRequestedEditor(descriptor) || navigateInAnyFileEditor(descriptor, requestFocus)
+    return navigateInRequestedEditor(descriptor, dataContextSupplier = {
+      @Suppress("DEPRECATION")
+      DataManager.getInstance().dataContext
+    }) || navigateInAnyFileEditor(descriptor, requestFocus)
   }
 
-  private fun navigateInRequestedEditor(descriptor: OpenFileDescriptor): Boolean {
+  fun navigateInRequestedEditor(descriptor: OpenFileDescriptor, dataContextSupplier: () -> DataContext): Boolean {
     if (ignoreContextEditor.get() == true) {
       return false
     }
 
-    @Suppress("DEPRECATION")
-    val dataContext = DataManager.getInstance().dataContext
+    val dataContext = dataContextSupplier()
     val e = OpenFileDescriptor.NAVIGATE_IN_EDITOR.getData(dataContext) ?: return false
     if (e.isDisposed) {
       logger<FileNavigatorImpl>().error("Disposed editor returned for NAVIGATE_IN_EDITOR from $dataContext")
@@ -93,8 +98,7 @@ private fun navigateInAnyFileEditor(descriptor: OpenFileDescriptor, focusEditor:
   val editors = fileEditorManager.openFileEditor(descriptor, focusEditor)
   for (editor in editors) {
     if (editor is TextEditor) {
-      val e = editor.editor
-      fileEditorManager.runWhenLoaded(e) { OpenFileDescriptor.unfoldCurrentLine(e) }
+      fileEditorManager.runWhenLoaded(editor.editor) { OpenFileDescriptor.unfoldCurrentLine(editor.editor) }
     }
   }
   return !editors.isEmpty()

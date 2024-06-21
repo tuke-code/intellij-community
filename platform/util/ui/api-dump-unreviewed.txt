@@ -405,7 +405,6 @@ f:com.intellij.icons.AllIcons$FileTypes
 - sf:Diagram:javax.swing.Icon
 - sf:Dtd:javax.swing.Icon
 - sf:Font:javax.swing.Icon
-- sf:Freemaker:javax.swing.Icon
 - sf:Gitignore:javax.swing.Icon
 - sf:Hprof:javax.swing.Icon
 - sf:Htaccess:javax.swing.Icon
@@ -2626,6 +2625,7 @@ c:com.intellij.ui.JBColor
 - s:namedColor(java.lang.String,I):com.intellij.ui.JBColor
 - s:namedColor(java.lang.String,I,I):com.intellij.ui.JBColor
 - s:namedColor(java.lang.String,java.awt.Color):com.intellij.ui.JBColor
+- s:namedColorOrNull(java.lang.String):com.intellij.ui.JBColor
 - s:setDark(Z):V
 f:com.intellij.ui.JBGradientPaint
 - java.awt.GradientPaint
@@ -2885,7 +2885,6 @@ com.intellij.ui.UserActivityProviderComponent
 - a:addChangeListener(javax.swing.event.ChangeListener):V
 - a:removeChangeListener(javax.swing.event.ChangeListener):V
 f:com.intellij.ui.UtilUiBundle
-- s:loadBundleFromPlugin(java.lang.ClassLoader):V
 - s:message(java.lang.String,java.lang.Object[]):java.lang.String
 com.intellij.ui.WidthBasedLayout
 - a:getPreferredHeight(I):I
@@ -3828,6 +3827,9 @@ f:com.intellij.util.ui.GraphicsUtil
 - s:setupFractionalMetrics(java.awt.Graphics):V
 - s:setupRoundedBorderAntialiasing(java.awt.Graphics):com.intellij.openapi.ui.GraphicsConfig
 - s:stringWidth(java.lang.String,java.awt.Font):I
+f:com.intellij.util.ui.GraphicsUtilKt
+- sf:withTranslated(java.awt.Graphics2D,D,D,kotlin.jvm.functions.Function0):V
+- sf:withTranslated(java.awt.Graphics2D,I,I,kotlin.jvm.functions.Function0):V
 f:com.intellij.util.ui.GridBag
 - java.awt.GridBagConstraints
 - <init>():V

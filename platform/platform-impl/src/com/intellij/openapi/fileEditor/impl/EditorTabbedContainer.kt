@@ -28,13 +28,15 @@ import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.fileEditor.FileEditorManagerEvent
 import com.intellij.openapi.fileEditor.FileEditorManagerListener
 import com.intellij.openapi.fileEditor.ex.IdeDocumentHistory
-import com.intellij.openapi.fileEditor.impl.EditorTabbedContainer.DockableEditor
 import com.intellij.openapi.fileEditor.impl.EditorWindow.Companion.DRAG_START_INDEX_KEY
 import com.intellij.openapi.fileEditor.impl.EditorWindow.Companion.DRAG_START_LOCATION_HASH_KEY
 import com.intellij.openapi.fileEditor.impl.EditorWindow.Companion.DRAG_START_PINNED_KEY
 import com.intellij.openapi.fileEditor.impl.tabActions.CloseTab
 import com.intellij.openapi.options.advanced.AdvancedSettings
-import com.intellij.openapi.util.*
+import com.intellij.openapi.util.ActionCallback
+import com.intellij.openapi.util.Disposer
+import com.intellij.openapi.util.NlsContexts
+import com.intellij.openapi.util.SystemInfoRt
 import com.intellij.openapi.util.registry.Registry
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.ui.*
@@ -53,11 +55,9 @@ import com.intellij.ui.tabs.impl.*
 import com.intellij.ui.tabs.impl.SingleHeightTabs.Companion.UNSCALED_PREF_HEIGHT
 import com.intellij.ui.tabs.impl.TabLabel.ActionsPosition
 import com.intellij.ui.tabs.impl.multiRow.CompressibleMultiRowLayout
-import com.intellij.ui.tabs.impl.multiRow.MultiRowLayout
 import com.intellij.ui.tabs.impl.multiRow.ScrollableMultiRowLayout
 import com.intellij.ui.tabs.impl.multiRow.WrapMultiRowLayout
 import com.intellij.ui.tabs.impl.singleRow.ScrollableSingleRowLayout
-import com.intellij.ui.tabs.impl.singleRow.SingleRowLayout
 import com.intellij.util.concurrency.EdtScheduledExecutorService
 import com.intellij.util.ui.JBInsets
 import com.intellij.util.ui.JBUI
@@ -89,6 +89,8 @@ class EditorTabbedContainer internal constructor(
     }
 
     editorTabs = EditorTabs(coroutineScope = coroutineScope, parentDisposable = disposable, window = window)
+    setTabPlacement(UISettings.getInstance().editorTabPlacement)
+
     dragOutDelegate = EditorTabbedContainerDragOutDelegate(window = window, editorTabs = editorTabs)
 
     val project = window.manager.project
@@ -107,6 +109,7 @@ class EditorTabbedContainer internal constructor(
     })
     editorTabs.component.isFocusable = false
     editorTabs.component.transferHandler = EditorTabbedContainerTransferHandler(window)
+    @Suppress("UsagesOfObsoleteApi")
     editorTabs.setDataProvider(object : EdtCompatibleDataProvider {
       override fun uiDataSnapshot(sink: DataSink) {
         sink[CommonDataKeys.PROJECT] = window.manager.project
@@ -125,20 +128,20 @@ class EditorTabbedContainer internal constructor(
       .addTabMouseListener(TabMouseListener(window = window, editorTabs = editorTabs)).presentation
       .setTabDraggingEnabled(true)
       .setTabLabelActionsMouseDeadzone(TimedDeadzone.NULL).setTabLabelActionsAutoHide(false)
-      .setActiveTabFillIn(EditorColorsManager.getInstance().globalScheme.defaultBackground).setPaintFocus(false).jbTabs
-      .setSelectionChangeHandler { _, _, doChangeSelection ->
-        if (window.isDisposed) {
-          return@setSelectionChangeHandler ActionCallback.DONE
-        }
-        val result = ActionCallback()
-        val ideDocumentHistory = IdeDocumentHistory.getInstance(project)
-        CommandProcessor.getInstance().executeCommand(project, {
-          ideDocumentHistory.onSelectionChanged()
-          result.notify(doChangeSelection.run())
-        }, "EditorChange", null)
-        result
+      .setActiveTabFillIn(EditorColorsManager.getInstance().globalScheme.defaultBackground).setPaintFocus(false)
+
+    editorTabs.setSelectionChangeHandler { _, _, doChangeSelection ->
+      if (window.isDisposed) {
+        return@setSelectionChangeHandler ActionCallback.DONE
       }
-    editorTabs.presentation.setRequestFocusOnLastFocusedComponent(true)
+      val result = ActionCallback()
+      val ideDocumentHistory = IdeDocumentHistory.getInstance(project)
+      CommandProcessor.getInstance().executeCommand(project, {
+        ideDocumentHistory.onSelectionChanged()
+        result.notify(doChangeSelection.run())
+      }, "EditorChange", null)
+      result
+    }
     editorTabs.component.addMouseListener(object : MouseAdapter() {
       override fun mouseClicked(e: MouseEvent) {
         if (editorTabs.findInfo(e) != null || window.owner.isFloating) {
@@ -149,7 +152,6 @@ class EditorTabbedContainer internal constructor(
         }
       }
     })
-    setTabPlacement(UISettings.getInstance().editorTabPlacement)
   }
 
   val tabCount: Int
@@ -168,13 +170,15 @@ class EditorTabbedContainer internal constructor(
     get() = editorTabs.component
 
   fun removeTabAt(componentIndex: Int, indexToSelect: Int) {
-    var toSelect = if (indexToSelect >= 0 && indexToSelect < editorTabs.tabCount) editorTabs.getTabAt(indexToSelect) else null
     val info = editorTabs.getTabAt(componentIndex)
     // removing the hidden tab happens at the end of the drag-out, we've already selected the correct tab for this case in dragOutStarted
     if (info.isHidden || !window.manager.project.isOpen || window.isDisposed) {
-      toSelect = null
+      editorTabs.removeTabWithoutChangingSelection(info = info)
     }
-    editorTabs.removeTab(info, toSelect)
+    else {
+      val toSelect = if (indexToSelect >= 0 && indexToSelect < editorTabs.tabCount) editorTabs.getTabAt(indexToSelect) else null
+      editorTabs.removeTab(info = info, forcedSelectionTransfer = toSelect)
+    }
   }
 
   val selectedIndex: Int
@@ -188,21 +192,21 @@ class EditorTabbedContainer internal constructor(
     editorTabs.getTabAt(index).setDefaultAttributes(attributes)
   }
 
-  fun setTabLayoutPolicy(policy: Int) {
+  internal fun setTabLayoutPolicy(policy: Int) {
     when (policy) {
-      JTabbedPane.SCROLL_TAB_LAYOUT -> editorTabs.presentation.setSingleRow(true)
-      JTabbedPane.WRAP_TAB_LAYOUT -> editorTabs.presentation.setSingleRow(false)
+      JTabbedPane.SCROLL_TAB_LAYOUT -> editorTabs.setSingleRow(true)
+      JTabbedPane.WRAP_TAB_LAYOUT -> editorTabs.setSingleRow(false)
       else -> throw IllegalArgumentException("Unsupported tab layout policy: $policy")
     }
   }
 
-  fun setTabPlacement(tabPlacement: Int) {
+  internal fun setTabPlacement(tabPlacement: Int) {
     when (tabPlacement) {
-      SwingConstants.TOP -> editorTabs.presentation.setTabsPosition(JBTabsPosition.top)
-      SwingConstants.BOTTOM -> editorTabs.presentation.setTabsPosition(JBTabsPosition.bottom)
-      SwingConstants.LEFT -> editorTabs.presentation.setTabsPosition(JBTabsPosition.left)
-      SwingConstants.RIGHT -> editorTabs.presentation.setTabsPosition(JBTabsPosition.right)
-      UISettings.TABS_NONE -> editorTabs.presentation.isHideTabs = true
+      SwingConstants.TOP -> editorTabs.setTabsPosition(JBTabsPosition.top)
+      SwingConstants.BOTTOM -> editorTabs.setTabsPosition(JBTabsPosition.bottom)
+      SwingConstants.LEFT -> editorTabs.setTabsPosition(JBTabsPosition.left)
+      SwingConstants.RIGHT -> editorTabs.setTabsPosition(JBTabsPosition.right)
+      UISettings.TABS_NONE -> editorTabs.isHideTabs = true
       else -> throw IllegalArgumentException("Unknown tab placement code=$tabPlacement")
     }
   }
@@ -210,7 +214,7 @@ class EditorTabbedContainer internal constructor(
   /**
    * @param ignorePopup if `false` and a context menu is shown currently for some tab, component for which a menu is invoked will be returned
    */
-  fun getSelectedComponent(ignorePopup: Boolean): Any? {
+  internal fun getSelectedComponent(ignorePopup: Boolean): Any? {
     return (if (ignorePopup) editorTabs.selectedInfo else editorTabs.targetInfo)?.component
   }
 
@@ -279,48 +283,32 @@ class EditorTabbedContainer internal constructor(
     val selected = editorTabs.targetInfo ?: return
     window.manager.closeFile((selected.`object` as VirtualFile), window)
   }
+}
 
-  class DockableEditor(
-    val img: Image?,
-    val file: VirtualFile,
-    private val presentation: Presentation,
-    private val preferredSize: Dimension,
-    val isPinned: Boolean,
-    val isNorthPanelAvailable: Boolean,
-  ) : DockableContent<VirtualFile?> {
-    constructor(
-      img: Image,
-      file: VirtualFile,
-      presentation: Presentation,
-      preferredSize: Dimension,
-      isFilePinned: Boolean,
-    ) : this(
-      img = img,
-      file = file,
-      presentation = presentation,
-      preferredSize = preferredSize,
-      isPinned = isFilePinned,
-      isNorthPanelAvailable = isNorthPanelVisible(UISettings.getInstance()),
-    )
+internal class DockableEditor @JvmOverloads constructor(
+  @JvmField val img: Image?,
+  @JvmField val file: VirtualFile,
+  private val presentation: Presentation,
+  private val preferredSize: Dimension,
+  @JvmField val isPinned: Boolean,
+  @JvmField val isNorthPanelAvailable: Boolean = isNorthPanelVisible(UISettings.getInstance()),
+) : DockableContent<VirtualFile?> {
+  override fun getKey(): VirtualFile = file
 
-    override fun getKey(): VirtualFile = file
+  override fun getPreviewImage(): Image? = img
 
-    override fun getPreviewImage(): Image? = img
+  override fun getPreferredSize(): Dimension = preferredSize
 
-    override fun getPreferredSize(): Dimension = preferredSize
+  override fun getDockContainerType(): String = DockableEditorContainerFactory.TYPE
 
-    override fun getDockContainerType(): String = DockableEditorContainerFactory.TYPE
+  override fun getPresentation(): Presentation = presentation
 
-    override fun getPresentation(): Presentation = presentation
-
-    override fun close() {}
-  }
+  override fun close() {}
 }
 
 private fun doProcessDoubleClick(e: MouseEvent, editorTabs: JBTabsImpl, window: EditorWindow) {
-  val info = editorTabs.findInfo(e)
-  if (info != null) {
-    val composite = (info.component as EditorCompositePanel).composite
+  editorTabs.findInfo(e)?.let { info ->
+    val composite = info.composite
     if (composite.isPreview) {
       composite.isPreview = false
       window.owner.scheduleUpdateFileColor(composite.file)
@@ -439,17 +427,18 @@ internal class EditorTabbedContainerDragOutDelegate(private val window: EditorWi
   private var session: DragSession? = null
 
   override fun dragOutStarted(mouseEvent: MouseEvent, info: TabInfo) {
-    val previousSelection = info.previousSelection ?: editorTabs.getToSelectOnRemoveOf(info)
     val img = JBTabsImpl.getComponentImage(info)
+    val file = info.`object` as VirtualFile
 
     val dragStartIndex = editorTabs.getIndexOf(info)
     val isPinnedAtStart = info.isPinned
-    info.isHidden = true
-    if (previousSelection != null) {
-      editorTabs.select(previousSelection, true)
-    }
 
-    val file = info.`object` as VirtualFile
+    // setting isHidden to true will hide the tab - we must select another tab now
+    window.getTabToSelect(tabBeingClosed = info, fileBeingClosed = file, componentIndex = dragStartIndex)?.let {
+      window.setCurrentCompositeAndSelectTab(it)
+    }
+    info.isHidden = true
+
     this.file = file
     file.putUserData(DRAG_START_INDEX_KEY, dragStartIndex)
     file.putUserData(DRAG_START_LOCATION_HASH_KEY, System.identityHashCode(editorTabs))
@@ -483,8 +472,9 @@ internal class EditorTabbedContainerDragOutDelegate(private val window: EditorWi
       source.isHidden = false
     }
     else {
-      file!!.putUserData(FileEditorManagerImpl.CLOSING_TO_REOPEN, true)
-      window.manager.closeFile(file!!, window)
+      val file = file!!
+      file.putUserData(FileEditorManagerImpl.CLOSING_TO_REOPEN, true)
+      window.manager.closeFile(window = window, composite = source.composite, runChecks = false)
     }
     session!!.process(event)
     if (!copy) {
@@ -541,6 +531,11 @@ private class EditorTabs(
   project = window.manager.project,
   parentDisposable = parentDisposable,
   coroutineScope = window.coroutineScope,
+  tabListOptions = TabListOptions(
+    supportCompression = true,
+    singleRow = UISettings.getInstance().scrollTabLayoutInEditor,
+    requestFocusOnLastFocusedComponent = true,
+  ),
 ), ComponentWithMnemonics, EditorWindowHolder, DataProvider {
   private val _entryPointActionGroup: DefaultActionGroup
   private var isActive = false
@@ -583,23 +578,20 @@ private class EditorTabs(
 
   override fun getEditorWindow(): EditorWindow = window
 
-  override fun useMultiRowLayout(): Boolean {
-    return !isSingleRow || (isHorizontalTabs && (TabLayout.showPinnedTabsSeparately() || !UISettings.getInstance().hideTabsIfNeeded))
-  }
-
-  override fun createSingleRowLayout(): SingleRowLayout {
-    return ScrollableSingleRowLayout(this, ExperimentalUI.isEditorTabsWithScrollBar)
-  }
-
-  override fun createMultiRowLayout(): MultiRowLayout {
-    return when {
-      !isSingleRow -> WrapMultiRowLayout(this, TabLayout.showPinnedTabsSeparately())
-      UISettings.getInstance().hideTabsIfNeeded -> ScrollableMultiRowLayout(
-        tabs = this,
-        showPinnedTabsSeparately = true,
-        isWithScrollBar = ExperimentalUI.isEditorTabsWithScrollBar,
-      )
-      else -> CompressibleMultiRowLayout(this, TabLayout.showPinnedTabsSeparately())
+  override fun createRowLayout(): TabLayout {
+    if (!isSingleRow || (isHorizontalTabs && (TabLayout.showPinnedTabsSeparately() || !UISettings.getInstance().hideTabsIfNeeded))) {
+      return when {
+        !isSingleRow -> WrapMultiRowLayout(this, TabLayout.showPinnedTabsSeparately())
+        UISettings.getInstance().hideTabsIfNeeded -> ScrollableMultiRowLayout(
+          tabs = this,
+          showPinnedTabsSeparately = true,
+          isWithScrollBar = ExperimentalUI.isEditorTabsWithScrollBar,
+        )
+        else -> CompressibleMultiRowLayout(this, TabLayout.showPinnedTabsSeparately())
+      }
+    }
+    else {
+      return ScrollableSingleRowLayout(this, ExperimentalUI.isEditorTabsWithScrollBar)
     }
   }
 
@@ -738,14 +730,14 @@ private class EditorTabLabel(info: TabInfo, tabs: JBTabsImpl) : TabLabel(tabs, i
 
 internal fun createDockableEditor(
   image: Image?,
-  file: VirtualFile?,
+  file: VirtualFile,
   presentation: Presentation,
   window: EditorWindow,
   isNorthPanelAvailable: Boolean,
 ): DockableEditor {
   return DockableEditor(
     img = image,
-    file = file!!,
+    file = file,
     presentation = presentation,
     preferredSize = window.size,
     isPinned = window.isFilePinned(file),

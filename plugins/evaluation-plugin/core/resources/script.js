@@ -4,7 +4,10 @@ isCompletionGolf = false
 const prefix = "ep@"
 const LC_KEYS = {
   delimiter: prefix + "delimiter"
-}
+};
+
+const lineDiff = new Diff();
+
 
 document.addEventListener("click", function (e) {
   if (e.target.closest(".multiline") != null) {
@@ -43,10 +46,8 @@ function updateBackgrounds(e, elementClasses, bgClass) {
   addClassForElements(selected, bgClass, true)
 }
 
-document.getElementById("wrong-filters").onchange = (e) => updateBackgrounds(e,
-  ["raw-filter", "analyzed-filter"], "bg-filters-skipped")
-document.getElementById("model-skipped").onchange = (e) => updateBackgrounds(e,
-  ["trigger-skipped", "filter-skipped"], "bg-model-skipped")
+document.getElementById("wrong-filters").onchange = (e) => updateBackgrounds(e,  ["raw-filter", "analyzed-filter"], "bg-filters-skipped")
+document.getElementById("model-skipped").onchange = (e) => updateBackgrounds(e, ["trigger-skipped", "filter-skipped"], "bg-model-skipped")
 
 function removeClassForElements(elementsClassName, classToAdd) {
   let tokens = document.getElementsByClassName(elementsClassName)
@@ -122,15 +123,17 @@ function updatePopup(sessionDiv) {
   popup.setAttribute("class", "autocomplete-items")
   const prefixDiv = document.createElement("DIV")
   prefixDiv.setAttribute("style", "background-color: lightgrey;")
+  const codeElement = document.querySelector('.code');
   if ("aia_user_prompt" in lookup["additionalInfo"]) {
     prefixDiv.innerHTML = `user prompt: &quot;${lookup["additionalInfo"]["aia_user_prompt"]}&quot;; latency: ${lookup["latency"]}`
   } else {
     prefixDiv.innerHTML = `prefix: &quot;${lookup["prefix"]}&quot;; latency: ${lookup["latency"]}`
   }
   popup.appendChild(prefixDiv)
-  // order: () -> suggestions -> features -> contexts
-  const needAddFeatures = sessionDiv.classList.contains("suggestions")
+  // order: () -> (suggestions or diffView) -> features -> contexts
+  const needAddFeatures = sessionDiv.classList.contains("diffView") || sessionDiv.classList.contains("suggestions")
   const needAddContext = sessionDiv.classList.contains("features")
+  const isCodeGeneration = sessionDiv.classList.contains("code-generation");
   closeAllLists()
   if (needAddFeatures) {
     addCommonFeatures(sessionDiv, popup, lookup)
@@ -139,14 +142,60 @@ function updatePopup(sessionDiv) {
     addContexts(sessionDiv, popup, lookup)
   }
   else {
-    addSuggestions(sessionDiv, popup, lookup)
+    if (isCodeGeneration) {
+      addDiffView(sessionDiv, popup, lookup, codeElement.innerText);
+    } else {
+      addSuggestions(sessionDiv, popup, lookup);
+    }
   }
   sessionDiv.appendChild(popup)
 }
 
+// Add the `addDiffView` function
+function addDiffView(sessionDiv, popup, lookup, originalText) {
+  sessionDiv.classList.add("diffView")
+  sessionDiv.classList.remove("features", "contexts","suggestions")
+  const diffDiv = document.createElement("DIV");
+  diffDiv.setAttribute("class", "diffView");
+
+  const suggestionsText = lookup["suggestions"].map(s => s.presentationText).join("\n");
+
+  const unifiedDiff = lineDiff.unifiedSlideDiff(originalText, suggestionsText, 1);
+
+  unifiedDiff.forEach(line => {
+    const lineDiv = document.createElement("DIV");
+    lineDiv.textContent = line.content;
+    lineDiv.style.whiteSpace = "pre"; // Ensure indentation is preserved
+
+    const oldLineNumberSpan = document.createElement("span");
+    oldLineNumberSpan.textContent = line.oldLineNumber !== '' ? line.oldLineNumber : ' ';
+    oldLineNumberSpan.style.width = '30px';
+    oldLineNumberSpan.style.display = 'inline-block';
+
+    const newLineNumberSpan = document.createElement("span");
+    newLineNumberSpan.textContent = line.newLineNumber !== '' ? line.newLineNumber : ' ';
+    newLineNumberSpan.style.width = '30px';
+    newLineNumberSpan.style.display = 'inline-block';
+
+    if (line.type === "added") {
+      lineDiv.style.color = "green";
+    } else if (line.type === "removed") {
+      lineDiv.style.color = "red";
+    } else {
+      lineDiv.style.color = "black";
+    }
+
+    lineDiv.prepend(newLineNumberSpan);
+    lineDiv.prepend(oldLineNumberSpan);
+    diffDiv.appendChild(lineDiv);
+  });
+
+  popup.appendChild(diffDiv);
+}
+
 function addCommonFeatures(sessionDiv, popup, lookup) {
   sessionDiv.classList.add("features")
-  sessionDiv.classList.remove("contexts", "suggestions")
+  sessionDiv.classList.remove("contexts", "diffView","suggestions")
   const parts = sessionDiv.id.split(" ")
   const sessionId = parts[0]
   const lookupOrder = parts[1]
@@ -178,7 +227,7 @@ function addCommonFeatures(sessionDiv, popup, lookup) {
 
 function addContexts(sessionDiv, popup, lookup) {
   sessionDiv.classList.add("contexts")
-  sessionDiv.classList.remove("features", "suggestions")
+  sessionDiv.classList.remove("features", "diffView","suggestions")
 
   if (!("cc_context" in lookup["additionalInfo"])) return
 

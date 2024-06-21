@@ -83,7 +83,7 @@ class LanguageAndRegionUi {
       }
 
       panel.row(IdeBundle.message("combobox.region")) {
-        val helpUrl = (HelpManager.getInstance() as HelpManagerImpl).getHelpUrl("preferences.language.and.region")
+        val helpUrl = (HelpManager.getInstance() as HelpManagerImpl).getHelpUrl("region-settings")
 
         val model = CollectionComboBoxModel(Region.entries, RegionSettings.getRegion())
         val regionBox = comboBox(model).accessibleName(IdeBundle.message("combobox.region")).widthGroup(comboGroup)
@@ -125,7 +125,7 @@ class LanguageAndRegionUi {
 }
 
 internal class LanguageAndRegionConfigurable :
-  BoundSearchableConfigurable(IdeBundle.message("title.language.and.region"), "preferences.language.and.region") {
+  BoundSearchableConfigurable(IdeBundle.message("title.language.and.region"), "region-settings", "preferences.language.and.region") {
   private lateinit var initSelectionLanguage: Locale
   private lateinit var initSelectionRegion: Region
 
@@ -152,15 +152,8 @@ internal class LanguageAndRegionConfigurable :
 private class LanguageComboBoxRenderer(private val locales: Pair<kotlin.collections.List<Locale>, Map<Locale, String>>) :
   GroupedComboBoxRenderer<Locale>() {
 
-  @Suppress("NonAsciiCharacters")
-  private val names = buildMap<Locale, String> {
-    put(Locale.forLanguageTag("zh-CN"), "Chinese (Simplified) 中文语言包")
-    put(Locale.forLanguageTag("ko"), "Korean 한국어 언어 팩")
-    put(Locale.forLanguageTag("ja"), "Japanese 日本語言語パック")
-  }
-
   override fun getText(item: Locale): @NlsSafe String {
-    return locales.second[item] ?: names[item] ?: item.getDisplayLanguage(Locale.ENGLISH)
+    return locales.second[item] ?: item.getDisplayLanguage(Locale.ENGLISH)
   }
 
   override fun separatorFor(value: Locale): ListSeparator? {
@@ -177,7 +170,7 @@ private class RegionComboBoxRenderer : GroupedComboBoxRenderer<Region>() {
   }
 
   override fun separatorFor(value: Region): ListSeparator? {
-    if (value == Region.AFRICA) {
+    if (value == Region.NOT_SET) {
       return ListSeparator()
     }
     return null

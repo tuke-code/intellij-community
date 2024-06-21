@@ -5,6 +5,7 @@ package org.jetbrains.kotlin.idea.k2.codeinsight.intentions
 import com.intellij.codeInsight.intention.HighPriorityAction
 import com.intellij.modcommand.ActionContext
 import com.intellij.modcommand.ModPsiUpdater
+import com.intellij.modcommand.Presentation
 import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.components.ShortenCommand
 import org.jetbrains.kotlin.analysis.api.components.ShortenStrategy
@@ -40,13 +41,17 @@ internal class ImportAllMembersIntention :
         val shortenCommand: ShortenCommand,
     )
 
-    override fun getFamilyName(): String = KotlinBundle.message("import.members.with")
+    override fun getFamilyName(): String =
+        KotlinBundle.message("import.members.with")
 
-    override fun getActionName(
-      actionContext: ActionContext,
-      element: KtExpression,
-      elementContext: Context,
-    ): String = KotlinBundle.message("import.members.from.0", elementContext.fqName.asString())
+    override fun getPresentation(
+        context: ActionContext,
+        element: KtExpression,
+    ): Presentation? {
+        val (fqName) = getElementContext(context, element)
+            ?: return null
+        return Presentation.of(KotlinBundle.message("import.members.from.0", fqName.asString()))
+    }
 
     override fun isApplicableByPsi(element: KtExpression): Boolean =
         element.isOnTheLeftOfQualificationDot && !element.isInImportDirective()
@@ -153,7 +158,7 @@ private fun isReferenceToObjectMemberOrUnresolved(qualifiedAccess: KtExpression)
         else -> return false
     } as? KaSymbolWithKind ?: return true
     if (referencedSymbol is KaConstructorSymbol) return false
-    return (referencedSymbol.getContainingSymbol() as? KaClassOrObjectSymbol)?.classKind?.isObject ?: true
+    return (referencedSymbol.containingSymbol as? KaClassOrObjectSymbol)?.classKind?.isObject ?: true
 }
 
 private fun KaDeclarationSymbol.isEnum(): Boolean = safeAs<KaClassOrObjectSymbol>()?.classKind == KaClassKind.ENUM_CLASS

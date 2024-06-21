@@ -99,6 +99,13 @@
                      enabledByDefault="true" level="ERROR"
                      implementationClass="org.jetbrains.idea.devkit.inspections.PluginXmlDomInspection"
                      key="inspection.plugin.xml.validity.display.name"/>
+    <localInspection isInternal="true"
+                     language="XML" applyToDialects="false"
+                     projectType="INTELLIJ_PLUGIN"
+                     groupPathKey="inspections.group.path" groupKey="inspections.group.descriptor"
+                     enabledByDefault="true" level="ERROR"
+                     implementationClass="org.jetbrains.idea.devkit.inspections.PluginXmlRegistrationCheckInspection"
+                     key="inspection.plugin.xml.registration.check.display.name"/>
     <localInspection language="XML" applyToDialects="false"
                      projectType="INTELLIJ_PLUGIN"
                      groupPathKey="inspections.group.path" groupKey="inspections.group.descriptor"
@@ -560,7 +567,7 @@
       implementation="org.jetbrains.idea.devkit.inspections.PluginXmlExternalAnnotatorsFilter"/>
 
     <!-- must be before SubstringConsoleFolding to be able to fold the entire stacktrace -->
-    <console.folding order="first" implementation="org.jetbrains.idea.devkit.FailedTestDebugLogConsoleFolding"/>
+    <console.folding order="first" implementation="org.jetbrains.idea.devkit.run.FailedTestDebugLogConsoleFolding"/>
 
     <applicationService serviceImplementation="org.jetbrains.idea.devkit.actions.updateFromSources.UpdateFromSourcesSettings"/>
 
@@ -596,6 +603,9 @@
     <smartUpdateStep implementation="org.jetbrains.idea.devkit.actions.updateFromSources.UpdateFromSourcesStep" order="first"/>
     <registryKey key="intellij.commit.message.validation.enabled" defaultValue="false"
                  description="Enables commit messages validation for intellij project"/>
+
+    <fileIconProvider implementation="org.jetbrains.idea.devkit.apiDump.ApiDumpFileIconProvider"/>
+    <generatedSourcesFilter implementation="org.jetbrains.idea.devkit.apiDump.ApiDumpGeneratedSourcesFilter"/>
 
     <!-- INTERNAL -->
     <consoleFilterProvider implementation="org.jetbrains.idea.devkit.run.ModulePathFilterProvider"/>

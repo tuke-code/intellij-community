@@ -309,6 +309,7 @@
     <typeConverter implementation="org.jetbrains.plugins.groovy.lang.psi.typeEnhancers.GrWildcardTypeConverter"/>
     <typeConverter implementation="org.jetbrains.plugins.groovy.lang.psi.typeEnhancers.GrStringConverter"/>
 
+    <typeConverter implementation="org.jetbrains.plugins.groovy.lang.psi.typeEnhancers.GrNamedParamsConverter"/>
     <typeConverter implementation="org.jetbrains.plugins.groovy.lang.psi.typeEnhancers.GrEnumConverter"/>
     <typeConverter implementation="org.jetbrains.plugins.groovy.lang.psi.typeEnhancers.GrContainerTypeConverter"/>
     <typeConverter implementation="org.jetbrains.plugins.groovy.lang.sam.ClosureToSamConverter"/>
@@ -536,7 +537,6 @@
     <lang.formatter language="Groovy" implementationClass="org.jetbrains.plugins.groovy.formatter.GroovyFormattingModelBuilder"/>
     <lang.whiteSpaceFormattingStrategy language="Groovy"
                                        implementationClass="org.jetbrains.plugins.groovy.formatter.GroovyWhiteSpaceFormattingStrategy"/>
-    <inspection.basicVisitor class="org.jetbrains.plugins.groovy.lang.psi.GroovyElementVisitor"/>
 
     <focusModeProvider language="Groovy" implementationClass="org.jetbrains.plugins.groovy.lang.GrFocusModeProvider" />
     <postFormatProcessor implementation="org.jetbrains.plugins.groovy.formatter.GroovyBracePostFormatProcessor"/>

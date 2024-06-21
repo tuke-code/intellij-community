@@ -1,6 +1,7 @@
 package com.intellij.tools.launch.docker.cli
 
 import com.intellij.openapi.diagnostic.thisLogger
+import com.intellij.tools.launch.os.ProcessOutputStrategy
 import com.intellij.tools.launch.os.affixIO
 import com.intellij.tools.launch.os.pathNotResolvingSymlinks
 import java.io.File
@@ -14,7 +15,7 @@ import kotlin.time.Duration.Companion.minutes
 internal class DockerCli(
   private val workDir: File,
   private val redirectOutputIntoParentProcess: Boolean,
-  private val logFolder: File
+  private val logFolder: File,
 ) {
   fun info(timeout: Duration = DEFAULT_TIMEOUT) {
     runCmd(timeout, assertSuccess = false, captureOutput = false, "docker", "info")
@@ -30,10 +31,12 @@ internal class DockerCli(
   fun listContainers(timeout: Duration = DEFAULT_TIMEOUT): List<String> =
     runCmd(timeout, assertSuccess = true, captureOutput = true, "docker", "ps")
 
-  private fun runCmd(timeout: Duration,
-                     assertSuccess: Boolean,
-                     captureOutput: Boolean = false,
-                     vararg cmd: String): List<String> {
+  private fun runCmd(
+    timeout: Duration,
+    assertSuccess: Boolean,
+    captureOutput: Boolean = false,
+    vararg cmd: String,
+  ): List<String> {
     val processBuilder = ProcessBuilder(*cmd)
     processBuilder.directory(workDir)
 
@@ -41,11 +44,15 @@ internal class DockerCli(
     @Suppress("SSBasedInspection")
     stdoutFile.deleteOnExit()
 
-    if (!captureOutput)
-      processBuilder.affixIO(redirectOutputIntoParentProcess, logFolder)
-    else {
+    if (captureOutput) {
       processBuilder.redirectOutput(stdoutFile)
       processBuilder.redirectError(stdoutFile)
+    }
+    else if (redirectOutputIntoParentProcess) {
+      processBuilder.affixIO(ProcessOutputStrategy.InheritIO)
+    }
+    else {
+      processBuilder.affixIO(ProcessOutputStrategy.RedirectToFiles(logFolder))
     }
 
     val readableCmd = cmd.joinToString(" ", prefix = "'", postfix = "'")

@@ -90,7 +90,12 @@ open class TextEditorProvider : DefaultPlatformFileEditorProvider, TextBasedFile
 
   final override fun acceptRequiresReadAction() = false
 
-  override suspend fun createFileEditor(project: Project, file: VirtualFile, document: Document?, editorCoroutineScope: CoroutineScope): FileEditor {
+  override suspend fun createFileEditor(
+    project: Project,
+    file: VirtualFile,
+    document: Document?,
+    editorCoroutineScope: CoroutineScope,
+  ): TextEditor {
     val asyncLoader = createAsyncEditorLoader(
       provider = this@TextEditorProvider,
       project = project,
@@ -233,7 +238,7 @@ open class TextEditorProvider : DefaultPlatformFileEditorProvider, TextBasedFile
   }
 
   override fun getStructureViewBuilder(project: Project, file: VirtualFile): StructureViewBuilder? {
-    return StructureViewBuilder.PROVIDER.getStructureViewBuilder(file.fileType, file, project)
+    return StructureViewBuilder.getProvider().getStructureViewBuilder(file.fileType, file, project)
   }
 
   protected open inner class EditorWrapper(private val editor: Editor) : UserDataHolderBase(), TextEditor {

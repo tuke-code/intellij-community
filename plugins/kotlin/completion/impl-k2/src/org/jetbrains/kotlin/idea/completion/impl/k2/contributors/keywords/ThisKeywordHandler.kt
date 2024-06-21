@@ -5,6 +5,7 @@ package org.jetbrains.kotlin.idea.completion.contributors.keywords
 import com.intellij.codeInsight.completion.CompletionParameters
 import com.intellij.codeInsight.lookup.LookupElement
 import com.intellij.openapi.project.Project
+import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
 import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.components.KtImplicitReceiver
 import org.jetbrains.kotlin.analysis.api.symbols.KaAnonymousFunctionSymbol
@@ -48,11 +49,11 @@ internal class ThisKeywordHandler(
             if (!canReferenceSymbolByThis(parameters, receiver.ownerSymbol)) {
                 return@forEachIndexed
             }
-            if (index == 0 && !basicContext.prefixMatcher.prefix.startsWith("this@")) {
-                result += createThisLookupElement(receiver, labelName = null)
-                return@forEachIndexed
-            }
-            val labelName = getThisLabelBySymbol(receiver.ownerSymbol)
+            // only add label when `receiver` can't be called with `this` without label
+            val labelName = if (index != 0 || basicContext.prefixMatcher.prefix.startsWith(KtTokens.THIS_KEYWORD.value + "@")) {
+                getThisLabelBySymbol(receiver.ownerSymbol)
+            } else null
+
             result += createThisLookupElement(receiver, labelName)
         }
 
@@ -68,8 +69,9 @@ internal class ThisKeywordHandler(
     }
 
     context(KaSession)
+    @OptIn(KaExperimentalApi::class)
     private fun createThisLookupElement(receiver: KtImplicitReceiver, labelName: Name?): LookupElement {
-        return createKeywordElement("this", labelName.labelNameToTail(), lookupObject = KeywordLookupObject())
+        return createKeywordElement(KtTokens.THIS_KEYWORD.value, labelName.labelNameToTail(), lookupObject = KeywordLookupObject())
             .withTypeText(receiver.type.render(CompletionShortNamesRenderer.rendererVerbose, position = Variance.INVARIANT))
     }
 

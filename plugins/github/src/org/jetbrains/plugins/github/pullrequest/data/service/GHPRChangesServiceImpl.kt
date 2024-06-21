@@ -3,24 +3,20 @@ package org.jetbrains.plugins.github.pullrequest.data.service
 
 import com.github.benmanes.caffeine.cache.Caffeine
 import com.intellij.collaboration.api.page.ApiPageUtil
-import com.intellij.collaboration.async.classAsCoroutineName
+import com.intellij.collaboration.api.page.foldToList
 import com.intellij.collaboration.util.ResultUtil.processErrorAndGet
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.diff.impl.patch.BinaryFilePatch
 import com.intellij.openapi.diff.impl.patch.FilePatch
 import com.intellij.openapi.diff.impl.patch.PatchReader
 import com.intellij.openapi.diff.impl.patch.TextFilePatch
-import com.intellij.openapi.progress.coroutineToIndicator
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vcs.FileStatus
 import com.intellij.platform.util.coroutines.childScope
 import git4idea.changes.GitBranchComparisonResult
 import git4idea.changes.GitCommitShaWithPatches
-import git4idea.commands.Git
-import git4idea.commands.GitCommand
-import git4idea.commands.GitLineHandler
-import git4idea.fetch.GitFetchSupport
 import git4idea.remote.GitRemoteUrlCoordinates
+import git4idea.remote.hosting.GitCodeReviewUtils
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.fold
 import org.jetbrains.plugins.github.api.GHGQLRequests
@@ -32,6 +28,7 @@ import org.jetbrains.plugins.github.api.data.GHCommit
 import org.jetbrains.plugins.github.api.data.commit.GHCommitFile
 import org.jetbrains.plugins.github.api.executeSuspend
 import org.jetbrains.plugins.github.api.util.GithubApiPagesLoader
+import org.jetbrains.plugins.github.api.util.GithubApiPagesLoader.batchesFlow
 import org.jetbrains.plugins.github.pullrequest.data.GHPRIdentifier
 import java.time.Duration
 
@@ -63,27 +60,16 @@ class GHPRChangesServiceImpl(parentCs: CoroutineScope,
 
   override suspend fun fetch(refspec: String) =
     runCatching {
-      withContext(Dispatchers.IO) {
-        coroutineToIndicator {
-          GitFetchSupport.fetchSupport(project).fetch(gitRemote.repository, gitRemote.remote, refspec).throwExceptionIfFailed()
-        }
-      }
+      GitCodeReviewUtils.fetch(gitRemote.repository, gitRemote.remote, refspec)
     }.processErrorAndGet {
       LOG.info("Error occurred while fetching \"$refspec\"", it)
     }
 
-  override suspend fun isAncestor(potentialAncestorRev: String, rev: String): Boolean =
+  override suspend fun areAllRevisionsFetched(revisions: List<String>): Boolean =
     runCatching {
-      withContext(Dispatchers.IO) {
-        coroutineToIndicator {
-          val h = GitLineHandler(project, gitRemote.repository.root, GitCommand.MERGE_BASE)
-          h.setSilent(true)
-          h.addParameters("--is-ancestor", potentialAncestorRev, rev)
-          Git.getInstance().runCommand(h).success()
-        }
-      }
+      GitCodeReviewUtils.testRevisionsExist(gitRemote.repository, revisions)
     }.processErrorAndGet {
-      LOG.info("Error occurred while checking revision ancestry relation", it)
+      LOG.info("Error occurred while seeking revisions $revisions", it)
     }
 
   override suspend fun loadCommitsFromApi(pullRequestId: GHPRIdentifier): List<GHCommit> =
@@ -101,7 +87,7 @@ class GHPRChangesServiceImpl(parentCs: CoroutineScope,
   private suspend fun loadCommitDiff(oid: String): List<FilePatch> =
     runCatching {
       val request = GithubApiPagesLoader.Request(Commits.getDiffFiles(ghRepository, oid), Commits::getDiffFiles)
-      GithubApiPagesLoader.loadAll(requestExecutor, request).mapNotNull(::toPatch)
+      batchesFlow(requestExecutor, request).foldToList().mapNotNull(::toPatch)
     }.processErrorAndGet {
       LOG.info("Error occurred while loading diffs for commit $oid", it)
     }
@@ -137,7 +123,7 @@ class GHPRChangesServiceImpl(parentCs: CoroutineScope,
           }
         }
         val request = GithubApiPagesLoader.Request(PullRequests.getDiffFiles(ghRepository, id), PullRequests::getDiffFiles)
-        val prPatches = GithubApiPagesLoader.loadAll(requestExecutor, request).mapNotNull(::toPatch)
+        val prPatches = batchesFlow(requestExecutor, request).foldToList().mapNotNull(::toPatch)
         val commitsWithPatches = commitsWithPatchesReqs.awaitAll()
 
         GitBranchComparisonResult.create(project, gitRemote.repository.root, baseRef, mergeBaseRef, commitsWithPatches, prPatches)

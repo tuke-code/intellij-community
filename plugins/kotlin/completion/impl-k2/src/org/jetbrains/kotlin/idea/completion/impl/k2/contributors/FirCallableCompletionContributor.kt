@@ -8,6 +8,7 @@ import com.intellij.psi.PsiPrimitiveType
 import com.intellij.psi.util.parents
 import com.intellij.util.applyIf
 import com.intellij.util.containers.addIfNotNull
+import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
 import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.annotations.annotations
 import org.jetbrains.kotlin.analysis.api.components.KaExtensionApplicabilityResult
@@ -32,6 +33,7 @@ import org.jetbrains.kotlin.idea.base.analysis.api.utils.isJavaSourceOrLibrary
 import org.jetbrains.kotlin.idea.base.analysis.api.utils.isPossiblySubTypeOf
 import org.jetbrains.kotlin.idea.base.analysis.api.utils.resolveToExpandedSymbol
 import org.jetbrains.kotlin.idea.base.psi.isInsideAnnotationEntryArgumentList
+import org.jetbrains.kotlin.idea.codeinsight.utils.canBeUsedAsExtension
 import org.jetbrains.kotlin.idea.completion.FirCompletionSessionParameters
 import org.jetbrains.kotlin.idea.completion.checkers.ApplicableExtension
 import org.jetbrains.kotlin.idea.completion.checkers.CompletionVisibilityChecker
@@ -73,6 +75,7 @@ internal open class FirCallableCompletionContributor(
         }
 
     context(KaSession)
+    @KaExperimentalApi
     protected open fun getInsertionStrategyForExtensionFunction(
         signature: KtCallableSignature<*>,
         applicabilityResult: KaExtensionApplicabilityResult?
@@ -92,6 +95,7 @@ internal open class FirCallableCompletionContributor(
     )
 
     context(KaSession)
+    @KaExperimentalApi
     private fun getExtensionOptions(
         signature: KtCallableSignature<*>,
         applicability: KaExtensionApplicabilityResult?
@@ -163,6 +167,7 @@ internal open class FirCallableCompletionContributor(
     }
 
     context(KaSession)
+    @OptIn(KaExperimentalApi::class)
     private fun completeWithoutReceiver(
         scopeContext: KtScopeContext,
         extensionChecker: KtCompletionExtensionCandidateChecker?,
@@ -276,12 +281,13 @@ internal open class FirCallableCompletionContributor(
         get() = classKind.isObject || companionObject != null
 
     context(KaSession)
+    @OptIn(KaExperimentalApi::class)
     private fun collectDotCompletionForPackageReceiver(
         packageSymbol: KtPackageSymbol,
         visibilityChecker: CompletionVisibilityChecker,
         sessionParameters: FirCompletionSessionParameters,
     ): Sequence<CallableWithMetadataForCompletion> {
-        val packageScope = packageSymbol.getPackageScope()
+        val packageScope = packageSymbol.packageScope
         val packageScopeKind = KaScopeKind.PackageMemberScope(CompletionSymbolOrigin.SCOPE_OUTSIDE_TOWER_INDEX)
 
         return packageScope
@@ -297,6 +303,7 @@ internal open class FirCallableCompletionContributor(
     }
 
     context(KaSession)
+    @OptIn(KaExperimentalApi::class)
     protected fun collectDotCompletionForCallableReceiver(
         scopeContext: KtScopeContext,
         explicitReceiver: KtExpression,
@@ -314,7 +321,7 @@ internal open class FirCallableCompletionContributor(
         )
         yieldAll(callablesWithMetadata)
 
-        val smartCastInfo = explicitReceiver.getSmartCastInfo()
+        val smartCastInfo = explicitReceiver.smartCastInfo
         if (smartCastInfo?.isStable == false) {
             // Collect members available from unstable smartcast as well.
             val callablesWithMetadataFromUnstableSmartCast = collectDotCompletionForCallableReceiver(
@@ -466,7 +473,7 @@ internal open class FirCallableCompletionContributor(
         sessionParameters: FirCompletionSessionParameters,
     ): Collection<ApplicableExtension> =
         scope.getCallableSymbols(scopeNameFilter)
-            .filter { it.isExtension || it is KtVariableLikeSymbol && (it.returnType as? KtFunctionalType)?.hasReceiver == true }
+            .filter { it.canBeUsedAsExtension() }
             .filter { visibilityChecker.isVisible(it) }
             .filter { filter(it, sessionParameters) }
             .mapNotNull { callable -> checkApplicabilityAndSubstitute(callable, hasSuitableExtensionReceiver) }
@@ -477,6 +484,7 @@ internal open class FirCallableCompletionContributor(
      * When [extensionChecker] is null, no check is carried and applicability result is null.
      */
     context(KaSession)
+    @OptIn(KaExperimentalApi::class)
     private fun checkApplicabilityAndSubstitute(
         callableSymbol: KaCallableSymbol,
         extensionChecker: KtCompletionExtensionCandidateChecker?
@@ -565,7 +573,7 @@ internal open class FirCallableCompletionContributor(
             for (callableWithMetadata in this@filterOutShadowedCallables) {
                 val callableFqName = callableWithMetadata.signature.callableId?.asSingleFqName()
                 val isAlreadyImported = with(importStrategyDetector) { callableFqName?.isAlreadyImported() == true }
-                val typeArgumentsAreRequired = (callableWithMetadata.signature.symbol as? KaFunctionLikeSymbol)?.let {
+                val typeArgumentsAreRequired = (callableWithMetadata.signature.symbol as? KaFunctionSymbol)?.let {
                     FunctionInsertionHelper.functionCanBeCalledWithoutExplicitTypeArguments(it, expectedType)
                 } == false
 
@@ -598,7 +606,7 @@ internal open class FirCallableCompletionContributor(
                 is KtJavaFieldSymbol -> symbol.isStatic && symbol.isVal && symbol.hasPrimitiveOrStringReturnType()
                 is KtKotlinPropertySymbol -> symbol.isConst
                 is KaEnumEntrySymbol -> true
-                is KaFunctionSymbol -> {
+                is KaNamedFunctionSymbol -> {
                     val isArrayOfCall = symbol.callableId?.asSingleFqName() in ArrayFqNames.ARRAY_CALL_FQ_NAMES
 
                     isArrayOfCall && expectedType?.let { symbol.returnType.isPossiblySubTypeOf(it) } != false
@@ -620,9 +628,9 @@ internal open class FirCallableCompletionContributor(
     context(KaSession)
     protected fun KaNamedClassOrObjectSymbol.staticScope(withCompanionScope: Boolean = true): KtScope = buildList {
         if (withCompanionScope) {
-            addIfNotNull(companionObject?.getMemberScope())
+            addIfNotNull(companionObject?.memberScope)
         }
-        add(getStaticMemberScope())
+        add(staticMemberScope)
     }.asCompositeScope()
 }
 
@@ -642,6 +650,7 @@ internal class FirCallableReferenceCompletionContributor(
         CallableInsertionStrategy.AsIdentifier
 
     context(KaSession)
+    @KaExperimentalApi
     override fun getInsertionStrategyForExtensionFunction(
         signature: KtCallableSignature<*>,
         applicabilityResult: KaExtensionApplicabilityResult?
@@ -716,6 +725,7 @@ internal class FirInfixCallableCompletionContributor(
         infixCallableInsertionStrategy
 
     context(KaSession)
+    @KaExperimentalApi
     override fun getInsertionStrategyForExtensionFunction(
         signature: KtCallableSignature<*>,
         applicabilityResult: KaExtensionApplicabilityResult?
@@ -727,7 +737,7 @@ internal class FirInfixCallableCompletionContributor(
 
     context(KaSession)
     override fun filter(symbol: KaCallableSymbol, sessionParameters: FirCompletionSessionParameters): Boolean {
-        return symbol is KaFunctionSymbol && symbol.isInfix && super.filter(symbol, sessionParameters)
+        return symbol is KaNamedFunctionSymbol && symbol.isInfix && super.filter(symbol, sessionParameters)
     }
 
     companion object {
@@ -750,12 +760,14 @@ internal class FirKDocCallableCompletionContributor(
         CallableInsertionStrategy.AsIdentifier
 
     context(KaSession)
+    @KaExperimentalApi
     override fun getInsertionStrategyForExtensionFunction(
         signature: KtCallableSignature<*>,
         applicabilityResult: KaExtensionApplicabilityResult?
     ): CallableInsertionStrategy = CallableInsertionStrategy.AsIdentifier
 
     context(KaSession)
+    @OptIn(KaExperimentalApi::class)
     override fun collectDotCompletion(
         scopeContext: KtScopeContext,
         explicitReceiver: KtElement,
@@ -770,13 +782,13 @@ internal class FirKDocCallableCompletionContributor(
             when (parentSymbol) {
                 is KtPackageSymbol -> {
                     val packageScopeKind = KaScopeKind.PackageMemberScope(CompletionSymbolOrigin.SCOPE_OUTSIDE_TOWER_INDEX)
-                    listOf(KtScopeWithKind(parentSymbol.getPackageScope(), packageScopeKind, token))
+                    listOf(KtScopeWithKind(parentSymbol.packageScope, packageScopeKind, token))
                 }
 
                 is KaNamedClassOrObjectSymbol -> buildList {
                     val type = parentSymbol.buildSelfClassType()
 
-                    type.getTypeScope()?.getDeclarationScope()?.let { typeScope ->
+                    type.scope?.declarationScope?.let { typeScope ->
                         val typeScopeKind = KaScopeKind.TypeScope(CompletionSymbolOrigin.SCOPE_OUTSIDE_TOWER_INDEX)
                         add(KtScopeWithKind(typeScope, typeScopeKind, token))
                     }
@@ -820,8 +832,10 @@ private class CachingKtCompletionExtensionCandidateChecker(
      * The cache also helps to avoid recalculation of applicability for extensions which are suggested twice:
      * the first time while processing the scope context and the second time while processing callables from indexes.
      */
+    @OptIn(KaExperimentalApi::class)
     private val cache: MutableMap<KaCallableSymbol, KaExtensionApplicabilityResult> = mutableMapOf()
 
+    @KaExperimentalApi
     override fun computeApplicability(candidate: KaCallableSymbol): KaExtensionApplicabilityResult {
         return cache.computeIfAbsent(candidate) {
             delegate.computeApplicability(candidate)

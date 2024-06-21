@@ -15,8 +15,10 @@ import com.intellij.util.animation.Easing
 import com.intellij.util.animation.JBAnimator
 import com.intellij.util.animation.animation
 import com.intellij.util.ui.JBUI
+import org.jetbrains.annotations.ApiStatus.Internal
 import java.awt.*
 
+@Internal
 class JBEditorTabsBorder(tabs: JBTabsImpl) : JBTabsBorder(tabs) {
   private val animator = JBAnimator()
   private var start: Int = -1
@@ -83,9 +85,9 @@ class JBEditorTabsBorder(tabs: JBTabsImpl) : JBTabsBorder(tabs) {
 
     val firstLabel = tabs.getTabLabel(tabs.getVisibleInfos().first()) ?: return
 
-    when (tabs.position) {
+    when (tabs.tabsPosition) {
       JBTabsPosition.top -> {
-        val startY = firstLabel.y - if (tabs.position == JBTabsPosition.bottom) 0 else thickness
+        val startY = firstLabel.y - if (tabs.tabsPosition == JBTabsPosition.bottom) 0 else thickness
         val startRow = if (ExperimentalUI.isNewUI()) 1 else 0
         val lastRow = tabs.lastLayoutPass!!.rowCount
         for (eachRow in startRow until lastRow) {
@@ -116,11 +118,11 @@ class JBEditorTabsBorder(tabs: JBTabsImpl) : JBTabsBorder(tabs) {
     }
 
     if (hasAnimation()) {
-      tabs.tabPainter.paintUnderline(tabs.position, calcRectangle() ?: return, thickness, g, tabs.isActiveTabs(tabs.selectedInfo))
+      tabs.tabPainter.paintUnderline(tabs.tabsPosition, calcRectangle() ?: return, thickness, g, tabs.isActiveTabs(tabs.selectedInfo))
     }
     else {
       val selectedLabel = tabs.selectedLabel ?: return
-      tabs.tabPainter.paintUnderline(tabs.position, selectedLabel.bounds, thickness, g, tabs.isActiveTabs(tabs.selectedInfo))
+      tabs.tabPainter.paintUnderline(tabs.tabsPosition, selectedLabel.bounds, thickness, g, tabs.isActiveTabs(tabs.selectedInfo))
     }
   }
 

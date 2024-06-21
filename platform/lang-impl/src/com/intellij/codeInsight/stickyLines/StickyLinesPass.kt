@@ -21,13 +21,13 @@ internal class StickyLinesPass(
   override fun doCollectInformation(progress: ProgressIndicator) {
     FileDocumentManager.getInstance().getFile(document)?.let { vFile ->
       collectedLines = collector.collectLines(vFile, progress)
-      StickyLinesCollector.updatesModStamp(psiFile)
+      StickyLinesCollector.ModStamp.update(psiFile)
     }
   }
 
   override fun doApplyInformationToEditor() {
     collectedLines?.let { lines ->
-      collector.applyLines(lines)
+      collector.applyLines(psiFile, lines)
     }
     collectedLines = null
   }

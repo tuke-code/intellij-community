@@ -18,9 +18,10 @@ import java.util.stream.Stream;
 
 /**
  * Provides services for creating document and editor instances.
- *
+ * <p>
  * Creating and releasing of editors must be done from EDT.
  */
+@ApiStatus.NonExtendable
 public abstract class EditorFactory {
   /**
    * Returns the editor factory instance.
@@ -88,7 +89,7 @@ public abstract class EditorFactory {
    * @see Editor#getProject()
    */
   @RequiresEdt
-  public abstract Editor createEditor(@NotNull Document document, Project project, @NotNull FileType fileType, boolean isViewer);
+  public abstract Editor createEditor(@NotNull Document document, @Nullable Project project, @NotNull FileType fileType, boolean isViewer);
 
   /**
    * Creates an editor for the specified document associated with the specified project. Must be invoked in EDT.
@@ -103,13 +104,13 @@ public abstract class EditorFactory {
    * @see Editor#getProject()
    */
   @RequiresEdt
-  public abstract Editor createEditor(@NotNull Document document, Project project, @NotNull VirtualFile file, boolean isViewer);
+  public abstract Editor createEditor(@NotNull Document document, @Nullable Project project, @NotNull VirtualFile file, boolean isViewer);
 
   /**
    * Does the same as {@link #createEditor(Document, Project, VirtualFile, boolean)} and also sets the special kind for the created editor
    */
   @RequiresEdt
-  public abstract Editor createEditor(@NotNull Document document, Project project, @NotNull VirtualFile file, boolean isViewer,
+  public abstract Editor createEditor(@NotNull Document document, @Nullable Project project, @NotNull VirtualFile file, boolean isViewer,
                                       @NotNull EditorKind kind);
 
   /**
@@ -202,8 +203,4 @@ public abstract class EditorFactory {
    */
   @RequiresEdt
   public abstract void refreshAllEditors();
-
-  @ApiStatus.Internal
-  protected EditorFactory() {
-  }
 }

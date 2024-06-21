@@ -888,7 +888,7 @@
       <option name="CHECK_TRY_CATCH_SECTION" value="true" />
       <option name="CHECK_METHOD_BODY" value="true" />
     </inspection_tool>
-    <inspection_tool class="DefaultNotLastCaseInSwitch" enabled="false" level="WARNING" enabled_by_default="false" />
+    <inspection_tool class="DefaultNotLastCaseInSwitch" enabled="true" level="WARNING" enabled_by_default="true" />
     <inspection_tool class="DefaultNotLastCaseInSwitchJS" enabled="false" level="WARNING" enabled_by_default="false" />
     <inspection_tool class="DeferredIsResult" enabled="false" level="WEAK WARNING" enabled_by_default="false" />
     <inspection_tool class="DeferredResultUnused" enabled="false" level="WARNING" enabled_by_default="false" />
@@ -2132,7 +2132,7 @@
     <inspection_tool class="MinitestFrameworkSupportInspection" enabled="false" level="WARNING" enabled_by_default="false" />
     <inspection_tool class="MismatchedArrayReadWrite" enabled="true" level="WARNING" enabled_by_default="true" />
     <inspection_tool class="MismatchedLightServiceLevelAndCtor" enabled="true" level="WARNING" enabled_by_default="true" />
-    <inspection_tool class="MismatchedCollectionQueryUpdate" enabled="false" level="WARNING" enabled_by_default="false">
+    <inspection_tool class="MismatchedCollectionQueryUpdate" enabled="true" level="WARNING" enabled_by_default="true">
       <option name="queryNames">
         <value />
       </option>
@@ -2493,6 +2493,7 @@
       <option name="CHECK_NON_CONSTANT_VALUES" value="true" />
     </inspection_tool>
     <inspection_tool class="PatternVariableCanBeUsed" enabled="false" level="WARNING" enabled_by_default="false" />
+    <inspection_tool class="PatternVariableHidesField" enabled="true" level="WARNING" enabled_by_default="true" />
     <inspection_tool class="PermissionUsageInspection" enabled="false" level="WARNING" enabled_by_default="false" />
     <inspection_tool class="PgSelectFromProcedureInspection" enabled="false" level="WARNING" enabled_by_default="false" />
     <inspection_tool class="Php7ReadinessInspection" enabled="false" level="ERROR" enabled_by_default="true" />
@@ -3490,6 +3491,7 @@
     <inspection_tool class="SuspiciousGetterSetter" enabled="false" level="WARNING" enabled_by_default="false" />
     <inspection_tool class="SuspiciousIndentAfterControlStatement" enabled="false" level="WARNING" enabled_by_default="false" />
     <inspection_tool class="SuspiciousInstanceOfGuard" enabled="false" level="WARNING" enabled_by_default="false" />
+    <inspection_tool class="SuspiciousIndentAfterControlStatement" enabled="true" level="WARNING" enabled_by_default="true" />
     <inspection_tool class="SuspiciousIntegerDivAssignment" enabled="true" level="WARNING" enabled_by_default="true" />
     <inspection_tool class="SuspiciousListRemoveInLoop" enabled="true" level="WARNING" enabled_by_default="true" />
     <inspection_tool class="SuspiciousLiteralUnderscore" enabled="false" level="WARNING" enabled_by_default="false" />

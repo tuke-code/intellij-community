@@ -61,7 +61,7 @@ internal class WeighingContext private constructor(
             if (symbol in symbols) return true
 
             val overriddenSymbols = contextualOverriddenSymbols.getOrPut(symbol.name) {
-                symbols.flatMap { it.getAllOverriddenSymbols() }.toSet()
+                symbols.flatMap { it.allOverriddenSymbols }.toSet()
             }
 
             return symbol.unwrapFakeOverrides in overriddenSymbols
@@ -92,20 +92,6 @@ internal class WeighingContext private constructor(
 
     val isPositionSuitableForNull: Boolean = isPositionSuitableForNull(positionInFakeCompletionFile)
     val isPositionInsideImportOrPackageDirective: Boolean = isPositionInsideImportOrPackageDirective(positionInFakeCompletionFile)
-
-    fun withoutExpectedType(): WeighingContext = withValidityAssertion {
-        WeighingContext(
-            token,
-            languageVersionSettings,
-            explicitReceiver,
-            positionInFakeCompletionFile,
-            myExpectedType = null,
-            myImplicitReceivers,
-            contextualSymbolsCache,
-            importableFqNameClassifier,
-            mySymbolsToSkip,
-        )
-    }
 
     companion object {
         context(KaSession)

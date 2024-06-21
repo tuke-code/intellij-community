@@ -32,9 +32,6 @@ f:com.intellij.BundleBase
 - sf:replaceMnemonicAmpersand(java.lang.String):java.lang.String
 - sf:setTranslationConsumer(java.util.function.BiConsumer):V
 - sf:useDefaultValue(java.util.ResourceBundle,java.lang.String,java.lang.String):java.lang.String
-f:com.intellij.BundleUtil
-- <init>():V
-- s:loadLanguageBundle(java.lang.ClassLoader,java.lang.String):java.util.ResourceBundle
 f:com.intellij.Patches
 - sf:IBM_JDK_DISABLE_COLLECTION_BUG:Z
 - sf:JDK_BUG_ID_21275177:Z
@@ -45,7 +42,6 @@ f:com.intellij.Patches
 - sf:TEXT_LAYOUT_IS_SLOW:Z
 - <init>():V
 f:com.intellij.UtilBundle
-- s:loadBundleFromPlugin(java.lang.ClassLoader):V
 - s:message(java.lang.String,java.lang.Object[]):java.lang.String
 *f:com.intellij.concurrency.ThreadContext
 - sf:captureThreadContext(java.lang.Runnable):java.lang.Runnable
@@ -343,10 +339,8 @@ f:com.intellij.openapi.application.PathManager
 - sf:PROPERTY_SYSTEM_PATH:java.lang.String
 - sf:SYSTEM_PATHS_CUSTOMIZER:java.lang.String
 - <init>():V
-- s:customizePaths():V
 - s:findBinFile(java.lang.String):java.nio.file.Path
 - s:findBinFileWithException(java.lang.String):java.nio.file.Path
-- s:findFileInLibDirectory(java.lang.String):java.io.File
 - s:getAbsolutePath(java.lang.String):java.lang.String
 - s:getBinPath():java.lang.String
 - s:getBundledRuntimePath():java.lang.String
@@ -356,15 +350,9 @@ f:com.intellij.openapi.application.PathManager
 - s:getConfigPath():java.lang.String
 - s:getCustomOptionsDirectory():java.lang.String
 - s:getDefaultConfigPathFor(java.lang.String):java.lang.String
-- s:getDefaultLogPathFor(java.lang.String):java.lang.String
-- s:getDefaultPluginPathFor(java.lang.String):java.lang.String
 - s:getDefaultSystemPathFor(java.lang.String):java.lang.String
-- s:getDefaultUnixSystemPath(java.lang.String,java.lang.String):java.lang.String
-- s:getHomeDirFor(java.lang.Class):java.nio.file.Path
 - s:getHomePath():java.lang.String
 - s:getHomePath(Z):java.lang.String
-- s:getHomePathFor(java.lang.Class):java.lang.String
-- s:getIndexRoot():java.nio.file.Path
 - s:getJarForClass(java.lang.Class):java.nio.file.Path
 - s:getJarPathForClass(java.lang.Class):java.lang.String
 - s:getLibPath():java.lang.String
@@ -372,7 +360,6 @@ f:com.intellij.openapi.application.PathManager
 - s:getLogPath():java.lang.String
 - s:getOptionsFile(java.lang.String):java.io.File
 - s:getOptionsPath():java.lang.String
-- s:getPathsSelector():java.lang.String
 - s:getPluginTempPath():java.lang.String
 - s:getPluginsDir():java.nio.file.Path
 - s:getPluginsPath():java.lang.String
@@ -386,8 +373,6 @@ f:com.intellij.openapi.application.PathManager
 - s:isUnderHomeDirectory(java.lang.String):Z
 - s:isUnderHomeDirectory(java.nio.file.Path):Z
 - s:setExplicitConfigPath(java.lang.String):V
-- s:substituteVars(java.lang.String):java.lang.String
-- s:substituteVars(java.lang.String,java.lang.String):java.lang.String
 f:com.intellij.openapi.diagnostic.Attachment
 - sf:EMPTY_ARRAY:com.intellij.openapi.diagnostic.Attachment[]
 - <init>(java.lang.String,java.io.File,java.lang.String):V
@@ -4730,12 +4715,7 @@ f:com.intellij.util.indexing.impl.CollectionDataExternalizer
 - <init>(com.intellij.util.io.DataExternalizer):V
 - read(java.io.DataInput):java.util.Collection
 - save(java.io.DataOutput,java.util.Collection):V
-*a:com.intellij.util.indexing.impl.DirectInputDataDiffBuilder
-- com.intellij.util.indexing.impl.InputDataDiffBuilder
-- p:<init>(I):V
-- a:getKeys():java.util.Collection
 f:com.intellij.util.indexing.impl.EmptyInputDataDiffBuilder
-- com.intellij.util.indexing.impl.DirectInputDataDiffBuilder
 - <init>(I):V
 - differentiate(java.util.Map,com.intellij.util.indexing.impl.KeyValueUpdateProcessor,com.intellij.util.indexing.impl.KeyValueUpdateProcessor,com.intellij.util.indexing.impl.RemovedKeyProcessor):Z
 - getKeys():java.util.Collection
@@ -4760,10 +4740,6 @@ f:com.intellij.util.indexing.impl.IndexStorageUtil
 c:com.intellij.util.indexing.impl.InputData
 - s:empty():com.intellij.util.indexing.impl.InputData
 - getKeyValues():java.util.Map
-a:com.intellij.util.indexing.impl.InputDataDiffBuilder
-- pf:myInputId:I
-- p:<init>(I):V
-- a:differentiate(java.util.Map,com.intellij.util.indexing.impl.KeyValueUpdateProcessor,com.intellij.util.indexing.impl.KeyValueUpdateProcessor,com.intellij.util.indexing.impl.RemovedKeyProcessor):Z
 f:com.intellij.util.indexing.impl.InputIndexDataExternalizer
 - com.intellij.util.io.DataExternalizer
 - <init>(com.intellij.util.io.KeyDescriptor,com.intellij.util.indexing.IndexId):V
@@ -4772,7 +4748,6 @@ f:com.intellij.util.indexing.impl.InputIndexDataExternalizer
 com.intellij.util.indexing.impl.KeyValueUpdateProcessor
 - a:process(java.lang.Object,java.lang.Object,I):V
 c:com.intellij.util.indexing.impl.MapInputDataDiffBuilder
-- com.intellij.util.indexing.impl.DirectInputDataDiffBuilder
 - <init>(I,java.util.Map):V
 - differentiate(java.util.Map,com.intellij.util.indexing.impl.KeyValueUpdateProcessor,com.intellij.util.indexing.impl.KeyValueUpdateProcessor,com.intellij.util.indexing.impl.RemovedKeyProcessor):Z
 - getKeys():java.util.Collection
@@ -4787,48 +4762,18 @@ f:com.intellij.util.indexing.impl.UpdateData
 - <init>(I,java.util.Map,com.intellij.openapi.util.ThrowableComputable,com.intellij.util.indexing.IndexId,com.intellij.util.ThrowableRunnable):V
 com.intellij.util.indexing.impl.ValueSerializationProblemReporter
 - a:reportProblem(java.lang.Exception):V
-a:com.intellij.util.indexing.impl.forward.AbstractForwardIndexAccessor
-- com.intellij.util.indexing.impl.forward.ForwardIndexAccessor
-- p:<init>(com.intellij.util.io.DataExternalizer):V
-- pa:convertToDataType(com.intellij.util.indexing.impl.InputData):java.lang.Object
-- pa:createDiffBuilder(I,java.lang.Object):com.intellij.util.indexing.impl.InputDataDiffBuilder
-- deserializeData(com.intellij.openapi.util.io.ByteArraySequence):java.lang.Object
-- s:deserializeFromByteSeq(com.intellij.openapi.util.io.ByteArraySequence,com.intellij.util.io.DataExternalizer):java.lang.Object
-- p:getBufferInitialSize(java.lang.Object):I
-- getDiffBuilder(I,com.intellij.openapi.util.io.ByteArraySequence):com.intellij.util.indexing.impl.InputDataDiffBuilder
-- serializeIndexedData(com.intellij.util.indexing.impl.InputData):com.intellij.openapi.util.io.ByteArraySequence
-- p:serializeIndexedData(java.lang.Object):com.intellij.openapi.util.io.ByteArraySequence
-- s:serializeKeyToByteSeq(java.lang.Object,com.intellij.util.io.DataExternalizer,I):com.intellij.openapi.util.io.ByteArraySequence
-- s:serializeToByteSeq(java.lang.Object,com.intellij.util.io.DataExternalizer,I,com.intellij.openapi.util.ThreadLocalCachedByteArray):com.intellij.openapi.util.io.ByteArraySequence
-- s:serializeValueToByteSeq(java.lang.Object,com.intellij.util.io.DataExternalizer,I):com.intellij.openapi.util.io.ByteArraySequence
-a:com.intellij.util.indexing.impl.forward.AbstractMapForwardIndexAccessor
-- com.intellij.util.indexing.impl.forward.AbstractForwardIndexAccessor
-- <init>(com.intellij.util.io.DataExternalizer):V
-- convertToInputDataMap(I,com.intellij.openapi.util.io.ByteArraySequence):java.util.Map
-- pa:convertToMap(I,java.lang.Object):java.util.Map
-- pf:createDiffBuilder(I,java.lang.Object):com.intellij.util.indexing.impl.InputDataDiffBuilder
-- createDiffBuilderByMap(I,java.util.Map):com.intellij.util.indexing.impl.InputDataDiffBuilder
 com.intellij.util.indexing.impl.forward.ForwardIndex
 - com.intellij.util.io.KeyValueStore
 - a:clear():V
 - a:get(java.lang.Integer):com.intellij.openapi.util.io.ByteArraySequence
 - a:isClosed():Z
 - a:put(java.lang.Integer,com.intellij.openapi.util.io.ByteArraySequence):V
-com.intellij.util.indexing.impl.forward.ForwardIndexAccessor
-- a:getDiffBuilder(I,com.intellij.openapi.util.io.ByteArraySequence):com.intellij.util.indexing.impl.InputDataDiffBuilder
-- a:serializeIndexedData(com.intellij.util.indexing.impl.InputData):com.intellij.openapi.util.io.ByteArraySequence
 com.intellij.util.indexing.impl.forward.IntForwardIndex
 - com.intellij.util.indexing.impl.forward.ForwardIndex
 - get(java.lang.Integer):com.intellij.openapi.util.io.ByteArraySequence
 - a:getInt(I):I
 - put(java.lang.Integer,com.intellij.openapi.util.io.ByteArraySequence):V
 - a:putInt(I,I):V
-com.intellij.util.indexing.impl.forward.IntForwardIndexAccessor
-- com.intellij.util.indexing.impl.forward.ForwardIndexAccessor
-- getDiffBuilder(I,com.intellij.openapi.util.io.ByteArraySequence):com.intellij.util.indexing.impl.InputDataDiffBuilder
-- a:getDiffBuilderFromInt(I,I):com.intellij.util.indexing.impl.InputDataDiffBuilder
-- serializeIndexedData(com.intellij.util.indexing.impl.InputData):com.intellij.openapi.util.io.ByteArraySequence
-- a:serializeIndexedDataToInt(com.intellij.util.indexing.impl.InputData):I
 f:com.intellij.util.indexing.impl.forward.IntMapForwardIndex
 - com.intellij.util.indexing.impl.forward.IntForwardIndex
 - <init>(java.nio.file.Path,Z):V
@@ -4840,17 +4785,6 @@ f:com.intellij.util.indexing.impl.forward.IntMapForwardIndex
 - isDirty():Z
 - keysCountApproximately():I
 - putInt(I,I):V
-f:com.intellij.util.indexing.impl.forward.KeyCollectionForwardIndexAccessor
-- com.intellij.util.indexing.impl.forward.AbstractForwardIndexAccessor
-- <init>(com.intellij.util.indexing.IndexExtension):V
-- <init>(com.intellij.util.io.DataExternalizer):V
-- convertToDataType(com.intellij.util.indexing.impl.InputData):java.util.Collection
-c:com.intellij.util.indexing.impl.forward.MapForwardIndexAccessor
-- com.intellij.util.indexing.impl.forward.AbstractMapForwardIndexAccessor
-- <init>(com.intellij.util.io.DataExternalizer):V
-- convertToDataType(com.intellij.util.indexing.impl.InputData):java.util.Map
-- p:convertToMap(I,java.util.Map):java.util.Map
-- p:getBufferInitialSize(java.util.Map):I
 com.intellij.util.io.AbstractStringEnumerator
 - com.intellij.openapi.Forceable
 - com.intellij.util.io.DataEnumerator

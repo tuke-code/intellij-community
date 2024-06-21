@@ -3,6 +3,8 @@ package org.jetbrains.kotlin.idea.k2.codeinsight.fixes
 
 import com.intellij.modcommand.ActionContext
 import com.intellij.modcommand.ModPsiUpdater
+import com.intellij.modcommand.Presentation
+import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
 import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.fir.diagnostics.KaFirDiagnostic
 import org.jetbrains.kotlin.analysis.api.renderer.types.impl.KtTypeRendererForSource
@@ -21,7 +23,7 @@ import org.jetbrains.kotlin.types.Variance
 internal object AddTypeAnnotationToValueParameterFixFactory {
 
     val addTypeAnnotationToValueParameterFixFactory =
-        KotlinQuickFixFactory.ModCommandBased { diagnostic: KaFirDiagnostic.ValueParameterWithNoTypeAnnotation ->
+        KotlinQuickFixFactory.ModCommandBased { diagnostic: KaFirDiagnostic.ValueParameterWithoutExplicitType ->
             val element = diagnostic.psi
             val defaultValue = element.defaultValue ?: return@ModCommandBased emptyList()
             val elementContext = getTypeName(element, defaultValue) ?: return@ModCommandBased emptyList()
@@ -35,12 +37,12 @@ internal object AddTypeAnnotationToValueParameterFixFactory {
     private fun getTypeName(element: KtParameter, defaultValue: KtExpression): String? {
         val type = defaultValue.getKtType() ?: return null
 
-        if (type.isArrayOrPrimitiveArray()) {
+        if (type.isArrayOrPrimitiveArray) {
             if (element.hasModifier(KtTokens.VARARG_KEYWORD)) {
-                val elementType = type.getArrayElementType() ?: return null
+                val elementType = type.arrayElementType ?: return null
                 return getTypeName(elementType)
             } else if (defaultValue is KtCollectionLiteralExpression) {
-                val elementType = type.getArrayElementType()
+                val elementType = type.arrayElementType
                 if (elementType?.isPrimitive == true) {
                     val classId = (elementType as KtNonErrorClassType).classId
                     val arrayTypeName = "${classId.shortClassName}Array"
@@ -52,6 +54,7 @@ internal object AddTypeAnnotationToValueParameterFixFactory {
     }
 
     context(KaSession)
+    @OptIn(KaExperimentalApi::class)
     private fun getTypeName(type: KtType): String {
         val typeName = type.render(
             KtTypeRendererForSource.WITH_SHORT_NAMES,
@@ -74,12 +77,19 @@ internal object AddTypeAnnotationToValueParameterFixFactory {
             element.typeReference = KtPsiFactory(actionContext.project).createType(typeName)
         }
 
-        override fun getFamilyName(): String = KotlinBundle.message("fix.add.type.annotation.family")
+        override fun getFamilyName(): String =
+            KotlinBundle.message("fix.add.type.annotation.family")
 
-        override fun getActionName(
-            actionContext: ActionContext,
+        override fun getPresentation(
+            context: ActionContext,
             element: KtParameter,
-            elementContext: Unit,
-        ): String = KotlinBundle.message("fix.add.type.annotation.text", typeName, element.name.toString())
+        ): Presentation {
+            val actionName = KotlinBundle.message(
+                "fix.add.type.annotation.text",
+                typeName,
+                element.name.toString(),
+            )
+            return Presentation.of(actionName)
+        }
     }
 }

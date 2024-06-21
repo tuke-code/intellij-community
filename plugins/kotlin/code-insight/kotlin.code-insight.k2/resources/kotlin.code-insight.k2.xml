@@ -126,6 +126,8 @@
     <applicationService serviceInterface="org.jetbrains.kotlin.idea.base.codeInsight.KotlinNameValidatorProvider"
                         serviceImplementation="org.jetbrains.kotlin.idea.k2.codeinsight.K2NameValidatorProviderImpl"/>
 
+    <copyPastePostProcessor implementation="org.jetbrains.kotlin.idea.k2.codeinsight.copyPaste.KotlinCopyPasteReferenceProcessor"/>
+
     <registryKey key="kotlin.k2.allow.constant.computation.on.EDT" defaultValue="true" description="When enabled, error about analysis on EDT is disabled"/>
 
     <registryKey key="kotlin.k2.kmp.enabled"
@@ -214,10 +216,10 @@
             nameKey="hints.settings.parameters"
             descriptionKey="inlay.kotlin.parameters.hints">
       <!--        <option bundle="messages.KotlinBundle"-->
-      <!--              optionId="hints.parameters.blacklisted"-->
+      <!--              optionId="hints.parameters.excluded"-->
       <!--              enabledByDefault="false"-->
       <!--              nameKey="hints.settings.excluded.parameters"-->
-      <!--              descriptionKey="inlay.kotlin.parameters.hints.blacklisted"/>-->
+      <!--              descriptionKey="inlay.kotlin.parameters.hints.excluded"/>-->
     </codeInsight.declarativeInlayProvider>
 
     <codeInsight.declarativeInlayProvider
@@ -237,6 +239,8 @@
             language="kotlin"
             implementationClass="org.jetbrains.kotlin.idea.k2.codeinsight.hierarchy.calls.KotlinCallHierarchyProvider"/>
     <hierarchy.referenceProcessor implementation="org.jetbrains.kotlin.idea.k2.codeinsight.hierarchy.calls.KotlinCallReferenceProcessor"/>
+
+    <typeHierarchyProvider language="kotlin" implementationClass="org.jetbrains.kotlin.idea.k2.codeinsight.hierarchy.types.KotlinTypeHierarchyProvider"/>
   </extensions>
   <extensions defaultExtensionNs="org.jetbrains.kotlin">
     <codeinsight.quickfix.registrar implementation="org.jetbrains.kotlin.idea.k2.codeinsight.quickFixes.createFromUsage.K2CreateFromUsageQuickFixesRegistrar"/>

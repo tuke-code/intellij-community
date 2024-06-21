@@ -2,18 +2,24 @@ package com.intellij.tools.launch.rd
 
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.tools.launch.docker.BindMount
+import com.intellij.tools.launch.os.ProcessOutputInfo
+import com.intellij.tools.launch.os.terminal.AnsiColor
+import com.intellij.tools.launch.os.terminal.colorize
 import com.intellij.tools.launch.rd.RemoteDevLauncher.logger
+import com.intellij.tools.launch.rd.components.BackendLaunchResult
 import com.intellij.tools.launch.rd.components.runCodeWithMeHostNoLobby
 import com.intellij.tools.launch.rd.components.runJetBrainsClientLocally
 import com.intellij.tools.launch.rd.dsl.*
+import kotlinx.coroutines.*
 import java.nio.file.Path
 
-suspend fun launchRemoteDev(init: LaunchRemoteDevBuilder.() -> Unit) {
+suspend fun CoroutineScope.launchRemoteDev(init: LaunchRemoteDevBuilder.() -> Unit): LaunchRemoteDevResult =
   LaunchRemoteDevBuilderImpl().let {
     it.init()
-    it.launch()
+    it.launch(remoteDevLifespanScope = this)
   }
-}
+
+data class LaunchRemoteDevResult(val clientTerminationDeferred: Deferred<Int>, val backendTerminationDeferred: Deferred<Int>)
 
 private class LaunchRemoteDevBuilderImpl : LaunchRemoteDevBuilder {
   private lateinit var clientResult: JetBrainsClientBuilderImpl.Result
@@ -42,26 +48,92 @@ private class LaunchRemoteDevBuilderImpl : LaunchRemoteDevBuilder {
     )
   }
 
-  suspend fun launch() {
+  suspend fun launch(remoteDevLifespanScope: CoroutineScope): LaunchRemoteDevResult {
     logger.info("Starting backend: $backendInEnvDescription")
-    val backendStatus = runCodeWithMeHostNoLobby(backendInEnvDescription)
+    val backendLaunchResult = runCodeWithMeHostNoLobby(backendInEnvDescription, remoteDevLifespanScope)
+    handleBackendProcessOutput(backendLaunchResult, remoteDevLifespanScope)
     val backendDebugPort = 5006
     logger.info("Attaching debugger to backend at port $backendDebugPort")
     backendInEnvDescription.backendDescription.attachDebuggerCallback?.invoke(backendDebugPort)
-    if (backendStatus.waitForHealthy()) {
+    if (backendLaunchResult.backendStatus.waitForHealthy()) {
       logger.info("Backend is healthy now")
     }
     else {
       error("Backend failed to start normally")
     }
     logger.info("Starting JetBrains client")
-    val clientDebugPort = runJetBrainsClientLocally()
+    val (clientLocalProcessResult, clientDebugPort) =
+      withContext(CoroutineName("JetBrains Client Launcher")) {
+        runJetBrainsClientLocally(remoteDevLifespanScope)
+      }
+    handleLocalProcessOutput(
+      clientLocalProcessResult.processWrapper.processOutputInfo,
+      processShortName = "\uD83D\uDE80 JetBrains Client",
+      processColor = AnsiColor.GREEN,
+      remoteDevLifespanScope
+    )
     clientResult.attachDebuggerCallback?.let {
       logger.info("Attaching debugger to client at port $clientDebugPort")
       it.invoke(clientDebugPort)
     }
+    return LaunchRemoteDevResult(
+      clientTerminationDeferred = clientLocalProcessResult.processWrapper.terminationDeferred,
+      backendTerminationDeferred = backendLaunchResult.asyncAwaitExit(remoteDevLifespanScope)
+    )
   }
 }
+
+private suspend fun handleBackendProcessOutput(backendLaunchResult: BackendLaunchResult, coroutineScope: CoroutineScope) {
+  when (backendLaunchResult) {
+    is BackendLaunchResult.Local -> handleLocalProcessOutput(
+      backendLaunchResult.localProcessResult.processWrapper.processOutputInfo,
+      processShortName = "IDE Backend",
+      processColor = AnsiColor.PURPLE,
+      coroutineScope
+    )
+    is BackendLaunchResult.Docker -> handleLocalProcessOutput(
+      backendLaunchResult.localDockerRunResult.processWrapper.processOutputInfo,
+      processShortName = "\uD83D\uDC33 IDE Backend",
+      processColor = AnsiColor.CYAN,
+      coroutineScope
+    )
+  }
+}
+
+private fun handleLocalProcessOutput(
+  outputStrategy: ProcessOutputInfo,
+  processShortName: String,
+  processColor: AnsiColor,
+  coroutineScope: CoroutineScope,
+) {
+  val prefix = colorize("$processShortName\t| ", processColor)
+  when (outputStrategy) {
+    is ProcessOutputInfo.Piped -> {
+      coroutineScope.launch(Dispatchers.IO + SupervisorJob() + CoroutineName("$processShortName | stdout")) {
+        outputStrategy.outputFlows.stdout.collect { line ->
+          println("$prefix$line")
+        }
+      }
+      coroutineScope.launch(Dispatchers.IO + SupervisorJob() + CoroutineName("$processShortName | stderr")) {
+        outputStrategy.outputFlows.stderr.collect { line ->
+          println("$prefix${colorize(line, AnsiColor.RED)}")
+        }
+      }
+    }
+    ProcessOutputInfo.InheritedByParent -> Unit
+    is ProcessOutputInfo.RedirectedToFiles -> {
+      logger.info("JetBrains Client's standard streams redirected to:\n" +
+                  "${outputStrategy.stdoutLogPath.toUri()}\n" +
+                  "${outputStrategy.stderrLogPath.toUri()}")
+    }
+  }
+}
+
+private suspend fun BackendLaunchResult.asyncAwaitExit(coroutineScope: CoroutineScope): Deferred<Int> =
+  when (this) {
+    is BackendLaunchResult.Local -> localProcessResult.processWrapper.terminationDeferred
+    is BackendLaunchResult.Docker -> localDockerRunResult.processWrapper.terminationDeferred
+  }
 
 internal sealed interface BackendInEnvDescription {
   val backendDescription: BackendDescription
@@ -78,7 +150,7 @@ internal data class BackendInDockerContainer(
 ) : BackendInEnvDescription
 
 private abstract class IdeBuilderImpl : IdeBuilder {
-  protected var attachDebuggerCallback: (suspend (Int) -> Unit)? = null
+  var attachDebuggerCallback: (suspend (Int) -> Unit)? = null
     private set
 
   override fun attachDebugger(callback: suspend (Int) -> Unit) {
@@ -116,18 +188,24 @@ private class DockerBuilderImpl : DockerBuilder {
 }
 
 private open class BackendBuilderImpl(val product: Product, val launchInDocker: Boolean) : IdeBuilderImpl(), BackendBuilder {
+  var jbrPath: String? = null
   lateinit var projectPath: String
+
+  override fun jbr(path: String) {
+    jbrPath = path
+  }
 
   override fun project(path: String) {
     projectPath = path
   }
 
-  fun build(): BackendDescription = BackendDescription(product, launchInDocker, projectPath, attachDebuggerCallback)
+  fun build(): BackendDescription = BackendDescription(product, launchInDocker, jbrPath, projectPath, attachDebuggerCallback)
 }
 
 internal data class BackendDescription(
   val product: Product,
   val launchInDocker: Boolean,
+  val jbrPath: String?,
   val projectPath: String,
   val attachDebuggerCallback: (suspend (Int) -> Unit)?,
 )

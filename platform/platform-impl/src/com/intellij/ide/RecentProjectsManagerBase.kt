@@ -62,7 +62,6 @@ import kotlin.collections.Map.Entry
 import kotlin.collections.component1
 import kotlin.collections.component2
 import kotlin.io.path.invariantSeparatorsPathString
-import kotlin.io.path.isDirectory
 import kotlin.time.Duration.Companion.milliseconds
 
 private val LOG = logger<RecentProjectsManager>()
@@ -82,10 +81,7 @@ open class RecentProjectsManagerBase(coroutineScope: CoroutineScope) :
     @JvmStatic
     fun getInstanceEx(): RecentProjectsManagerBase = RecentProjectsManager.getInstance() as RecentProjectsManagerBase
 
-    @JvmStatic
-    fun isFileSystemPath(path: String): Boolean {
-      return path.indexOf('/') != -1 || path.indexOf('\\') != -1
-    }
+    internal fun isFileSystemPath(path: String): Boolean = path.indexOf('/') != -1 || path.indexOf('\\') != -1
   }
 
   private val modCounter = LongAdder()
@@ -444,8 +440,7 @@ open class RecentProjectsManagerBase(coroutineScope: CoroutineScope) :
     }
     check(nameResolveRequests.tryEmit(Unit))
 
-    val name = PathUtilRt.getFileName(path)
-    return if (path.endsWith(".ipr")) FileUtilRt.getNameWithoutExtension(name) else name
+    return getProjectNameOnlyByPath(path).nameOnlyByProjectName
   }
 
   fun forceReopenProjects() {
@@ -844,6 +839,10 @@ private fun readProjectName(path: String): String {
     return path
   }
 
+  if (path.endsWith(".ipr")) {
+    return FileUtilRt.getNameWithoutExtension(path)
+  }
+
   val file = try {
     Path.of(path)
   }
@@ -851,15 +850,7 @@ private fun readProjectName(path: String): String {
     return path
   }
 
-  if (!file.isDirectory()) {
-    val fileName = file.fileName
-    if (fileName != null) {
-      return FileUtilRt.getNameWithoutExtension(fileName.toString())
-    }
-  }
-
-  val projectDir = file.resolve(Project.DIRECTORY_STORE_FOLDER)
-  return JpsPathUtil.readProjectName(projectDir) ?: JpsPathUtil.getDefaultProjectName(projectDir)
+  return JpsPathUtil.readProjectName(file.resolve(Project.DIRECTORY_STORE_FOLDER)) ?: PathUtilRt.getFileName(path)
 }
 
 private fun getLastProjectFrameInfoFile() = appSystemDir.resolve("lastProjectFrameInfo")
@@ -909,3 +900,12 @@ private fun validateRecentProjects(modCounter: LongAdder, map: MutableMap<String
     modCounter.increment()
   }
 }
+
+internal fun getProjectNameOnlyByPath(path: String): ProjectNameOnlyByPath {
+  val name = PathUtilRt.getFileName(path)
+  return ProjectNameOnlyByPath(if (path.endsWith(".ipr")) FileUtilRt.getNameWithoutExtension(name) else name)
+}
+
+@JvmInline
+@Internal
+value class ProjectNameOnlyByPath(val nameOnlyByProjectName: String)

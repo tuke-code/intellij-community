@@ -69,7 +69,7 @@ private val getModulesTimeMs = MillisecondsMeasurer()
 private val LOG = logger<ModuleManagerBridgeImpl>()
 private val MODULE_BRIDGE_MAPPING_ID = ExternalMappingKey.create<ModuleBridge>("intellij.modules.bridge")
 
-class ModuleManagerComponentBridgeInitializer : BridgeInitializer {
+internal class ModuleManagerComponentBridgeInitializer : BridgeInitializer {
   override fun isEnabled(): Boolean = true
 
   override fun initializeBridges(project: Project, changes: Map<Class<*>, List<EntityChange<*>>>, builder: MutableEntityStorage) {
@@ -448,7 +448,7 @@ abstract class ModuleManagerBridgeImpl(private val project: Project,
     }
   }
 
-  private fun createModuleInstanceWithoutCreatingComponents(
+  protected fun createModuleInstanceWithoutCreatingComponents(
     moduleEntity: ModuleEntity,
     versionedStorage: VersionedEntityStorage,
     diff: MutableEntityStorage?,
@@ -567,8 +567,8 @@ abstract class ModuleManagerBridgeImpl(private val project: Project,
 
     private fun EntityChange<LibraryEntity>.isModuleLibrary(): Boolean {
       return when (this) {
-        is EntityChange.Added -> entity.tableId is LibraryTableId.ModuleLibraryTableId
-        is EntityChange.Removed -> entity.tableId is LibraryTableId.ModuleLibraryTableId
+        is EntityChange.Added -> newEntity.tableId is LibraryTableId.ModuleLibraryTableId
+        is EntityChange.Removed -> oldEntity.tableId is LibraryTableId.ModuleLibraryTableId
         is EntityChange.Replaced -> oldEntity.tableId is LibraryTableId.ModuleLibraryTableId
       }
     }

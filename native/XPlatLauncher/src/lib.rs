@@ -91,9 +91,11 @@ pub fn main_lib() {
 #[cfg(target_os = "windows")]
 fn attach_console() {
     unsafe {
-        match AttachConsole(ATTACH_PARENT_PROCESS) {
-            Ok(_) => {}
-            Err(_) => AllocConsole().expect("Failed to attach to existing console or allocate a new one")
+        if AttachConsole(ATTACH_PARENT_PROCESS).is_err() {
+            eprintln!("AttachConsole(ATTACH_PARENT_PROCESS): {:?}", Foundation::GetLastError());
+            if AllocConsole().is_err() {
+                eprintln!("AllocConsole(): {:?}", Foundation::GetLastError());
+            }
         }
     }
 }
@@ -104,6 +106,11 @@ fn main_impl(exe_path: PathBuf, remote_dev: bool, debug_mode: bool, sandbox_subp
     debug!("Executable: {exe_path:?}");
     debug!("Mode: {}", if remote_dev { "remote-dev" } else { "standard" });
 
+    #[cfg(target_os = "windows")]
+    {
+        // Windows namespace prefixes are misunderstood both by JVM and classloaders
+        strip_working_directory_ns_prefix()?;
+    }
     #[cfg(target_os = "macos")]
     {
         // on macOS, `open` doesn't preserve a current working directory
@@ -152,6 +159,25 @@ fn ensure_env_vars_set() -> Result<()> {
 
     let local_app_data = get_known_folder_path(&Shell::FOLDERID_LocalAppData, "FOLDERID_LocalAppData")?;
     env::set_var("LOCALAPPDATA", local_app_data.strip_ns_prefix()?.to_string_checked()?);
+
+    Ok(())
+}
+
+#[cfg(target_os = "windows")]
+fn strip_working_directory_ns_prefix() -> Result<()> {
+    let cwd_res = env::current_dir();
+    debug!("Adjusting current directory {:?}", cwd_res);
+
+    if let Ok(cwd) = cwd_res {
+        let orig_len = cwd.as_os_str().len();
+        if let Ok(stripped) = cwd.strip_ns_prefix() {
+            if stripped.as_os_str().len() < orig_len {
+                debug!("  ... to {:?}", stripped);
+                env::set_current_dir(&stripped)
+                    .with_context(|| format!("Cannot set current directory to '{}'", stripped.display()))?;
+            }
+        }
+    }
 
     Ok(())
 }

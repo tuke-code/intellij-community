@@ -21,6 +21,7 @@ import org.jetbrains.kotlin.analysis.api.symbols.markers.KaSymbolWithMembers
 import org.jetbrains.kotlin.analysis.api.types.KtFunctionalType
 import org.jetbrains.kotlin.asJava.toLightElements
 import org.jetbrains.kotlin.idea.base.analysis.api.utils.shortenReferences
+import org.jetbrains.kotlin.idea.base.psi.canBeUsedInImport
 import org.jetbrains.kotlin.idea.k2.refactoring.move.processor.K2MoveRenameUsageInfo.Companion.internalUsageInfo
 import org.jetbrains.kotlin.idea.refactoring.nameDeterminant
 import org.jetbrains.kotlin.idea.references.KtConstructorDelegationReference
@@ -131,12 +132,12 @@ sealed class K2MoveRenameUsageInfo(
         @OptIn(KaAllowAnalysisOnEdt::class)
         override fun isUpdatable(movedElements: List<KtNamedDeclaration>): Boolean = allowAnalysisOnEdt {
             val refExpr = element as KtSimpleNameExpression
-            if (refExpr.isSuperOrThisExpr()) return false
+            if (!refExpr.canBeUsedInImport()) return false
             if (refExpr.parentOfType<KtImportDirective>(withSelf = false) != null) return true
             if (refExpr.isUnqualifiable()) return true
             val refChain = (refExpr.getTopmostParentQualifiedExpressionForReceiver() ?: refExpr)
                 .collectDescendantsOfType<KtSimpleNameExpression>()
-                .filter { !it.isSuperOrThisExpr() }
+                .filter { it.canBeUsedInImport() }
             return if (isInternal) {
                 // for internal usages, update the first name determinant in the call chain
                 refChain.firstOrNull { simpleNameExpr -> simpleNameExpr.isNameDeterminantInQualifiedChain() } == refExpr
@@ -152,17 +153,13 @@ sealed class K2MoveRenameUsageInfo(
             }.lastOrNull()
         }
 
-        private fun KtSimpleNameExpression.isSuperOrThisExpr(): Boolean {
-            return this is KtEnumEntrySuperclassReferenceExpression || parent is KtThisExpression || parent is KtSuperExpression
-        }
-
         @OptIn(KaAllowAnalysisOnEdt::class)
         private fun KtSimpleNameExpression.isNameDeterminantInQualifiedChain(): Boolean = allowAnalysisOnEdt {
             analyze(this) {
                 val resolvedSymbol = mainReference.resolveToSymbol()
                 if (resolvedSymbol is KaClassOrObjectSymbol && resolvedSymbol.classKind == KaClassKind.COMPANION_OBJECT) return true
                 if (resolvedSymbol is KaConstructorSymbol) return true
-                val containingSymbol = resolvedSymbol?.getContainingSymbol()
+                val containingSymbol = resolvedSymbol?.containingSymbol
                 if (resolvedSymbol is KaPackageSymbol) return false // ignore packages
                 if (containingSymbol == null) return true // top levels are static
                 if (containingSymbol is KaClassOrObjectSymbol) {
@@ -172,7 +169,7 @@ sealed class K2MoveRenameUsageInfo(
                     }
                 }
                 if (containingSymbol is KaSymbolWithMembers) {
-                    if (resolvedSymbol in containingSymbol.getStaticMemberScope().getAllSymbols()) return true
+                    if (resolvedSymbol in containingSymbol.staticMemberScope.getAllSymbols()) return true
                 }
                 return false
             }
@@ -324,10 +321,10 @@ sealed class K2MoveRenameUsageInfo(
             originalFile: KtFile,
             fileCopy: KtFile,
         ) {
-            val inCopy = fileCopy.collectDescendantsOfType<KtSimpleNameExpression>()
-            val original = originalFile.collectDescendantsOfType<KtSimpleNameExpression>()
+            val skipPackageStmt: (KtSimpleNameExpression) -> Boolean = { PsiTreeUtil.getParentOfType(it, KtPackageDirective::class.java) == null }
+            val inCopy = fileCopy.collectDescendantsOfType<KtSimpleNameExpression>().filter(skipPackageStmt)
+            val original = originalFile.collectDescendantsOfType<KtSimpleNameExpression>().filter(skipPackageStmt)
             val internalUsages = original.zip(inCopy).mapNotNull { (o, c) ->
-                if (PsiTreeUtil.getParentOfType(o, KtPackageDirective::class.java) != null) return@mapNotNull null
                 val usageInfo = o.internalUsageInfo
                 val referencedElement = (usageInfo as? Source)?.referencedElement ?: return@mapNotNull null
                 if (!referencedElement.isValid ||

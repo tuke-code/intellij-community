@@ -602,9 +602,7 @@
     <projectService serviceInterface="com.intellij.externalDependencies.ExternalDependenciesManager"
                     serviceImplementation="com.intellij.externalDependencies.impl.ExternalDependenciesManagerImpl"/>
 
-    <projectService serviceInterface="com.intellij.codeInsight.actions.ReaderModeSettings"
-                    serviceImplementation="com.intellij.codeInsight.actions.ReaderModeSettingsImpl"
-                    client="local"/>
+    <projectService serviceImplementation="com.intellij.codeInsight.actions.ReaderModeSettingsImpl" client="all"/>
 
     <applicationService serviceInterface="com.intellij.ide.PlatformIdeService"
                         serviceImplementation="com.intellij.ide.PlatformIdeServiceImpl"/>
@@ -910,6 +908,7 @@
     <statistics.applicationUsagesCollector implementation="com.intellij.internal.statistic.collectors.fus.os.SystemRuntimeCollector"
                                            allowOnStartup="true"/>
     <statistics.applicationUsagesCollector implementation="com.intellij.internal.statistic.collectors.fus.ui.UiInfoUsageCollector"/>
+    <statistics.applicationUsagesCollector implementation="com.intellij.internal.statistic.collectors.fus.LocalizationUsageCollector"/>
     <statistics.applicationUsagesCollector implementation="com.intellij.internal.statistic.collectors.fus.UpdateManagerUsagesCollector"
                                            allowOnStartup="true"/>
     <statistics.applicationUsagesCollector implementation="com.intellij.internal.statistic.collectors.fus.settings.ProxySettingsCollector"/>
@@ -954,6 +953,7 @@
       implementation="com.intellij.ide.plugins.marketplace.statistics.validators.MarketplaceVendorsListValidator"/>
     <statistics.counterUsagesCollector implementationClass="com.intellij.codeInsight.template.impl.LiveTemplateRunLogger"/>
     <statistics.counterUsagesCollector implementationClass="com.intellij.openapi.diff.impl.DiffUsageTriggerCollector"/>
+    <statistics.counterUsagesCollector implementationClass="com.intellij.diff.statistics.MergeStatisticsCollector"/>
     <statistics.counterUsagesCollector implementationClass="com.intellij.openapi.updateSettings.impl.IdeUpdateUsageTriggerCollector"/>
     <statistics.counterUsagesCollector implementationClass="com.intellij.openapi.application.ImportOldConfigsUsagesCollector"/>
     <statistics.counterUsagesCollector implementationClass="com.intellij.openapi.application.OldDirectoryCleaner$Stats"/>
@@ -1632,7 +1632,7 @@
     <advancedSetting id="documentation.auto.show.in.modal.dialogs" default="false"
                      groupKey="group.advanced.settings.documentation.components"/>
     <advancedSetting id="search.everywhere.wait.for.contributors" default="true" groupKey="group.advanced.settings.se"/>
-    <advancedSetting id="search.everywhere.show.only.similar.indicator" default="true" groupKey="group.advanced.settings.se"/>
+    <advancedSetting id="search.everywhere.show.results.notification" default="true" groupKey="group.advanced.settings.se"/>
     <advancedSetting id="search.everywhere.contributors.wait.timeout" default="2000" groupKey="group.advanced.settings.se"/>
     <advancedSetting id="search.everywhere.recent.at.top" default="true" groupKey="group.advanced.settings.se"/>
     <advancedSetting id="search.everywhere.send.search.history.statistics" default="true" groupKey="group.advanced.settings.se"/>

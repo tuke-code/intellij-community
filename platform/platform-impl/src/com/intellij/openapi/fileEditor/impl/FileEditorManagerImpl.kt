@@ -663,10 +663,6 @@ open class FileEditorManagerImpl(
     fileTitleUpdateChannel.queue(file)
   }
 
-  override fun unsplitWindow() {
-    getActiveSplitterSync().currentWindow?.unsplit(true)
-  }
-
   override fun unsplitAllWindow() {
     getActiveSplitterSync().currentWindow?.unsplitAll()
   }
@@ -757,7 +753,6 @@ open class FileEditorManagerImpl(
 
     openFileSetModificationCount.increment()
     window.closeFile(file = file, composite = composite)
-    selectionHistory.removeRecord(file, window)
     return true
   }
 
@@ -1204,7 +1199,7 @@ open class FileEditorManagerImpl(
     window: EditorWindow,
     fileEntry: FileEntry? = null,
   ): EditorComposite? {
-    val compositeCoroutineScope = window.coroutineScope.childScope("EditorComposite(file=${file.name})")
+    val compositeCoroutineScope = window.owner.coroutineScope.childScope("EditorComposite(file=${file.name})")
     val model = createEditorCompositeModel(
       coroutineScope = compositeCoroutineScope,
       editorPropertyChangeListener = editorPropertyChangeListener,
@@ -1343,7 +1338,7 @@ open class FileEditorManagerImpl(
     for (editor in fileEditors) {
       // try to navigate opened editor
       if (editor is NavigatableFileEditor && currentCompositeForFile?.selectedWithProvider?.fileEditor === editor &&
-          navigateAndSelectEditor(editor, effectiveDescriptor)) {
+          navigateAndSelectEditor(editor, effectiveDescriptor, currentCompositeForFile)) {
         return fileEditors to editor
       }
     }
@@ -1351,24 +1346,11 @@ open class FileEditorManagerImpl(
     for (editor in fileEditors) {
       // try other editors
       if (editor is NavigatableFileEditor && currentCompositeForFile?.selectedWithProvider?.fileEditor !== editor &&
-          navigateAndSelectEditor(editor, effectiveDescriptor)) {
+          navigateAndSelectEditor(editor, effectiveDescriptor, currentCompositeForFile)) {
         return fileEditors to editor
       }
     }
     return fileEditors to null
-  }
-
-  private fun navigateAndSelectEditor(editor: NavigatableFileEditor, descriptor: Navigatable): Boolean {
-    if (editor.canNavigateTo(descriptor)) {
-      setSelectedEditor(editor)
-      editor.navigateTo(descriptor)
-      return true
-    }
-    return false
-  }
-
-  private fun setSelectedEditor(editor: FileEditor) {
-    (getComposite(editor) ?: return).setSelectedEditor(editor)
   }
 
   override fun getProject(): Project = project
@@ -1399,7 +1381,8 @@ open class FileEditorManagerImpl(
         }
       }
     }
-    setSelectedEditor(target)
+
+    getComposite(target)?.setSelectedEditor(target)
     return target.editor
   }
 
@@ -1832,12 +1815,12 @@ open class FileEditorManagerImpl(
       }
 
       val propertyName = e.propertyName
-      if (FileEditor.PROP_MODIFIED == propertyName) {
+      if (FileEditor.getPropModified() == propertyName) {
         getComposite(e.source as FileEditor)?.let {
           updateFileIcon(it.file)
         }
       }
-      else if (FileEditor.PROP_VALID == propertyName) {
+      else if (FileEditor.getPropValid() == propertyName) {
         if (e.newValue == false) {
           closeFileEditor(e.source as FileEditor)
         }
@@ -1982,7 +1965,7 @@ open class FileEditorManagerImpl(
       mainSplitters.revalidate()
       val allSplitters = getAllSplitters()
       for (splitters in allSplitters) {
-        splitters.setTabsPlacement(uiSettings.editorTabPlacement)
+        splitters.setTabPlacement(uiSettings.editorTabPlacement)
         splitters.trimToSize()
 
         // Tab layout policy
@@ -2153,11 +2136,7 @@ open class FileEditorManagerImpl(
         }
       }
 
-      composite.coroutineScope.launch {
-        composite.selectedEditorWithProvider.drop(1).collect {
-          tab.setTabPaneActions(it?.fileEditor?.tabActions)
-        }
-      }
+      window.watchForTabActions(composite = composite, tab = tab)
     }
   }
 
@@ -2398,4 +2377,14 @@ fun getForegroundColorForFile(project: Project, file: VirtualFile): ColorKey? {
   return EditorTabColorProvider.EP_NAME.extensionList.firstNotNullOfOrNull {
     it.getEditorTabForegroundColor(project, file)
   }
+}
+
+@Internal
+fun navigateAndSelectEditor(editor: NavigatableFileEditor, descriptor: Navigatable, composite: EditorComposite?): Boolean {
+  if (editor.canNavigateTo(descriptor)) {
+    composite?.setSelectedEditor(editor)
+    editor.navigateTo(descriptor)
+    return true
+  }
+  return false
 }

@@ -122,6 +122,7 @@ object KotlinPluginBuilder {
     "kotlin.j2k.k1.new",
     "kotlin.j2k.k2",
     "kotlin.onboarding",
+    "kotlin.onboarding.gradle",
     "kotlin.plugin-updater",
     "kotlin.preferences",
     "kotlin.project-configuration",
@@ -210,7 +211,6 @@ object KotlinPluginBuilder {
 
   private val LIBRARIES = java.util.List.of(
     "kotlinc.analysis-api-platform-interface",
-    "kotlinc.analysis-project-structure",
     "kotlinc.analysis-api",
     "kotlinc.analysis-api-fe10",
     "kotlinc.analysis-api-impl-base",

@@ -7,12 +7,14 @@ import com.intellij.ui.tabs.impl.JBTabsImpl;
 import com.intellij.ui.tabs.impl.TabLabel;
 import com.intellij.ui.tabs.impl.TabLayout;
 import com.intellij.util.ui.JBUI;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.awt.*;
 import java.util.Objects;
 
+@ApiStatus.Internal
 public final class ScrollableSingleRowLayout extends SingleRowLayout {
   public static final int DEADZONE_FOR_DECLARE_TAB_HIDDEN = 10;
   private int myScrollOffset = 0;
@@ -67,7 +69,7 @@ public final class ScrollableSingleRowLayout extends SingleRowLayout {
       return;
     }
     int offset = -myScrollOffset;
-    for (TabInfo info : passInfo.myVisibleInfos) {
+    for (TabInfo info : passInfo.visibleInfos) {
       final int length = getRequiredLength(info);
       if (info == tabs.getSelectedInfo()) {
         if (offset < 0) {
@@ -162,7 +164,7 @@ public final class ScrollableSingleRowLayout extends SingleRowLayout {
   }
 
   private int getMoreRectAxisSize() {
-    if (ExperimentalUI.isNewUI() && tabs.getPosition().isSide()) {
+    if (ExperimentalUI.isNewUI() && tabs.getTabsPosition().isSide()) {
       return 0;
     }
     return getStrategy().getMoreRectAxisSize();

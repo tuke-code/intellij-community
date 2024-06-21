@@ -41,6 +41,7 @@ import com.intellij.util.containers.ContainerUtil;
 import com.intellij.util.ui.JBEmptyBorder;
 import com.intellij.util.ui.JBUI;
 import com.intellij.util.ui.UIUtil;
+import com.intellij.util.ui.components.BorderLayoutPanel;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NonNls;
 import org.jetbrains.annotations.NotNull;
@@ -221,14 +222,24 @@ public abstract class MergeRequestProcessor implements Disposable {
     JPanel buttonsPanel = new NonOpaquePanel(new BorderLayout());
     buttonsPanel.setBorder(new JBEmptyBorder(UIUtil.PANEL_REGULAR_INSETS));
 
-    if (leftActions.size() > 0) {
+    if (!leftActions.isEmpty()) {
       buttonsPanel.add(createButtonsPanel(leftActions, rootPane), BorderLayout.WEST);
     }
-    if (rightActions.size() > 0) {
+    if (!rightActions.isEmpty()) {
       buttonsPanel.add(createButtonsPanel(rightActions, rootPane), BorderLayout.EAST);
     }
 
+    BorderLayoutPanel toolbarPanel = createFeedbackToolbarPanel();
+
+    buttonsPanel.add(toolbarPanel, BorderLayout.CENTER);
     myButtonsPanel.setContent(buttonsPanel);
+  }
+
+  private @NotNull BorderLayoutPanel createFeedbackToolbarPanel() {
+    AnAction action = ActionManager.getInstance().getAction("Diff.Conflicts.Feedback");
+    ActionToolbar actionToolbar = ActionManager.getInstance().createActionToolbar("FeedbackToolbar", (ActionGroup)action, true);
+    actionToolbar.setTargetComponent(myMainPanel);
+    return new BorderLayoutPanel().addToRight(actionToolbar.getComponent());
   }
 
   @NotNull

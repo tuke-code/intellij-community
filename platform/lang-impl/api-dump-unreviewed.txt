@@ -761,6 +761,7 @@ f:com.intellij.application.options.codeStyle.CodeStyleSchemesModel
 - restoreDefaults(com.intellij.psi.codeStyle.CodeStyleScheme):V
 - selectScheme(com.intellij.psi.codeStyle.CodeStyleScheme,java.lang.Object):V
 - setUiEventsEnabled(Z):V
+- updateClonedSettings():V
 - updateOverridingStatus():V
 f:com.intellij.application.options.codeStyle.CodeStyleSchemesModel$ModelSettings
 - com.intellij.psi.codeStyle.CodeStyleSettings
@@ -2772,6 +2773,12 @@ c:com.intellij.codeInsight.actions.VcsFacade
 - isFileUnderVcs(com.intellij.psi.PsiFile):java.lang.Boolean
 - markFilesDirty(com.intellij.openapi.project.Project,java.util.List):V
 - runHeavyModificationTask(com.intellij.openapi.project.Project,com.intellij.openapi.editor.Document,java.lang.Runnable):V
+f:com.intellij.codeInsight.actions.VisualFormattingSchemesCombo
+- com.intellij.application.options.schemes.SchemesCombo
+- <init>(com.intellij.openapi.project.Project):V
+- f:onApply(com.intellij.codeInsight.actions.ReaderModeSettings):V
+- f:onIsModified(com.intellij.codeInsight.actions.ReaderModeSettings):Z
+- f:onReset(com.intellij.codeInsight.actions.ReaderModeSettings):V
 a:com.intellij.codeInsight.actions.onSave.ActionOnSaveInfoBase
 - com.intellij.ide.actionsOnSave.ActionOnSaveInfo
 - <init>(com.intellij.ide.actionsOnSave.ActionOnSaveContext,java.lang.String,java.lang.String,Z):V
@@ -13378,12 +13385,6 @@ f:com.intellij.ide.actions.TestDialogBuilder
 f:com.intellij.ide.actions.TestDialogBuilder$TestAnswers
 - sf:KEY:com.intellij.openapi.actionSystem.DataKey
 - <init>(java.lang.String,java.lang.String):V
-f:com.intellij.ide.actions.ToggleEssentialHighlightingAction
-- com.intellij.openapi.actionSystem.ToggleAction
-- <init>():V
-- getActionUpdateThread():com.intellij.openapi.actionSystem.ActionUpdateThread
-- isSelected(com.intellij.openapi.actionSystem.AnActionEvent):Z
-- setSelected(com.intellij.openapi.actionSystem.AnActionEvent,Z):V
 f:com.intellij.ide.actions.ViewInplaceCommentsAction
 - com.intellij.openapi.project.DumbAwareToggleAction
 - <init>():V
@@ -14056,6 +14057,7 @@ f:com.intellij.ide.actions.searcheverywhere.PSIPresentationBgRendererWrapper
 - com.intellij.ide.actions.searcheverywhere.EssentialContributor
 - com.intellij.ide.actions.searcheverywhere.PossibleSlowContributor
 - com.intellij.ide.actions.searcheverywhere.ScopeSupporting
+- com.intellij.ide.actions.searcheverywhere.SearchEverywhereContributorWrapper
 - com.intellij.ide.actions.searcheverywhere.SearchEverywhereExtendedInfoProvider
 - com.intellij.ide.actions.searcheverywhere.SearchEverywherePreviewProvider
 - com.intellij.ide.actions.searcheverywhere.WeightedSearchEverywhereContributor
@@ -14069,6 +14071,7 @@ f:com.intellij.ide.actions.searcheverywhere.PSIPresentationBgRendererWrapper
 - getAutocompleteItems(java.lang.String,I):java.util.List
 - getDataForItem(java.lang.Object,java.lang.String):java.lang.Object
 - getDelegate():com.intellij.ide.actions.searcheverywhere.AbstractGotoSEContributor
+- getEffectiveContributor():com.intellij.ide.actions.searcheverywhere.SearchEverywhereContributor
 - getElementPriority(java.lang.Object,java.lang.String):I
 - getElementsRenderer():javax.swing.ListCellRenderer
 - getFullGroupName():java.lang.String
@@ -14259,6 +14262,8 @@ f:com.intellij.ide.actions.searcheverywhere.SearchEverywhereContributorValidatio
 - com.intellij.internal.statistic.eventLog.validator.rules.impl.UtilValidationRule
 - <init>():V
 - getRuleId():java.lang.String
+com.intellij.ide.actions.searcheverywhere.SearchEverywhereContributorWrapper
+- a:getEffectiveContributor():com.intellij.ide.actions.searcheverywhere.SearchEverywhereContributor
 com.intellij.ide.actions.searcheverywhere.SearchEverywhereEmptyTextProvider
 - a:updateEmptyStatus(com.intellij.util.ui.StatusText,kotlin.jvm.functions.Function0):V
 c:com.intellij.ide.actions.searcheverywhere.SearchEverywhereFiltersAction
@@ -14324,6 +14329,7 @@ f:com.intellij.ide.actions.searcheverywhere.SearchEverywhereHeader
 - getTabs():java.util.List
 - isEverywhere():Z
 - resetScope():V
+- setResultsNotifyCallback(java.util.function.Consumer):V
 - switchToNextTab():V
 - switchToPrevTab():V
 - switchToTab(com.intellij.ide.actions.searcheverywhere.SearchEverywhereHeader$SETab):V
@@ -14337,6 +14343,7 @@ f:com.intellij.ide.actions.searcheverywhere.SearchEverywhereHeader$SETab
 - getName():java.lang.String
 - getReportableID():java.lang.String
 - isSingleContributor():Z
+- setResultsNotifyCallback(java.util.function.Consumer):V
 - setSelected(Z):V
 com.intellij.ide.actions.searcheverywhere.SearchEverywhereManager
 - a:getCurrentlyShownUI():com.intellij.ide.actions.searcheverywhere.SearchEverywhereUI
@@ -19129,14 +19136,6 @@ c:com.intellij.ide.util.treeView.SmartElementDescriptor
 - p:isMarkModified():Z
 - p:isMarkReadOnly():Z
 - update():Z
-f:com.intellij.ide.workspace.configuration.NewWorkspaceWizard
-- com.intellij.ide.wizard.GeneratorNewProjectWizard
-- <init>():V
-- createStep(com.intellij.ide.util.projectWizard.WizardContext):com.intellij.ide.wizard.NewProjectWizardStep
-- getIcon():javax.swing.Icon
-- getId():java.lang.String
-- getName():java.lang.String
-- isEnabled():Z
 f:com.intellij.internal.AddInlayBlockInternalAction
 - com.intellij.openapi.actionSystem.AnAction
 - com.intellij.openapi.project.DumbAware
@@ -24547,67 +24546,16 @@ f:com.intellij.psi.search.DefaultSearchScopeProviders$CustomNamed
 - getSearchScopes(com.intellij.openapi.project.Project,com.intellij.openapi.actionSystem.DataContext):java.util.List
 f:com.intellij.psi.search.FileTypeIndexImpl
 - com.intellij.util.indexing.ScalarIndexExtension
-- com.intellij.util.indexing.CustomImplementationFileBasedIndexExtension
 - <init>():V
-- createIndexImplementation(com.intellij.util.indexing.FileBasedIndexExtension,com.intellij.util.indexing.storage.VfsAwareIndexStorageLayout):com.intellij.util.indexing.UpdatableIndex
 - dependsOnFileContent():Z
 - getIndexer():com.intellij.util.indexing.DataIndexer
 - getInputFilter():com.intellij.util.indexing.FileBasedIndex$InputFilter
 - getKeyDescriptor():com.intellij.util.io.KeyDescriptor
 - getName():com.intellij.util.indexing.ID
 - getVersion():I
-a:com.intellij.psi.search.FileTypeIndexImplBase
-- com.intellij.psi.search.FileTypeNameEnumerator
-- com.intellij.util.indexing.UpdatableIndex
-- pf:myExtension:com.intellij.util.indexing.FileBasedIndexExtension
-- pf:myFileTypeEnumerator:com.intellij.util.io.SimpleStringPersistentEnumerator
-- pf:myInMemoryMode:java.util.concurrent.atomic.AtomicBoolean
-- pf:myIndexChangeNotifier:com.intellij.psi.search.FileTypeIndexChangeNotifier
-- pf:myIndexId:com.intellij.util.indexing.ID
-- pf:myLock:java.util.concurrent.locks.ReadWriteLock
-- <init>(com.intellij.util.indexing.FileBasedIndexExtension):V
-- cleanupForNextTest():V
-- cleanupMemoryStorage():V
-- clear():V
-- dispose():V
-- getData(com.intellij.openapi.fileTypes.FileType):com.intellij.util.indexing.ValueContainer
-- getExtension():com.intellij.util.indexing.IndexExtension
-- getFileIndexMetaData(com.intellij.util.indexing.IndexedFile):java.lang.Void
-- p:getFileTypeById(I):com.intellij.openapi.fileTypes.FileType
-- p:getFileTypeId(com.intellij.openapi.fileTypes.FileType):I
-- getFileTypeId(java.lang.String):I
-- getFileTypeName(I):java.lang.String
-- getIndexedFileData(I):java.util.Map
-- pa:getIndexedFileTypeId(I):I
-- getIndexingStateForFile(I,com.intellij.util.indexing.IndexedFile):com.intellij.util.indexing.FileIndexingState
-- getLock():java.util.concurrent.locks.ReadWriteLock
-- p:getStorageFile():java.nio.file.Path
-- invalidateIndexedStateForFile(I):V
-- keysCountApproximately():I
-- p:notifyInvertedIndexChangedForFileTypeId(I):V
-- prepareUpdate(I,com.intellij.util.indexing.impl.InputData):com.intellij.openapi.util.Computable
-- processAllKeys(com.intellij.util.Processor,com.intellij.psi.search.GlobalSearchScope,com.intellij.util.indexing.IdFilter):Z
-- pa:processFileIdsForFileTypeId(I,java.util.function.IntConsumer):V
-- processPendingNotifications():V
-- removeTransientDataForFile(I):V
-- removeTransientDataForKeys(I,com.intellij.util.indexing.impl.InputDataDiffBuilder):V
-- setBufferingEnabled(Z):V
-- setIndexedStateForFile(I,com.intellij.util.indexing.IndexedFile,Z):V
-- setIndexedStateForFileOnFileIndexMetaData(I,java.lang.Void,Z):V
-- setUnindexedStateForFile(I):V
-- updateWithMap(com.intellij.util.indexing.impl.AbstractUpdateData):V
 com.intellij.psi.search.FileTypeNameEnumerator
 - a:getFileTypeId(java.lang.String):I
 - a:getFileTypeName(I):java.lang.String
-f:com.intellij.psi.search.MappedFileTypeIndex
-- com.intellij.psi.search.FileTypeIndexImplBase
-- <init>(com.intellij.util.indexing.FileBasedIndexExtension):V
-- clear():V
-- dispose():V
-- flush():V
-- getModificationStamp():J
-- isDirty():Z
-- mapInputAndPrepareUpdate(I,com.intellij.util.indexing.FileContent):com.intellij.openapi.util.Computable
 c:com.intellij.psi.search.PredefinedSearchScopeProviderImpl
 - com.intellij.psi.search.PredefinedSearchScopeProvider
 - sf:Companion:com.intellij.psi.search.PredefinedSearchScopeProviderImpl$Companion
@@ -24716,14 +24664,6 @@ e:com.intellij.psi.stubs.StubIndexImpl$PerFileElementTypeStubChangeTrackingSourc
 - sf:Disabled:com.intellij.psi.stubs.StubIndexImpl$PerFileElementTypeStubChangeTrackingSource
 - s:valueOf(java.lang.String):com.intellij.psi.stubs.StubIndexImpl$PerFileElementTypeStubChangeTrackingSource
 - s:values():com.intellij.psi.stubs.StubIndexImpl$PerFileElementTypeStubChangeTrackingSource[]
-f:com.intellij.psi.stubs.StubUpdatingIndexStorage
-- com.intellij.util.indexing.impl.storage.TransientFileContentIndex
-- getFileIndexMetaData(com.intellij.util.indexing.IndexedFile):com.intellij.psi.stubs.StubUpdatingIndexStorage$Data
-- mapInputAndPrepareUpdate(I,com.intellij.util.indexing.FileContent):com.intellij.openapi.util.Computable
-- removeTransientDataForKeys(I,com.intellij.util.indexing.impl.InputDataDiffBuilder):V
-- setIndexedStateForFile(I,com.intellij.util.indexing.IndexedFile,Z):V
-- setIndexedStateForFileOnFileIndexMetaData(I,com.intellij.psi.stubs.StubUpdatingIndexStorage$Data,Z):V
-- setUnindexedStateForFile(I):V
 f:com.intellij.psi.templateLanguages.ChangeTemplateDataLanguageAction
 - com.intellij.openapi.actionSystem.AnAction
 - <init>():V
@@ -28460,7 +28400,6 @@ f:com.intellij.util.indexing.FileBasedIndexImpl
 - getContainingProjects(com.intellij.openapi.vfs.VirtualFile):java.util.Set
 - getContentDependentIndexes():java.util.Collection
 - getFileBeingCurrentlyIndexed():com.intellij.openapi.vfs.VirtualFile
-- getIndex(com.intellij.util.indexing.ID):com.intellij.util.indexing.UpdatableIndex
 - getIndexableFilesFilterHolder():com.intellij.util.indexing.projectFilter.ProjectIndexableFilesFilterHolder
 - getLogger():com.intellij.openapi.diagnostic.Logger
 - getRegisteredIndexes():com.intellij.util.indexing.RegisteredIndexes
@@ -28489,10 +28428,6 @@ f:com.intellij.util.indexing.FileBasedIndexImpl
 - scheduleFileForIndexing(I,com.intellij.openapi.vfs.VirtualFile,Z,java.util.List):V
 - s:unmarkBeingIndexed():V
 - waitUntilIndicesAreInitialized():V
-com.intellij.util.indexing.FileBasedIndexInfrastructureExtensionUpdatableIndex
-- com.intellij.util.indexing.UpdatableIndex
-- a:getBaseIndex():com.intellij.util.indexing.UpdatableIndex
-- a:mapInputAndPrepareUpdate(I,java.lang.Object):com.intellij.util.indexing.IndexInfrastructureExtensionUpdateComputation
 f:com.intellij.util.indexing.FileBasedIndexProjectHandler
 - <init>():V
 - s:scheduleReindexingInDumbMode(com.intellij.openapi.project.Project):V
@@ -28596,20 +28531,6 @@ f:com.intellij.util.indexing.IndexingReasonExplanationLogger
 - f:logScannerRemoversOnlyForFile(com.intellij.util.indexing.IndexedFile,kotlin.jvm.functions.Function1):V
 f:com.intellij.util.indexing.IndexingReasonExplanationLogger$Companion
 - f:getLOG():com.intellij.openapi.diagnostic.Logger
-f:com.intellij.util.indexing.IndexingStamp
-- s:dropIndexingTimeStamps(I):V
-- s:dropTimestampMemoryCaches():V
-- s:dumpCachedUnfinishedFiles():I[]
-- s:flushCache(I):V
-- s:flushCaches():V
-- s:getIndexStamp(I,com.intellij.util.indexing.ID):J
-- s:getNontrivialFileIndexedStates(I):java.util.List
-- s:hasIndexingTimeStamp(I):Z
-- s:isFileIndexedStateCurrent(I,com.intellij.util.indexing.ID):com.intellij.util.indexing.FileIndexingState
-- s:setFileIndexedStateCurrent(I,com.intellij.util.indexing.ID,Z):V
-- s:setFileIndexedStateOutdated(I,com.intellij.util.indexing.ID):V
-- s:setFileIndexedStateUnindexed(I,com.intellij.util.indexing.ID):V
-- s:update(I,com.intellij.util.indexing.ID,J):V
 com.intellij.util.indexing.IndexingStampStorage
 - java.io.Closeable
 - a:readTimestamps(I):com.intellij.util.indexing.TimestampsImmutable
@@ -28673,12 +28594,8 @@ com.intellij.util.indexing.UnindexedFilesUpdaterListener
 - sf:TOPIC:com.intellij.util.messages.Topic
 - a:updateFinished(com.intellij.openapi.project.Project):V
 - a:updateStarted(com.intellij.openapi.project.Project):V
-com.intellij.util.indexing.contentQueue.CachedFileContentLoader
-- a:loadContent(com.intellij.openapi.vfs.VirtualFile):com.intellij.util.indexing.contentQueue.CachedFileContent
 f:com.intellij.util.indexing.contentQueue.CurrentProjectHintedCachedFileContentLoader
-- com.intellij.util.indexing.contentQueue.CachedFileContentLoader
 - <init>(com.intellij.openapi.project.Project):V
-- loadContent(com.intellij.openapi.vfs.VirtualFile):com.intellij.util.indexing.contentQueue.CachedFileContent
 f:com.intellij.util.indexing.contentQueue.FailedToLoadContentException
 - java.lang.Exception
 - <init>(com.intellij.openapi.vfs.VirtualFile,java.lang.Throwable):V
@@ -28905,26 +28822,6 @@ f:com.intellij.util.indexing.events.FileBasedIndexTreeChangePreprocessor
 - com.intellij.psi.impl.PsiTreeChangePreprocessor
 - <init>():V
 - treeChanged(com.intellij.psi.impl.PsiTreeChangeEventImpl):V
-c:com.intellij.util.indexing.events.FilesToUpdateCollector
-- <init>():V
-- clear():V
-- containsFileId(I):Z
-- getDirtyFiles():com.intellij.util.indexing.events.DirtyFiles
-- getFilesToUpdate():java.util.Collection
-- getFilesToUpdateAsIterator():java.util.Iterator
-- isScheduledForUpdate(com.intellij.openapi.vfs.VirtualFile):Z
-- removeFileIdFromFilesScheduledForUpdate(I):V
-- removeScheduledFileFromUpdate(com.intellij.openapi.vfs.VirtualFile):V
-- scheduleForUpdate(com.intellij.util.indexing.events.FileIndexingRequest,java.util.Set,java.util.Collection):V
-a:com.intellij.util.indexing.events.IndexedFilesListener
-- com.intellij.openapi.vfs.AsyncFileListener
-- <init>():V
-- getEventMerger():com.intellij.util.indexing.events.VfsEventsMerger
-- pa:iterateIndexableFiles(com.intellij.openapi.vfs.VirtualFile,com.intellij.openapi.roots.ContentIterator):V
-- prepareChange(java.util.List):com.intellij.openapi.vfs.AsyncFileListener$ChangeApplier
-- p:recordFileEvent(com.intellij.openapi.vfs.VirtualFile,Z):V
-- p:recordFileRemovedEvent(com.intellij.openapi.vfs.VirtualFile):V
-- scheduleForIndexingRecursively(com.intellij.openapi.vfs.VirtualFile,Z):V
 f:com.intellij.util.indexing.events.ProjectDirtyFiles
 - <init>():V
 - f:addAllTo(it.unimi.dsi.fastutil.ints.IntSet):V
@@ -28939,21 +28836,6 @@ f:com.intellij.util.indexing.impl.perFileVersion.AutoRefreshingOnVfsCloseRef
 - <init>(kotlin.jvm.functions.Function1):V
 - close():V
 - f:invoke():java.io.Closeable
-f:com.intellij.util.indexing.impl.perFileVersion.PersistentSubIndexerRetriever
-- java.io.Closeable
-- <init>(com.intellij.util.indexing.ID,I,com.intellij.util.indexing.CompositeDataIndexer):V
-- clear():V
-- close():V
-- flush():V
-- getFileIndexerId(com.intellij.util.indexing.IndexedFile):I
-- getStoredFileIndexerId(I):I
-- getSubIndexerState(I,com.intellij.util.indexing.IndexedFile):com.intellij.util.indexing.FileIndexingState
-- getVersion(com.intellij.util.indexing.IndexedFile):java.lang.Object
-- getVersionByIndexerId(I):java.lang.Object
-- isDirty():Z
-- setFileIndexerId(I,I):V
-- setIndexedState(I,com.intellij.util.indexing.IndexedFile):V
-- setUnindexedState(I):V
 f:com.intellij.util.indexing.impl.perFileVersion.PersistentSubIndexerVersionEnumerator
 - java.io.Closeable
 - <init>(java.io.File,com.intellij.util.io.KeyDescriptor):V
@@ -28992,45 +28874,6 @@ f:com.intellij.util.indexing.impl.storage.SwitchFileBasedIndexStorageAction
 - <init>():V
 - actionPerformed(com.intellij.openapi.actionSystem.AnActionEvent):V
 - getActionUpdateThread():com.intellij.openapi.actionSystem.ActionUpdateThread
-c:com.intellij.util.indexing.impl.storage.TransientFileContentIndex
-- com.intellij.util.indexing.impl.storage.VfsAwareMapReduceIndex
-- <init>(com.intellij.util.indexing.FileBasedIndexExtension,com.intellij.util.indexing.storage.VfsAwareIndexStorageLayout):V
-- cleanupForNextTest():V
-- cleanupMemoryStorage():V
-- s:createIndex(com.intellij.util.indexing.FileBasedIndexExtension,com.intellij.util.indexing.storage.VfsAwareIndexStorageLayout):com.intellij.util.indexing.impl.storage.TransientFileContentIndex
-- p:getKeysDiffBuilder(I):com.intellij.util.indexing.impl.InputDataDiffBuilder
-- p:getNullableIndexedData(I):java.util.Map
-- removeTransientDataForFile(I):V
-- p:removeTransientDataForInMemoryKeys(I,java.util.Map):V
-- removeTransientDataForKeys(I,com.intellij.util.indexing.impl.InputDataDiffBuilder):V
-- setBufferingEnabled(Z):V
-- p:updateForwardIndex(I,com.intellij.util.indexing.impl.InputData):V
-c:com.intellij.util.indexing.impl.storage.VfsAwareMapReduceIndex
-- com.intellij.util.indexing.storage.MapReduceIndexBase
-- p:<init>(com.intellij.util.indexing.FileBasedIndexExtension,com.intellij.openapi.util.ThrowableComputable,com.intellij.openapi.util.ThrowableComputable,com.intellij.util.indexing.impl.forward.ForwardIndexAccessor):V
-- <init>(com.intellij.util.indexing.FileBasedIndexExtension,com.intellij.util.indexing.storage.VfsAwareIndexStorageLayout):V
-- p:checkNonCancellableSection():V
-- p:doClear():V
-- p:doDispose():V
-- p:doFlush():V
-- getFileIndexMetaData(com.intellij.util.indexing.IndexedFile):com.intellij.util.indexing.impl.storage.VfsAwareMapReduceIndex$IndexerIdHolder
-- getIndexingStateForFile(I,com.intellij.util.indexing.IndexedFile):com.intellij.util.indexing.FileIndexingState
-- getKeysDiffBuilder(I,java.util.Map):com.intellij.util.indexing.impl.InputDataDiffBuilder
-- p:getLogger():com.intellij.openapi.diagnostic.Logger
-- p:getSerializationProblemReporter():com.intellij.util.indexing.impl.ValueSerializationProblemReporter
-- p:getStoredFileSubIndexerId(I):I
-- getStoredSubIndexerVersion(I):java.lang.Object
-- invalidateIndexedStateForFile(I):V
-- isDirty():Z
-- p:isIndexConfigurationUpToDate(I,com.intellij.util.indexing.IndexedFile):com.intellij.util.indexing.FileIndexingState
-- p:requestRebuild(java.lang.Throwable):V
-- p:setIndexConfigurationUpToDate(I,com.intellij.util.indexing.IndexedFile):V
-- setIndexedStateForFile(I,com.intellij.util.indexing.IndexedFile,Z):V
-- setIndexedStateForFileOnFileIndexMetaData(I,com.intellij.util.indexing.impl.storage.VfsAwareMapReduceIndex$IndexerIdHolder,Z):V
-- setUnindexedStateForFile(I):V
-c:com.intellij.util.indexing.impl.storage.VfsAwareMapReduceIndex$IndexerIdHolder
-- indexerId:I
-- <init>(I):V
 f:com.intellij.util.indexing.internal.InternalIndexingActionsService
 - <init>(com.intellij.openapi.project.Project,kotlinx.coroutines.CoroutineScope):V
 - f:pauseScanningAndIndexingAndRunEmptyTask():V

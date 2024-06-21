@@ -13,7 +13,7 @@ import org.jetbrains.annotations.ApiStatus
 class ExecutorAction private constructor(val origin: AnAction,
                                          val executor: Executor,
                                          val order: Int) :
-  ActionGroup(), ActionWithDelegate<AnAction> {
+  ActionGroup(), DataSnapshotProvider, ActionWithDelegate<AnAction> {
   init {
     copyFrom(origin)
     if (origin !is ActionGroup) {
@@ -22,13 +22,17 @@ class ExecutorAction private constructor(val origin: AnAction,
     }
   }
 
-  override fun getActionUpdateThread() = origin.actionUpdateThread
-
-  override fun getDelegate(): AnAction {
-    return origin
-  }
+  override fun getDelegate(): AnAction = origin
 
   override fun isDumbAware() = origin.isDumbAware
+
+  override fun getActionUpdateThread() = ActionWrapperUtil.getActionUpdateThread(this, origin)
+
+  override fun dataSnapshot(sink: DataSink) {
+    if (order != 0) {
+      sink[orderKey] = order
+    }
+  }
 
   companion object {
 
@@ -52,17 +56,22 @@ class ExecutorAction private constructor(val origin: AnAction,
             ExecutorAction(it, executor, order)
           }
         }
-      if (createAction != null) {
-        result.add(createAction)
+      if (createAction is ActionGroup) {
+        result.add(object : ActionGroupWrapper(createAction), DataSnapshotProvider {
+          override fun dataSnapshot(sink: DataSink) {
+            sink[orderKey] = order
+          }
+
+          override fun equals(other: Any?): Boolean {
+            return other is ActionGroupWrapper && delegate == other.delegate
+          }
+
+          override fun hashCode(): Int {
+            return delegate.hashCode()
+          }
+        })
       }
       return result
-    }
-
-    private fun wrapEvent(e: AnActionEvent, order: Int): AnActionEvent {
-      return if (order == 0) e
-      else e.withDataContext(CustomizedDataContext.withSnapshot(e.dataContext) { sink ->
-        sink[orderKey] = order
-      })
     }
 
     @ApiStatus.Internal
@@ -73,19 +82,19 @@ class ExecutorAction private constructor(val origin: AnAction,
   }
 
   override fun update(e: AnActionEvent) {
-    origin.update(wrapEvent(e, order))
+    ActionWrapperUtil.update(e, this, origin)
   }
 
   override fun getChildren(e: AnActionEvent?): Array<AnAction> {
     if (origin !is ActionGroup) return EMPTY_ARRAY
-    if (e == null) return origin.getChildren(null)
-    return origin.getChildren(wrapEvent(e, order))
+    return ActionWrapperUtil.getChildren(e, this, origin)
   }
 
   override fun actionPerformed(e: AnActionEvent) {
-    origin.actionPerformed(wrapEvent(e, order))
+    ActionWrapperUtil.actionPerformed(e, this, origin)
   }
 
+  // for EquatableTooltipProvider
   override fun equals(other: Any?): Boolean {
     if (this === other) {
       return true

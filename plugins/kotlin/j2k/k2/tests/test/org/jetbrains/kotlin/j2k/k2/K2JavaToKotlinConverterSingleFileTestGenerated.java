@@ -153,6 +153,16 @@ public abstract class K2JavaToKotlinConverterSingleFileTestGenerated extends Abs
             runTest("../../shared/tests/testData/newJ2k/annotations/nullabilityAnnotationOnAnnotationMethod.java");
         }
 
+        @TestMetadata("overrideCustom.java")
+        public void testOverrideCustom() throws Exception {
+            runTest("../../shared/tests/testData/newJ2k/annotations/overrideCustom.java");
+        }
+
+        @TestMetadata("overrideWithUnresolvedBaseMethod.java")
+        public void testOverrideWithUnresolvedBaseMethod() throws Exception {
+            runTest("../../shared/tests/testData/newJ2k/annotations/overrideWithUnresolvedBaseMethod.java");
+        }
+
         @TestMetadata("primaryConstructorAnnotation.java")
         public void testPrimaryConstructorAnnotation() throws Exception {
             runTest("../../shared/tests/testData/newJ2k/annotations/primaryConstructorAnnotation.java");
@@ -367,6 +377,11 @@ public abstract class K2JavaToKotlinConverterSingleFileTestGenerated extends Abs
 
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+        }
+
+        @TestMetadata("cStyleBrackets.java")
+        public void testCStyleBrackets() throws Exception {
+            runTest("../../shared/tests/testData/newJ2k/arrayInitializerExpression/cStyleBrackets.java");
         }
 
         @TestMetadata("doubleArray.java")
@@ -5424,6 +5439,30 @@ public abstract class K2JavaToKotlinConverterSingleFileTestGenerated extends Abs
         @TestMetadata("VariableInitializedWithTernaryNull.java")
         public void testVariableInitializedWithTernaryNull() throws Exception {
             runTest("../../shared/tests/testData/newJ2k/nullability/VariableInitializedWithTernaryNull.java");
+        }
+    }
+
+    @RunWith(JUnit3RunnerWithInners.class)
+    @TestMetadata("../../shared/tests/testData/newJ2k/nullabilityGenerics")
+    public static class NullabilityGenerics extends AbstractK2JavaToKotlinConverterSingleFileTest {
+        @java.lang.Override
+        @org.jetbrains.annotations.NotNull
+        public final KotlinPluginMode getPluginMode() {
+            return KotlinPluginMode.K2;
+        }
+
+        private void runTest(String testDataFilePath) throws Exception {
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+        }
+
+        @TestMetadata("nullabilityAnnotations.java")
+        public void testNullabilityAnnotations() throws Exception {
+            runTest("../../shared/tests/testData/newJ2k/nullabilityGenerics/nullabilityAnnotations.java");
+        }
+
+        @TestMetadata("typeParameterNotNullUpperBound.java")
+        public void testTypeParameterNotNullUpperBound() throws Exception {
+            runTest("../../shared/tests/testData/newJ2k/nullabilityGenerics/typeParameterNotNullUpperBound.java");
         }
     }
 

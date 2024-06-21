@@ -15,11 +15,11 @@ private val logger = logger<JsonSettingsModel>()
  * Contains supported settings which are publicly available to end users and can be edited without UI using only Json schema.
  * See [Json Settings](https://youtrack.jetbrains.com/articles/IDEA-A-2100661939/Json-Settings)
  */
-@ApiStatus.Experimental
+@ApiStatus.Internal
 class JsonSettingsModel(val propertyMap: Map<String, PropertyDescriptor>) {
 
   private val propertyPluginIdMap: Map<String, String> by lazy {
-    propertyMap.values.filter { it.pluginId != "com.intellij" }.mapNotNull { property ->
+    propertyMap.values.mapNotNull { property ->
       property.pluginId?.let { "${property.componentName}.${property.name}" to it }
     }.toMap()
   }

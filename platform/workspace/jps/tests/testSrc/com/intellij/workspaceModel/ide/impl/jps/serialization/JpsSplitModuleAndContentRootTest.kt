@@ -21,11 +21,13 @@ import com.intellij.platform.workspace.storage.MutableEntityStorage
 import com.intellij.platform.workspace.storage.url.VirtualFileUrlManager
 import com.intellij.testFramework.ApplicationRule
 import com.intellij.testFramework.rules.ProjectModelRule
-import com.intellij.workspaceModel.ide.EntitiesOrphanage
 import com.intellij.workspaceModel.ide.impl.IdeVirtualFileUrlManagerImpl
 import junit.framework.TestCase.assertEquals
 import junit.framework.TestCase.assertTrue
-import org.junit.*
+import org.junit.Before
+import org.junit.ClassRule
+import org.junit.Rule
+import org.junit.Test
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -41,7 +43,6 @@ class JpsSplitModuleAndContentRootTest {
 
   @Before
   fun setUp() {
-    Assume.assumeTrue(EntitiesOrphanage.isEnabled)
     virtualFileManager = IdeVirtualFileUrlManagerImpl()
   }
 
@@ -68,7 +69,6 @@ class JpsSplitModuleAndContentRootTest {
 
   @Test
   fun `add local source root via orphanage`() {
-    Assume.assumeTrue(EntitiesOrphanage.isEnabled)
     checkSaveProjectAfterChange("after/addSourceRootOrphanage", "after/addSourceRootOrphanage",
                                 false) { builder, orphanage, configLocation ->
       assertTrue(builder.entities(ModuleEntity::class.java).toList().isEmpty())
@@ -80,7 +80,6 @@ class JpsSplitModuleAndContentRootTest {
 
   @Test
   fun `add local content and source root via orphanage`() {
-    Assume.assumeTrue(EntitiesOrphanage.isEnabled)
     checkSaveProjectAfterChange("after/addSourceAndContentRootOrphanage", "after/addSourceAndContentRootOrphanage",
                                 false) { builder, orphanage, configLocation ->
       assertTrue(builder.entities(ModuleEntity::class.java).toList().isEmpty())
@@ -92,7 +91,6 @@ class JpsSplitModuleAndContentRootTest {
 
   @Test
   fun `add local exclude via orphanage`() {
-    Assume.assumeTrue(EntitiesOrphanage.isEnabled)
     checkSaveProjectAfterChange("after/addExcludeOrphanage", "after/addExcludeOrphanage", false) { builder, orphanage, configLocation ->
       assertTrue(builder.entities(ModuleEntity::class.java).toList().isEmpty())
       assertTrue(orphanage.entities(ModuleEntity::class.java).single().contentRoots.single().entitySource is OrphanageWorkerEntitySource)
@@ -103,7 +101,6 @@ class JpsSplitModuleAndContentRootTest {
 
   @Test
   fun `add local exclude and content root via orphanage`() {
-    Assume.assumeTrue(EntitiesOrphanage.isEnabled)
     checkSaveProjectAfterChange("after/addExcludeAndContentRootOrphanage", "after/addExcludeAndContentRootOrphanage",
                                 false) { builder, orphanage, configLocation ->
       assertTrue(builder.entities(ModuleEntity::class.java).toList().isEmpty())
@@ -644,6 +641,15 @@ class JpsSplitModuleAndContentRootTest {
                                 forceFilesRewrite = true) { builder, orphanage, configLocation ->
       val toRemove = builder.entities(ModuleEntity::class.java).single().contentRoots.filter { it.entitySource !is JpsImportedEntitySource }
       toRemove.forEach { builder.removeEntity(it) }
+    }
+  }
+
+  @Test
+  fun `load and remove one additional root`() {
+    checkSaveProjectAfterChange("before/loadAndRemoveOneAdditionalRoot", "after/loadAndRemoveOneAdditionalRoot",
+                                forceFilesRewrite = true) { builder, orphanage, configLocation ->
+      val toRemove = builder.entities(ModuleEntity::class.java).single().contentRoots.filter { it.entitySource !is JpsImportedEntitySource }
+      toRemove.first().also { builder.removeEntity(it) }
     }
   }
 

@@ -52,6 +52,7 @@ sealed interface IjentFileSystemApi {
     interface DoesNotExist : ListDirectoryError, IjentFsError.DoesNotExist
     interface PermissionDenied : ListDirectoryError, IjentFsError.PermissionDenied
     interface NotDirectory : ListDirectoryError, IjentFsError.NotDirectory
+    interface Other : ListDirectoryError, IjentFsError.Other
   }
 
   /**
@@ -66,6 +67,7 @@ sealed interface IjentFileSystemApi {
     interface PermissionDenied : CanonicalizeError, IjentFsError.PermissionDenied
     interface NotDirectory : CanonicalizeError, IjentFsError.NotDirectory
     interface NotFile : CanonicalizeError, IjentFsError.NotFile
+    interface Other : CanonicalizeError, IjentFsError.Other
   }
 
   /**
@@ -78,6 +80,7 @@ sealed interface IjentFileSystemApi {
     interface PermissionDenied : StatError, IjentFsError.PermissionDenied
     interface NotDirectory : StatError, IjentFsError.NotDirectory
     interface NotFile : StatError, IjentFsError.NotFile
+    interface Other : StatError, IjentFsError.Other
   }
 
   /**
@@ -93,6 +96,7 @@ sealed interface IjentFileSystemApi {
     interface PermissionDenied : SameFileError, IjentFsError.PermissionDenied
     interface NotDirectory : SameFileError, IjentFsError.NotDirectory
     interface NotFile : SameFileError, IjentFsError.NotFile
+    interface Other : SameFileError, IjentFsError.Other
   }
 
   suspend fun fileReader(path: IjentPath.Absolute): IjentFsResult<
@@ -104,6 +108,7 @@ sealed interface IjentFileSystemApi {
     interface PermissionDenied : FileReaderError, IjentFsError.PermissionDenied
     interface NotDirectory : FileReaderError, IjentFsError.NotDirectory
     interface NotFile : FileReaderError, IjentFsError.NotFile
+    interface Other : FileReaderError, IjentFsError.Other
   }
 
   /**
@@ -122,6 +127,7 @@ sealed interface IjentFileSystemApi {
     interface PermissionDenied : FileWriterError, IjentFsError.PermissionDenied
     interface NotDirectory : FileWriterError, IjentFsError.NotDirectory
     interface NotFile : FileWriterError, IjentFsError.NotFile
+    interface Other : FileWriterError, IjentFsError.Other
   }
 
   enum class FileWriterCreationMode {
@@ -139,31 +145,25 @@ sealed interface IjentOpenedFile {
     where: IjentPath.Absolute,
     additionalMessage: @NlsSafe String,
   ) : IjentFsIOException(where, additionalMessage) {
-    class DoesNotExist(where: IjentPath.Absolute, additionalMessage: @NlsSafe String)
-      : CloseException(where, additionalMessage), IjentFsError.DoesNotExist
-
-    class PermissionDenied(where: IjentPath.Absolute, additionalMessage: @NlsSafe String)
-      : CloseException(where, additionalMessage), IjentFsError.PermissionDenied
-
-    class NotDirectory(where: IjentPath.Absolute, additionalMessage: @NlsSafe String)
-      : CloseException(where, additionalMessage), IjentFsError.NotDirectory
-
-    class NotFile(where: IjentPath.Absolute, additionalMessage: @NlsSafe String)
-      : CloseException(where, additionalMessage), IjentFsError.NotFile
+    class Other(where: IjentPath.Absolute, additionalMessage: @NlsSafe String)
+      : CloseException(where, additionalMessage), IjentFsError.Other
   }
 
-  fun tell(): Long
+  fun tell(): IjentFsResult<
+    Long,
+    TellError>
+
+  sealed interface TellError : IjentFsError {
+    interface Other : TellError, IjentFsError.Other
+  }
 
   suspend fun seek(offset: Long, whence: SeekWhence): IjentFsResult<
     Long,
     SeekError>
 
   sealed interface SeekError : IjentFsError {
-    interface DoesNotExist : SeekError, IjentFsError.DoesNotExist
-    interface PermissionDenied : SeekError, IjentFsError.PermissionDenied
-    interface NotDirectory : SeekError, IjentFsError.NotDirectory
-    interface NotFile : SeekError, IjentFsError.NotFile
     interface InvalidValue : SeekError, IjentFsError
+    interface Other : SeekError, IjentFsError.Other
   }
 
   enum class SeekWhence {
@@ -176,10 +176,8 @@ sealed interface IjentOpenedFile {
       ReadError>
 
     sealed interface ReadError : IjentFsError {
-      interface DoesNotExist : ReadError, IjentFsError.DoesNotExist
-      interface PermissionDenied : ReadError, IjentFsError.PermissionDenied
-      interface NotDirectory : ReadError, IjentFsError.NotDirectory
-      interface NotFile : ReadError, IjentFsError.NotFile
+      interface InvalidValue : ReadError, IjentFsError
+      interface Other : ReadError, IjentFsError.Other
     }
   }
 
@@ -189,13 +187,24 @@ sealed interface IjentOpenedFile {
       WriteError>
 
     sealed interface WriteError : IjentFsError {
-      interface DoesNotExist : WriteError, IjentFsError.DoesNotExist
-      interface PermissionDenied : WriteError, IjentFsError.PermissionDenied
-      interface NotDirectory : WriteError, IjentFsError.NotDirectory
-      interface NotFile : WriteError, IjentFsError.NotFile
+      sealed interface ResourceExhausted : WriteError, IjentFsError.Other {
+        interface DiskQuotaExceeded : ResourceExhausted, IjentFsError.Other
+        interface FileSizeExceeded : ResourceExhausted, IjentFsError.Other
+        interface NoSpaceLeft : ResourceExhausted, IjentFsError.Other
+      }
+      interface Other : WriteError, IjentFsError.Other
     }
 
-    // There's no flush(). It's supposed that `write` flushes.
+    @Throws(FlushException::class)
+    suspend fun flush()
+
+    sealed class FlushException(
+      where: IjentPath.Absolute,
+      additionalMessage: @NlsSafe String,
+    ) : IjentFsIOException(where, additionalMessage) {
+      class Other(where: IjentPath.Absolute, additionalMessage: @NlsSafe String)
+        : FlushException(where, additionalMessage), IjentFsError.Other
+    }
 
     @Throws(TruncateException::class)
     suspend fun truncate()
@@ -204,17 +213,8 @@ sealed interface IjentOpenedFile {
       where: IjentPath.Absolute,
       additionalMessage: @NlsSafe String,
     ) : IjentFsIOException(where, additionalMessage) {
-      class DoesNotExist(where: IjentPath.Absolute, additionalMessage: @NlsSafe String)
-        : TruncateException(where, additionalMessage), IjentFsError.DoesNotExist
-
-      class PermissionDenied(where: IjentPath.Absolute, additionalMessage: @NlsSafe String)
-        : TruncateException(where, additionalMessage), IjentFsError.PermissionDenied
-
-      class NotDirectory(where: IjentPath.Absolute, additionalMessage: @NlsSafe String)
-        : TruncateException(where, additionalMessage), IjentFsError.NotDirectory
-
-      class NotFile(where: IjentPath.Absolute, additionalMessage: @NlsSafe String)
-        : TruncateException(where, additionalMessage), IjentFsError.NotFile
+      class Other(where: IjentPath.Absolute, additionalMessage: @NlsSafe String)
+        : TruncateException(where, additionalMessage), IjentFsError.Other
     }
   }
 }

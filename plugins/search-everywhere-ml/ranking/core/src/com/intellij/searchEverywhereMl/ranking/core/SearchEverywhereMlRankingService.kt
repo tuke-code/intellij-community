@@ -11,6 +11,7 @@ import com.intellij.searchEverywhereMl.RANKING_EP_NAME
 import com.intellij.searchEverywhereMl.SearchEverywhereMlExperiment
 import com.intellij.searchEverywhereMl.SearchEverywhereTabWithMlRanking
 import com.intellij.searchEverywhereMl.SemanticSearchEverywhereContributor
+import com.intellij.searchEverywhereMl.ranking.core.features.SearchEverywhereElementFeaturesProvider.Companion.BUFFERED_TIMESTAMP
 import com.intellij.searchEverywhereMl.settings.SearchEverywhereMlSettings
 import com.intellij.ui.components.JBList
 import org.jetbrains.annotations.ApiStatus
@@ -79,7 +80,7 @@ class SearchEverywhereMlRankingService : SearchEverywhereMlService {
     val elementId = ReadAction.compute<Int?, Nothing> { session.itemIdProvider.getId(element) }
     val mlElementInfo = state.getElementFeatures(elementId, element, contributor, priority, session.mixedListInfo, session.cachedContextInfo)
 
-    val effectiveContributor = if (contributor is PSIPresentationBgRendererWrapper) contributor.delegate else contributor
+    val effectiveContributor = if (contributor is SearchEverywhereContributorWrapper) contributor.getEffectiveContributor() else contributor
     val mlWeight = if (shouldCalculateMlWeight(effectiveContributor, state, element)) state.getMLWeight(session.cachedContextInfo, mlElementInfo) else null
 
     return if (isShowDiff()) SearchEverywhereFoundElementInfoBeforeDiff(element, priority, contributor, mlWeight, mlElementInfo.features)
@@ -182,6 +183,15 @@ class SearchEverywhereMlRankingService : SearchEverywhereMlService {
   override fun getExperimentVersion(): Int = SearchEverywhereMlExperiment.VERSION
 
   override fun getExperimentGroup(): Int = SearchEverywhereMlExperiment().experimentGroup
+
+  override fun addBufferedTimestamp(item: SearchEverywhereFoundElementInfo, timestamp: Long) {
+    (item as? SearchEverywhereFoundElementInfoWithMl)?.let {
+      val session = getCurrentSession() ?: return
+      session.getCurrentSearchState()?.apply {
+        item.addMlFeature(BUFFERED_TIMESTAMP.with(timestamp))
+      }
+    }
+  }
 
   private fun mapElementsProvider(elementsProvider: () -> List<SearchEverywhereFoundElementInfo>): () -> List<SearchEverywhereFoundElementInfoWithMl> {
     return { ->

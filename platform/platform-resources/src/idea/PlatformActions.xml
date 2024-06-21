@@ -179,9 +179,7 @@
     <action id="TextComponent.ClearAction" class="com.intellij.ui.ClearTextAction"/>
     <action id="QuickDocCopy" class="com.intellij.codeInsight.documentation.actions.CopyQuickDocAction"
             icon="AllIcons.Actions.Copy" use-shortcut-of="$Copy"/>
-    <action id="EditSourceInNewWindow" class="com.intellij.ide.actions.EditSourceInNewWindowAction">
-      <override-text place="EditorTabPopup"/>
-    </action>
+    <action id="EditSourceInNewWindow" class="com.intellij.ide.actions.EditSourceInNewWindowAction"/>
     <action id="OpenElementInNewWindow" class="com.intellij.ide.actions.OpenElementInNewWindowAction" />
     <action id="SearchEverywhere" class="com.intellij.ide.actions.SearchEverywhereAction" icon="AllIcons.Actions.Find"/>
     <action id="TestSearchContributors" class="com.intellij.ide.actions.searcheverywhere.setesting.TestSearchEverywhereAction" internal="true"/>
@@ -398,6 +396,7 @@
               icon="AllIcons.Diff.MagicResolveToolbar"/>
 
       <group id="Diff.Conflicts.Additional.Actions"/>
+      <group id="Diff.Conflicts.Feedback"/>
 
       <group id="compare.contents" icon="AllIcons.Actions.Diff" popup="true" class="com.intellij.openapi.actionSystem.EmptyActionGroup">
         <action id="Diff.ComparePartial.Base.Left" class="com.intellij.openapi.actionSystem.EmptyAction"
@@ -1682,5 +1681,7 @@
               class="com.intellij.ide.actions.searcheverywhere.CloseSearchEverywherePreview"
               icon="AllIcons.Actions.CloseDarkGrey"/>
     </group>
+
+    <action id="plugins.autoupdate.repository.view" class="com.intellij.openapi.application.PluginsAutoUpdateRepositoryViewAction" internal="true"/>
   </actions>
 </idea-plugin>

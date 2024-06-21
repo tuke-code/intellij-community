@@ -4,7 +4,9 @@ package org.jetbrains.kotlin.idea.k2.codeinsight.intentions
 
 import com.intellij.modcommand.ActionContext
 import com.intellij.modcommand.ModPsiUpdater
+import com.intellij.modcommand.Presentation
 import com.intellij.openapi.util.TextRange
+import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
 import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.components.KtDiagnosticCheckerFilter
 import org.jetbrains.kotlin.analysis.api.fir.diagnostics.KaFirDiagnostic
@@ -29,6 +31,7 @@ internal class SpecifyTypeExplicitlyIntention:
     }
 
     context(KaSession)
+    @OptIn(KaExperimentalApi::class)
     private fun skip(element: KtCallableDeclaration): Boolean =
         element.getDiagnostics(KtDiagnosticCheckerFilter.ONLY_COMMON_CHECKERS)
             .any { diagnostic ->
@@ -37,15 +40,18 @@ internal class SpecifyTypeExplicitlyIntention:
                         || diagnostic is KaFirDiagnostic.MustBeInitialized
             }
 
-    override fun getFamilyName(): String = KotlinBundle.message("specify.type.explicitly")
+    override fun getFamilyName(): String =
+        KotlinBundle.message("specify.type.explicitly")
 
-    override fun getActionName(
-      actionContext: ActionContext,
-      element: KtCallableDeclaration,
-      elementContext: TypeInfo,
-    ): String = when (element) {
-        is KtFunction -> KotlinBundle.message("specify.return.type.explicitly")
-        else -> KotlinBundle.message("specify.type.explicitly")
+    override fun getPresentation(
+        context: ActionContext,
+        element: KtCallableDeclaration,
+    ): Presentation {
+        val actionName = when (element) {
+            is KtFunction -> KotlinBundle.message("specify.return.type.explicitly")
+            else -> KotlinBundle.message("specify.type.explicitly")
+        }
+        return Presentation.of(actionName)
     }
 
     context(KaSession)

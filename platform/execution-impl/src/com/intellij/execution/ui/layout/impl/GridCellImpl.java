@@ -22,6 +22,7 @@ import com.intellij.ui.tabs.TabsListener;
 import com.intellij.ui.tabs.impl.*;
 import com.intellij.util.SmartList;
 import com.intellij.util.ui.UIUtil;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NonNls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -34,6 +35,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+@ApiStatus.Internal
 public final class GridCellImpl implements GridCell {
   private final GridImpl myContainer;
 
@@ -47,7 +49,7 @@ public final class GridCellImpl implements GridCell {
   private final ViewContextEx myContext;
   private JBPopup myPopup;
 
-  public GridCellImpl(ViewContextEx context, @NotNull GridImpl container, GridImpl.Placeholder placeholder, PlaceInGrid placeInGrid) {
+  GridCellImpl(ViewContextEx context, @NotNull GridImpl container, GridImpl.Placeholder placeholder, PlaceInGrid placeInGrid) {
     myContext = context;
     myContainer = container;
 
@@ -446,7 +448,7 @@ public final class GridCellImpl implements GridCell {
       super(context.getProject(), context.getFocusManager(), container);
 
       myContext = context;
-      JBRunnerTabsBase tabs = ((RunnerContentUi)myContext).myTabs;
+      JBRunnerTabsBase tabs = ((RunnerContentUi)myContext).tabs;
       ((JBTabsImpl)tabs).addNestedTabs(this, container);
     }
 
@@ -468,17 +470,17 @@ public final class GridCellImpl implements GridCell {
 
     @Override
     public void processDropOver(@NotNull TabInfo over, @NotNull RelativePoint point) {
-      ((RunnerContentUi)myContext).myTabs.processDropOver(over, point);
+      ((RunnerContentUi)myContext).tabs.processDropOver(over, point);
     }
 
     @Override
     public @NotNull Image startDropOver(@NotNull TabInfo tabInfo, @NotNull RelativePoint point) {
-      return ((RunnerContentUi)myContext).myTabs.startDropOver(tabInfo, point);
+      return ((RunnerContentUi)myContext).tabs.startDropOver(tabInfo, point);
     }
 
     @Override
     public void resetDropOver(@NotNull TabInfo tabInfo) {
-      ((RunnerContentUi)myContext).myTabs.resetDropOver(tabInfo);
+      ((RunnerContentUi)myContext).tabs.resetDropOver(tabInfo);
     }
 
     @Override

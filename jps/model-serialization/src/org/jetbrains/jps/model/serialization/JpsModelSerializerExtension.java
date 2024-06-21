@@ -16,6 +16,7 @@
 package org.jetbrains.jps.model.serialization;
 
 import org.jdom.Element;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.jps.model.JpsCompositeElement;
@@ -47,29 +48,35 @@ public abstract class JpsModelSerializerExtension {
     return JpsServiceManager.getInstance().getExtensions(JpsModelSerializerExtension.class);
   }
 
+  @ApiStatus.Internal
   public void loadRootModel(@NotNull JpsModule module, @NotNull Element rootModel) {
   }
 
   public void loadModuleOptions(@NotNull JpsModule module, @NotNull Element rootElement) {
   }
 
+  @ApiStatus.Internal
   public List<JpsLibraryRootTypeSerializer> getLibraryRootTypeSerializers() {
     return Collections.emptyList();
   }
 
+  @ApiStatus.Internal
   @NotNull
   public List<JpsLibraryRootTypeSerializer> getSdkRootTypeSerializers() {
     return Collections.emptyList();
   }
 
+  @ApiStatus.Internal
   public void loadModuleDependencyProperties(JpsDependencyElement dependency, Element orderEntry) {
   }
 
+  @ApiStatus.Internal
   @Nullable
   public JpsElementReference<? extends JpsCompositeElement> createLibraryTableReference(String tableLevel) {
     return null;
   }
 
+  @ApiStatus.Internal
   @Nullable
   public String getLibraryTableLevelId(JpsElementReference<? extends JpsCompositeElement> reference) {
     return null;
@@ -120,11 +127,13 @@ public abstract class JpsModelSerializerExtension {
     return Collections.emptyList();
   }
 
+  @ApiStatus.Internal
   @NotNull
   public List<? extends JpsArtifactExtensionSerializer<?>> getArtifactExtensionSerializers() {
     return Collections.emptyList();
   }
 
+  @ApiStatus.Internal
   @Nullable
   public JpsModuleClasspathSerializer getClasspathSerializer() {
     return null;

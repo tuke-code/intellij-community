@@ -1,16 +1,20 @@
 // Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.ide.settings.json
 
+import com.intellij.codeWithMe.ClientId
 import com.intellij.ide.plugins.PluginManagerCore
 import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.client.ClientSessionsManager
 import com.intellij.openapi.components.*
 import com.intellij.openapi.extensions.PluginDescriptor
 import com.intellij.serialization.MutableAccessor
 import com.intellij.serviceContainer.ComponentManagerImpl
 import com.intellij.util.xmlb.annotations.OptionTag
 import com.intellij.util.xmlb.getBeanAccessors
+import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.VisibleForTesting
 
+@ApiStatus.Internal
 @VisibleForTesting
 fun buildComponentModel(): JsonSettingsModel.ComponentModel =
   JsonSettingsModel.ComponentModel(listAppComponents().map { descriptor ->
@@ -27,8 +31,7 @@ fun buildComponentModel(): JsonSettingsModel.ComponentModel =
 
 internal fun listAppComponents(): List<ComponentDescriptor> {
   val descriptors = mutableListOf<ComponentDescriptor>()
-  val componentManager = ApplicationManager.getApplication() as ComponentManagerImpl
-  componentManager.processAllImplementationClasses { aClass, descriptor ->
+  fun processImplementationClass(aClass: Class<*>, descriptor: PluginDescriptor?) {
     if (PersistentStateComponent::class.java.isAssignableFrom(aClass)) {
       val state = aClass.getAnnotation(State::class.java)
       @Suppress("UNCHECKED_CAST")
@@ -42,6 +45,12 @@ internal fun listAppComponents(): List<ComponentDescriptor> {
       )
     }
   }
+
+  val componentManager = ApplicationManager.getApplication() as ComponentManagerImpl
+  val localAppSession = ClientSessionsManager.getAppSession(ClientId.localId) as ComponentManagerImpl
+  componentManager.processAllImplementationClasses(::processImplementationClass)
+  localAppSession.processAllImplementationClasses(::processImplementationClass)
+
   descriptors.sortWith(
     compareBy<ComponentDescriptor> { it.name }.thenBy { it.aClass.name }
   )

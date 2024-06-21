@@ -3,6 +3,7 @@ package com.intellij.ui.tabs.impl.singleRow;
 
 import com.intellij.ui.tabs.impl.JBTabsImpl;
 import com.intellij.ui.tabs.impl.TabLabel;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 
 import java.awt.*;
@@ -10,7 +11,8 @@ import java.awt.*;
 /**
  * @author Alexander Lobas
  */
-public class WindowTabsLayout extends SingleRowLayout {
+@ApiStatus.Internal
+public final class WindowTabsLayout extends SingleRowLayout {
   public WindowTabsLayout(JBTabsImpl tabs) {
     super(tabs);
   }
@@ -18,7 +20,7 @@ public class WindowTabsLayout extends SingleRowLayout {
   @Override
   protected void recomputeToLayout(SingleRowPassInfo data) {
     data.requiredLength = tabs.getWidth();
-    data.toLayout.addAll(data.myVisibleInfos);
+    data.toLayout.addAll(data.visibleInfos);
   }
 
   @Override
@@ -51,7 +53,7 @@ public class WindowTabsLayout extends SingleRowLayout {
   public int getDropIndexFor(Point point) {
     Component component = tabs.getComponentAt(point);
     if (component instanceof TabLabel label && lastSingRowLayout != null) {
-      return lastSingRowLayout.myVisibleInfos.indexOf(label.getInfo());
+      return lastSingRowLayout.visibleInfos.indexOf(label.getInfo());
     }
     return -1;
   }

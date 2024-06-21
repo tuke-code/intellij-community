@@ -42,8 +42,7 @@ class SuggestedRefactoringIntentionContributor : IntentionMenuContributor {
 
     // we add it into 'errorFixesToShow' if it's not empty to always be at the top of the list
     // we don't add into it if it's empty to keep the color of the bulb
-    val collectionToAdd = intentions.errorFixesToShow.takeIf { it.isNotEmpty() }
-                          ?: intentions.inspectionFixesToShow
+    val collectionToAdd = intentions.inspectionFixesToShow
     collectionToAdd.add(HighlightInfo.IntentionActionDescriptor(intention, null, null, icon, null, null, null))
   }
 
@@ -120,7 +119,7 @@ class SuggestedRefactoringIntentionContributor : IntentionMenuContributor {
     @IntentionName private val text: String,
     private val showReviewBalloon: Boolean
   ) : IntentionAction, PriorityAction {
-    override fun getPriority() = PriorityAction.Priority.TOP
+    override fun getPriority() = PriorityAction.Priority.HIGH
 
     @NonNls
     override fun getFamilyName() = "Suggested Refactoring"

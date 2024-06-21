@@ -2,18 +2,20 @@
 package org.jetbrains.kotlin.idea.base.codeInsight
 
 import com.intellij.openapi.components.service
+import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.project.DumbService
 import com.intellij.openapi.project.Project
 import com.intellij.psi.PsiElement
-import com.intellij.psi.util.CachedValueProvider.Result
 import com.intellij.psi.util.CachedValuesManager
 import com.intellij.psi.util.PsiModificationTracker
+import com.intellij.psi.util.CachedValueProvider.Result
 import com.intellij.psi.util.descendantsOfType
 import com.intellij.util.concurrency.annotations.RequiresReadLock
 import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.kotlin.idea.base.codeInsight.KotlinMainFunctionDetector.Configuration
 import org.jetbrains.kotlin.idea.base.projectStructure.RootKindFilter
 import org.jetbrains.kotlin.idea.base.projectStructure.matches
+import org.jetbrains.kotlin.idea.base.util.isInDumbMode
 import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.psi.psiUtil.parentsWithSelf
 
@@ -24,7 +26,6 @@ interface KotlinMainFunctionDetector {
         val checkParameterType: Boolean = true,
         val checkResultType: Boolean = true,
         val allowParameterless: Boolean = true,
-        val checkStrictlyOneMain: Boolean = false
     ) {
         companion object {
             val DEFAULT = Configuration()
@@ -111,55 +112,69 @@ fun KotlinMainFunctionDetector.findMain(
 }
 
 private fun KotlinMainFunctionDetector.findMainInContainer(owner: KtDeclarationContainer, configuration: Configuration): KtNamedFunction? {
-    val mains = owner
-        .declarations
-        .asSequence()
-        .filterIsInstance<KtNamedFunction>()
-        .filter { isMain(it, configuration) }
-
-    return if (configuration.checkStrictlyOneMain) mains.singleOrNull()
-    else mains.firstOrNull()
+    return if (owner is KtElement && owner.project.isInDumbMode) findMainInContainerDumb(owner, configuration)
+    else findMainInContainerSmart(owner, configuration)
 }
 
-@RequiresReadLock
-fun KotlinMainFunctionDetector.findMainOwner(element: PsiElement): KtDeclarationContainer? {
-    return findMainOwnerDumbAware(element)
-}
+private fun KotlinMainFunctionDetector.findMainInContainerDumb(
+    owner: KtDeclarationContainer,
+    configuration: Configuration
+): KtNamedFunction? {
+    if (owner !is KtElement) return null
 
-private fun KotlinMainFunctionDetector.findMainOwnerDumbAware(element: PsiElement): KtDeclarationContainer? {
-    val project = element.project
-    val dumbService = DumbService.getInstance(project)
+    return CachedValuesManager.getManager(owner.project).getCachedValue(owner) {
+        val mainOwner = findAllMainsInContainer(owner, configuration).singleOrNull()
 
-    if (!dumbService.isDumb || this !is PsiOnlyKotlinMainFunctionDetector) return findMainFunctionContainer(element)
-
-    return CachedValuesManager.getManager(project).getCachedValue(element) {
-        val mainOwner = findMainFunctionContainer(element, Configuration(checkStrictlyOneMain = true))
-
-        Result.create(mainOwner, PsiModificationTracker.getInstance(project), dumbService.modificationTracker)
+        val project = owner.project
+        Result.create(mainOwner, PsiModificationTracker.getInstance(project), DumbService.getInstance(project).modificationTracker)
     }
 }
 
-private fun KotlinMainFunctionDetector.findMainFunctionContainer(
-    element: PsiElement,
-    configuration: Configuration = Configuration.DEFAULT
-): KtDeclarationContainer? {
+private fun KotlinMainFunctionDetector.findMainInContainerSmart(
+    owner: KtDeclarationContainer,
+    configuration: Configuration
+): KtNamedFunction? {
+    return findAllMainsInContainer(owner, configuration).firstOrNull()
+}
+
+private fun KotlinMainFunctionDetector.findAllMainsInContainer(
+    owner: KtDeclarationContainer,
+    configuration: Configuration
+): Sequence<KtNamedFunction> {
+     return owner
+        .declarations
+        .asSequence()
+        .filterIsInstance<KtNamedFunction>()
+        .filter {
+            ProgressManager.checkCanceled()
+            isMain(it, configuration)
+        }
+}
+
+/**
+ * NOTE: In dumbMode it will return null if a container contains more than one main [findMainInContainerDumb]
+ *
+ * @return Main function container.
+ */
+@RequiresReadLock
+fun KotlinMainFunctionDetector.findMainOwner(element: PsiElement): KtDeclarationContainer? {
     val containingFile = element.containingFile as? KtFile ?: return null
     if (!RootKindFilter.projectSources.matches(containingFile)) {
         return null
     }
 
     for (parent in element.parentsWithSelf) {
-        if (parent is KtClassOrObject && hasMain(parent, configuration)) {
+        if (parent is KtClassOrObject && hasMain(parent)) {
             return parent
         }
     }
 
-    if (hasMain(containingFile, configuration)) {
+    if (hasMain(containingFile)) {
         return containingFile
     }
 
     for (descendant in element.descendantsOfType<KtClassOrObject>()) {
-        if (hasMain(descendant, configuration)) {
+        if (hasMain(descendant)) {
             return descendant
         }
     }

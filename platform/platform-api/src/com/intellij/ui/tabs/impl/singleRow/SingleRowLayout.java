@@ -7,6 +7,7 @@ import com.intellij.ui.tabs.TabsUtil;
 import com.intellij.ui.tabs.impl.*;
 import com.intellij.util.ObjectUtils;
 import org.intellij.lang.annotations.MagicConstant;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -16,6 +17,7 @@ import java.lang.ref.WeakReference;
 import java.util.List;
 import java.util.Objects;
 
+@ApiStatus.Internal
 public abstract class SingleRowLayout extends TabLayout {
   final JBTabsImpl tabs;
   public SingleRowPassInfo lastSingRowLayout;
@@ -65,7 +67,7 @@ public abstract class SingleRowLayout extends TabLayout {
         lastSingRowLayout.contentCount == tabs.getTabCount() &&
         lastSingRowLayout.layoutSize.equals(tabs.getSize()) &&
         lastSingRowLayout.scrollOffset == getScrollOffset()) {
-      for (TabInfo each : data.myVisibleInfos) {
+      for (TabInfo each : data.visibleInfos) {
         final TabLabel eachLabel = tabs.getTabLabel(each);
         if (!Objects.requireNonNull(eachLabel).isValid()) {
           layoutLabels = true;
@@ -233,7 +235,7 @@ public abstract class SingleRowLayout extends TabLayout {
   protected void calculateRequiredLength(SingleRowPassInfo data) {
     data.requiredLength += tabs.isHorizontalTabs() ? data.insets.left + data.insets.right
                                                    : data.insets.top + data.insets.bottom;
-    for (TabInfo eachInfo : data.myVisibleInfos) {
+    for (TabInfo eachInfo : data.visibleInfos) {
       data.requiredLength += getRequiredLength(eachInfo);
       data.toLayout.add(eachInfo);
     }
@@ -261,9 +263,9 @@ public abstract class SingleRowLayout extends TabLayout {
     Component c = tabs.getComponentAt(point);
 
     if (c instanceof JBTabsImpl) {
-      for (int i = 0; i < lastSingRowLayout.myVisibleInfos.size() - 1; i++) {
-        TabLabel first = tabs.getTabLabel(lastSingRowLayout.myVisibleInfos.get(i));
-        TabLabel second = tabs.getTabLabel(lastSingRowLayout.myVisibleInfos.get(i + 1));
+      for (int i = 0; i < lastSingRowLayout.visibleInfos.size() - 1; i++) {
+        TabLabel first = tabs.getTabLabel(lastSingRowLayout.visibleInfos.get(i));
+        TabLabel second = tabs.getTabLabel(lastSingRowLayout.visibleInfos.get(i + 1));
 
         Rectangle firstBounds = Objects.requireNonNull(first).getBounds();
         Rectangle secondBounds = Objects.requireNonNull(second).getBounds();
@@ -293,17 +295,17 @@ public abstract class SingleRowLayout extends TabLayout {
 
     if (c instanceof TabLabel) {
       TabInfo info = ((TabLabel)c).getInfo();
-      int index = lastSingRowLayout.myVisibleInfos.indexOf(info);
+      int index = lastSingRowLayout.visibleInfos.indexOf(info);
       boolean isDropTarget = tabs.isDropTarget(info);
       if (!isDropTarget) {
         for (int i = 0; i <= index; i++) {
-          if (tabs.isDropTarget(lastSingRowLayout.myVisibleInfos.get(i))) {
+          if (tabs.isDropTarget(lastSingRowLayout.visibleInfos.get(i))) {
             index -= 1;
             break;
           }
         }
         result = index;
-      } else if (index < lastSingRowLayout.myVisibleInfos.size()) {
+      } else if (index < lastSingRowLayout.visibleInfos.size()) {
         result = index;
       }
     }

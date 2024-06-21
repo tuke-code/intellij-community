@@ -10,7 +10,6 @@ import com.intellij.codeInsight.template.Template;
 import com.intellij.codeInsight.template.TemplateEditingAdapter;
 import com.intellij.codeInsight.template.TemplateManager;
 import com.intellij.codeInsight.template.impl.TemplateManagerUtilBase;
-import com.intellij.find.EditorSearchSession;
 import com.intellij.find.FindManager;
 import com.intellij.find.FindModel;
 import com.intellij.find.FindResult;
@@ -57,6 +56,7 @@ import java.util.Objects;
  */
 final class BackgroundHighlighter {
   private static final Key<Collection<RangeHighlighter>> SELECTION_HIGHLIGHTS = new Key<>("SELECTION_HIGHLIGHTS");
+  private static final Key<String> HIGHLIGHTED_TEXT = new Key<>("HIGHLIGHTED_TEXT");
   private final Alarm alarm = new Alarm();
 
   public void runActivity(@NotNull Project project) {
@@ -97,7 +97,9 @@ final class BackgroundHighlighter {
           return;
         }
 
-        highlightSelection(project, editor);
+        if (!highlightSelection(project, editor)) {
+          removeSelectionHighlights(editor);
+        }
 
         TextRange oldRange = e.getOldRange();
         TextRange newRange = e.getNewRange();
@@ -132,8 +134,11 @@ final class BackgroundHighlighter {
         }
         FileEditor newEditor = e.getNewEditor();
         if (newEditor instanceof TextEditor textEditor) {
-          updateHighlighted(project, textEditor.getEditor(), alarm);
-          highlightSelection(project, textEditor.getEditor());
+          Editor editor = textEditor.getEditor();
+          updateHighlighted(project, editor, alarm);
+          if (!highlightSelection(project, editor)) {
+            removeSelectionHighlights(editor);
+          }
         }
       }
     });
@@ -160,51 +165,42 @@ final class BackgroundHighlighter {
     updateHighlighted(project, editor, alarm);
   }
 
-  private static void highlightSelection(@NotNull Project project, @NotNull Editor editor) {
+  private static boolean highlightSelection(@NotNull Project project, @NotNull Editor editor) {
     ThreadingAssertions.assertEventDispatchThread();
     Document document = editor.getDocument();
     long stamp = document.getModificationStamp();
-    if (document.isInBulkUpdate()) {
-      return;
-    }
-    if (!BackgroundHighlightingUtil.isValidEditor(editor)) {
-      return;
-    }
-    MarkupModel markupModel = editor.getMarkupModel();
-    Collection<RangeHighlighter> oldHighlighters = editor.getUserData(SELECTION_HIGHLIGHTS);
-    if (oldHighlighters != null) {
-      editor.putUserData(SELECTION_HIGHLIGHTS, null);
-      for (RangeHighlighter highlighter : oldHighlighters) {
-        markupModel.removeHighlighter(highlighter);
-      }
+    if (document.isInBulkUpdate() || !BackgroundHighlightingUtil.isValidEditor(editor)) {
+      return false;
     }
     if (!editor.getSettings().isHighlightSelectionOccurrences()) {
-      return;
+      return false;
     }
     if (TemplateManagerUtilBase.getTemplateState(editor) != null) {
-      return; // don't highlight selected text when template is active
+      return false; // don't highlight selected text when template is active
     }
     CaretModel caretModel = editor.getCaretModel();
     if (caretModel.getCaretCount() > 1) {
-      return;
+      return false;
     }
     Caret caret = caretModel.getPrimaryCaret();
     if (!caret.hasSelection()) {
-      return;
+      return false;
     }
     int start = caret.getSelectionStart();
     int end = caret.getSelectionEnd();
     CharSequence sequence = document.getCharsSequence();
     String toFind = sequence.subSequence(start, end).toString();
-    if (toFind.trim().isEmpty()) {
-      return;
+    if (toFind.trim().isEmpty() || toFind.contains("\n")) {
+      return false;
     }
+    String previous = editor.getUserData(HIGHLIGHTED_TEXT);
+    if (toFind.equals(previous)) {
+      return true;
+    }
+    editor.putUserData(HIGHLIGHTED_TEXT, toFind);
     FindManager findManager = FindManager.getInstance(project);
     FindModel findModel = new FindModel();
-    EditorSearchSession editorSearchSession = EditorSearchSession.get(editor);
-    if (editorSearchSession != null) {
-      findModel.copyFrom(findManager.getFindInFileModel());
-    }
+    findModel.copyFrom(findManager.getFindInFileModel());
     findModel.setRegularExpressions(false);
     findModel.setStringToFind(toFind);
     ReadAction.nonBlocking(() -> {
@@ -216,7 +212,7 @@ final class BackgroundHighlighter {
           count++;
           results.add(result);
           offset = result.getEndOffset();
-          result = findManager.findString(sequence, offset, findModel, null);
+          result = findManager.findString(sequence, offset, findModel);
         }
         return results;
       })
@@ -226,14 +222,32 @@ final class BackgroundHighlighter {
         if (document.getModificationStamp() != stamp || results.isEmpty()) {
           return;
         }
+        removeSelectionHighlights(editor);
         List<RangeHighlighter> highlighters = new ArrayList<>();
+        MarkupModel markupModel = editor.getMarkupModel();
         for (FindResult result : results) {
-          highlighters.add(markupModel.addRangeHighlighter(EditorColors.TEXT_SEARCH_RESULT_ATTRIBUTES, result.getStartOffset(), result.getEndOffset(),
+          int startOffset = result.getStartOffset();
+          int endOffset = result.getEndOffset();
+          if (startOffset == start && endOffset == end) continue;
+          highlighters.add(markupModel.addRangeHighlighter(EditorColors.HIGHLIGHT_SELECTED_TEXT_ATTRIBUTES, startOffset, endOffset,
                                                            HighlightManagerImpl.OCCURRENCE_LAYER, HighlighterTargetArea.EXACT_RANGE));
         }
         editor.putUserData(SELECTION_HIGHLIGHTS, highlighters);
       })
       .submit(AppExecutorUtil.getAppExecutorService());
+    return true;
+  }
+
+  private static void removeSelectionHighlights(@NotNull Editor editor) {
+    MarkupModel markupModel = editor.getMarkupModel();
+    Collection<RangeHighlighter> oldHighlighters = editor.getUserData(SELECTION_HIGHLIGHTS);
+    if (oldHighlighters != null) {
+      editor.putUserData(SELECTION_HIGHLIGHTS, null);
+      for (RangeHighlighter highlighter : oldHighlighters) {
+        markupModel.removeHighlighter(highlighter);
+      }
+    }
+    editor.putUserData(HIGHLIGHTED_TEXT, null);
   }
 
   private static void updateHighlighted(@NotNull Project project, @NotNull Editor editor, @NotNull Alarm alarm) {
@@ -334,3 +348,4 @@ final class BackgroundHighlighter {
 
   private static final class HighlightSelectionKey {}
 }
+

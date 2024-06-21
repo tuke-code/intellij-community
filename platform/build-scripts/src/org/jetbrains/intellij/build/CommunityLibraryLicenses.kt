@@ -626,23 +626,12 @@ object CommunityLibraryLicenses {
     LibraryLicense(name = "JUnit5Launcher", libraryName = "JUnit5Launcher", url = "https://junit.org/junit5/").eplV2(),
     LibraryLicense(name = "JUnit5Vintage", libraryName = "JUnit5Vintage", url = "https://junit.org/junit5/").eplV2(),
     LibraryLicense(libraryName = "jzlib", url = "http://www.jcraft.com/jzlib/").newBsd("https://github.com/ymnk/jzlib/raw/master/LICENSE.txt"),
+    LibraryLicense(name = "Kconfig for the Zephyr Project", url = "https://github.com/trond-snekvik/vscode-kconfig", version = "1.2.0",
+                   attachedTo = "intellij.textmate").mit("https://github.com/trond-snekvik/vscode-kconfig/blob/master/LICENSE"),
     LibraryLicense(name = "KInference",
-                   libraryName = "kinference.core.jvm",
-                   url = "https://packages.jetbrains.team/maven/p/ki/maven",
-                   additionalLibraryNames = listOf(
-                     "kinference.api.jvm",
-                     "kinference.common.utils.jvm",
-                     "kinference.ir.jvm",
-                     "kinference.logger.jvm",
-                     "kinference.model.profiler.jvm",
-                     "kinference.ndarray.api.jvm",
-                     "kinference.ndarray.core.jvm",
-                     "kinference.primitives.annotations.jvm",
-                     "kinference.serializer.protobuf.jvm",
-                     "kinference.serializer.tiled.jvm",
-                     "kinference.core.jvm",
-                     "kinference.utils",
-                   )).apache("https://github.com/JetBrains-Research/kinference/blob/master/LICENSE.txt")
+                   libraryName = "kinference.core",
+                   url = "https://packages.jetbrains.team/maven/p/ki/maven")
+      .apache("https://github.com/JetBrains-Research/kinference/blob/master/LICENSE.txt")
       .suppliedByOrganizations(Suppliers.JETBRAINS),
     LibraryLicense(name = "Kodein-DI", libraryName = "kodein-di-jvm", url = "https://github.com/kosi-libs/Kodein")
       .mit("https://github.com/kosi-libs/Kodein/blob/master/LICENSE.txt"),
@@ -801,7 +790,8 @@ object CommunityLibraryLicenses {
                    license = "GPLv2 (used as hg extension called from hg executable)",
                    url = "https://github.com/willemv/mercurial_prompthooks",
                    licenseUrl = "https://github.com/willemv/mercurial_prompthooks/blob/master/LICENSE.txt"),
-    LibraryLicense(libraryName = "microba", url = "https://microba.sourceforge.net/",
+    LibraryLicense(name = "microba", attachedTo = "intellij.libraries.microba", version = LibraryLicense.CUSTOM_REVISION,
+                   url = "https://microba.sourceforge.net/",
                    licenseUrl = "https://microba.sourceforge.net/license.txt").newBsd()
       .suppliedByPersons("Michael Baranov"),
     LibraryLicense(name = "MigLayout", libraryName = "miglayout-swing",
@@ -1177,7 +1167,6 @@ object CommunityLibraryLicenses {
     jetbrainsLibrary("kotlinc.analysis-api-k2"),
     jetbrainsLibrary("kotlinc.analysis-api-k2-tests"),
     jetbrainsLibrary("kotlinc.analysis-api-platform-interface"),
-    jetbrainsLibrary("kotlinc.analysis-project-structure"),
     jetbrainsLibrary("kotlinc.android-extensions-compiler-plugin"),
     jetbrainsLibrary("kotlinc.assignment-compiler-plugin"),
     jetbrainsLibrary("kotlinc.incremental-compilation-impl-tests"),

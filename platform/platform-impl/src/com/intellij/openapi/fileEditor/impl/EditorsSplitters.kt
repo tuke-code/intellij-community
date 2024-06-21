@@ -102,13 +102,6 @@ open class EditorsSplitters internal constructor(
   companion object {
     const val SPLITTER_KEY: @NonNls String = "EditorsSplitters"
 
-    internal fun stopOpenFilesActivity(project: Project) {
-      project.getUserData(OPEN_FILES_ACTIVITY)?.let { activity ->
-        activity.end()
-        project.putUserData(OPEN_FILES_ACTIVITY, null)
-      }
-    }
-
     fun findDefaultComponentInSplitters(project: Project?): JComponent? {
       return getSplittersToFocus(project)?.currentCompositeFlow?.value?.preferredFocusedComponent
     }
@@ -436,15 +429,15 @@ open class EditorsSplitters internal constructor(
     }
   }
 
-  fun setTabsPlacement(tabPlacement: Int) {
+  internal fun setTabPlacement(tabPlacement: Int) {
     for (window in windows) {
-      window.setTabsPlacement(tabPlacement)
+      window.tabbedPane.setTabPlacement(tabPlacement)
     }
   }
 
-  fun setTabLayoutPolicy(scrollTabLayout: Int) {
+  internal fun setTabLayoutPolicy(scrollTabLayout: Int) {
     for (window in windows) {
-      window.setTabLayoutPolicy(scrollTabLayout)
+      window.tabbedPane.setTabLayoutPolicy(scrollTabLayout)
     }
   }
 
@@ -956,7 +949,7 @@ private class UiBuilder(private val splitters: EditorsSplitters, private val isL
       fileEntries.map { fileEntry ->
         async {
           val file = resolveFileOrLogError(virtualFileManager, fileEntry) ?: return@async null
-          val compositeCoroutineScope = windowCoroutineScope.childScope("EditorComposite(file=${fileEntry.url})")
+          val compositeCoroutineScope = splitters.coroutineScope.childScope("EditorComposite(file=${fileEntry.url})")
           val model = fileEditorManager.createEditorCompositeModelOnStartup(
             compositeCoroutineScope = compositeCoroutineScope,
             fileProvider = { file },
@@ -1112,26 +1105,23 @@ private class UiBuilder(private val splitters: EditorsSplitters, private val isL
           isLazyComposite = isLazyComposite,
           windowAdded = suspend { windowAddedDeferred.await() },
         )
-
-        window.coroutineScope.launch {
-          for (delayedTask in delayedTasks) {
-            delayedTask.start()
-          }
-        }
+        window.updateTabsVisibility()
+        addChild(window.component)
+        splitters.addWindow(window)
+        windowAddedDeferred.complete(Unit)
       }
       finally {
         splitters.insideChange--
         if (window != null) {
-          window.updateTabsVisibility(uiSettings = UISettings.getInstance())
-
-          addChild(window.component)
-          windowAddedDeferred.complete(Unit)
-
-          splitters.addWindow(window)
-          window.tabbedPane.editorTabs.revalidateAndRepaint(layoutNow = true)
           splitters.validate()
 
           window.tabbedPane.editorTabs.updateListeners()
+
+          window.coroutineScope.launch {
+            for (delayedTask in delayedTasks) {
+              delayedTask.start()
+            }
+          }
         }
       }
     }
@@ -1293,4 +1283,11 @@ private fun applyTabColor(
       this.foregroundColor = colorScheme.getColor(foregroundFileColor)
     },
   )
+}
+
+internal fun stopOpenFilesActivity(project: Project) {
+  project.getUserData(OPEN_FILES_ACTIVITY)?.let { activity ->
+    project.putUserData(OPEN_FILES_ACTIVITY, null)
+    activity.end()
+  }
 }

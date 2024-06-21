@@ -318,15 +318,9 @@ public abstract class AbstractProjectViewPane implements EdtCompatibleDataProvid
       paths == null || paths.length != 1 ? null :
       ArrayUtil.toObjectArray(ContainerUtil.map(paths[0].getPath(), TreeUtil::getUserObject));
 
-    sink.set(CommonDataKeys.PROJECT, myProject);
-    sink.set(PlatformCoreDataKeys.SELECTED_ITEMS, selectedUserObjects);
-    sink.set(PlatformDataKeys.LAST_ACTIVE_FILE_EDITOR,
-             FileEditorManagerEx.getInstanceEx(myProject).getSelectedEditor());
     sink.set(PlatformCoreDataKeys.BGT_DATA_PROVIDER,
              dataId -> getSlowDataFromSelection(
                selectedUserObjects, singleSelectedPathUserObjects, dataId));
-
-    sink.set(PlatformDataKeys.TREE_EXPANDER, getTreeExpander());
 
     if (paths != null) {
       ArrayList<Navigatable> navigatables = new ArrayList<>();
@@ -352,6 +346,11 @@ public abstract class AbstractProjectViewPane implements EdtCompatibleDataProvid
         selectedUserObjects, AbstractTreeNode.class);
       DataSink.uiDataSnapshot(sink, o -> treeStructure.getDataFromProviders(selection, o));
     }
+    sink.set(CommonDataKeys.PROJECT, myProject);
+    sink.set(PlatformCoreDataKeys.SELECTED_ITEMS, selectedUserObjects);
+    sink.set(PlatformDataKeys.LAST_ACTIVE_FILE_EDITOR,
+             FileEditorManagerEx.getInstanceEx(myProject).getSelectedEditor());
+    sink.set(PlatformDataKeys.TREE_EXPANDER, getTreeExpander());
   }
 
   // used for sorting tabs in the tabbed pane
@@ -367,7 +366,7 @@ public abstract class AbstractProjectViewPane implements EdtCompatibleDataProvid
 
   /** @deprecated Use {@link #getSelectedPath} */
   @Deprecated(forRemoval = true)
-  public final @Nullable NodeDescriptor getSelectedDescriptor() {
+  public final @Nullable NodeDescriptor<?> getSelectedDescriptor() {
     return TreeUtil.getLastUserObject(NodeDescriptor.class, getSelectedPath());
   }
 
@@ -556,15 +555,13 @@ public abstract class AbstractProjectViewPane implements EdtCompatibleDataProvid
   public static Object extractValueFromNode(@Nullable Object node) {
     Object userObject = TreeUtil.getUserObject(node);
     Object element = null;
-    if (userObject instanceof AbstractTreeNode) {
-      AbstractTreeNode descriptor = (AbstractTreeNode)userObject;
+    if (userObject instanceof AbstractTreeNode<?> descriptor) {
       element = descriptor.getValue();
     }
-    else if (userObject instanceof NodeDescriptor) {
-      NodeDescriptor descriptor = (NodeDescriptor)userObject;
+    else if (userObject instanceof NodeDescriptor<?> descriptor) {
       element = descriptor.getElement();
-      if (element instanceof AbstractTreeNode) {
-        element = ((AbstractTreeNode<?>)element).getValue();
+      if (element instanceof AbstractTreeNode<?> treeNode) {
+        element = treeNode.getValue();
       }
     }
     else if (userObject != null) {
@@ -1168,12 +1165,11 @@ public abstract class AbstractProjectViewPane implements EdtCompatibleDataProvid
       }
       object = node.getValue();
     }
-    else if (object instanceof ProjectFileNode) {
-      ProjectFileNode node = (ProjectFileNode)object;
+    else if (object instanceof ProjectFileNode node) {
       return createVisitor(node.getVirtualFile());
     }
-    if (object instanceof VirtualFile) return createVisitor((VirtualFile)object);
-    if (object instanceof PsiElement) return createVisitor((PsiElement)object);
+    if (object instanceof VirtualFile virtualFile) return createVisitor(virtualFile);
+    if (object instanceof PsiElement psiElement) return createVisitor(psiElement);
     LOG.warn("unsupported object: " + object);
     return null;
   }

@@ -7,8 +7,8 @@ import com.intellij.modcommand.PsiUpdateModCommandQuickFix;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.psi.*;
+import com.intellij.psi.util.JavaPsiStringTemplateUtil;
 import com.intellij.psi.util.PsiPrecedenceUtil;
-import com.intellij.psi.util.PsiUtil;
 import com.intellij.util.containers.ContainerUtil;
 import com.siyeh.ig.psiutils.CommentTracker;
 import com.siyeh.ig.psiutils.ExpressionUtils;
@@ -30,15 +30,7 @@ public final class StringTemplateReverseMigrationInspection extends AbstractBase
         PsiTemplate template = expression.getTemplate();
         PsiLiteralExpression literal = expression.getLiteralExpression();
         if (template == null && literal == null) return;
-        PsiExpression processor = PsiUtil.deparenthesizeExpression(expression.getProcessor());
-        if (!(processor instanceof PsiReferenceExpression reference) || !"STR".equals(reference.getReferenceName())) return;
-        PsiElement target = reference.resolve();
-        if (target != null) {
-          if (!(target instanceof PsiField field)) return;
-          PsiClass aClass = field.getContainingClass();
-          if (aClass == null || !CommonClassNames.JAVA_LANG_STRING_TEMPLATE.equals(aClass.getQualifiedName())) return;
-        }
-        else if (reference.getQualifierExpression() != null) return;
+        if (!JavaPsiStringTemplateUtil.isStrTemplate(expression.getProcessor())) return;
         if (template != null && ContainerUtil.exists(template.getFragments(), f -> f.getValue() == null)) return;
         if (literal != null && literal.getValue() == null) return;
         holder.registerProblem(expression,
@@ -71,22 +63,23 @@ public final class StringTemplateReverseMigrationInspection extends AbstractBase
       List<@NotNull PsiExpression> expressions = template.getEmbeddedExpressions();
       CommentTracker ct = new CommentTracker();
       StringBuilder concatenation = new StringBuilder();
-      boolean start = true;
+      boolean stringSeen = false;
       for (int i = 0; i < expressions.size(); i++) {
         PsiFragment fragment = fragments.get(i);
         String value = fragment.getValue();
         if (value == null) return;
-        if (!value.isEmpty()) {
+        if (!value.isEmpty() || i > 0 && !stringSeen) {
           if (!concatenation.isEmpty()) concatenation.append('+');
           concatenation.append('"').append(StringUtil.escapeStringCharacters(value)).append('"');
-          start = false;
+          stringSeen = true;
         }
         if (!concatenation.isEmpty()) concatenation.append('+');
         PsiExpression expression = expressions.get(i);
         int precedence = PsiPrecedenceUtil.getPrecedence(expression);
+        boolean string = ExpressionUtils.hasStringType(expression);
         boolean needParentheses = 
           precedence > PsiPrecedenceUtil.ADDITIVE_PRECEDENCE ||
-          !start && precedence == PsiPrecedenceUtil.ADDITIVE_PRECEDENCE && !ExpressionUtils.hasStringType(expression);
+          stringSeen && precedence == PsiPrecedenceUtil.ADDITIVE_PRECEDENCE && !string;
         if (needParentheses) {
           concatenation.append('(').append(ct.text(expression)).append(')');
         }
@@ -94,6 +87,7 @@ public final class StringTemplateReverseMigrationInspection extends AbstractBase
           String text = ct.text(expression);
           concatenation.append(text.isEmpty() ? "null" : text);
         }
+        if (string) stringSeen = true;
       }
       String last = fragments.get(fragments.size() - 1).getValue();
       if (last == null) return;

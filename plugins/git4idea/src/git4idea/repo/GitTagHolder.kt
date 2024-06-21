@@ -27,7 +27,7 @@ class GitTagHolder(val repository: GitRepository) {
   private val repositoryFiles = repository.repositoryFiles
 
   private var tagsWithHashes: Map<GitTag, Hash> = mapOf()
-  private val hashToTagCache: MutableMap<String, GitTag?> = ConcurrentHashMap()
+  private var hashToTagCache: MutableMap<String, GitTag> = ConcurrentHashMap()
 
   private val updateSemaphore = OverflowSemaphore(overflow = BufferOverflow.DROP_OLDEST)
   private var isEnabled = false
@@ -49,14 +49,7 @@ class GitTagHolder(val repository: GitRepository) {
   }
 
   fun getTag(hash: String): GitTag? {
-    return hashToTagCache.computeIfAbsent(hash) {
-      tagsWithHashes.firstNotNullOfOrNull {
-        if (it.value.asString() == hash) {
-          return@firstNotNullOfOrNull it.key
-        }
-        return@firstNotNullOfOrNull null
-      }
-    }
+    return hashToTagCache[hash]
   }
 
   fun getTags(): Map<GitTag, Hash> {
@@ -66,24 +59,24 @@ class GitTagHolder(val repository: GitRepository) {
   private suspend fun updateState() {
     if (isEnabled) {
       tagsWithHashes = loadTagsForRepo()
-      hashToTagCache.clear()
       BackgroundTaskUtil.syncPublisher(repository.project, GIT_TAGS_LOADED).tagsLoaded(repository)
     }
     else {
       tagsWithHashes = emptyMap()
-      hashToTagCache.clear()
+      hashToTagCache = ConcurrentHashMap()
     }
   }
 
   private suspend fun loadTagsForRepo(): MutableMap<GitTag, Hash> {
     isLoadingFlow.emit(true)
     val tags = mutableMapOf<GitTag, Hash>()
+    val cache = ConcurrentHashMap<String, GitTag>()
     try {
-      readPackedTags(repositoryFiles.packedRefsPath, tags)
+      readPackedTags(repositoryFiles.packedRefsPath, tags, cache)
       GitRefUtil.readFromRefsFiles(repositoryFiles.refsTagsFile,
                                    GitTag.REFS_TAGS_PREFIX,
-                                   repositoryFiles,
-                                   tags::putValue)
+                                   repositoryFiles) { tag, hash -> putValue(tag, hash, tags, cache) }
+      hashToTagCache = cache
     }
     finally {
       isLoadingFlow.emit(false)
@@ -91,7 +84,7 @@ class GitTagHolder(val repository: GitRepository) {
     return tags
   }
 
-  private fun readPackedTags(myPackedRefsFile: File, tags: MutableMap<GitTag, Hash>) {
+  private fun readPackedTags(myPackedRefsFile: File, tags: MutableMap<GitTag, Hash>, cache: ConcurrentHashMap<String, GitTag>) {
     if (!myPackedRefsFile.exists()) {
       return
     }
@@ -119,10 +112,10 @@ class GitTagHolder(val repository: GitRepository) {
             // annotated tag
             scanner.skipChars(1)
             val realHash = scanner.line()
-            tags.putValue(reference, realHash)
+            putValue(reference, realHash, tags, cache)
           }
           else {
-            tags.putValue(reference, hash)
+            putValue(reference, hash, tags, cache)
           }
         }
       }
@@ -132,13 +125,17 @@ class GitTagHolder(val repository: GitRepository) {
     }
   }
 
+  private fun putValue(tagName: String, hash: String, tags: MutableMap<GitTag, Hash>, cache: MutableMap<String, GitTag>) {
+    val gitTag = GitTag(tagName)
+    cache[hash] = gitTag
+    tags[gitTag] = HashImpl.build(hash)
+  }
+
   companion object {
     private val LOG = logger<GitTagHolder>()
     val GIT_TAGS_LOADED: Topic<GitTagLoaderListener> = Topic.create("GitTags loaded", GitTagLoaderListener::class.java)
   }
 }
-
-private fun MutableMap<GitTag, Hash>.putValue(tagName: String, hash: String) = put(GitTag(tagName), HashImpl.build(hash))
 
 fun interface GitTagLoaderListener : EventListener {
   fun tagsLoaded(repository: GitRepository)

@@ -8,20 +8,35 @@ import com.intellij.tools.launch.ide.IdeLaunchContext
 import com.intellij.tools.launch.ide.IdeLauncher
 import com.intellij.tools.launch.ide.classpathCollector
 import com.intellij.tools.launch.ide.environments.docker.DockerContainerOptions
+import com.intellij.tools.launch.ide.environments.docker.LocalDockerRunResult
 import com.intellij.tools.launch.ide.environments.docker.dockerRunCliCommandLauncherFactory
 import com.intellij.tools.launch.ide.environments.local.LocalIdeCommandLauncherFactory
+import com.intellij.tools.launch.ide.environments.local.LocalProcessLaunchResult
 import com.intellij.tools.launch.ide.environments.local.localLaunchOptions
+import com.intellij.tools.launch.os.ProcessOutputFlows
+import com.intellij.tools.launch.os.ProcessOutputInfo
+import com.intellij.tools.launch.os.ProcessOutputStrategy
 import com.intellij.tools.launch.rd.BackendInDockerContainer
 import com.intellij.tools.launch.rd.BackendInEnvDescription
 import com.intellij.tools.launch.rd.BackendOnLocalMachine
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.withContext
 import java.io.File
 
 private const val DEFAULT_CONTAINER_NAME = "idea-ultimate"
 private const val DEFAULT_JAVA_EXECUTABLE_PATH: PathInLaunchEnvironment = "/usr/bin/java"
 
-internal fun runCodeWithMeHostNoLobby(backendDescription: BackendInEnvDescription): BackendStatus {
+internal sealed interface BackendLaunchResult {
+  val backendStatus: BackendStatus
+
+  data class Local(val localProcessResult: LocalProcessLaunchResult, override val backendStatus: BackendStatus) : BackendLaunchResult
+
+  data class Docker(val localDockerRunResult: LocalDockerRunResult, override val backendStatus: BackendStatus) : BackendLaunchResult
+}
+
+internal fun runCodeWithMeHostNoLobby(backendDescription: BackendInEnvDescription, coroutineScope: CoroutineScope): BackendLaunchResult {
   val projectPath = backendDescription.backendDescription.projectPath
   val mainModule = backendDescription.backendDescription.product.mainModule
   val paths = IdeaPathsProvider()
@@ -37,10 +52,14 @@ internal fun runCodeWithMeHostNoLobby(backendDescription: BackendInEnvDescriptio
     "ORG_JETBRAINS_PROJECTOR_SERVER_ATTACH_TO_IDE" to "false",
     "DISPLAY" to ":0",
   )
-  val process = when (backendDescription) {
+  return when (backendDescription) {
     is BackendOnLocalMachine -> {
-      IdeLauncher.launchCommand(
-        LocalIdeCommandLauncherFactory(localLaunchOptions(redirectOutputIntoParentProcess = false, logFolder = paths.logFolder)),
+      val localProcessLaunchResult = IdeLauncher.launchCommand(
+        LocalIdeCommandLauncherFactory(localLaunchOptions(
+          processOutputStrategy = ProcessOutputStrategy.RedirectToFiles(paths.logFolder),
+          processTitle = "IDE Backend on Docker",
+          lifespanScope = coroutineScope
+        )),
         context = IdeLaunchContext(
           classpathCollector = classpathCollector,
           localPaths = paths,
@@ -51,14 +70,15 @@ internal fun runCodeWithMeHostNoLobby(backendDescription: BackendInEnvDescriptio
           specifyUserHomeExplicitly = false,
         )
       )
+      BackendLaunchResult.Local(localProcessLaunchResult, localProcessLaunchResult.processWrapper.processOutputInfo.toBackendStatus())
     }
     is BackendInDockerContainer -> {
-      IdeLauncher.launchCommand(
+      val localDockerRunResult = IdeLauncher.launchCommand(
         dockerRunCliCommandLauncherFactory(
           DockerContainerOptions(
             image = backendDescription.image,
             containerName = DEFAULT_CONTAINER_NAME,
-            javaExecutable = DEFAULT_JAVA_EXECUTABLE_PATH,
+            javaExecutable = backendDescription.backendDescription.jbrPath ?: DEFAULT_JAVA_EXECUTABLE_PATH,
             ultimateRepositoryPathInContainer = "/intellij",
             bindMounts = backendDescription.bindMounts
           )
@@ -72,32 +92,33 @@ internal fun runCodeWithMeHostNoLobby(backendDescription: BackendInEnvDescriptio
           environment = environment,
           specifyUserHomeExplicitly = false,
         )
-      ).process
+      )
+      BackendLaunchResult.Docker(localDockerRunResult, localDockerRunResult.processWrapper.processOutputInfo.toBackendStatus())
     }
   }
-
-  return BackendStatusFromStdout(process)
 }
 
 internal interface BackendStatus {
   suspend fun waitForHealthy(): Boolean
 }
 
-private class BackendStatusFromStdout(private val process: Process) : BackendStatus {
-  override suspend fun waitForHealthy(): Boolean {
-    return withContext(Dispatchers.IO) {
-      // do not call `use` or `useLines` to prevent the process from stopping after closing its `stdout`
-      process.inputStream
-        .bufferedReader()
-        .lineSequence()
-        .forEach { line ->
-          if (line.contains("Join link:")) {
-            return@withContext true
-          }
-        }
-      false
+private fun ProcessOutputInfo.toBackendStatus(): BackendStatus =
+  when (this) {
+    is ProcessOutputInfo.Piped -> BackendStatusFromStdout(outputFlows)
+    ProcessOutputInfo.InheritedByParent -> {
+      throw NotImplementedError("We should look for the status in the parent's process standard output (if we stick to parsing stdout)")
+    }
+    is ProcessOutputInfo.RedirectedToFiles -> {
+      throw NotImplementedError("We should look for the status in the log: $stdoutLogPath")
     }
   }
+
+private class BackendStatusFromStdout(private val processOutputFlows: ProcessOutputFlows) : BackendStatus {
+  override suspend fun waitForHealthy(): Boolean =
+    withContext(Dispatchers.IO) {
+      // do not call `use` or `useLines` to prevent the process from stopping after closing its `stdout`
+      processOutputFlows.stdout.firstOrNull { it.contains("Join link:") } != null
+    }
 }
 
 private fun cwmHostNoLobby(bindToHost: String, projectPath: PathInLaunchEnvironment) =
