@@ -4,7 +4,7 @@ package org.jetbrains.kotlin.idea.k2.codeinsight.inspections
 import com.intellij.codeInspection.LocalQuickFix
 import com.intellij.psi.PsiElement
 import org.jetbrains.kotlin.analysis.api.KaSession
-import org.jetbrains.kotlin.analysis.api.annotations.KtAnnotated
+import org.jetbrains.kotlin.analysis.api.annotations.KaAnnotated
 import org.jetbrains.kotlin.analysis.api.annotations.hasAnnotation
 import org.jetbrains.kotlin.analysis.api.components.ShortenStrategy
 import org.jetbrains.kotlin.config.AnalysisFlags
@@ -49,7 +49,7 @@ internal class EnumValuesSoftDeprecateInspection : EnumValuesSoftDeprecateInspec
     context(KaSession)
     private fun isDeclarationAnnotatedWith(element: PsiElement, annotationClassId: ClassId): Boolean {
         if (element !is KtDeclaration) return false
-        return true == (element.symbol as? KtAnnotated)?.hasAnnotation(annotationClassId)
+        return true == (element.symbol as? KaAnnotated)?.hasAnnotation(annotationClassId)
     }
 
     /**
@@ -59,8 +59,8 @@ internal class EnumValuesSoftDeprecateInspection : EnumValuesSoftDeprecateInspec
     context(KaSession)
     private fun isElementAnnotatedWithOptIn(element: PsiElement, annotationClassId: ClassId): Boolean {
         return element is org.jetbrains.kotlin.psi.KtAnnotated && element.annotationEntries.any { entry ->
-            val ktType = entry.typeReference?.getKtType()
-            if (true == ktType?.isClassTypeWithClassId(OptInNames.OPT_IN_CLASS_ID)) {
+            val ktType = entry.typeReference?.type
+            if (true == ktType?.isClassType(OptInNames.OPT_IN_CLASS_ID)) {
                 entry.valueArguments.any { valueArgument ->
                     val expression = valueArgument.getArgumentExpression()
                     expression != null && isClassLiteralExpressionOfClass(expression, annotationClassId)
@@ -72,6 +72,6 @@ internal class EnumValuesSoftDeprecateInspection : EnumValuesSoftDeprecateInspec
     context(KaSession)
     private fun isClassLiteralExpressionOfClass(expression: KtExpression, classId: ClassId): Boolean {
         val receiverExpression = (expression as? KtClassLiteralExpression)?.receiverExpression as? KtNameReferenceExpression
-        return true == receiverExpression?.getKtType()?.isClassTypeWithClassId(classId)
+      return true == receiverExpression?.expressionType?.isClassType(classId)
     }
 }

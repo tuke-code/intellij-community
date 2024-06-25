@@ -1,38 +1,34 @@
 // Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.plugins.gitlab.mergerequest.ui.editor
 
+import com.intellij.collaboration.async.collectScoped
 import com.intellij.collaboration.async.launchNow
 import com.intellij.collaboration.ui.codereview.diff.DiscussionsViewOption
 import com.intellij.collaboration.ui.codereview.editor.CodeReviewEditorGutterChangesRenderer
 import com.intellij.collaboration.ui.codereview.editor.CodeReviewEditorGutterControlsRenderer
-import com.intellij.collaboration.ui.codereview.editor.action.CodeReviewInEditorToolbarActionGroup
+import com.intellij.collaboration.ui.codereview.editor.ReviewInEditorUtil
 import com.intellij.collaboration.ui.codereview.editor.renderInlays
+import com.intellij.collaboration.ui.icon.IconsProvider
 import com.intellij.collaboration.util.HashingUtil
 import com.intellij.collaboration.util.getOrNull
-import com.intellij.openapi.actionSystem.Constraints
-import com.intellij.openapi.actionSystem.DefaultActionGroup
-import com.intellij.openapi.actionSystem.Separator
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.intellij.openapi.components.serviceAsync
-import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.editor.EditorKind
 import com.intellij.openapi.editor.event.EditorFactoryEvent
 import com.intellij.openapi.editor.event.EditorFactoryListener
 import com.intellij.openapi.editor.ex.EditorEx
-import com.intellij.openapi.editor.ex.EditorMarkupModel
 import com.intellij.openapi.editor.ex.util.EditorUtil
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
 import com.intellij.util.cancelOnDispose
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
+import org.jetbrains.plugins.gitlab.api.dto.GitLabUserDTO
 import org.jetbrains.plugins.gitlab.mergerequest.GitLabMergeRequestsPreferences
 import org.jetbrains.plugins.gitlab.mergerequest.ui.toolwindow.model.GitLabToolWindowViewModel
 import org.jetbrains.plugins.gitlab.util.GitLabStatistics
-
-private val LOG = logger<GitLabMergeRequestEditorReviewController>()
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @Service(Service.Level.PROJECT)
@@ -59,26 +55,16 @@ internal class GitLabMergeRequestEditorReviewController(private val project: Pro
         .flatMapLatest {
           it?.currentMergeRequestReviewVm ?: flowOf(null)
         }.collectLatest { reviewVm ->
-          reviewVm?.getFileVm(file)?.collectLatest { fileVm ->
-            if (fileVm != null) {
-              val toolbarActionGroup = DefaultActionGroup(
-                CodeReviewInEditorToolbarActionGroup(reviewVm),
-                Separator.getInstance()
-              )
-              val editorMarkupModel = editor.markupModel as? EditorMarkupModel
-              if (editorMarkupModel == null) {
-                LOG.warn("Editor markup model is not available")
+          reviewVm?.getFileVm(file)?.collectScoped { fileVm ->
+            if (fileVm != null) supervisorScope {
+              launchNow {
+                ReviewInEditorUtil.showReviewToolbar(reviewVm, editor)
               }
-              editorMarkupModel?.addInspectionWidgetAction(toolbarActionGroup, Constraints.FIRST)
-              try {
-                val enabledFlow = reviewVm.discussionsViewOption.map { it != DiscussionsViewOption.DONT_SHOW }
-                val syncedFlow = reviewVm.localRepositorySyncStatus.map { it?.getOrNull()?.incoming != true }
-                combine(enabledFlow, syncedFlow) { enabled, synced -> enabled && synced }.distinctUntilChanged().collectLatest { enabled ->
-                  if (enabled) showReview(fileVm, editor)
-                }
-              }
-              finally {
-                editorMarkupModel?.removeInspectionWidgetAction(toolbarActionGroup)
+
+              val enabledFlow = reviewVm.discussionsViewOption.map { it != DiscussionsViewOption.DONT_SHOW }
+              val syncedFlow = reviewVm.localRepositorySyncStatus.map { it?.getOrNull()?.incoming != true }
+              combine(enabledFlow, syncedFlow) { enabled, synced -> enabled && synced }.distinctUntilChanged().collectLatest { enabled ->
+                if (enabled) showReview(fileVm, editor)
               }
             }
           }
@@ -89,38 +75,41 @@ internal class GitLabMergeRequestEditorReviewController(private val project: Pro
   private suspend fun showReview(fileVm: GitLabMergeRequestEditorReviewFileViewModel, editor: EditorEx): Nothing {
     withContext(Dispatchers.Main) {
       val preferences = project.serviceAsync<GitLabMergeRequestsPreferences>()
-      val model = GitLabMergeRequestEditorReviewUIModel(this, preferences, fileVm, editor.document)
-      try {
-        launchNow {
-          CodeReviewEditorGutterChangesRenderer.render(model, editor)
-        }
-        launchNow {
-          CodeReviewEditorGutterControlsRenderer.render(model, editor)
-        }
-        launchNow {
-          editor.renderInlays(model.inlays, HashingUtil.mappingStrategy(GitLabMergeRequestEditorMappedComponentModel::key)) { createRenderer(model, it) }
-        }
-        awaitCancellation()
+      val reviewHeadContent = fileVm.headContent.mapNotNull { it?.result?.getOrThrow() }.first()
+
+      val model = GitLabMergeRequestEditorReviewUIModel(this, preferences, fileVm)
+      launchNow {
+        ReviewInEditorUtil.trackDocumentDiffSync(reviewHeadContent, editor.document, model::setPostReviewChanges)
       }
-      finally {
-        withContext(NonCancellable) {
-          Disposer.dispose(model)
+
+      launchNow {
+        CodeReviewEditorGutterChangesRenderer.render(model, editor)
+      }
+      launchNow {
+        CodeReviewEditorGutterControlsRenderer.render(model, editor)
+      }
+      launchNow {
+        editor.renderInlays(model.inlays, HashingUtil.mappingStrategy(GitLabMergeRequestEditorMappedComponentModel::key)) {
+          createRenderer(it, fileVm.avatarIconsProvider)
         }
       }
+      awaitCancellation()
     }
   }
 
-  private fun CoroutineScope.createRenderer(model: GitLabMergeRequestEditorReviewUIModel,
-                                            inlayModel: GitLabMergeRequestEditorMappedComponentModel) =
+  private fun CoroutineScope.createRenderer(
+    inlayModel: GitLabMergeRequestEditorMappedComponentModel,
+    avatarIconsProvider: IconsProvider<GitLabUserDTO>,
+  ) =
     when (inlayModel) {
       is GitLabMergeRequestEditorMappedComponentModel.Discussion<*> ->
-        GitLabMergeRequestDiscussionInlayRenderer(this, project, inlayModel.vm, model.avatarIconsProvider,
+        GitLabMergeRequestDiscussionInlayRenderer(this, project, inlayModel.vm, avatarIconsProvider,
                                                   GitLabStatistics.MergeRequestNoteActionPlace.EDITOR)
       is GitLabMergeRequestEditorMappedComponentModel.DraftNote<*> ->
-        GitLabMergeRequestDraftNoteInlayRenderer(this, project, inlayModel.vm, model.avatarIconsProvider,
+        GitLabMergeRequestDraftNoteInlayRenderer(this, project, inlayModel.vm, avatarIconsProvider,
                                                  GitLabStatistics.MergeRequestNoteActionPlace.EDITOR)
       is GitLabMergeRequestEditorMappedComponentModel.NewDiscussion<*> ->
-        GitLabMergeRequestNewDiscussionInlayRenderer(this, project, inlayModel.vm, model.avatarIconsProvider,
+        GitLabMergeRequestNewDiscussionInlayRenderer(this, project, inlayModel.vm, avatarIconsProvider,
                                                      GitLabStatistics.MergeRequestNoteActionPlace.EDITOR, inlayModel::cancel)
 
     }

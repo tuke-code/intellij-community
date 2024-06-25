@@ -4,8 +4,7 @@ package org.jetbrains.plugins.gradle.service.project;
 import com.intellij.execution.CommandLineUtil;
 import com.intellij.externalSystem.JavaModuleData;
 import com.intellij.externalSystem.JavaProjectData;
-import com.intellij.openapi.application.ApplicationManager;
-import com.intellij.openapi.application.ReadAction;
+import com.intellij.openapi.application.WriteAction;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.externalSystem.model.DataNode;
 import com.intellij.openapi.externalSystem.model.ProjectKeys;
@@ -36,7 +35,6 @@ import com.intellij.pom.java.LanguageLevel;
 import com.intellij.util.Consumer;
 import com.intellij.util.Function;
 import com.intellij.util.ObjectUtils;
-import com.intellij.util.concurrency.annotations.RequiresReadLock;
 import com.intellij.util.containers.ContainerUtil;
 import com.intellij.util.execution.ParametersListUtil;
 import org.gradle.api.JavaVersion;
@@ -494,7 +492,7 @@ public final class JavaGradleProjectResolver extends AbstractProjectResolverExte
     if (gradleJvm == null) {
       return null;
     }
-    var sdk = ReadAction.compute(() -> findSdkInSdkTable(gradleJvm));
+    var sdk = findSdkInSdkTable(gradleJvm);
     if (sdk == null) {
       return null;
     }
@@ -517,17 +515,20 @@ public final class JavaGradleProjectResolver extends AbstractProjectResolverExte
   }
 
   private static @NotNull Sdk lookupJdkByPath(@NotNull String sdkHome) {
-    var sdkType = ExternalSystemJdkProvider.getInstance().getJavaSdkType();
+    var sdkProvider = ExternalSystemJdkProvider.getInstance();
+    var sdkType = sdkProvider.getJavaSdkType();
     var sdkName = sdkType.suggestSdkName(null, sdkHome);
-    var sdk = ReadAction.compute(() -> findSdkInSdkTable(sdkName, sdkHome));
+    var sdk = findSdkInSdkTable(sdkName, sdkHome);
     if (sdk != null) {
       return sdk;
     }
-    var effectiveSdk = ExternalSystemJdkProvider.getInstance().createJdk(sdkName, sdkHome);
-    ApplicationManager.getApplication().invokeAndWait(() -> {
-      SdkConfigurationUtil.addSdk(effectiveSdk);
+    return WriteAction.computeAndWait(() -> {
+      var projectJdkTable = ProjectJdkTable.getInstance();
+      var effectiveSdkName = SdkConfigurationUtil.createUniqueSdkName(sdkName, projectJdkTable.getSdksOfType(sdkType));
+      var effectiveSdk = sdkProvider.createJdk(effectiveSdkName, sdkHome);
+      projectJdkTable.addJdk(effectiveSdk);
+      return effectiveSdk;
     });
-    return effectiveSdk;
   }
 
   private @Nullable GradleProjectSettings getProjectSettings() {
@@ -540,12 +541,10 @@ public final class JavaGradleProjectResolver extends AbstractProjectResolverExte
     return null;
   }
 
-  @RequiresReadLock
   private static @Nullable Sdk findSdkInSdkTable(@NotNull String sdkName) {
     return ProjectJdkTable.getInstance().findJdk(sdkName);
   }
 
-  @RequiresReadLock
   private static @Nullable Sdk findSdkInSdkTable(@NotNull String sdkName, @NotNull String sdkHome) {
     var sdk = findSdkInSdkTable(sdkName);
     if (sdk == null) {

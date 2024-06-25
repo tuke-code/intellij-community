@@ -13,11 +13,11 @@ import com.intellij.util.PsiIconUtil
 import com.intellij.util.ui.StartupUiUtil
 import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
 import org.jetbrains.kotlin.analysis.api.analyze
-import org.jetbrains.kotlin.analysis.api.renderer.base.KtKeywordsRenderer
+import org.jetbrains.kotlin.analysis.api.renderer.base.KaKeywordsRenderer
 import org.jetbrains.kotlin.analysis.api.renderer.base.annotations.KaRendererAnnotationsFilter
 import org.jetbrains.kotlin.analysis.api.renderer.declarations.KaCallableReturnTypeFilter
 import org.jetbrains.kotlin.analysis.api.renderer.declarations.bodies.KaParameterDefaultValueRenderer
-import org.jetbrains.kotlin.analysis.api.renderer.declarations.impl.KtDeclarationRendererForSource
+import org.jetbrains.kotlin.analysis.api.renderer.declarations.impl.KaDeclarationRendererForSource
 import org.jetbrains.kotlin.analysis.api.renderer.declarations.modifiers.renderers.KaRendererKeywordFilter
 import org.jetbrains.kotlin.analysis.api.renderer.declarations.renderers.KaTypeParametersRenderer
 import org.jetbrains.kotlin.analysis.api.renderer.declarations.renderers.callables.KaConstructorSymbolRenderer
@@ -26,7 +26,7 @@ import org.jetbrains.kotlin.analysis.api.renderer.declarations.renderers.classif
 import org.jetbrains.kotlin.analysis.api.renderer.declarations.superTypes.KaSuperTypesFilter
 import org.jetbrains.kotlin.analysis.api.symbols.KaCallableSymbol
 import org.jetbrains.kotlin.analysis.api.symbols.KaDeclarationSymbol
-import org.jetbrains.kotlin.analysis.api.symbols.KtSymbolOrigin
+import org.jetbrains.kotlin.analysis.api.symbols.KaSymbolOrigin
 import org.jetbrains.kotlin.analysis.api.symbols.markers.KaNamedSymbol
 import org.jetbrains.kotlin.analysis.api.symbols.pointers.KaSymbolPointer
 import org.jetbrains.kotlin.idea.base.codeInsight.KotlinIconProvider.getIconFor
@@ -45,7 +45,7 @@ internal class KotlinFirStructureElementPresentation(
 ) : ColoredItemPresentation, LocationPresentation {
     companion object {
         @KaExperimentalApi
-        private val renderer = KtDeclarationRendererForSource.WITH_SHORT_NAMES.with {
+        private val renderer = KaDeclarationRendererForSource.WITH_SHORT_NAMES.with {
             annotationRenderer = annotationRenderer.with {
                 annotationFilter = KaRendererAnnotationsFilter.NONE
             }
@@ -56,7 +56,7 @@ internal class KotlinFirStructureElementPresentation(
 
             superTypesFilter = KaSuperTypesFilter.NONE
             typeParametersRenderer = KaTypeParametersRenderer.NO_TYPE_PARAMETERS
-            keywordsRenderer = KtKeywordsRenderer.AS_WORD.with {
+            keywordsRenderer = KaKeywordsRenderer.AS_WORD.with {
                 keywordFilter = KaRendererKeywordFilter.onlyWith(
                     KtTokens.CONSTRUCTOR_KEYWORD,
                     KtTokens.OBJECT_KEYWORD,
@@ -167,7 +167,7 @@ internal class KotlinFirStructureElementPresentation(
 
         analyze(ktElement) {
             val symbol = pointer.restoreSymbol()
-            if (symbol is KaCallableSymbol && symbol.origin == KtSymbolOrigin.SUBSTITUTION_OVERRIDE) {
+            if (symbol is KaCallableSymbol && symbol.origin == KaSymbolOrigin.SUBSTITUTION_OVERRIDE) {
                 val containerPsi = symbol.psi?.parent
                 if (containerPsi is PsiNamedElement) {
                     containerPsi.name?.let { 

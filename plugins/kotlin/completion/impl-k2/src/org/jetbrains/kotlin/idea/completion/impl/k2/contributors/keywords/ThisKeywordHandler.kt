@@ -7,11 +7,8 @@ import com.intellij.codeInsight.lookup.LookupElement
 import com.intellij.openapi.project.Project
 import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
 import org.jetbrains.kotlin.analysis.api.KaSession
-import org.jetbrains.kotlin.analysis.api.components.KtImplicitReceiver
-import org.jetbrains.kotlin.analysis.api.symbols.KaAnonymousFunctionSymbol
-import org.jetbrains.kotlin.analysis.api.symbols.KaClassKind
-import org.jetbrains.kotlin.analysis.api.symbols.KaClassOrObjectSymbol
-import org.jetbrains.kotlin.analysis.api.symbols.KtSymbol
+import org.jetbrains.kotlin.analysis.api.components.KaImplicitReceiver
+import org.jetbrains.kotlin.analysis.api.symbols.*
 import org.jetbrains.kotlin.analysis.api.symbols.markers.KaNamedSymbol
 import org.jetbrains.kotlin.idea.completion.KeywordLookupObject
 import org.jetbrains.kotlin.idea.completion.context.FirBasicCompletionContext
@@ -43,7 +40,7 @@ internal class ThisKeywordHandler(
         }
 
         val result = mutableListOf<LookupElement>()
-        val receivers = basicContext.originalKtFile.getScopeContextForPosition(expression).implicitReceivers
+        val receivers = basicContext.originalKtFile.scopeContext(expression).implicitReceivers
 
         receivers.forEachIndexed { index, receiver ->
             if (!canReferenceSymbolByThis(parameters, receiver.ownerSymbol)) {
@@ -61,8 +58,8 @@ internal class ThisKeywordHandler(
     }
 
     context(KaSession)
-    private fun canReferenceSymbolByThis(parameters: CompletionParameters, symbol: KtSymbol): Boolean {
-        if (symbol !is KaClassOrObjectSymbol) return true
+    private fun canReferenceSymbolByThis(parameters: CompletionParameters, symbol: KaSymbol): Boolean {
+        if (symbol !is KaClassSymbol) return true
         if (symbol.classKind != KaClassKind.COMPANION_OBJECT) return true
         val companionPsi = symbol.psi as KtClassOrObject
         return parameters.offset in companionPsi.textRange
@@ -70,13 +67,13 @@ internal class ThisKeywordHandler(
 
     context(KaSession)
     @OptIn(KaExperimentalApi::class)
-    private fun createThisLookupElement(receiver: KtImplicitReceiver, labelName: Name?): LookupElement {
+    private fun createThisLookupElement(receiver: KaImplicitReceiver, labelName: Name?): LookupElement {
         return createKeywordElement(KtTokens.THIS_KEYWORD.value, labelName.labelNameToTail(), lookupObject = KeywordLookupObject())
             .withTypeText(receiver.type.render(CompletionShortNamesRenderer.rendererVerbose, position = Variance.INVARIANT))
     }
 
     context(KaSession)
-    private fun getThisLabelBySymbol(symbol: KtSymbol): Name? = when {
+    private fun getThisLabelBySymbol(symbol: KaSymbol): Name? = when {
         symbol is KaNamedSymbol && !symbol.name.isSpecial -> symbol.name
         symbol is KaAnonymousFunctionSymbol -> {
             val psi = symbol.psi as KtFunctionLiteral

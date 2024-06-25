@@ -17,10 +17,10 @@ internal object ReplacePrimitiveCastWithNumberConversionFixFactory {
         KotlinQuickFixFactory.ModCommandBased { diagnostic: KaFirDiagnostic.CastNeverSucceeds ->
             val binaryExpression = diagnostic.psi
 
-            val expressionType = binaryExpression.left.getKaType() ?: return@ModCommandBased emptyList()
+            val expressionType = binaryExpression.left.expressionType ?: return@ModCommandBased emptyList()
             if (!expressionType.isPrimitiveNumberType()) return@ModCommandBased emptyList()
 
-            val castType = binaryExpression.right?.getKaType() ?: return@ModCommandBased emptyList()
+            val castType = binaryExpression.right?.type ?: return@ModCommandBased emptyList()
             if (!castType.isPrimitiveNumberType()) return@ModCommandBased emptyList()
 
             listOf(

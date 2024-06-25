@@ -1,6 +1,7 @@
 // Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.kotlin.idea.codeinsight.utils
 
+import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
 import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.analyze
 import org.jetbrains.kotlin.analysis.api.symbols.*
@@ -46,10 +47,10 @@ fun KtModifierKeywordToken.toVisibility(): Visibility = when (this) {
 context(KaSession)
 private fun explicitVisibilityRequired(symbol: KaSymbolWithVisibility): Boolean {
     if ((symbol as? KaConstructorSymbol)?.isPrimary == true) return false // 1
-    if (symbol is KtPropertySymbol && (symbol.containingSymbol as? KaNamedClassOrObjectSymbol)?.isData == true) return false // 2
+    if (symbol is KaPropertySymbol && (symbol.containingSymbol as? KaNamedClassOrObjectSymbol)?.isData == true) return false // 2
     if ((symbol as? KaCallableSymbol)?.allOverriddenSymbols?.any() == true) return false // 3
     if (symbol is KaPropertyAccessorSymbol) return false // 4
-    if (symbol is KtPropertySymbol && (symbol.containingSymbol as? KaClassOrObjectSymbol)?.classKind == KaClassKind.ANNOTATION_CLASS) return false // 5
+    if (symbol is KaPropertySymbol && (symbol.containingSymbol as? KaClassSymbol)?.classKind == KaClassKind.ANNOTATION_CLASS) return false // 5
     return true
 }
 
@@ -68,15 +69,16 @@ fun KtModifierListOwner.setVisibility(visibilityModifier: KtModifierKeywordToken
     addModifier(visibilityModifier)
 }
 
+@OptIn(KaExperimentalApi::class)
 fun KtDeclaration.implicitVisibility(): KtModifierKeywordToken? {
     return when {
         this is KtPropertyAccessor && isSetter && property.hasModifier(KtTokens.OVERRIDE_KEYWORD) -> {
             analyze(property) {
                 property
-                    .getSymbolOfType<KtPropertySymbol>()
+                    .getSymbolOfType<KaPropertySymbol>()
                     .allOverriddenSymbols
                     .forEach { overriddenSymbol ->
-                        val visibility = (overriddenSymbol as? KtPropertySymbol)?.setter?.visibility?.toKeywordToken()
+                        val visibility = (overriddenSymbol as? KaPropertySymbol)?.setter?.compilerVisibility?.toKeywordToken()
                         if (visibility != null) return visibility
                     }
             }
@@ -101,7 +103,7 @@ fun KtDeclaration.implicitVisibility(): KtModifierKeywordToken? {
             analyze(this) {
                 getSymbolOfType<KaCallableSymbol>()
                     .allOverriddenSymbols
-                    .mapNotNull { (it as? KaSymbolWithVisibility)?.visibility }
+                    .mapNotNull { (it as? KaSymbolWithVisibility)?.compilerVisibility }
                     .maxWithOrNull { v1, v2 -> Visibilities.compare(v1, v2) ?: -1 }
                     ?.toKeywordToken()
             }

@@ -12,16 +12,12 @@ import org.jetbrains.kotlin.analysis.api.resolution.KaImplicitReceiverValue
 import org.jetbrains.kotlin.analysis.api.resolution.singleCallOrNull
 import org.jetbrains.kotlin.analysis.api.resolution.singleFunctionCallOrNull
 import org.jetbrains.kotlin.analysis.api.resolution.symbol
-import org.jetbrains.kotlin.analysis.api.symbols.KaAnonymousObjectSymbol
-import org.jetbrains.kotlin.analysis.api.symbols.KaClassOrObjectSymbol
-import org.jetbrains.kotlin.analysis.api.symbols.KaClassifierSymbol
-import org.jetbrains.kotlin.analysis.api.symbols.KaNamedFunctionSymbol
-import org.jetbrains.kotlin.analysis.api.symbols.KaReceiverParameterSymbol
-import org.jetbrains.kotlin.analysis.api.types.KtErrorType
-import org.jetbrains.kotlin.analysis.api.types.KtFunctionalType
-import org.jetbrains.kotlin.analysis.api.types.KtNonErrorClassType
-import org.jetbrains.kotlin.analysis.api.types.KtType
-import org.jetbrains.kotlin.analysis.api.types.KtTypeNullability
+import org.jetbrains.kotlin.analysis.api.symbols.*
+import org.jetbrains.kotlin.analysis.api.types.KaErrorType
+import org.jetbrains.kotlin.analysis.api.types.KaFunctionType
+import org.jetbrains.kotlin.analysis.api.types.KaClassType
+import org.jetbrains.kotlin.analysis.api.types.KaType
+import org.jetbrains.kotlin.analysis.api.types.KaTypeNullability
 import org.jetbrains.kotlin.idea.base.codeInsight.KotlinDeclarationNameValidator
 import org.jetbrains.kotlin.idea.base.codeInsight.KotlinNameSuggester
 import org.jetbrains.kotlin.idea.base.codeInsight.KotlinNameSuggestionProvider
@@ -54,9 +50,9 @@ class CodeInliner(
     private val call: KtElement,
     private val inlineSetter: Boolean,
     codeToInline: CodeToInline
-) : AbstractCodeInliner<KtElement, KtParameter, KtType, KtDeclaration>(call, codeToInline) {
+) : AbstractCodeInliner<KtElement, KtParameter, KaType, KtDeclaration>(call, codeToInline) {
     private val mapping: Map<KtExpression, Name>? = analyze(call) {
-        call.resolveCallOld()?.singleFunctionCallOrNull()?.argumentMapping?.mapValues { e -> e.value.name }
+        call.resolveToCall()?.singleFunctionCallOrNull()?.argumentMapping?.mapValues { e -> e.value.name }
     }
 
     @OptIn(KaExperimentalApi::class)
@@ -74,7 +70,7 @@ class CodeInliner(
             (call.parent as? KtCallableReferenceExpression
                 ?: PsiTreeUtil.getParentOfType(call, KtSuperTypeCallEntry::class.java)
                 ?: call)
-                .resolveCallOld()?.singleCallOrNull<KaCallableMemberCall<*, *>>()?.partiallyAppliedSymbol?.symbol?.psi as? KtDeclaration
+                .resolveToCall()?.singleCallOrNull<KaCallableMemberCall<*, *>>()?.partiallyAppliedSymbol?.symbol?.psi as? KtDeclaration
         } ?: return null
         val callableForParameters = (if (assignment != null && originalDeclaration is KtProperty)
             originalDeclaration.setter?.takeIf { inlineSetter && it.hasBody() } ?: originalDeclaration
@@ -120,20 +116,20 @@ class CodeInliner(
         var receiverType =
             receiver?.let {
                 analyze(it) {
-                    val type = it.getKtType()
-                    type to (type?.nullability == KtTypeNullability.NULLABLE)
+                    val type = it.expressionType
+                    type to (type?.nullability == KaTypeNullability.NULLABLE)
                 }
             }
 
         if (receiver == null) {
             analyze(call) {
                 val partiallyAppliedSymbol =
-                    call.resolveCallOld()?.singleCallOrNull<KaCallableMemberCall<*, *>>()?.partiallyAppliedSymbol
+                    call.resolveToCall()?.singleCallOrNull<KaCallableMemberCall<*, *>>()?.partiallyAppliedSymbol
                 val receiverValue = partiallyAppliedSymbol?.extensionReceiver ?: partiallyAppliedSymbol?.dispatchReceiver
                 if (receiverValue is KaImplicitReceiverValue) {
                     val symbol = receiverValue.symbol
                     val thisText = when {
-                        symbol is KaClassOrObjectSymbol && symbol.classKind.isObject && symbol.name != null -> symbol.name!!.asString()
+                        symbol is KaClassSymbol && symbol.classKind.isObject && symbol.name != null -> symbol.name!!.asString()
                         symbol is KaClassifierSymbol && symbol !is KaAnonymousObjectSymbol -> "this@" + symbol.name!!.asString()
                         symbol is KaReceiverParameterSymbol -> {
                             symbol.owningCallableSymbol.callableId?.callableName?.asString()?.let { "this@$it" } ?: "this"
@@ -142,7 +138,7 @@ class CodeInliner(
                     }
                     receiver = psiFactory.createExpression(thisText)
                     val type = receiverValue.type
-                    receiverType = type to (type.nullability == KtTypeNullability.NULLABLE)
+                    receiverType = type to (type.nullability == KaTypeNullability.NULLABLE)
                 }
             }
         }
@@ -165,7 +161,7 @@ class CodeInliner(
             namer = { it.nameAsSafeName },
             typeRetriever = {
                 analyze(callableForParameters) {
-                    call.resolveCallOld()?.singleFunctionCallOrNull()?.typeArgumentsMapping?.get(it.symbol)
+                    call.resolveToCall()?.singleFunctionCallOrNull()?.typeArgumentsMapping?.get(it.symbol)
                 }
             },
             renderType = {
@@ -180,7 +176,7 @@ class CodeInliner(
             },
             renderClassifier = {
                 analyze(call) {
-                    (it as? KtNonErrorClassType)?.classId?.asSingleFqName()?.asString()
+                    (it as? KaClassType)?.classId?.asSingleFqName()?.asString()
                 }
             }
         )
@@ -280,7 +276,7 @@ class CodeInliner(
 
     context(KaSession)
     @OptIn(KaExperimentalApi::class)
-    private fun arrayOfFunctionName(elementType: KtType): String {
+    private fun arrayOfFunctionName(elementType: KaType): String {
         return when {
             elementType.isInt -> "kotlin.intArrayOf"
             elementType.isLong -> "kotlin.longArrayOf"
@@ -290,7 +286,7 @@ class CodeInliner(
             elementType.isByte -> "kotlin.byteArrayOf"
             elementType.isDouble -> "kotlin.doubleArrayOf"
             elementType.isFloat -> "kotlin.floatArrayOf"
-            elementType is KtErrorType -> "kotlin.arrayOf"
+            elementType is KaErrorType -> "kotlin.arrayOf"
             else -> "kotlin.arrayOf<" + elementType.render(position = Variance.INVARIANT) + ">"
         }
     }
@@ -304,7 +300,7 @@ class CodeInliner(
                 ?.getQualifiedExpressionForSelectorOrThis()
                 ?.getAssignmentByLHS()
                 ?.right ?: return null
-            return Argument(expr, analyze(call) { expr.getKtType() })
+            return Argument(expr, analyze(call) { expr.expressionType })
         }
 
         val expressions = mapping?.entries?.filter { (_, value) ->
@@ -317,9 +313,9 @@ class CodeInliner(
                 if (single?.getSpreadElement() != null) {
                     val expression = expressions.first()
                     expression.putCopyableUserData(USER_CODE_KEY, Unit)
-                    return Argument(expression, expression.getKtType(), isNamed = single.isNamed())
+                    return Argument(expression, expression.expressionType, isNamed = single.isNamed())
                 }
-                val parameterType = parameter.getReturnKtType()
+                val parameterType = parameter.returnType
                 val elementType = parameterType.arrayElementType ?: return null
                 val expression = psiFactory.buildExpression {
                     appendFixedText(arrayOfFunctionName(elementType))
@@ -336,7 +332,7 @@ class CodeInliner(
                     }
                     appendFixedText(")")
                 }
-                Argument(expression, expression.getKtType())
+                Argument(expression, expression.expressionType)
             }
         } else {
             val expression = expressions.firstOrNull() ?: parameter.defaultValue ?: return null
@@ -349,7 +345,7 @@ class CodeInliner(
                 }
 
                 analyze(call) {
-                    if ((expression.getKtType() as? KtFunctionalType)?.hasReceiver == true) {
+                    if ((expression.expressionType as? KaFunctionType)?.hasReceiver == true) {
                         //expand to function only for types with an extension
                         LambdaToAnonymousFunctionUtil.prepareFunctionText(expression)
                     } else {
@@ -370,7 +366,7 @@ class CodeInliner(
                 }
             }
 
-            return Argument(resultExpression, analyze(call) { resultExpression.getKtType() }, isNamed = isNamed, expressions.isEmpty())
+            return Argument(resultExpression, analyze(call) { resultExpression.expressionType }, isNamed = isNamed, expressions.isEmpty())
         }
     }
 
@@ -380,7 +376,7 @@ class CodeInliner(
 
     override fun introduceValue(
         value: KtExpression,
-        valueType: KtType?,
+        valueType: KaType?,
         usages: Collection<KtExpression>,
         expressionToBeReplaced: KtExpression,
         nameSuggestion: String?,

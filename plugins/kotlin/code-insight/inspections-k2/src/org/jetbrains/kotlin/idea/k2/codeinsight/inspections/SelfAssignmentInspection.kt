@@ -8,9 +8,9 @@ import com.intellij.openapi.project.Project
 import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.resolution.singleVariableAccessCall
 import org.jetbrains.kotlin.analysis.api.resolution.symbol
-import org.jetbrains.kotlin.analysis.api.symbols.KaClassOrObjectSymbol
-import org.jetbrains.kotlin.analysis.api.symbols.KtSymbol
-import org.jetbrains.kotlin.analysis.api.symbols.KtVariableLikeSymbol
+import org.jetbrains.kotlin.analysis.api.symbols.KaClassSymbol
+import org.jetbrains.kotlin.analysis.api.symbols.KaSymbol
+import org.jetbrains.kotlin.analysis.api.symbols.KaVariableSymbol
 import org.jetbrains.kotlin.idea.base.resources.KotlinBundle
 import org.jetbrains.kotlin.idea.codeinsight.api.applicable.inspections.KotlinApplicableInspectionBase
 import org.jetbrains.kotlin.idea.codeinsight.api.applicable.inspections.KotlinModCommandQuickFix
@@ -58,9 +58,9 @@ internal class SelfAssignmentInspection : KotlinApplicableInspectionBase.Simple<
         val left = element.left
         val right = element.right
 
-        val leftResolvedCall = left?.resolveCallOld()?.singleVariableAccessCall()
+        val leftResolvedCall = left?.resolveToCall()?.singleVariableAccessCall()
         val leftCallee = leftResolvedCall?.symbol ?: return null
-        val rightResolvedCall = right?.resolveCallOld()?.singleVariableAccessCall()
+        val rightResolvedCall = right?.resolveToCall()?.singleVariableAccessCall()
         val rightCallee = rightResolvedCall?.symbol ?: return null
 
         if (leftCallee != rightCallee) return null
@@ -94,13 +94,13 @@ internal class SelfAssignmentInspection : KotlinApplicableInspectionBase.Simple<
 
     context(KaSession)
     private fun KtExpression.receiver(
-        callSymbol: KtVariableLikeSymbol,
-    ): KtSymbol? {
+      callSymbol: KaVariableSymbol,
+    ): KaSymbol? {
         when (val receiverExpression = (this as? KtDotQualifiedExpression)?.receiverExpression) {
             is KtThisExpression -> return receiverExpression.instanceReference.mainReference.resolveToSymbol()
             is KtNameReferenceExpression -> return receiverExpression.mainReference.resolveToSymbol()
         }
 
-        return callSymbol.containingSymbol as? KaClassOrObjectSymbol
+        return callSymbol.containingSymbol as? KaClassSymbol
     }
 }

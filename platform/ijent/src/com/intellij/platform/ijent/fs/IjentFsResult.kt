@@ -8,8 +8,8 @@ import java.io.IOException
 /**
  * [T] should not be `Unit`, throw a subclass of [IjentFsIOException] in such cases instead.
  */
-sealed interface IjentFsResult<T, E : IjentFsError> {
-  interface Ok<T, E : IjentFsError> : IjentFsResult<T, E> {
+sealed interface IjentFsResult<out T, E : IjentFsError> {
+  interface Ok<out T, E : IjentFsError> : IjentFsResult<T, E> {
     val value: T
   }
 
@@ -31,9 +31,12 @@ sealed interface IjentFsError {
   sealed interface Other : IjentFsError
 
   sealed interface DoesNotExist : IjentFsError
+  sealed interface AlreadyExists : IjentFsError
+  sealed interface AlreadyDeleted : IjentFsError
   sealed interface PermissionDenied : IjentFsError
   sealed interface NotDirectory : IjentFsError
   sealed interface NotFile : IjentFsError
+  sealed interface FileNotOpened: IjentFsError
 }
 
 /**
@@ -50,7 +53,10 @@ sealed class IjentFsIOException(
       is IjentFsError.NotDirectory -> "Not a directory"
       is IjentFsError.NotFile -> "Not a file"
       is IjentFsError.PermissionDenied -> "Permission denied"
+      is IjentFsError.AlreadyDeleted -> "Already deleted"
+      is IjentFsError.AlreadyExists -> "File with this name already exists"
       is IjentFsError.Other -> "Unexpected rare error"
+      is IjentFileSystemApi.DeleteException.DirNotEmpty -> "Directory is not empty"
     }
     return if (additionalMessage.isEmpty()) "$prefix: $where" else "$prefix: $where ($additionalMessage)"
   }

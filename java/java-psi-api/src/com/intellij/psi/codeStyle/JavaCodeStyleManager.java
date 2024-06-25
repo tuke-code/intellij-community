@@ -6,12 +6,14 @@ import com.intellij.psi.*;
 import com.intellij.util.IncorrectOperationException;
 import com.intellij.util.containers.ContainerUtil;
 import org.intellij.lang.annotations.MagicConstant;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NonNls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Set;
 import java.util.function.Predicate;
 
 public abstract class JavaCodeStyleManager {
@@ -172,6 +174,22 @@ public abstract class JavaCodeStyleManager {
   public abstract String suggestUniqueVariableName(@NonNls @NotNull String baseName, PsiElement place, boolean lookForward);
 
   /**
+   * Please, use {@link com.siyeh.ig.psiutils.VariableNameGenerator#skipNames(Collection)} instead of the direct call of this method
+   * Suggests a unique name for the variable used at the specified location. The returned name is guaranteed to not shadow
+   * the existing name.
+   *
+   * @param baseName    the base name for the variable.
+   * @param place       the location where the variable will be used.
+   * @param lookForward if true, the existing variables are searched in both directions; if false - only backward
+   * @param skipNames   the names which will not be used.
+   * @return the generated unique name,
+   */
+  @ApiStatus.Internal
+  @NotNull
+  public abstract String suggestUniqueVariableName(@NonNls @NotNull String baseName, PsiElement place, boolean lookForward,
+                                                   @NotNull Set<@NotNull String> skipNames);
+
+  /**
    * Suggests a unique names for the variable used at the specified location. The resulting name info may contain names which
    * shadow existing names.
    *
@@ -198,24 +216,6 @@ public abstract class JavaCodeStyleManager {
    */
   @NotNull
   public abstract String suggestUniqueVariableName(@NotNull String baseName, PsiElement place, Predicate<? super PsiVariable> canBeReused);
-
-  /**
-   * Suggests a unique name for the variable used at the specified location looking forward with possible filtering.
-   *
-   * @param baseName            the base name info for the variable.
-   * @param place               the location where the variable will be used.
-   * @param lookForward  if true, the existing variables are searched in both directions; if false - only backward
-   * @param canBeReused         a predicate which returns true for variables which names still could be reused (e.g. a variable will be deleted
-   *                            during the ongoing refactoring)
-   * @param additionalValidator additional validator, which the generated name should pass
-   * @return the generated unique name
-   */
-  @NotNull
-  public abstract String suggestUniqueVariableName(@NotNull String baseName,
-                                                   PsiElement place,
-                                                   boolean lookForward,
-                                                   Predicate<? super PsiVariable> canBeReused,
-                                                   @Nullable Predicate<String> additionalValidator);
 
   /**
    * Suggests a unique name for the variable used at the specified location.

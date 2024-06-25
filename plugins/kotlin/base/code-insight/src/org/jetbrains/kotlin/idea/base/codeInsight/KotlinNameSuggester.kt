@@ -165,7 +165,7 @@ class KotlinNameSuggester(
      */
     context(KaSession)
     private fun suggestNamesByType(expression: KtExpression, validator: (String) -> Boolean): Sequence<String> {
-        val type = expression.getKtType() ?: return emptySequence()
+        val type = expression.expressionType ?: return emptySequence()
         return suggestTypeNames(type).map { name -> suggestNameByName(name, validator) }
     }
 
@@ -182,7 +182,7 @@ class KotlinNameSuggester(
         val argumentExpression = expression.getOutermostParenthesizerOrThis()
         val valueArgument = argumentExpression.parent as? KtValueArgument ?: return emptySequence()
         val callElement = getCallElement(valueArgument) ?: return emptySequence()
-        val resolvedCall = callElement.resolveCallOld()?.singleFunctionCallOrNull() ?: return emptySequence()
+        val resolvedCall = callElement.resolveToCall()?.singleFunctionCallOrNull() ?: return emptySequence()
         val parameter = resolvedCall.argumentMapping[valueArgument.getArgumentExpression()]?.symbol ?: return emptySequence()
         return suggestNameByValidIdentifierName(parameter.name.asString(), validator)?.let { sequenceOf(it) } ?: emptySequence()
     }
@@ -195,7 +195,7 @@ class KotlinNameSuggester(
      *  - `List<User>` -> {users}
      */
     context(KaSession)
-    fun suggestTypeNames(type: KtType): Sequence<String> {
+    fun suggestTypeNames(type: KaType): Sequence<String> {
         return sequence {
             val presentableType = getPresentableType(type)
 
@@ -225,14 +225,14 @@ class KotlinNameSuggester(
                 return@sequence
             }
 
-            fun getClassId(type: KtType): ClassId = when (type) {
-                is KtNonErrorClassType -> type.classId
-                is KtTypeParameterType -> ClassId(FqName.ROOT, FqName.topLevel(type.name), false)
+            fun getClassId(type: KaType): ClassId = when (type) {
+                is KaClassType -> type.classId
+                is KaTypeParameterType -> ClassId(FqName.ROOT, FqName.topLevel(type.name), false)
 
                 else -> ClassId(FqName.ROOT, FqName.topLevel(Name.identifier("Value")), false)
             }
 
-            suspend fun SequenceScope<String>.registerClassNames(type: KtType, preprocessor: (String) -> String = { it }) {
+            suspend fun SequenceScope<String>.registerClassNames(type: KaType, preprocessor: (String) -> String = { it }) {
                 val classId = getClassId(type)
 
                 KotlinNameSuggester(case, EscapingRules.NONE, ignoreCompanionNames)
@@ -274,7 +274,7 @@ class KotlinNameSuggester(
 
     context(KaSession)
     @OptIn(KaExperimentalApi::class)
-    private fun getPresentableType(type: KtType): KtType = type.approximateToSuperPublicDenotableOrSelf(approximateLocalTypes = true)
+    private fun getPresentableType(type: KaType): KaType = type.approximateToSuperPublicDenotableOrSelf(approximateLocalTypes = true)
 
     /**
      * Suggests type alias name for a given type element.
@@ -302,7 +302,7 @@ class KotlinNameSuggester(
                     type.parameters.forEach { process(it.typeReference?.typeElement) }
                     val returnType = type.returnTypeReference
                     if (returnType != null) {
-                        if (returnType.getKtType().isBoolean) {
+                        if (returnType.type.isBoolean) {
                             add("predicate")
                         } else {
                             add("to")
@@ -571,7 +571,7 @@ class KotlinNameSuggester(
 }
 
 context(KaSession)
-private fun getPrimitiveType(type: KtType): PrimitiveType? {
+private fun getPrimitiveType(type: KaType): PrimitiveType? {
     return when {
         type.isBoolean -> PrimitiveType.BOOLEAN
         type.isChar -> PrimitiveType.CHAR
@@ -590,15 +590,15 @@ private val ITERABLE_LIKE_CLASS_IDS =
         .map { ClassId.topLevel(it) }
 
 context(KaSession)
-private fun getIterableElementType(type: KtType): KtType? {
-    if (type is KtNonErrorClassType && type.classId in ITERABLE_LIKE_CLASS_IDS) {
-        return type.ownTypeArguments.singleOrNull()?.type
+private fun getIterableElementType(type: KaType): KaType? {
+    if (type is KaClassType && type.classId in ITERABLE_LIKE_CLASS_IDS) {
+        return type.typeArguments.singleOrNull()?.type
     }
 
     for (supertype in type.getAllSuperTypes()) {
-        if (supertype is KtNonErrorClassType) {
+        if (supertype is KaClassType) {
             if (supertype.classId in ITERABLE_LIKE_CLASS_IDS) {
-                return supertype.ownTypeArguments.singleOrNull()?.type
+                return supertype.typeArguments.singleOrNull()?.type
             }
         }
     }

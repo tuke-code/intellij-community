@@ -7,12 +7,11 @@ import com.intellij.util.containers.addIfNotNull
 import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
 import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.analyze
-import org.jetbrains.kotlin.analysis.api.annotations.KtAnnotationApplicationWithArgumentsInfo
-import org.jetbrains.kotlin.analysis.api.annotations.KtKClassAnnotationValue
-import org.jetbrains.kotlin.analysis.api.annotations.annotationsByClassId
+import org.jetbrains.kotlin.analysis.api.annotations.KaAnnotation
+import org.jetbrains.kotlin.analysis.api.annotations.KaAnnotationValue
 import org.jetbrains.kotlin.analysis.api.fir.diagnostics.KaFirDiagnostic
 import org.jetbrains.kotlin.analysis.api.fir.utils.getActualAnnotationTargets
-import org.jetbrains.kotlin.analysis.api.types.KtNonErrorClassType
+import org.jetbrains.kotlin.analysis.api.types.KaClassType
 import org.jetbrains.kotlin.idea.base.psi.KotlinPsiHeuristics
 import org.jetbrains.kotlin.idea.codeinsight.api.applicators.fixes.KotlinQuickFixFactory
 import org.jetbrains.kotlin.idea.quickfix.AddAnnotationFix
@@ -100,17 +99,17 @@ private object OptInGeneralUtils : OptInGeneralUtilsBase() {
         analyze(this) {
             return superTypeListEntries.any {
                 val typeReference = it.typeReference
-                val resolvedClass = typeReference?.getKtType()?.expandedSymbol ?: return false
-                val classAnnotation = resolvedClass.annotationsByClassId(OptInNames.SUBCLASS_OPT_IN_REQUIRED_CLASS_ID).firstOrNull()
+                val resolvedClass = typeReference?.type?.expandedSymbol ?: return false
+                val classAnnotation = resolvedClass.annotations[OptInNames.SUBCLASS_OPT_IN_REQUIRED_CLASS_ID].firstOrNull()
                 classAnnotation != null && findMarkerClassId(classAnnotation)?.asSingleFqName() == annotationFqName
             }
         }
     }
 
-    private fun findMarkerClassId(annotation: KtAnnotationApplicationWithArgumentsInfo): ClassId? {
+    private fun findMarkerClassId(annotation: KaAnnotation): ClassId? {
         val argument = annotation.arguments.find { arg -> arg.name == OptInNames.OPT_IN_ANNOTATION_CLASS } ?: return null
-        val value = argument.expression as? KtKClassAnnotationValue ?: return null
-        val type = value.type as? KtNonErrorClassType ?: return null
+        val value = argument.expression as? KaAnnotationValue.ClassLiteralValue ?: return null
+        val type = value.type as? KaClassType ?: return null
         return type.classId.takeUnless { it.isLocal }
     }
 }

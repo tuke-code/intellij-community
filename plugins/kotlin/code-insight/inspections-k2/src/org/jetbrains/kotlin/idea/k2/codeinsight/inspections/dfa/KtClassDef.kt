@@ -12,13 +12,13 @@ import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.analyze
 import org.jetbrains.kotlin.analysis.api.projectStructure.KaModule
 import org.jetbrains.kotlin.analysis.api.symbols.KaClassKind
-import org.jetbrains.kotlin.analysis.api.symbols.KaClassOrObjectSymbol
+import org.jetbrains.kotlin.analysis.api.symbols.KaClassSymbol
+import org.jetbrains.kotlin.analysis.api.symbols.KaSymbolModality
 import org.jetbrains.kotlin.analysis.api.symbols.markers.KaSymbolWithModality
 import org.jetbrains.kotlin.analysis.api.symbols.pointers.KaSymbolPointer
-import org.jetbrains.kotlin.analysis.api.types.KtNonErrorClassType
+import org.jetbrains.kotlin.analysis.api.types.KaClassType
 import org.jetbrains.kotlin.asJava.toLightClass
 import org.jetbrains.kotlin.builtins.jvm.JavaToKotlinClassMap
-import org.jetbrains.kotlin.descriptors.Modality
 import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.name.FqNameUnsafe
@@ -29,15 +29,15 @@ import java.util.stream.Stream
 class KtClassDef(
     private val module: KaModule,
     private val hash: Int,
-    private val cls: KaSymbolPointer<KaClassOrObjectSymbol>,
+    private val cls: KaSymbolPointer<KaClassSymbol>,
     private val kind: KaClassKind,
-    private val modality: Modality?
+    private val modality: KaSymbolModality?
 ) : TypeConstraints.ClassDef {
     override fun isInheritor(superClassQualifiedName: String): Boolean =
         analyze(module) {
             val classLikeSymbol = cls.restoreSymbol() ?: return@analyze false
             classLikeSymbol.superTypes.any { superType ->
-                (superType as? KtNonErrorClassType)?.expandedSymbol?.classId?.asFqNameString() == superClassQualifiedName
+                (superType as? KaClassType)?.expandedSymbol?.classId?.asFqNameString() == superClassQualifiedName
             }
         }
 
@@ -61,9 +61,9 @@ class KtClassDef(
 
     override fun isEnum(): Boolean = kind == KaClassKind.ENUM_CLASS
 
-    override fun isFinal(): Boolean = kind != KaClassKind.ANNOTATION_CLASS && modality == Modality.FINAL
+    override fun isFinal(): Boolean = kind != KaClassKind.ANNOTATION_CLASS && modality == KaSymbolModality.FINAL
 
-    override fun isAbstract(): Boolean = modality == Modality.ABSTRACT
+    override fun isAbstract(): Boolean = modality == KaSymbolModality.ABSTRACT
 
     override fun getEnumConstant(ordinal: Int): PsiEnumConstant? = analyze(module) {
         val classLikeSymbol = cls.restoreSymbol() ?: return@analyze null
@@ -91,7 +91,7 @@ class KtClassDef(
         analyze(module) {
             val classLikeSymbol = cls.restoreSymbol() ?: return@analyze Stream.empty<TypeConstraints.ClassDef>()
             val list: List<TypeConstraints.ClassDef> = classLikeSymbol.superTypes.asSequence()
-                .filterIsInstance<KtNonErrorClassType>()
+                .filterIsInstance<KaClassType>()
                 .mapNotNull { type -> type.expandedSymbol }
                 .map { symbol -> symbol.classDef() }
                 .toList()
@@ -120,7 +120,7 @@ class KtClassDef(
 
     companion object {
         context(KaSession)
-        fun KaClassOrObjectSymbol.classDef(): KtClassDef = KtClassDef(
+        fun KaClassSymbol.classDef(): KtClassDef = KtClassDef(
             useSiteModule, classId?.hashCode() ?: name.hashCode(), createPointer(),
             classKind, (this as? KaSymbolWithModality)?.modality
         )

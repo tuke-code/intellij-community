@@ -5,8 +5,8 @@ import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
 import org.jetbrains.kotlin.analysis.api.analyze
 import org.jetbrains.kotlin.analysis.api.permissions.KaAllowAnalysisOnEdt
 import org.jetbrains.kotlin.analysis.api.permissions.allowAnalysisOnEdt
-import org.jetbrains.kotlin.analysis.api.renderer.types.impl.KtTypeRendererForSource
-import org.jetbrains.kotlin.analysis.api.types.KtType
+import org.jetbrains.kotlin.analysis.api.renderer.types.impl.KaTypeRendererForSource
+import org.jetbrains.kotlin.analysis.api.types.KaType
 import org.jetbrains.kotlin.idea.base.analysis.api.utils.analyzeInModalWindow
 import org.jetbrains.kotlin.idea.base.resources.KotlinBundle
 import org.jetbrains.kotlin.idea.k2.refactoring.extractFunction.ExtractableCodeDescriptor
@@ -22,19 +22,19 @@ import org.jetbrains.kotlin.psi.KtTypeCodeFragment
 import org.jetbrains.kotlin.types.Variance
 
 @OptIn(KaAllowAnalysisOnEdt::class, KaExperimentalApi::class)
-internal fun render(type: KtType, context: KtElement): String {
+internal fun render(type: KaType, context: KtElement): String {
     return allowAnalysisOnEdt {
         analyze(context) {
-            type.render(KtTypeRendererForSource.WITH_QUALIFIED_NAMES, Variance.IN_VARIANCE)
+            type.render(KaTypeRendererForSource.WITH_QUALIFIED_NAMES, Variance.IN_VARIANCE)
         }
     }
 }
 
 @OptIn(KaAllowAnalysisOnEdt::class)
-internal fun getKtType(fragment: KtTypeCodeFragment): KtType? {
+internal fun getKtType(fragment: KtTypeCodeFragment): KaType? {
     return allowAnalysisOnEdt {
         analyze(fragment) {
-            fragment.getContentElement()?.getKtType()
+            fragment.getContentElement()?.type
         }
     }
 }
@@ -55,7 +55,7 @@ internal fun validate(
             newVisibility,
             newReceiverInfo,
             newParameterInfos,
-            returnCodeFragment.getContentElement()?.getKtType()
+            returnCodeFragment.getContentElement()?.type
         )
 
         newDescriptor.validate()
@@ -79,7 +79,7 @@ internal fun getSignaturePreview(
             newVisibility,
             newReceiverInfo,
             newParameterInfos,
-            returnCodeFragment.getContentElement()?.getKtType()
+            returnCodeFragment.getContentElement()?.type
         )
 
         Generator.getSignaturePreview(ExtractionGeneratorConfiguration(newDescriptor, ExtractionGeneratorOptions.DEFAULT))

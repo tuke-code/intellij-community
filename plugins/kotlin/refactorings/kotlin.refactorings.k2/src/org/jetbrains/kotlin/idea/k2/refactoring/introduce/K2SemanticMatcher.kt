@@ -5,13 +5,14 @@ import com.intellij.psi.PsiNamedElement
 import com.intellij.psi.tree.IElementType
 import com.intellij.psi.util.elementType
 import com.intellij.psi.util.startOffset
+import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
 import org.jetbrains.kotlin.analysis.api.KaSession
-import org.jetbrains.kotlin.analysis.api.resolution.*
 import org.jetbrains.kotlin.analysis.api.fir.diagnostics.KaFirDiagnostic
+import org.jetbrains.kotlin.analysis.api.resolution.*
 import org.jetbrains.kotlin.analysis.api.symbols.*
 import org.jetbrains.kotlin.analysis.api.symbols.markers.KaNamedSymbol
-import org.jetbrains.kotlin.analysis.api.types.KtType
-import org.jetbrains.kotlin.analysis.api.types.KtTypeParameterType
+import org.jetbrains.kotlin.analysis.api.types.KaType
+import org.jetbrains.kotlin.analysis.api.types.KaTypeParameterType
 import org.jetbrains.kotlin.analysis.utils.errors.unexpectedElementError
 import org.jetbrains.kotlin.idea.base.analysis.api.utils.CallParameterInfoProvider.getArgumentOrIndexExpressions
 import org.jetbrains.kotlin.idea.base.analysis.api.utils.CallParameterInfoProvider.mapArgumentsToParameterIndices
@@ -207,12 +208,12 @@ object K2SemanticMatcher {
      * All arguments for a parameter should be equal.
      */
     private data class MatchingContext(
-        val symbols: MutableMap<KtSymbol, KtSymbol> = mutableMapOf(),
+        val symbols: MutableMap<KaSymbol, KaSymbol> = mutableMapOf(),
         val blockBodyOwners: MutableMap<KaFunctionSymbol, KaFunctionSymbol> = mutableMapOf(),
         val parameterSubstitution: MutableMap<PsiNamedElement, KtElement?> = mutableMapOf(),
     ) {
         context(KaSession)
-        fun areSymbolsEqualOrAssociated(targetSymbol: KtSymbol?, patternSymbol: KtSymbol?): Boolean {
+        fun areSymbolsEqualOrAssociated(targetSymbol: KaSymbol?, patternSymbol: KaSymbol?): Boolean {
             if (targetSymbol == null || patternSymbol == null) return targetSymbol == null && patternSymbol == null
 
             if (patternSymbol is KaNamedSymbol) {
@@ -237,12 +238,12 @@ object K2SemanticMatcher {
 
         // TODO: current approach doesn't work on pairs of types such as `List<U>` and `List<T>`, where `U` and `T` are associated
         context(KaSession)
-        fun areTypesEqualOrAssociated(targetType: KtType?, patternType: KtType?): Boolean {
+        fun areTypesEqualOrAssociated(targetType: KaType?, patternType: KaType?): Boolean {
             if (targetType == null || patternType == null) return targetType == null && patternType == null
 
             return targetType.isEqualTo(patternType) ||
-                    targetType is KtTypeParameterType &&
-                    patternType is KtTypeParameterType &&
+                    targetType is KaTypeParameterType &&
+                    patternType is KaTypeParameterType &&
                     symbols[targetType.symbol] == patternType.symbol
         }
 
@@ -251,7 +252,7 @@ object K2SemanticMatcher {
             val targetSymbol = targetDeclaration.symbol
             val patternSymbol = patternDeclaration.symbol
 
-            if (targetSymbol is KtDestructuringDeclarationSymbol && patternSymbol is KtDestructuringDeclarationSymbol) {
+            if (targetSymbol is KaDestructuringDeclarationSymbol && patternSymbol is KaDestructuringDeclarationSymbol) {
                 for ((targetEntry, patternEntry) in targetSymbol.entries.zip(patternSymbol.entries)) {
                     symbols[targetEntry] = patternEntry
                 }
@@ -685,8 +686,8 @@ object K2SemanticMatcher {
     ): Boolean {
         if (areNonCallsMatchingByResolve(targetExpression, patternExpression, context)) return true
 
-        val targetCallInfo = targetExpression.resolveCallOld() ?: return false
-        val patternCallInfo = patternExpression.resolveCallOld() ?: return false
+        val targetCallInfo = targetExpression.resolveToCall() ?: return false
+        val patternCallInfo = patternExpression.resolveToCall() ?: return false
 
         if (targetCallInfo is KaErrorCallInfo && patternCallInfo is KaErrorCallInfo) {
             if (targetCallInfo.isUnresolvedCall() != patternCallInfo.isUnresolvedCall()) return false
@@ -813,10 +814,11 @@ object K2SemanticMatcher {
     }
 
     context(KaSession)
-    private fun KaCallableMemberCall<*, *>.getTypeArguments(): List<KtType?> = symbol.typeParameters.map { typeArgumentsMapping[it] }
+    @OptIn(KaExperimentalApi::class)
+    private fun KaCallableMemberCall<*, *>.getTypeArguments(): List<KaType?> = symbol.typeParameters.map { typeArgumentsMapping[it] }
 
     context(KaSession)
-    private fun KaExplicitReceiverValue.getSymbolForThisExpressionOrNull(): KtSymbol? =
+    private fun KaExplicitReceiverValue.getSymbolForThisExpressionOrNull(): KaSymbol? =
         (expression as? KtThisExpression)?.mainReference?.resolveToSymbol()
 
     context(KaSession)
@@ -832,8 +834,8 @@ object K2SemanticMatcher {
         patternExpression: KtReturnExpression,
         context: MatchingContext,
     ): Boolean {
-        val targetReturnTargetSymbol = targetExpression.getReturnTargetSymbol() as? KaFunctionSymbol ?: return false
-        val patternReturnTargetSymbol = patternExpression.getReturnTargetSymbol() as? KaFunctionSymbol ?: return false
+        val targetReturnTargetSymbol = targetExpression.targetSymbol as? KaFunctionSymbol ?: return false
+        val patternReturnTargetSymbol = patternExpression.targetSymbol as? KaFunctionSymbol ?: return false
 
         return context.areBlockBodyOwnersEqualOrAssociated(targetReturnTargetSymbol, patternReturnTargetSymbol)
     }
@@ -843,7 +845,7 @@ object K2SemanticMatcher {
         targetDeclaration: KtCallableDeclaration,
         patternDeclaration: KtCallableDeclaration,
         context: MatchingContext,
-    ): Boolean = context.areTypesEqualOrAssociated(targetDeclaration.getReturnKtType(), patternDeclaration.getReturnKtType())
+    ): Boolean = context.areTypesEqualOrAssociated(targetDeclaration.returnType, patternDeclaration.returnType)
 
     context(KaSession)
     private fun areReceiverParametersMatchingByResolve(
@@ -890,7 +892,7 @@ object K2SemanticMatcher {
         targetTypeReference: KtTypeReference,
         patternTypeReference: KtTypeReference,
         context: MatchingContext
-    ): Boolean = context.areTypesEqualOrAssociated(targetTypeReference.getKtType(), patternTypeReference.getKtType())
+    ): Boolean = context.areTypesEqualOrAssociated(targetTypeReference.type, patternTypeReference.type)
 
     context(KaSession)
     private fun KtFunction.getFunctionLikeSymbol(): KaFunctionSymbol = getSymbolOfType<KaFunctionSymbol>()

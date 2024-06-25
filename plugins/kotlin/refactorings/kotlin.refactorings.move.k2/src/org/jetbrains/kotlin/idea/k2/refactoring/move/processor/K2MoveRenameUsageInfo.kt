@@ -18,7 +18,7 @@ import org.jetbrains.kotlin.analysis.api.permissions.KaAllowAnalysisOnEdt
 import org.jetbrains.kotlin.analysis.api.permissions.allowAnalysisOnEdt
 import org.jetbrains.kotlin.analysis.api.symbols.*
 import org.jetbrains.kotlin.analysis.api.symbols.markers.KaSymbolWithMembers
-import org.jetbrains.kotlin.analysis.api.types.KtFunctionalType
+import org.jetbrains.kotlin.analysis.api.types.KaFunctionType
 import org.jetbrains.kotlin.asJava.toLightElements
 import org.jetbrains.kotlin.idea.base.analysis.api.utils.shortenReferences
 import org.jetbrains.kotlin.idea.base.psi.canBeUsedInImport
@@ -157,12 +157,12 @@ sealed class K2MoveRenameUsageInfo(
         private fun KtSimpleNameExpression.isNameDeterminantInQualifiedChain(): Boolean = allowAnalysisOnEdt {
             analyze(this) {
                 val resolvedSymbol = mainReference.resolveToSymbol()
-                if (resolvedSymbol is KaClassOrObjectSymbol && resolvedSymbol.classKind == KaClassKind.COMPANION_OBJECT) return true
+                if (resolvedSymbol is KaClassSymbol && resolvedSymbol.classKind == KaClassKind.COMPANION_OBJECT) return true
                 if (resolvedSymbol is KaConstructorSymbol) return true
                 val containingSymbol = resolvedSymbol?.containingSymbol
                 if (resolvedSymbol is KaPackageSymbol) return false // ignore packages
                 if (containingSymbol == null) return true // top levels are static
-                if (containingSymbol is KaClassOrObjectSymbol) {
+                if (containingSymbol is KaClassSymbol) {
                     when (containingSymbol.classKind) {
                         KaClassKind.OBJECT, KaClassKind.COMPANION_OBJECT, KaClassKind.ENUM_CLASS -> return true
                         else -> {}
@@ -181,9 +181,9 @@ sealed class K2MoveRenameUsageInfo(
                 return analyze(this) {
                     val callable = mainReference.resolveToSymbol() as? KaCallableSymbol
                     if (callable?.isExtension == true) return true
-                    if (callable is KtPropertySymbol) {
+                    if (callable is KaPropertySymbol) {
                         val returnType = callable.returnType
-                        returnType is KtFunctionalType && returnType.receiverType != null
+                        returnType is KaFunctionType && returnType.receiverType != null
                     } else false
                 }
             }

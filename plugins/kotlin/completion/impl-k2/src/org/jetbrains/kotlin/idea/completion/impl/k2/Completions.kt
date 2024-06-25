@@ -5,7 +5,7 @@ package org.jetbrains.kotlin.idea.completion
 import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.resolution.KaFunctionCall
 import org.jetbrains.kotlin.analysis.api.resolution.singleCallOrNull
-import org.jetbrains.kotlin.analysis.api.symbols.KtSymbol
+import org.jetbrains.kotlin.analysis.api.symbols.KaSymbol
 import org.jetbrains.kotlin.idea.base.analysis.api.utils.CallParameterInfoProvider
 import org.jetbrains.kotlin.idea.base.projectStructure.languageVersionSettings
 import org.jetbrains.kotlin.idea.completion.context.*
@@ -176,7 +176,7 @@ internal object Completions {
     private fun createWeighingContextForNameReference(
         basicContext: FirBasicCompletionContext,
         positionContext: KotlinNameReferencePositionContext,
-        symbolsToSkip: Set<KtSymbol> = emptySet(),
+        symbolsToSkip: Set<KaSymbol> = emptySet(),
     ): WeighingContext {
         val expectedType = when (positionContext) {
             // during the sorting of completion suggestions expected type from position and actual types of suggestions are compared;
@@ -188,7 +188,7 @@ internal object Completions {
             else -> positionContext.nameExpression.expectedType
         }
         val receiver = positionContext.explicitReceiver
-        val implicitReceivers = basicContext.originalKtFile.getScopeContextForPosition(positionContext.nameExpression).implicitReceivers
+        val implicitReceivers = basicContext.originalKtFile.scopeContext(positionContext.nameExpression).implicitReceivers
 
         return WeighingContext.createWeighingContext(
             basicContext,
@@ -211,7 +211,7 @@ private fun KotlinExpressionNameReferencePositionContext.allowsOnlyNamedArgument
 
     if (valueArgument.getArgumentName() != null) return false
 
-    val call = callElement.resolveCallOld()?.singleCallOrNull<KaFunctionCall<*>>() ?: return false
+    val call = callElement.resolveToCall()?.singleCallOrNull<KaFunctionCall<*>>() ?: return false
 
     if (CallParameterInfoProvider.isJavaArgumentWithNonDefaultName(
             call.partiallyAppliedSymbol.signature,

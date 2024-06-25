@@ -7,13 +7,14 @@ import com.intellij.lang.jvm.JvmModifier
 import com.intellij.lang.jvm.actions.CreateMethodRequest
 import com.intellij.lang.jvm.actions.EP_NAME
 import com.intellij.psi.PsiElement
+import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
 import org.jetbrains.kotlin.analysis.api.KaSession
-import org.jetbrains.kotlin.analysis.api.KtStarTypeProjection
 import org.jetbrains.kotlin.analysis.api.analyze
 import org.jetbrains.kotlin.analysis.api.symbols.KaClassKind
-import org.jetbrains.kotlin.analysis.api.symbols.KaClassOrObjectSymbol
-import org.jetbrains.kotlin.analysis.api.types.KtType
-import org.jetbrains.kotlin.analysis.api.types.KtTypeParameterType
+import org.jetbrains.kotlin.analysis.api.symbols.KaClassSymbol
+import org.jetbrains.kotlin.analysis.api.types.KaStarTypeProjection
+import org.jetbrains.kotlin.analysis.api.types.KaType
+import org.jetbrains.kotlin.analysis.api.types.KaTypeParameterType
 import org.jetbrains.kotlin.asJava.toLightClass
 import org.jetbrains.kotlin.idea.k2.codeinsight.quickFixes.createFromUsage.K2CreateFunctionFromUsageUtil.canRefactor
 import org.jetbrains.kotlin.idea.k2.codeinsight.quickFixes.createFromUsage.K2CreateFunctionFromUsageUtil.convertToClass
@@ -130,7 +131,7 @@ object K2CreateFunctionFromUsageBuilder {
     private fun shouldCreateCompanionClass(calleeExpression: KtSimpleNameExpression): Boolean {
         val receiverExpression = calleeExpression.getReceiverExpression()
         val receiverResolved =
-            (receiverExpression as? KtNameReferenceExpression)?.mainReference?.resolveToSymbol() as? KaClassOrObjectSymbol
+            (receiverExpression as? KtNameReferenceExpression)?.mainReference?.resolveToSymbol() as? KaClassSymbol
         return receiverResolved != null && receiverResolved.classKind != KaClassKind.OBJECT && receiverResolved.classKind != KaClassKind.COMPANION_OBJECT
     }
 
@@ -196,26 +197,27 @@ object K2CreateFunctionFromUsageBuilder {
      * Returns the type of the class containing this [KtSimpleNameExpression] if the class is abstract. Otherwise, returns null.
      */
     context (KaSession)
-    private fun KtSimpleNameExpression.getAbstractTypeOfContainingClass(): KtType? {
+    @OptIn(KaExperimentalApi::class)
+    private fun KtSimpleNameExpression.getAbstractTypeOfContainingClass(): KaType? {
         val containingClass = getStrictParentOfType<KtClassOrObject>() as? KtClass ?: return null
         if (containingClass is KtEnumEntry || containingClass.isAnnotation()) return null
 
-        val classSymbol = containingClass.symbol as? KaClassOrObjectSymbol ?: return null
+        val classSymbol = containingClass.symbol as? KaClassSymbol ?: return null
         val classType = buildClassType(classSymbol) {
             for (typeParameter in containingClass.typeParameters) {
-                argument(KtStarTypeProjection(token))
+                argument(buildStarTypeProjection())
             }
         }
         if (containingClass.modifierList.hasAbstractModifier() || classSymbol.classKind == KaClassKind.INTERFACE) return classType
 
-        // KtType.getAbstractSuperType() does not guarantee it's the closest abstract super type. We can implement it as a
+        // KaType.getAbstractSuperType() does not guarantee it's the closest abstract super type. We can implement it as a
         // breadth-first search, but it can cost a lot in terms of the memory usage.
         return classType.getAbstractSuperType()
     }
 
     context (KaSession)
-    private fun KtType.getAbstractSuperType(): KtType? {
-        fun List<KtType>.firstAbstractEditableType() = firstOrNull { it.hasAbstractDeclaration() && it.canRefactor() }
+    private fun KaType.getAbstractSuperType(): KaType? {
+        fun List<KaType>.firstAbstractEditableType() = firstOrNull { it.hasAbstractDeclaration() && it.canRefactor() }
         return getDirectSuperTypes().firstAbstractEditableType() ?: getAllSuperTypes().firstAbstractEditableType()
     }
 
@@ -223,8 +225,8 @@ object K2CreateFunctionFromUsageBuilder {
      * Returns class or superclass of the express's type if the class or the super class is abstract. Otherwise, returns null.
      */
     context (KaSession)
-    private fun KtExpression.getTypeOfAbstractSuperClass(): KtType? {
-        val type = getKtType() ?: return null
+    private fun KtExpression.getTypeOfAbstractSuperClass(): KaType? {
+        val type = expressionType ?: return null
         if (type.hasAbstractDeclaration()) return type
         return type.getAllSuperTypes().firstOrNull { it.hasAbstractDeclaration() }
     }
@@ -233,7 +235,7 @@ object K2CreateFunctionFromUsageBuilder {
      * Returns the receiver's type if it is abstract, or it has an abstract superclass. Otherwise, returns null.
      */
     context (KaSession)
-    private fun KtSimpleNameExpression.getAbstractTypeOfReceiver(): KtType? {
+    private fun KtSimpleNameExpression.getAbstractTypeOfReceiver(): KaType? {
         // If no explicit receiver exists, the containing class can be an implicit receiver.
         val receiver = getReceiverExpression() ?: return getAbstractTypeOfContainingClass()
         return receiver.getTypeOfAbstractSuperClass()
@@ -244,16 +246,16 @@ object K2CreateFunctionFromUsageBuilder {
         return computeImplicitReceiverType(calleeExpression)?.convertToClass()
     }
     context (KaSession)
-    private fun computeImplicitReceiverType(calleeExpression: KtSimpleNameExpression): KtType? {
-        val implicitReceiver = calleeExpression.containingKtFile.getScopeContextForPosition(calleeExpression).implicitReceivers.firstOrNull()
+    private fun computeImplicitReceiverType(calleeExpression: KtSimpleNameExpression): KaType? {
+        val implicitReceiver = calleeExpression.containingKtFile.scopeContext(calleeExpression).implicitReceivers.firstOrNull()
         if (implicitReceiver != null) {
             val callable = (calleeExpression.getParentOfTypeAndBranch<KtFunction> { bodyExpression }
                 ?: calleeExpression.getParentOfTypeAndBranches<KtProperty> { listOf(getter, setter) })
                 ?: return null
             if (callable !is KtFunctionLiteral && callable.receiverTypeReference == null) return null
 
-            var type: KtType? = implicitReceiver.type
-            if (type is KtTypeParameterType) {
+            var type: KaType? = implicitReceiver.type
+            if (type is KaTypeParameterType) {
                 type = type.getDirectSuperTypes().firstOrNull()
             }
             return type

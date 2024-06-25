@@ -2,6 +2,8 @@
 package git4idea.rebase.interactive
 
 import git4idea.rebase.GitRebaseEntry
+import git4idea.rebase.GitRebaseEntryWithDetails
+import git4idea.rebase.GitSquashedCommitsMessage
 
 internal fun <T : GitRebaseEntry> convertToModel(entries: List<T>): GitRebaseTodoModel<T> {
   val result = mutableListOf<GitRebaseTodoModel.Element<T>>()
@@ -20,7 +22,7 @@ internal fun <T : GitRebaseEntry> convertToModel(entries: List<T>): GitRebaseTod
       GitRebaseEntry.Action.DROP -> {
         // move them to the end
       }
-      GitRebaseEntry.Action.FIXUP, GitRebaseEntry.Action.SQUASH -> {
+      is GitRebaseEntry.Action.FIXUP, GitRebaseEntry.Action.SQUASH -> {
         val lastElement = result.lastOrNull() ?: throw IllegalArgumentException("Couldn't unite with non-existed commit")
         val root = when (lastElement) {
           is GitRebaseTodoModel.Element.UniteChild<T> -> lastElement.root
@@ -41,6 +43,11 @@ internal fun <T : GitRebaseEntry> convertToModel(entries: List<T>): GitRebaseTod
         val element = GitRebaseTodoModel.Element.UniteChild(index, entry, root)
         root.addChild(element)
         result.add(element)
+
+        val newMessage = amendCommitMessage(root, entry)
+        if (newMessage != null) {
+          root.type = GitRebaseTodoModel.Type.NonUnite.KeepCommit.Reword(newMessage)
+        }
       }
       GitRebaseEntry.Action.UPDATE_REF -> {
         val type = GitRebaseTodoModel.Type.NonUnite.UpdateRef
@@ -55,6 +62,31 @@ internal fun <T : GitRebaseEntry> convertToModel(entries: List<T>): GitRebaseTod
     result.add(GitRebaseTodoModel.Element.Simple(index, GitRebaseTodoModel.Type.NonUnite.Drop, entry))
   }
   return GitRebaseTodoModel(result)
+}
+
+private fun <T : GitRebaseEntry> amendCommitMessage(root: GitRebaseTodoModel.Element.UniteRoot<T>,
+                                                    newEntry: GitRebaseEntry): String? {
+  if (newEntry !is GitRebaseEntryWithDetails || root.entry !is GitRebaseEntryWithDetails) return null
+
+  val oldMessage = (root.type as? GitRebaseTodoModel.Type.NonUnite.KeepCommit.Reword)?.newMessage
+                   ?: root.entry.commitDetails.fullMessage
+  val entryCommitMessage = GitSquashedCommitsMessage.trimAutosquashSubject(newEntry.commitDetails.fullMessage)
+  if (entryCommitMessage.isBlank()) return null
+
+  val newMessage = when {
+    newEntry.action is GitRebaseEntry.Action.SQUASH -> {
+      GitSquashedCommitsMessage.squash(oldMessage, entryCommitMessage)
+    }
+    newEntry.action is GitRebaseEntry.Action.FIXUP && newEntry.action.overrideMessage -> {
+      entryCommitMessage
+    }
+    else -> {
+      return null
+    }
+  }
+
+  if (oldMessage == newMessage) return null
+  return newMessage
 }
 
 

@@ -6,18 +6,18 @@ import org.jetbrains.kotlin.analysis.api.resolution.KaCompoundArrayAccessCall
 import org.jetbrains.kotlin.analysis.api.resolution.KaFunctionCall
 import org.jetbrains.kotlin.analysis.api.resolution.calls
 import org.jetbrains.kotlin.analysis.api.components.DefaultTypeClassIds
-import org.jetbrains.kotlin.analysis.api.types.KtType
-import org.jetbrains.kotlin.analysis.api.types.KtTypeNullability
+import org.jetbrains.kotlin.analysis.api.types.KaType
+import org.jetbrains.kotlin.analysis.api.types.KaTypeNullability
 import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.psi.psiUtil.isNull
 import org.jetbrains.kotlin.types.Variance
 
-class ExpectedExpressionMatcher(val types: List<KtType>? = null, val nullability: KtTypeNullability? = null) {
+class ExpectedExpressionMatcher(val types: List<KaType>? = null, val nullability: KaTypeNullability? = null) {
 
     context(KaSession)
-    fun match(candidateType: KtType): Boolean {
+    fun match(candidateType: KaType): Boolean {
         if (types != null && types.none { candidateType.isSubTypeOf(it) }) {
             return false
         }
@@ -52,7 +52,7 @@ private fun getForElvis(target: KtElement): ExpectedExpressionMatcher? {
                 return elvisMatcher
             }
 
-            val leftType = elvisExpression.left?.getKtType()
+            val leftType = elvisExpression.left?.expressionType
             if (leftType != null) {
                 return ExpectedExpressionMatcher(types = listOf(leftType))
             }
@@ -96,7 +96,7 @@ private fun getForElvis(target: KtElement): ExpectedExpressionMatcher? {
         val containerNode = target.parent as? KtContainerNode ?: return null
         val arrayAccessExpression = (containerNode.parent as? KtArrayAccessExpression) ?: return null
 
-        for (call in arrayAccessExpression.resolveCallOld()?.calls.orEmpty()) {
+        for (call in arrayAccessExpression.resolveToCall()?.calls.orEmpty()) {
             if (call is KaFunctionCall<*>) {
                 for ((argumentExpression, sig) in call.argumentMapping) {
                     if (argumentExpression == target) {
@@ -119,7 +119,7 @@ private fun getForElvis(target: KtElement): ExpectedExpressionMatcher? {
 
     context(KaSession)
     private fun getForArgument(callElement: KtCallElement, argument: ValueArgument): ExpectedExpressionMatcher? {
-        for (call in callElement.resolveCallOld()?.calls.orEmpty()) {
+        for (call in callElement.resolveToCall()?.calls.orEmpty()) {
             if (call is KaFunctionCall<*>) {
                 for ((argumentExpression, sig) in call.argumentMapping) {
                     if (argumentExpression == argument) {
@@ -148,7 +148,7 @@ private fun getForElvis(target: KtElement): ExpectedExpressionMatcher? {
 
         if (otherOperand != null) {
             if (otherOperand.isNull()) {
-                return ExpectedExpressionMatcher(nullability = KtTypeNullability.NULLABLE)
+                return ExpectedExpressionMatcher(nullability = KaTypeNullability.NULLABLE)
             }
         }
 
@@ -163,7 +163,7 @@ private fun getForElvis(target: KtElement): ExpectedExpressionMatcher? {
         if (target == ifExpression.condition) {
             return ExpectedExpressionMatcher(
                 types = listOf(buildClassType(DefaultTypeClassIds.BOOLEAN)),
-                nullability = KtTypeNullability.NON_NULLABLE
+                nullability = KaTypeNullability.NON_NULLABLE
             )
         }
 
@@ -191,7 +191,7 @@ private fun getForElvis(target: KtElement): ExpectedExpressionMatcher? {
                 else -> buildClassType(DefaultTypeClassIds.ANY)
             }
 
-            fun constructType(classId: ClassId): KtType {
+            fun constructType(classId: ClassId): KaType {
                 return buildClassType(classId) {
                     argument(elementType, Variance.OUT_VARIANCE)
                 }

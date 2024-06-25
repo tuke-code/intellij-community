@@ -57,8 +57,8 @@ import org.jetbrains.kotlin.analysis.api.analyze
 import org.jetbrains.kotlin.analysis.api.resolution.successfulFunctionCallOrNull
 import org.jetbrains.kotlin.analysis.api.resolution.symbol
 import org.jetbrains.kotlin.analysis.api.symbols.KaNamedFunctionSymbol
-import org.jetbrains.kotlin.analysis.api.types.KtFunctionalType
-import org.jetbrains.kotlin.analysis.api.types.KtUsualClassType
+import org.jetbrains.kotlin.analysis.api.types.KaFunctionType
+import org.jetbrains.kotlin.analysis.api.types.KaUsualClassType
 import org.jetbrains.kotlin.analysis.decompiler.psi.file.KtClsFile
 import org.jetbrains.kotlin.codegen.inline.KOTLIN_STRATA_NAME
 import org.jetbrains.kotlin.fileClasses.JvmFileClassUtil
@@ -408,7 +408,7 @@ class KotlinPositionManager(private val debugProcess: DebugProcess) : MultiReque
 
     context(KaSession)
     private fun KtCallExpression.getBytecodeMethodName(): String? {
-        val resolvedCall = resolveCallOld()?.successfulFunctionCallOrNull() ?: return null
+        val resolvedCall = resolveToCall()?.successfulFunctionCallOrNull() ?: return null
         val symbol = resolvedCall.partiallyAppliedSymbol.symbol as? KaNamedFunctionSymbol ?: return null
         return symbol.getByteCodeMethodName()
     }
@@ -477,8 +477,8 @@ class KotlinPositionManager(private val debugProcess: DebugProcess) : MultiReque
             return false
         }
         val isUnitReturnType = analyze(function) {
-            val functionalType = function.getFunctionalType()
-            (functionalType as? KtFunctionalType)?.returnType?.isUnit == true
+            val functionalType = function.functionType
+            (functionalType as? KaFunctionType)?.returnType?.isUnit == true
         }
         if (!isUnitReturnType) {
             // We always must specify return explicitly
@@ -900,10 +900,10 @@ private fun KtFunction.isSamLambda(): Boolean {
 
     analyze(this) {
         val parentCall = KtPsiUtil.getParentCallIfPresent(this@isSamLambda) as? KtCallExpression ?: return false
-        val call = parentCall.resolveCallOld()?.successfulFunctionCallOrNull() ?: return false
+        val call = parentCall.resolveToCall()?.successfulFunctionCallOrNull() ?: return false
         val valueArgument = parentCall.getContainingValueArgument(this@isSamLambda) ?: return false
         val argument = call.argumentMapping[valueArgument.getArgumentExpression()]?.symbol ?: return false
-        return argument.returnType is KtUsualClassType
+        return argument.returnType is KaUsualClassType
     }
 }
 

@@ -8,8 +8,8 @@ import org.jetbrains.kotlin.analysis.api.resolution.KaCallableMemberCall
 import org.jetbrains.kotlin.analysis.api.resolution.KaImplicitReceiverValue
 import org.jetbrains.kotlin.analysis.api.resolution.KaSmartCastedReceiverValue
 import org.jetbrains.kotlin.analysis.api.resolution.singleCallOrNull
-import org.jetbrains.kotlin.analysis.api.symbols.KtSymbol
-import org.jetbrains.kotlin.analysis.api.types.KtType
+import org.jetbrains.kotlin.analysis.api.symbols.KaSymbol
+import org.jetbrains.kotlin.analysis.api.types.KaType
 import org.jetbrains.kotlin.idea.references.mainReference
 import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.psi.*
@@ -36,7 +36,7 @@ internal fun isSmartCastNecessary(expr: KtExpression, value: Boolean): Boolean {
 
             val implicitReceiverSmartCastList = e.implicitReceiverSmartCasts
             if (implicitReceiverSmartCastList.isNotEmpty()) {
-                val symbol = e.resolveCallOld()?.singleCallOrNull<KaCallableMemberCall<*, *>>()?.partiallyAppliedSymbol
+                val symbol = e.resolveToCall()?.singleCallOrNull<KaCallableMemberCall<*, *>>()?.partiallyAppliedSymbol
                 if (symbol != null) {
                     var receiver = symbol.dispatchReceiver ?: symbol.extensionReceiver
                     if (receiver is KaSmartCastedReceiverValue) {
@@ -53,14 +53,14 @@ internal fun isSmartCastNecessary(expr: KtExpression, value: Boolean): Boolean {
 }
 
 context(KaSession)
-private fun getValuesInExpression(expr: KtExpression): Map<KtSymbol, KtType> {
-    val map = hashMapOf<KtSymbol, KtType>()
+private fun getValuesInExpression(expr: KtExpression): Map<KaSymbol, KaType> {
+    val map = hashMapOf<KaSymbol, KaType>()
     SyntaxTraverser.psiTraverser(expr)
         .filter(KtReferenceExpression::class.java)
         .forEach { e ->
             val symbol = e.mainReference.resolveToSymbol()
             if (symbol != null) {
-                val type = e.getKtType()
+                val type = e.expressionType
                 if (type != null) {
                     map[symbol] = type
                 }

@@ -9,9 +9,9 @@ import org.jetbrains.kotlin.analysis.api.analyze
 import org.jetbrains.kotlin.analysis.api.annotations.annotationClassIds
 import org.jetbrains.kotlin.analysis.api.annotations.hasAnnotation
 import org.jetbrains.kotlin.analysis.api.symbols.KaClassKind
-import org.jetbrains.kotlin.analysis.api.symbols.KaClassOrObjectSymbol
-import org.jetbrains.kotlin.analysis.api.types.KtFunctionalType
-import org.jetbrains.kotlin.analysis.api.types.KtType
+import org.jetbrains.kotlin.analysis.api.symbols.KaClassSymbol
+import org.jetbrains.kotlin.analysis.api.types.KaFunctionType
+import org.jetbrains.kotlin.analysis.api.types.KaType
 import org.jetbrains.kotlin.idea.base.highlighting.dsl.DslStyleUtils
 import org.jetbrains.kotlin.idea.highlighter.HighlightingFactory
 import org.jetbrains.kotlin.name.ClassId
@@ -34,7 +34,7 @@ internal class DslHighlighter(holder: HighlightInfoHolder) : KotlinSemanticAnaly
     private fun highlightCall(element: KtCallExpression): HighlightInfo.Builder? {
         val calleeExpression = element.calleeExpression ?: return null
         val lambdaExpression = element.lambdaArguments.singleOrNull()?.getLambdaExpression() ?: return null
-        val receiverType = (lambdaExpression.getKtType() as? KtFunctionalType)?.receiverType ?: return null
+        val receiverType = (lambdaExpression.expressionType as? KaFunctionType)?.receiverType ?: return null
         val dslAnnotation = getDslAnnotation(receiverType) ?: return null
 
         val dslStyleId = DslStyleUtils.styleIdByFQName(dslAnnotation.asSingleFqName())
@@ -67,7 +67,7 @@ fun KtClass.getDslStyleId(): Int? {
  * A Dsl annotation is an annotation that is itself marked by [DslMarker] annotation.
  */
 context(KaSession)
-private fun getDslAnnotation(type: KtType): ClassId? {
+private fun getDslAnnotation(type: KaType): ClassId? {
     val allAnnotationsWithSuperTypes = sequence {
         yieldAll(type.annotationClassIds)
         val symbol = type.expandedSymbol ?: return@sequence
@@ -82,6 +82,6 @@ private fun getDslAnnotation(type: KtType): ClassId? {
     return dslAnnotation
 }
 
-private fun KaClassOrObjectSymbol.isDslHighlightingMarker(): Boolean {
+private fun KaClassSymbol.isDslHighlightingMarker(): Boolean {
     return hasAnnotation(DslStyleUtils.DSL_MARKER_CLASS_ID)
 }

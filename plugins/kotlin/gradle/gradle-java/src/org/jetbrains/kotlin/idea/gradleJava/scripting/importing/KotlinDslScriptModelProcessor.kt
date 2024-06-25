@@ -28,7 +28,6 @@ fun saveGradleBuildEnvironment(resolverCtx: ProjectResolverContext) {
 
         synchronized(sync) {
             sync.gradleVersion = resolverCtx.projectGradleVersion
-
             sync.javaHome = resolverCtx.buildEnvironment
                 ?.java?.javaHome?.path
                 ?.let { toSystemIndependentName(it) }
@@ -42,6 +41,7 @@ fun saveGradleBuildEnvironment(resolverCtx: ProjectResolverContext) {
 
 fun processScriptModel(
     resolverCtx: ProjectResolverContext,
+    sync: KotlinDslGradleBuildSync?,
     model: KotlinDslScriptsModel,
     projectName: String
 ): Boolean {
@@ -55,8 +55,6 @@ fun processScriptModel(
         val project = task.findProject() ?: return false
         val models = model.toListOfScriptModels(project)
 
-        val tasks = KotlinDslSyncListener.instance?.tasks
-        val sync = tasks?.let { synchronized(tasks) { tasks[task] } }
         if (sync != null) {
             synchronized(sync) {
                 sync.models.addAll(models)

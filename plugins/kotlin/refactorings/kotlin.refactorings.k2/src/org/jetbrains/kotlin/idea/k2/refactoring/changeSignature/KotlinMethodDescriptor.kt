@@ -25,14 +25,14 @@ class KotlinMethodDescriptor(private val callable: KtNamedDeclaration) :
     @OptIn(KaAllowAnalysisOnEdt::class, KaExperimentalApi::class)
     internal val oldReturnType: String = allowAnalysisOnEdt {
         analyze(callable) {
-            (callable as? KtCallableDeclaration)?.getReturnKtType()?.render(position = Variance.INVARIANT) ?: ""
+            (callable as? KtCallableDeclaration)?.returnType?.render(position = Variance.INVARIANT) ?: ""
         }
     }
 
     @OptIn(KaAllowAnalysisOnEdt::class, KaExperimentalApi::class)
     internal val oldReceiverType: String? = allowAnalysisOnEdt {
         analyze(callable) {
-            (callable as? KtCallableDeclaration)?.receiverTypeReference?.getKtType()?.render(position = Variance.INVARIANT)
+            (callable as? KtCallableDeclaration)?.receiverTypeReference?.type?.render(position = Variance.INVARIANT)
         }
     }
 
@@ -40,7 +40,7 @@ class KotlinMethodDescriptor(private val callable: KtNamedDeclaration) :
     override var receiver: KotlinParameterInfo? = (callable as? KtCallableDeclaration)?.receiverTypeReference?.let {
         allowAnalysisOnEdt {
             analyze(callable) {
-                val ktType = it.getKtType()
+                val ktType = it.type
                 val nameValidator = KotlinDeclarationNameValidator(
                     callable,
                     true,
@@ -71,7 +71,7 @@ class KotlinMethodDescriptor(private val callable: KtNamedDeclaration) :
                 (callable as? KtCallableDeclaration)
                     ?.valueParameters?.forEach { p ->
                         val parameterInfo = KotlinParameterInfo(
-                            params.size, KotlinTypeInfo(p.getReturnKtType(), callable),
+                            params.size, KotlinTypeInfo(p.returnType, callable),
                             p.name ?: "",
                             p.valOrVarKeyword.toValVar(),
                             p.defaultValue, p.defaultValue != null, p.defaultValue, callable
@@ -95,10 +95,10 @@ class KotlinMethodDescriptor(private val callable: KtNamedDeclaration) :
         return (callable as? KtCallableDeclaration)?.valueParameters?.size ?: 0
     }
 
-    @OptIn(KaAllowAnalysisOnEdt::class)
+    @OptIn(KaAllowAnalysisOnEdt::class, KaExperimentalApi::class)
     private val _visibility = allowAnalysisOnEdt {
         analyze(callable) {
-            (callable.symbol as? KaSymbolWithVisibility)?.visibility ?: Visibilities.Public
+            (callable.symbol as? KaSymbolWithVisibility)?.compilerVisibility ?: Visibilities.Public
         }
     }
 

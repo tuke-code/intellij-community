@@ -3,14 +3,16 @@ package org.jetbrains.kotlin.idea.codeInsight.inspections.shared.collections
 
 import com.intellij.codeInspection.ProblemHighlightType
 import com.intellij.openapi.util.TextRange
+import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
 import org.jetbrains.kotlin.analysis.api.KaSession
-import org.jetbrains.kotlin.analysis.api.KtTypeArgumentWithVariance
 import org.jetbrains.kotlin.analysis.api.resolution.singleFunctionCallOrNull
 import org.jetbrains.kotlin.analysis.api.resolution.symbol
-import org.jetbrains.kotlin.analysis.api.types.KtFlexibleType
-import org.jetbrains.kotlin.analysis.api.types.KtFunctionalType
-import org.jetbrains.kotlin.analysis.api.types.KtNonErrorClassType
-import org.jetbrains.kotlin.analysis.api.types.KtType
+import org.jetbrains.kotlin.analysis.api.symbols.typeParameters
+import org.jetbrains.kotlin.analysis.api.types.KaFlexibleType
+import org.jetbrains.kotlin.analysis.api.types.KaFunctionType
+import org.jetbrains.kotlin.analysis.api.types.KaClassType
+import org.jetbrains.kotlin.analysis.api.types.KaType
+import org.jetbrains.kotlin.analysis.api.types.KaTypeArgumentWithVariance
 import org.jetbrains.kotlin.builtins.StandardNames
 import org.jetbrains.kotlin.idea.base.resources.KotlinBundle
 import org.jetbrains.kotlin.name.ClassId
@@ -52,18 +54,18 @@ class UselessCallOnCollectionInspection : AbstractUselessCallInspection() {
         if (expression !is KtLambdaExpression) return false
         var labelledReturnReturnsNullable = false
         expression.bodyExpression?.forEachDescendantOfType<KtReturnExpression> { returnExpression ->
-            val targetExpression = returnExpression.getReturnTargetSymbol()?.psi?.parent
+            val targetExpression = returnExpression.targetSymbol?.psi?.parent
             if (targetExpression == expression) {
                 labelledReturnReturnsNullable = labelledReturnReturnsNullable ||
-                        returnExpression.returnedExpression?.getKtType()?.canBeNull == true
+                        returnExpression.returnedExpression?.expressionType?.canBeNull == true
             }
         }
-        return !labelledReturnReturnsNullable && expression.bodyExpression?.getKtType()?.canBeNull == false
+        return !labelledReturnReturnsNullable && expression.bodyExpression?.expressionType?.canBeNull == false
     }
 
     context(KaSession)
     private fun KtExpression.isMethodReferenceReturningNotNull(): Boolean {
-        val type = getKtType() as? KtFunctionalType ?: return false
+        val type = expressionType as? KaFunctionType ?: return false
         return !type.returnType.canBeNull
     }
 
@@ -73,16 +75,17 @@ class UselessCallOnCollectionInspection : AbstractUselessCallInspection() {
         calleeExpression: KtExpression,
         conversion: Conversion
     ) {
-        val receiverType = expression.receiverExpression.getKtType() as? KtNonErrorClassType ?: return
-        val receiverTypeArgument = receiverType.ownTypeArguments.singleOrNull() ?: return
+        val receiverType = expression.receiverExpression.expressionType as? KaClassType ?: return
+        val receiverTypeArgument = receiverType.typeArguments.singleOrNull() ?: return
         val receiverTypeArgumentType = receiverTypeArgument.type ?: return
-        val resolvedCall = expression.resolveCallOld()?.singleFunctionCallOrNull() ?: return
+        val resolvedCall = expression.resolveToCall()?.singleFunctionCallOrNull() ?: return
         val callableName = resolvedCall.symbol.callableId?.callableName?.asString() ?: return
         if (callableName == "filterIsInstance") {
-            if (receiverTypeArgument is KtTypeArgumentWithVariance && receiverTypeArgument.variance == Variance.IN_VARIANCE) return
+            if (receiverTypeArgument is KaTypeArgumentWithVariance && receiverTypeArgument.variance == Variance.IN_VARIANCE) return
+            @OptIn(KaExperimentalApi::class)
             val typeParameterDescriptor = resolvedCall.symbol.typeParameters.singleOrNull() ?: return
             val argumentType = resolvedCall.typeArgumentsMapping[typeParameterDescriptor] ?: return
-            if (receiverTypeArgumentType is KtFlexibleType || !receiverTypeArgumentType.isSubTypeOf(argumentType)) return
+            if (receiverTypeArgumentType is KaFlexibleType || !receiverTypeArgumentType.isSubTypeOf(argumentType)) return
         } else {
             // xxxNotNull
             if (receiverTypeArgumentType.canBeNull) return
@@ -136,5 +139,5 @@ class UselessCallOnCollectionInspection : AbstractUselessCallInspection() {
     }
 
     context(KaSession)
-    private fun KtType.isList() = this.fullyExpandedType.isClassTypeWithClassId(ClassId.topLevel(StandardNames.FqNames.list))
+    private fun KaType.isList() = this.fullyExpandedType.isClassType(ClassId.topLevel(StandardNames.FqNames.list))
 }

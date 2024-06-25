@@ -145,7 +145,7 @@ object OperatorToFunctionConverter {
         @OptIn(KaAllowAnalysisFromWriteAction::class)
         allowAnalysisFromWriteAction {
             analyze(expression) {
-                expression.getKtType()?.isMarkedNullable
+                expression.expressionType?.isMarkedNullable
             }
         }
     }
@@ -155,7 +155,7 @@ object OperatorToFunctionConverter {
         @OptIn(KaAllowAnalysisFromWriteAction::class)
         allowAnalysisFromWriteAction {
             analyze(element) {
-                val resolvedCall = element.resolveCallOld()?.singleFunctionCallOrNull()
+                val resolvedCall = element.resolveToCall()?.singleFunctionCallOrNull()
                 val targetSymbol = resolvedCall?.partiallyAppliedSymbol?.symbol
 
                 (targetSymbol as? KaNamedSymbol)?.name

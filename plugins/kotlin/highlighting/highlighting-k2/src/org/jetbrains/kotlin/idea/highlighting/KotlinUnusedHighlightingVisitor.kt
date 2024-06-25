@@ -84,7 +84,7 @@ class KotlinUnusedHighlightingVisitor(private val ktFile: KtFile) {
                 }
 
                 val symbol = expression.mainReference.resolveToSymbol()
-                if (symbol is KaLocalVariableSymbol || symbol is KaValueParameterSymbol || symbol is KtKotlinPropertySymbol) {
+                if (symbol is KaLocalVariableSymbol || symbol is KaValueParameterSymbol || symbol is KaKotlinPropertySymbol) {
                     refHolder.registerLocalRef(symbol.psi, expression)
                 }
                 if (!expression.isCalleeExpression()) {
@@ -104,7 +104,7 @@ class KotlinUnusedHighlightingVisitor(private val ktFile: KtFile) {
             }
 
             override fun visitBinaryExpression(expression: KtBinaryExpression) {
-                val call = expression.resolveCallOld()?.successfulCallOrNull<KaCall>() ?: return
+                val call = expression.resolveToCall()?.successfulCallOrNull<KaCall>() ?: return
                 if (call is KaSimpleFunctionCall) {
                     refHolder.registerLocalRef(call.symbol.psi, expression)
                 }
@@ -117,7 +117,7 @@ class KotlinUnusedHighlightingVisitor(private val ktFile: KtFile) {
 
             override fun visitCallExpression(expression: KtCallExpression) {
                 val callee = expression.calleeExpression ?: return
-                val call = expression.resolveCallOld()?.singleCallOrNull<KaCall>() ?: return
+                val call = expression.resolveToCall()?.singleCallOrNull<KaCall>() ?: return
                 if (callee is KtLambdaExpression || callee is KtCallExpression /* KT-16159 */) return
                 refHolder.registerLocalRef((call as? KaSimpleFunctionCall)?.symbol?.psi, expression)
             }

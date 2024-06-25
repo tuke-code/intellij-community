@@ -7,7 +7,7 @@ import com.intellij.openapi.progress.ProgressManager
 import com.intellij.psi.PsiElement
 import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.symbols.*
-import org.jetbrains.kotlin.analysis.api.types.KtType
+import org.jetbrains.kotlin.analysis.api.types.KaType
 import org.jetbrains.kotlin.idea.completion.FirCompletionSessionParameters
 import org.jetbrains.kotlin.idea.completion.ItemPriority
 import org.jetbrains.kotlin.idea.completion.context.FirBasicCompletionContext
@@ -91,7 +91,7 @@ internal class FirDeclarationFromUnresolvedNameContributor(
                 refExprParent !is KtCallableReferenceExpression && refExprParent !is KtCallExpression && symbol is KaFunctionSymbol -> false
 
                 receiver != null -> {
-                    val actualReceiverType = receiver.getKtType() ?: return false
+                    val actualReceiverType = receiver.expressionType ?: return false
                     val expectedReceiverType = getReceiverType(symbol) ?: return false
 
                     // FIXME: this check does not work with generic types (i.e. List<String> and List<T>)
@@ -104,7 +104,7 @@ internal class FirDeclarationFromUnresolvedNameContributor(
                     getImplicitReceiverTypesAtPosition(unresolvedRef).any { it.isSubTypeOf(extensionReceiverType) }
                 }
             }
-            is KaClassOrObjectSymbol -> when {
+            is KaClassSymbol -> when {
                 receiver != null -> false
                 refExprParent is KtUserType -> true
                 refExprParent is KtCallExpression -> symbol.classKind == KaClassKind.CLASS
@@ -120,7 +120,7 @@ internal class FirDeclarationFromUnresolvedNameContributor(
     }
 
     context(KaSession)
-    private fun getReceiverType(symbol: KaCallableSymbol): KtType? {
+    private fun getReceiverType(symbol: KaCallableSymbol): KaType? {
         return symbol.receiverType ?: (symbol as? KaCallableSymbol)?.dispatchReceiverType
     }
 

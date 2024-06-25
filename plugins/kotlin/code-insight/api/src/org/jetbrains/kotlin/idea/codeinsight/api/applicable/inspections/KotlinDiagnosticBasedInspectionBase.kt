@@ -3,8 +3,8 @@ package org.jetbrains.kotlin.idea.codeinsight.api.applicable.inspections
 
 import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
 import org.jetbrains.kotlin.analysis.api.KaSession
-import org.jetbrains.kotlin.analysis.api.components.KtDiagnosticCheckerFilter
-import org.jetbrains.kotlin.analysis.api.diagnostics.KtDiagnosticWithPsi
+import org.jetbrains.kotlin.analysis.api.components.KaDiagnosticCheckerFilter
+import org.jetbrains.kotlin.analysis.api.diagnostics.KaDiagnosticWithPsi
 import org.jetbrains.kotlin.psi.KtElement
 import kotlin.reflect.KClass
 import kotlin.reflect.safeCast
@@ -14,7 +14,7 @@ import kotlin.reflect.safeCast
  */
 abstract class KotlinDiagnosticBasedInspectionBase<
         E : KtElement,
-        D : KtDiagnosticWithPsi<E>,
+        D : KaDiagnosticWithPsi<E>,
         C : Any,
         > : KotlinApplicableInspectionBase.Simple<E, C>() {
 
@@ -36,7 +36,7 @@ abstract class KotlinDiagnosticBasedInspectionBase<
     context(KaSession)
     @OptIn(KaExperimentalApi::class)
     final override fun prepareContext(element: E): C? =
-        element.getDiagnostics(KtDiagnosticCheckerFilter.ONLY_EXTENDED_CHECKERS)
+        element.diagnostics(KaDiagnosticCheckerFilter.ONLY_EXTENDED_CHECKERS)
             .firstNotNullOfOrNull { diagnosticType.safeCast(it) }
             ?.let { prepareContextByDiagnostic(element, it) }
 }

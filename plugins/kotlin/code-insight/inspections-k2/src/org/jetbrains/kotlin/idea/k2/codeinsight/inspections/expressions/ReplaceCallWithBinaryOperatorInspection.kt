@@ -16,7 +16,7 @@ import org.jetbrains.kotlin.analysis.api.resolution.successfulFunctionCallOrNull
 import org.jetbrains.kotlin.analysis.api.resolution.symbol
 import org.jetbrains.kotlin.analysis.api.symbols.KaCallableSymbol
 import org.jetbrains.kotlin.analysis.api.symbols.KaNamedFunctionSymbol
-import org.jetbrains.kotlin.analysis.api.types.KtTypeNullability
+import org.jetbrains.kotlin.analysis.api.types.KaTypeNullability
 import org.jetbrains.kotlin.idea.base.resources.KotlinBundle
 import org.jetbrains.kotlin.idea.codeinsight.api.applicable.inspections.KotlinApplicableInspectionBase
 import org.jetbrains.kotlin.idea.codeinsight.api.applicable.inspections.KotlinModCommandQuickFix
@@ -72,7 +72,7 @@ internal class ReplaceCallWithBinaryOperatorInspection :
         val argument = callExpression.singleArgumentExpression() ?: return null
 
         analyze(element) {
-            val resolvedCall = callExpression.resolveCallOld()?.successfulFunctionCallOrNull() ?: return null
+            val resolvedCall = callExpression.resolveToCall()?.successfulFunctionCallOrNull() ?: return null
             if (resolvedCall.symbol.valueParameters.size != 1) return null
             if (resolvedCall.typeArgumentsMapping.isNotEmpty()) return null
             if (!element.isReceiverExpressionWithValue()) return null
@@ -147,7 +147,7 @@ internal class ReplaceCallWithBinaryOperatorInspection :
     private fun KtQualifiedExpression.isReceiverExpressionWithValue(): Boolean {
         val receiver = receiverExpression
         if (receiver is KtSuperExpression) return false
-        return receiver.getKtType() != null
+        return receiver.expressionType != null
     }
 
     context(KaSession)
@@ -155,7 +155,7 @@ internal class ReplaceCallWithBinaryOperatorInspection :
         val identifier = calleeExpression.getReferencedNameAsName()
         val dotQualified = calleeExpression.parent.parent as? KtDotQualifiedExpression ?: return null
         fun isOperatorOrCompatible(): Boolean {
-            val functionCall = calleeExpression.resolveCallOld()?.successfulFunctionCallOrNull()
+            val functionCall = calleeExpression.resolveToCall()?.successfulFunctionCallOrNull()
             return (functionCall?.symbol as? KaNamedFunctionSymbol)?.isOperator == true
         }
         return when (identifier) {
@@ -208,7 +208,7 @@ private fun KaCallableSymbol.isAnyEquals(): Boolean {
 
 context(KaSession)
 private fun KtExpression.isAnyEquals(): Boolean {
-    val resolvedCall = resolveCallOld()?.successfulCallOrNull<KaSimpleFunctionCall>() ?: return false
+    val resolvedCall = resolveToCall()?.successfulCallOrNull<KaSimpleFunctionCall>() ?: return false
     return resolvedCall.symbol.isAnyEquals()
 }
 
@@ -219,18 +219,18 @@ private fun KtExpression.isAnyEquals(): Boolean {
  */
 context(KaSession)
 private fun areRelatedBySubtyping(first: KtExpression, second: KtExpression): Boolean {
-    val firstType = first.getKtType() ?: return false
-    val secondType = second.getKtType() ?: return false
+    val firstType = first.expressionType ?: return false
+    val secondType = second.expressionType ?: return false
     return firstType.isSubTypeOf(secondType) || secondType.isSubTypeOf(firstType)
 }
 
 context(KaSession)
 private fun KtExpression.hasDoubleOrFloatType(): Boolean {
-    val type = getKtType() ?: return false
+    val type = expressionType ?: return false
     return type.isSubTypeOf(builtinTypes.DOUBLE) || type.isSubTypeOf(builtinTypes.FLOAT)
 }
 
 context(KaSession)
 private fun KtExpression.hasUnknownNullabilityType(): Boolean {
-    return this.getKtType()?.nullability == KtTypeNullability.UNKNOWN
+    return expressionType?.nullability == KaTypeNullability.UNKNOWN
 }

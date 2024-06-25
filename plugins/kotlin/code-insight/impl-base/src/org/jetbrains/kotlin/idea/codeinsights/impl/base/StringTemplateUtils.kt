@@ -46,7 +46,7 @@ fun isStringPlusExpressionWithoutNewLineInOperands(expression: KtBinaryExpressio
 
     if (!expression.containNoNewLine()) return false
 
-    if (expression.getKtType()?.isString != true) return false
+    if (expression.expressionType?.isString != true) return false
     val plusOperation = expression.operationReference.mainReference.resolveToSymbol() as? KaCallableSymbol
     val classContainingPlus = plusOperation?.containingSymbol as? KaNamedClassOrObjectSymbol
     return if (classContainingPlus != null) {
@@ -130,7 +130,7 @@ context(KaSession)
 private fun KtConstantExpression.buildStringTemplateForExpression(forceBraces: Boolean): String? {
     val constantValue = evaluate() ?: return "\${${text}}"
     val isChar = constantValue.constantValueKind == ConstantValueKind.Char
-    val stringValue = if (isChar) "${constantValue.value}" else constantValue.renderAsKotlinConstant()
+  val stringValue = if (isChar) "${constantValue.value}" else constantValue.render()
     if (isChar || stringValue == text) {
         return StringUtil.escapeStringCharacters(
             stringValue.length, stringValue, if (forceBraces) "\"$" else "\"", StringBuilder()

@@ -31,7 +31,6 @@ f:com.intellij.BundleBase
 - sf:partialMessage(java.util.ResourceBundle,java.lang.String,I,java.lang.Object[]):java.lang.String
 - sf:replaceMnemonicAmpersand(java.lang.String):java.lang.String
 - sf:setTranslationConsumer(java.util.function.BiConsumer):V
-- sf:useDefaultValue(java.util.ResourceBundle,java.lang.String,java.lang.String):java.lang.String
 f:com.intellij.Patches
 - sf:IBM_JDK_DISABLE_COLLECTION_BUG:Z
 - sf:JDK_BUG_ID_21275177:Z
@@ -1414,11 +1413,9 @@ f:com.intellij.openapi.util.io.FileFilters
 f:com.intellij.openapi.util.io.FileSystemUtil
 - s:getAttributes(java.io.File):com.intellij.openapi.util.io.FileAttributes
 - s:getAttributes(java.lang.String):com.intellij.openapi.util.io.FileAttributes
-- s:isCaseToggleable(java.lang.String):Z
 - s:isSymLink(java.io.File):Z
 - s:isSymLink(java.lang.String):Z
 - s:lastModified(java.io.File):J
-- s:readParentCaseSensitivity(java.io.File):com.intellij.openapi.util.io.FileAttributes$CaseSensitivity
 - s:resolveSymLink(java.io.File):java.lang.String
 - s:resolveSymLink(java.lang.String):java.lang.String
 c:com.intellij.openapi.util.io.FileUtil
@@ -1583,7 +1580,10 @@ f:com.intellij.openapi.util.io.JarUtil
 - s:loadProperties(java.io.File,java.lang.String):java.util.Properties
 f:com.intellij.openapi.util.io.NioFiles
 - sf:BROKEN_SYMLINK:java.nio.file.attribute.BasicFileAttributes
+- *s:copyRecursively(java.nio.file.Path,java.nio.file.Path):V
+- *s:copyRecursively(java.nio.file.Path,java.nio.file.Path,java.util.function.Consumer):V
 - s:createDirectories(java.nio.file.Path):java.nio.file.Path
+- s:createIfNotExists(java.nio.file.Path):java.nio.file.Path
 - s:createParentDirectories(java.nio.file.Path):java.nio.file.Path
 - s:deleteRecursively(java.nio.file.Path):V
 - s:deleteRecursively(java.nio.file.Path,java.util.function.Consumer):V

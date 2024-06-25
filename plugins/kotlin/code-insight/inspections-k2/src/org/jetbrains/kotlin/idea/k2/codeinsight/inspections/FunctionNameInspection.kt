@@ -3,7 +3,7 @@ package org.jetbrains.kotlin.idea.k2.codeinsight.inspections
 
 import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.analyze
-import org.jetbrains.kotlin.analysis.api.types.KtType
+import org.jetbrains.kotlin.analysis.api.types.KaType
 import org.jetbrains.kotlin.idea.codeInsight.inspections.shared.AbstractFunctionNameInspection
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.psi.KtNamedFunction
@@ -11,14 +11,14 @@ import org.jetbrains.kotlin.psi.KtNamedFunction
 class FunctionNameInspection : AbstractFunctionNameInspection() {
     override fun KtNamedFunction.isFactoryFunctionByAnalyze(): Boolean = analyze(this) {
         val functionName = name ?: return false
-        val returnType = getReturnKtType()
+        val returnType = returnType
 
         return returnType.hasShortName(functionName)
                 || returnType.getAllSuperTypes().any { it.hasShortName(functionName) }
     }
 
     context(KaSession)
-    private fun KtType.hasShortName(shortName: String): Boolean {
+    private fun KaType.hasShortName(shortName: String): Boolean {
         val typeShortName =
             expandedSymbol
                 ?.classId

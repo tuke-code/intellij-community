@@ -5,8 +5,8 @@ import com.intellij.codeInspection.LocalInspectionToolSession
 import com.intellij.codeInspection.ProblemsHolder
 import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.analyze
-import org.jetbrains.kotlin.analysis.api.types.KtType
-import org.jetbrains.kotlin.analysis.api.types.KtTypeNullability
+import org.jetbrains.kotlin.analysis.api.types.KaType
+import org.jetbrains.kotlin.analysis.api.types.KaTypeNullability
 import org.jetbrains.kotlin.idea.base.resources.KotlinBundle
 import org.jetbrains.kotlin.idea.codeinsight.api.classic.inspections.AbstractKotlinInspection
 import org.jetbrains.kotlin.idea.codeinsight.utils.isEnum
@@ -35,8 +35,8 @@ internal class KotlinEqualsBetweenInconvertibleTypesInspection : AbstractKotlinI
     )
 
     context(KaSession)
-    private fun KtExpression.getTypeIfComparable(): KtType? {
-        val type = getKtType()?.withNullability(KtTypeNullability.NON_NULLABLE)
+    private fun KtExpression.getTypeIfComparable(): KaType? {
+        val type = expressionType?.withNullability(KaTypeNullability.NON_NULLABLE)
         return type?.takeIf { it.isPrimitive || it.isString || it.isEnum() }
     }
 }

@@ -180,8 +180,8 @@ object WrapWithSafeLetCallFixFactories {
         val calleeExpression = callExpression.calleeExpression
         val calleeName = calleeExpression?.text?.let(Name::identifierIfValid) ?: return null
         val callSite = callExpression.parent as? KtQualifiedExpression ?: callExpression
-        val functionalVariableSymbol = (calleeExpression.resolveCallOld()?.singleCallOrNull<KaSimpleVariableAccessCall>())?.symbol ?: return false
-        val localScope = callExpression.containingKtFile.getScopeContextForPosition(callSite).getCompositeScope()
+        val functionalVariableSymbol = (calleeExpression.resolveToCall()?.singleCallOrNull<KaSimpleVariableAccessCall>())?.symbol ?: return false
+        val localScope = callExpression.containingKtFile.scopeContext(callSite).compositeScope()
         // If no symbol in the local scope contains the called symbol, then the symbol must be a member symbol.
 
         return localScope.getCallableSymbols(calleeName).any { symbol ->
@@ -235,7 +235,7 @@ object WrapWithSafeLetCallFixFactories {
             ?: nullableExpression?.surroundingExpression,
     ): List<WrapWithSafeLetCallModCommandAction> {
         if (nullableExpression == null || surroundingExpression == null) return emptyList()
-        val scope = nullableExpression.containingKtFile.getScopeContextForPosition(nullableExpression).getCompositeScope()
+        val scope = nullableExpression.containingKtFile.scopeContext(nullableExpression).compositeScope()
         val existingNames = scope.getPossibleCallableNames().mapNotNull { it.identifierOrNullIfSpecial }
 
         // Note, the order of the candidate matters. We would prefer the default `it` so the generated code won't need to declare the
@@ -256,7 +256,7 @@ object WrapWithSafeLetCallFixFactories {
     private fun getDeclaredParameterNameForArgument(argumentExpression: KtExpression): String? {
         val valueArgument = argumentExpression.parent as? KtValueArgument ?: return null
         val callExpression = argumentExpression.parentOfType<KtCallExpression>()
-        val successCallTarget = callExpression?.resolveCallOld()?.singleFunctionCallOrNull()?.symbol ?: return null
+        val successCallTarget = callExpression?.resolveToCall()?.singleFunctionCallOrNull()?.symbol ?: return null
 
         return successCallTarget.valueParameters.getOrNull(valueArgument.argumentIndex)?.name?.identifierOrNullIfSpecial
     }
@@ -284,7 +284,7 @@ object WrapWithSafeLetCallFixFactories {
                 // In the following logic, if call is missing, unresolved, or contains error, we just stop here so the wrapped call would be
                 // inserted here.
                 val functionCall = parent.getParentOfType<KtCallExpression>(strict = true) ?: return true
-                val resolvedCall = functionCall.resolveCallOld()?.singleFunctionCallOrNull() ?: return true
+                val resolvedCall = functionCall.resolveToCall()?.singleFunctionCallOrNull() ?: return true
                 return doesFunctionAcceptNull(resolvedCall, parent.argumentIndex) ?: true
             }
             parent is KtBinaryExpression -> {
@@ -292,7 +292,7 @@ object WrapWithSafeLetCallFixFactories {
                     // If current expression is an l-value in an assignment, just keep going up because one cannot assign to a let call.
                     return false
                 }
-                val resolvedCall = parent.resolveCallOld()?.singleFunctionCallOrNull()
+                val resolvedCall = parent.resolveToCall()?.singleFunctionCallOrNull()
                 when {
                     resolvedCall != null -> {
                         // The binary expression is a call to some function
@@ -306,7 +306,7 @@ object WrapWithSafeLetCallFixFactories {
                     }
                     parent.operationToken == KtTokens.EQ -> {
                         // The binary expression is a variable assignment
-                        parent.left?.getKtType()?.isMarkedNullable ?: true
+                        parent.left?.expressionType?.isMarkedNullable ?: true
                     }
                     // The binary expression is some unrecognized constructs so we stop here.
                     else -> true

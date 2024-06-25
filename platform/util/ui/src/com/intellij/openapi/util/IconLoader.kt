@@ -258,6 +258,7 @@ object IconLoader {
   fun getDisabledIcon(icon: Icon): Icon = getDisabledIcon(icon = icon, disableFilter = null)
 
   @Deprecated("Use com.intellij.ui.svg.colorPatchedIcon")
+  @Internal
   fun colorPatchedIcon(icon: Icon, colorPatcher: SvgElementColorPatcherProvider): Icon {
     return com.intellij.ui.svg.colorPatchedIcon(icon = icon, colorPatcher = colorPatcher)
   }
@@ -265,6 +266,7 @@ object IconLoader {
   /**
    * Creates a new icon with the filter applied.
    */
+  @Internal
   fun filterIcon(icon: Icon, filterSupplier: RgbImageFilterSupplier): Icon {
     val effectiveIcon = if (icon is LazyIcon) icon.getOrComputeIcon() else icon
     if (!checkIconSize(effectiveIcon)) {

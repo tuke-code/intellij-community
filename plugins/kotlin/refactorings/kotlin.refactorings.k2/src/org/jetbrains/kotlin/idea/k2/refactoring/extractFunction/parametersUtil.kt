@@ -17,20 +17,12 @@ import org.jetbrains.kotlin.analysis.api.resolution.KaReceiverValue
 import org.jetbrains.kotlin.analysis.api.resolution.KaSmartCastedReceiverValue
 import org.jetbrains.kotlin.analysis.api.resolution.singleCallOrNull
 import org.jetbrains.kotlin.analysis.api.resolution.symbol
-import org.jetbrains.kotlin.analysis.api.components.KtDiagnosticCheckerFilter
+import org.jetbrains.kotlin.analysis.api.components.KaDiagnosticCheckerFilter
 import org.jetbrains.kotlin.analysis.api.fir.diagnostics.KaFirDiagnostic
-import org.jetbrains.kotlin.analysis.api.signatures.KtCallableSignature
-import org.jetbrains.kotlin.analysis.api.symbols.KaCallableSymbol
-import org.jetbrains.kotlin.analysis.api.symbols.KaClassKind
-import org.jetbrains.kotlin.analysis.api.symbols.KaClassOrObjectSymbol
-import org.jetbrains.kotlin.analysis.api.symbols.KaClassifierSymbol
-import org.jetbrains.kotlin.analysis.api.symbols.KaConstructorSymbol
-import org.jetbrains.kotlin.analysis.api.symbols.KaNamedFunctionSymbol
-import org.jetbrains.kotlin.analysis.api.symbols.KaReceiverParameterSymbol
-import org.jetbrains.kotlin.analysis.api.symbols.KtSymbol
-import org.jetbrains.kotlin.analysis.api.symbols.KaTypeParameterSymbol
-import org.jetbrains.kotlin.analysis.api.types.KtNonErrorClassType
-import org.jetbrains.kotlin.analysis.api.types.KtType
+import org.jetbrains.kotlin.analysis.api.signatures.KaCallableSignature
+import org.jetbrains.kotlin.analysis.api.symbols.*
+import org.jetbrains.kotlin.analysis.api.types.KaClassType
+import org.jetbrains.kotlin.analysis.api.types.KaType
 import org.jetbrains.kotlin.idea.base.codeInsight.KotlinDeclarationNameValidator
 import org.jetbrains.kotlin.idea.base.codeInsight.KotlinNameSuggester
 import org.jetbrains.kotlin.idea.base.codeInsight.KotlinNameSuggester.Companion.suggestNameByName
@@ -111,9 +103,9 @@ context(KaSession)
 internal fun ExtractionData.inferParametersInfo(
     virtualBlock: KtBlockExpression,
     modifiedVariables: Set<String>,
-    typeDescriptor: TypeDescriptor<KtType>,
-): ParametersInfo<KtType, MutableParameter> {
-    val info = ParametersInfo<KtType, MutableParameter>()
+    typeDescriptor: TypeDescriptor<KaType>,
+): ParametersInfo<KaType, MutableParameter> {
+    val info = ParametersInfo<KaType, MutableParameter>()
 
     val extractedDescriptorToParameter = LinkedHashMap<ParameterWithReference, MutableParameter>()
 
@@ -143,8 +135,8 @@ internal fun ExtractionData.inferParametersInfo(
     )
 
     val existingParameterNames = hashSetOf<String>()
-    val generateArguments: (KtType) -> List<KtType> =
-        { ktType -> (ktType as? KtNonErrorClassType)?.ownTypeArguments?.mapNotNull { it.type } ?: emptyList() }
+    val generateArguments: (KaType) -> List<KaType> =
+        { ktType -> (ktType as? KaClassType)?.typeArguments?.mapNotNull { it.type } ?: emptyList() }
     for ((namedElement, parameter) in extractedDescriptorToParameter) {
         if (!parameter
                 .parameterType
@@ -189,7 +181,7 @@ internal fun ExtractionData.inferParametersInfo(
         }
     }
 
-    for (typeToCheck in info.typeParameters.flatMap { it.collectReferencedTypes() }.map { it.getKtType() }) {
+    for (typeToCheck in info.typeParameters.flatMap { it.collectReferencedTypes() }.map { it.type }) {
         typeToCheck.processTypeIfExtractable(
             info.typeParameters,
             info.nonDenotableTypes,
@@ -204,15 +196,15 @@ internal fun ExtractionData.inferParametersInfo(
 
 context(KaSession)
 private fun ExtractionData.registerParameter(
-    info: ParametersInfo<KtType, MutableParameter>,
-    refInfo: ResolvedReferenceInfo<PsiNamedElement, KtReferenceExpression, KtType>,
+    info: ParametersInfo<KaType, MutableParameter>,
+    refInfo: ResolvedReferenceInfo<PsiNamedElement, KtReferenceExpression, KaType>,
     extractedDescriptorToParameter: HashMap<ParameterWithReference, MutableParameter>,
     isMemberExtension: Boolean
 ) {
     val (originalRef, _, originalDeclaration, resolvedCall) = refInfo.resolveResult
 
     val partiallyAppliedSymbol =
-        resolvedCall?.resolveCallOld()?.singleCallOrNull<KaCallableMemberCall<*, *>>()?.partiallyAppliedSymbol
+        resolvedCall?.resolveToCall()?.singleCallOrNull<KaCallableMemberCall<*, *>>()?.partiallyAppliedSymbol
     val dispatchReceiver = partiallyAppliedSymbol?.dispatchReceiver
     val extensionReceiver = partiallyAppliedSymbol?.extensionReceiver
     //Context receivers are not supported.
@@ -314,7 +306,7 @@ private fun ExtractionData.registerParameter(
 private fun getParameterArgumentExpression(
     originalRef: KtReferenceExpression,
     receiverToExtract: KaReceiverValue?,
-    smartCast: KtType?
+    smartCast: KaType?
 ): KtExpression? = when {
     receiverToExtract is KaExplicitReceiverValue -> {
         val receiverExpression = receiverToExtract.expression
@@ -362,7 +354,7 @@ private fun ExtractionData.calculateArgumentText(
 context(KaSession)
 private fun ExtractionData.registerQualifierReplacements(
     referencedClassifierSymbol: KaClassifierSymbol,
-    parametersInfo: ParametersInfo<KtType, MutableParameter>,
+    parametersInfo: ParametersInfo<KaType, MutableParameter>,
     originalDeclaration: PsiNamedElement,
     originalRef: KtReferenceExpression
 ) {
@@ -372,7 +364,7 @@ private fun ExtractionData.registerQualifierReplacements(
         if (listOwner == null || !PsiTreeUtil.isAncestor(listOwner, targetSibling, true)) {
             parametersInfo.typeParameters.add(TypeParameter(typeParameter, typeParameter.collectRelevantConstraints()))
         }
-    } else if (referencedClassifierSymbol is KaClassOrObjectSymbol && originalRef is KtSimpleNameExpression) {
+    } else if (referencedClassifierSymbol is KaClassSymbol && originalRef is KtSimpleNameExpression) {
         val fqName = referencedClassifierSymbol.classId?.asSingleFqName()
         if (fqName != null) {
             val name = when (originalDeclaration) {
@@ -391,15 +383,15 @@ private fun ExtractionData.registerQualifierReplacements(
 
 context(KaSession)
 private fun getReferencedClassifierSymbol(
-    thisSymbol: KtSymbol?,
+    thisSymbol: KaSymbol?,
     originalDeclaration: PsiNamedElement,
-    refInfo: ResolvedReferenceInfo<PsiNamedElement, KtReferenceExpression, KtType>,
-    partiallyAppliedSymbol: KaPartiallyAppliedSymbol<KaCallableSymbol, KtCallableSignature<KaCallableSymbol>>?
+    refInfo: ResolvedReferenceInfo<PsiNamedElement, KtReferenceExpression, KaType>,
+    partiallyAppliedSymbol: KaPartiallyAppliedSymbol<KaCallableSymbol, KaCallableSignature<KaCallableSymbol>>?
 ): KaClassifierSymbol? {
     val referencedSymbol = (thisSymbol ?: (originalDeclaration as? KtNamedDeclaration)?.symbol
     ?: (originalDeclaration as? PsiMember)?.callableSymbol) ?: return null
     return when (referencedSymbol) {
-        is KaClassOrObjectSymbol -> when (referencedSymbol.classKind) {
+        is KaClassSymbol -> when (referencedSymbol.classKind) {
             KaClassKind.OBJECT, KaClassKind.COMPANION_OBJECT, KaClassKind.ENUM_CLASS -> referencedSymbol
             //if type reference or call to implicit constructor, then type expansion might be required
             else -> if (refInfo.refExpr.getNonStrictParentOfType<KtTypeReference>() != null || partiallyAppliedSymbol?.symbol is KaConstructorSymbol) referencedSymbol else null
@@ -420,7 +412,7 @@ private fun createOriginalType(
     originalDeclaration: PsiNamedElement,
     parameterExpression: KtExpression?,
     receiverToExtract: KaReceiverValue?
-): KtType = (if (extractFunctionRef) {
+): KaType = (if (extractFunctionRef) {
     val functionSymbol = (originalDeclaration as KtNamedFunction).symbol as KaNamedFunctionSymbol
     val typeString =
         buildString { //todo rewrite as soon as functional type can be created by api call: https://youtrack.jetbrains.com/issue/KT-66566
@@ -442,26 +434,26 @@ private fun createOriginalType(
         }
 
     org.jetbrains.kotlin.psi.KtPsiFactory(originalDeclaration.project).createTypeCodeFragment(typeString, originalDeclaration)
-        .getContentElement()?.getKtType()
+        .getContentElement()?.type
 } else {
-    parameterExpression?.getKtType() ?: receiverToExtract?.type
+    parameterExpression?.expressionType ?: receiverToExtract?.type
 }) ?: builtinTypes.NULLABLE_ANY
 
 
 @OptIn(KaExperimentalApi::class)
-private fun ExtractionData.getBrokenReferencesInfo(body: KtBlockExpression): List<ResolvedReferenceInfo<PsiNamedElement, KtReferenceExpression, KtType>> {
+private fun ExtractionData.getBrokenReferencesInfo(body: KtBlockExpression): List<ResolvedReferenceInfo<PsiNamedElement, KtReferenceExpression, KaType>> {
     val newReferences = body.collectDescendantsOfType<KtReferenceExpression> { it.resolveResult != null }
 
     val smartCastPossibleRoots = mutableSetOf<KtExpression>()
-    val referencesInfo = ArrayList<ResolvedReferenceInfo<PsiNamedElement, KtReferenceExpression, KtType>>()
+    val referencesInfo = ArrayList<ResolvedReferenceInfo<PsiNamedElement, KtReferenceExpression, KaType>>()
     for (newRef in newReferences) {
         val originalResolveResult = newRef.resolveResult as? ResolveResult<PsiNamedElement, KtReferenceExpression> ?: continue
         val originalRefExpr = originalResolveResult.originalRefExpr
         val parent = newRef.parent
 
-        val smartCast: KtType?
+        val smartCast: KaType?
 
-        fun calculateSmartCastType(target: KtExpression): KtType? {
+        fun calculateSmartCastType(target: KtExpression): KaType? {
             return analyze(target) {
                 val cast = target.smartCastInfo?.smartCastType
                 when {
@@ -478,7 +470,7 @@ private fun ExtractionData.getBrokenReferencesInfo(body: KtBlockExpression): Lis
             }
         }
 
-        val possibleTypes: Set<KtType>
+        val possibleTypes: Set<KaType>
 
         // Qualified property reference: a.b
         val qualifiedExpression = newRef.getQualifiedExpressionForSelector()
@@ -487,9 +479,9 @@ private fun ExtractionData.getBrokenReferencesInfo(body: KtBlockExpression): Lis
             smartCast = calculateSmartCastType(smartCastTarget)
             possibleTypes = analyze(smartCastTarget) { smartCastTarget.expectedType?.let { setOf(it) } ?: emptySet() }
             val (isCompanionObject, bothReceivers) = analyze(smartCastTarget) {
-                val symbol = originalRefExpr.resolveCallOld()?.singleCallOrNull<KaCallableMemberCall<*, *>>()?.partiallyAppliedSymbol
+                val symbol = originalRefExpr.resolveToCall()?.singleCallOrNull<KaCallableMemberCall<*, *>>()?.partiallyAppliedSymbol
                 val receiverSymbol = (symbol?.dispatchReceiver as? KaImplicitReceiverValue)?.symbol
-                ((receiverSymbol?.containingSymbol as? KaClassOrObjectSymbol)?.classKind == KaClassKind.COMPANION_OBJECT) to
+                ((receiverSymbol?.containingSymbol as? KaClassSymbol)?.classKind == KaClassKind.COMPANION_OBJECT) to
                         (symbol?.dispatchReceiver != null && symbol.extensionReceiver != null)
             }
             val shouldSkipPrimaryReceiver = smartCast == null
@@ -522,7 +514,7 @@ private fun ExtractionData.getBrokenReferencesInfo(body: KtBlockExpression): Lis
         }
 
         fun hasResolveErrors(): Boolean =
-            analyze(newRef) { newRef.getDiagnostics(KtDiagnosticCheckerFilter.ONLY_COMMON_CHECKERS) }
+            analyze(newRef) { newRef.diagnostics(KaDiagnosticCheckerFilter.ONLY_COMMON_CHECKERS) }
                 .any {
                     it.diagnosticClass == KaFirDiagnostic.UnresolvedReferenceWrongReceiver::class ||
                             it.diagnosticClass == KaFirDiagnostic.UnresolvedReference::class

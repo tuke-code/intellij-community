@@ -7,7 +7,7 @@ import org.jetbrains.kotlin.analysis.api.resolution.KaSimpleFunctionCall
 import org.jetbrains.kotlin.analysis.api.resolution.singleFunctionCallOrNull
 import org.jetbrains.kotlin.analysis.api.resolution.symbol
 import org.jetbrains.kotlin.analysis.api.symbols.*
-import org.jetbrains.kotlin.analysis.api.types.KaFunctionalType
+import org.jetbrains.kotlin.analysis.api.types.KaFunctionType
 import org.jetbrains.kotlin.builtins.StandardNames
 import org.jetbrains.kotlin.idea.references.KtReference
 import org.jetbrains.kotlin.idea.references.KtSimpleNameReference
@@ -37,12 +37,12 @@ fun KtDeclaration.isFinalizeMethod(): Boolean {
     val function = this as? KtNamedFunction ?: return false
     return function.name == "finalize"
             && function.valueParameters.isEmpty()
-            && function.getReturnKtType().isUnit
+            && function.returnType.isUnit
 }
 
 context(KaSession)
-fun KtSymbol.getFqNameIfPackageOrNonLocal(): FqName? = when (this) {
-    is KtPackageSymbol -> fqName
+fun KaSymbol.getFqNameIfPackageOrNonLocal(): FqName? = when (this) {
+    is KaPackageSymbol -> fqName
     is KaCallableSymbol -> callableId?.asSingleFqName()
     is KaClassLikeSymbol -> classId?.asSingleFqName()
     else -> null
@@ -54,7 +54,7 @@ fun KtCallExpression.isArrayOfFunction(): Boolean {
             ArrayFqNames.ARRAY_OF_FUNCTION +
             ArrayFqNames.EMPTY_ARRAY
 
-    val call = resolveCallOld()?.singleFunctionCallOrNull()?.partiallyAppliedSymbol?.symbol?.callableId ?: return false
+    val call = resolveToCall()?.singleFunctionCallOrNull()?.partiallyAppliedSymbol?.symbol?.callableId ?: return false
 
     return call.packageName == StandardNames.BUILT_INS_PACKAGE_FQ_NAME &&
             functionNames.contains(call.callableName)
@@ -68,7 +68,7 @@ fun KtCallExpression.isArrayOfFunction(): Boolean {
  */
 context(KaSession)
 fun KtCallExpression.isImplicitInvokeCall(): Boolean? {
-    val functionCall = this.resolveCallOld()?.singleFunctionCallOrNull() ?: return null
+    val functionCall = this.resolveToCall()?.singleFunctionCallOrNull() ?: return null
 
     return functionCall is KaSimpleFunctionCall && functionCall.isImplicitInvoke
 }
@@ -93,7 +93,7 @@ fun KtReference.resolveCompanionObjectShortReferenceToContainingClassSymbol(): K
     if (this !is KtSimpleNameReference) return null
 
     val symbol = this.resolveToSymbol()
-    if (symbol !is KaClassOrObjectSymbol || symbol.classKind != KaClassKind.COMPANION_OBJECT) return null
+    if (symbol !is KaClassSymbol || symbol.classKind != KaClassKind.COMPANION_OBJECT) return null
 
     // class name reference resolves to companion
     if (expression.name == symbol.name?.asString()) return null
@@ -109,4 +109,4 @@ fun KtReference.resolveCompanionObjectShortReferenceToContainingClassSymbol(): K
  */
 context(KaSession)
 fun KaCallableSymbol.canBeUsedAsExtension(): Boolean =
-    isExtension || this is KaVariableLikeSymbol && (returnType as? KaFunctionalType)?.hasReceiver == true
+    isExtension || this is KaVariableSymbol && (returnType as? KaFunctionType)?.hasReceiver == true

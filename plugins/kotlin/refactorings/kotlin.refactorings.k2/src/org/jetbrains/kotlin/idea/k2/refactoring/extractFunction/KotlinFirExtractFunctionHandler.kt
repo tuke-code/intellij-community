@@ -14,12 +14,11 @@ import org.jetbrains.annotations.Nls
 import org.jetbrains.kotlin.analysis.api.resolution.KaErrorCallInfo
 import org.jetbrains.kotlin.analysis.api.permissions.KaAllowAnalysisOnEdt
 import org.jetbrains.kotlin.analysis.api.permissions.allowAnalysisOnEdt
-import org.jetbrains.kotlin.analysis.api.types.KtType
+import org.jetbrains.kotlin.analysis.api.types.KaType
 import org.jetbrains.kotlin.idea.base.analysis.api.utils.analyzeInModalWindow
 import org.jetbrains.kotlin.idea.base.psi.unifier.toRange
 import org.jetbrains.kotlin.idea.base.resources.KotlinBundle
 import org.jetbrains.kotlin.idea.k2.refactoring.extractFunction.ui.KotlinFirExtractFunctionDialog
-import org.jetbrains.kotlin.idea.k2.refactoring.extractFunction.KotlinFirExtractFunctionHandler.InteractiveExtractionHelper
 import org.jetbrains.kotlin.idea.k2.refactoring.introduce.extractionEngine.ExtractionDataAnalyzer
 import org.jetbrains.kotlin.idea.k2.refactoring.introduce.extractionEngine.ExtractionEngineHelper
 import org.jetbrains.kotlin.idea.refactoring.introduce.extractFunction.AbstractExtractKotlinFunctionHandler
@@ -62,7 +61,7 @@ class KotlinFirExtractFunctionHandler(
     }
 
     class InplaceExtractionHelper(private val acceptAllScopes: Boolean) : ExtractionEngineHelper(EXTRACT_FUNCTION),
-                                                                          AbstractInplaceExtractionHelper<KtType, ExtractionResult, ExtractableCodeDescriptorWithConflicts> {
+                                                                          AbstractInplaceExtractionHelper<KaType, ExtractionResult, ExtractableCodeDescriptorWithConflicts> {
         override fun createRestartHandler(): AbstractExtractKotlinFunctionHandler =
             KotlinFirExtractFunctionHandler(acceptAllScopes, InteractiveExtractionHelper)
 
@@ -70,7 +69,7 @@ class KotlinFirExtractFunctionHandler(
             KotlinFirExtractFunctionHandler(acceptAllScopes, this)
 
         override fun doRefactor(
-            descriptor: IExtractableCodeDescriptor<KtType>, onFinish: (ExtractionResult) -> Unit
+            descriptor: IExtractableCodeDescriptor<KaType>, onFinish: (ExtractionResult) -> Unit
         ) {
             val configuration =
                 ExtractionGeneratorConfiguration(descriptor as ExtractableCodeDescriptor, withCollapseOption(descriptor.context.project))
@@ -92,7 +91,7 @@ class KotlinFirExtractFunctionHandler(
             val name = file.viewProvider.document.getText(variableRange)
             return if (!name.isIdentifier()) {
                 JavaRefactoringBundle.message("template.error.invalid.identifier.name")
-            } else if (analyzeInModalWindow(file, KotlinBundle.message("fix.change.signature.prepare")) { call.resolveCallOld() is KaErrorCallInfo }) {
+            } else if (analyzeInModalWindow(file, KotlinBundle.message("fix.change.signature.prepare")) { call.resolveToCall() is KaErrorCallInfo }) {
                 JavaRefactoringBundle.message("extract.method.error.method.conflict")
             } else {
                 null
@@ -114,10 +113,10 @@ class KotlinFirExtractFunctionHandler(
         }
 
         val engine = object :
-            IExtractionEngine<KtType, ExtractionData, ExtractionGeneratorConfiguration, ExtractionResult, ExtractableCodeDescriptor, ExtractableCodeDescriptorWithConflicts>(
+            IExtractionEngine<KaType, ExtractionData, ExtractionGeneratorConfiguration, ExtractionResult, ExtractableCodeDescriptor, ExtractableCodeDescriptorWithConflicts>(
                 helper
             ) {
-            override fun performAnalysis(extractionData: ExtractionData): AnalysisResult<KtType> {
+            override fun performAnalysis(extractionData: ExtractionData): AnalysisResult<KaType> {
                 return ExtractionDataAnalyzer(extractionData).performAnalysis()
             }
         }

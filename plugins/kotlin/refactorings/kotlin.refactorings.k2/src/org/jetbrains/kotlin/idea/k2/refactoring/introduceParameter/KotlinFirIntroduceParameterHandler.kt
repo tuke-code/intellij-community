@@ -24,10 +24,10 @@ import org.jetbrains.kotlin.analysis.api.permissions.allowAnalysisOnEdt
 import org.jetbrains.kotlin.analysis.api.resolution.KaCallableMemberCall
 import org.jetbrains.kotlin.analysis.api.resolution.KaImplicitReceiverValue
 import org.jetbrains.kotlin.analysis.api.resolution.successfulCallOrNull
-import org.jetbrains.kotlin.analysis.api.renderer.types.impl.KtTypeRendererForSource
+import org.jetbrains.kotlin.analysis.api.renderer.types.impl.KaTypeRendererForSource
 import org.jetbrains.kotlin.analysis.api.renderer.types.renderers.KaFunctionalTypeRenderer
 import org.jetbrains.kotlin.analysis.api.symbols.KaCallableSymbol
-import org.jetbrains.kotlin.analysis.api.types.KtType
+import org.jetbrains.kotlin.analysis.api.types.KaType
 import org.jetbrains.kotlin.idea.base.analysis.api.utils.analyzeInModalWindow
 import org.jetbrains.kotlin.idea.base.codeInsight.KotlinDeclarationNameValidator
 import org.jetbrains.kotlin.idea.base.codeInsight.KotlinNameSuggestionProvider.ValidatorTarget
@@ -89,7 +89,7 @@ class KotlinFirIntroduceParameterHandler(private val helper: KotlinIntroducePara
                     override fun visitKtElement(element: KtElement) {
                         super.visitKtElement(element)
 
-                        val symbol = element.resolveCallOld()?.successfulCallOrNull<KaCallableMemberCall<*, *>>()?.partiallyAppliedSymbol
+                        val symbol = element.resolveToCall()?.successfulCallOrNull<KaCallableMemberCall<*, *>>()?.partiallyAppliedSymbol
                         val callableSymbol = targetParent.symbol as? KaCallableSymbol
                         if (callableSymbol != null) {
                             if ((symbol?.dispatchReceiver as? KaImplicitReceiverValue)?.symbol == callableSymbol.receiverParameter || (symbol?.extensionReceiver as? KaImplicitReceiverValue)?.symbol == callableSymbol.receiverParameter) {
@@ -108,21 +108,21 @@ class KotlinFirIntroduceParameterHandler(private val helper: KotlinIntroducePara
     private fun getExpressionType(
         physicalExpression: KtExpression,
         expression: KtExpression
-    ): KtType? {
+    ): KaType? {
         val type = if (physicalExpression is KtProperty && physicalExpression.isLocal) {
-            physicalExpression.getReturnKtType()
+            physicalExpression.returnType
         } else {
-            (expression.extractableSubstringInfo as? K2ExtractableSubstringInfo)?.guessLiteralType() ?: physicalExpression.getKtType()
+            (expression.extractableSubstringInfo as? K2ExtractableSubstringInfo)?.guessLiteralType() ?: physicalExpression.expressionType
         }
         return approximateWithResolvableType(type, physicalExpression)
     }
 
     operator fun invoke(project: Project, editor: Editor, expression: KtExpression, targetParent: KtNamedDeclaration) {
-        val expressionTypeEvaluator: KaSession.() -> KtType? = {
+        val expressionTypeEvaluator: KaSession.() -> KaType? = {
             val physicalExpression = expression.substringContextOrThis
             getExpressionType(physicalExpression, expression)
         }
-        val nameSuggester: KaSession.(KtType) -> List<String> = { expressionType ->
+        val nameSuggester: KaSession.(KaType) -> List<String> = { expressionType ->
             val suggestedNames = SmartList<String>()
             val physicalExpression = expression.substringContextOrThis
             val body = when (targetParent) {
@@ -152,7 +152,7 @@ class KotlinFirIntroduceParameterHandler(private val helper: KotlinIntroducePara
      * (to be reused in "create parameter from usage" where both type and name are fixed, and computed a bit differently from the regular "introduce parameter")
      */
     @OptIn(KaExperimentalApi::class)
-    fun addParameter(project: Project, editor: Editor, expression: KtExpression, targetParent: KtNamedDeclaration, expressionTypeEvaluator: KaSession.()->KtType?, nameSuggester:  KaSession.(KtType)->List<String>) {
+    fun addParameter(project: Project, editor: Editor, expression: KtExpression, targetParent: KtNamedDeclaration, expressionTypeEvaluator: KaSession.()->KaType?, nameSuggester:  KaSession.(KaType)->List<String>) {
         val physicalExpression = expression.substringContextOrThis
         if (physicalExpression is KtProperty && physicalExpression.isLocal && physicalExpression.nameIdentifier == null) {
             showErrorHintByKey(project, editor, "cannot.refactor.no.expression", INTRODUCE_PARAMETER)
@@ -168,7 +168,7 @@ class KotlinFirIntroduceParameterHandler(private val helper: KotlinIntroducePara
             } else if (expressionType.isUnit || expressionType.isNothing) {
                 KotlinBundle.message(
                     "cannot.introduce.parameter.of.0.type",
-                    expressionType.render(KtTypeRendererForSource.WITH_SHORT_NAMES, position = Variance.INVARIANT),
+                    expressionType.render(KaTypeRendererForSource.WITH_SHORT_NAMES, position = Variance.INVARIANT),
                 )
             } else null
 
@@ -248,7 +248,7 @@ class KotlinFirIntroduceParameterHandler(private val helper: KotlinIntroducePara
 
                 if (inplaceIsAvailable) {
 
-                    val introducer = object : KotlinInplaceParameterIntroducerBase<KtType, KtNamedDeclaration>(
+                    val introducer = object : KotlinInplaceParameterIntroducerBase<KaType, KtNamedDeclaration>(
                         introduceParameterDescriptor,
                         replacementType,
                         suggestedNames.toTypedArray(),
@@ -279,15 +279,15 @@ class KotlinFirIntroduceParameterHandler(private val helper: KotlinIntroducePara
         project: Project,
         editor: Editor,
         physicalExpression: KtExpression,
-        replacementType: KtType,
+        replacementType: KaType,
         suggestedNames: List<String>,
         introduceParameterDescriptor: IntroduceParameterDescriptor<KtNamedDeclaration>
     ) {
         val types = analyzeInModalWindow(physicalExpression, KotlinBundle.message("find.usages.prepare.dialog.progress")) {
             buildList {
-                add(replacementType.render(KtTypeRendererForSource.WITH_SHORT_NAMES, position = Variance.INVARIANT))
+                add(replacementType.render(KaTypeRendererForSource.WITH_SHORT_NAMES, position = Variance.INVARIANT))
                 replacementType.getAllSuperTypes(true).mapTo(this) {
-                    it.render(KtTypeRendererForSource.WITH_SHORT_NAMES, position = Variance.INVARIANT)
+                    it.render(KaTypeRendererForSource.WITH_SHORT_NAMES, position = Variance.INVARIANT)
                 }
             }
         }
@@ -307,7 +307,7 @@ class KotlinFirIntroduceParameterHandler(private val helper: KotlinIntroducePara
         targetParent: KtNamedDeclaration,
         suggestedNames: List<String>,
         physicalExpression: KtExpression,
-        replacementType: KtType,
+        replacementType: KaType,
         parametersUsages: MultiMap<KtElement, KtElement>,
         occurrencesToReplace: List<KotlinPsiRange>,
         psiFactory: KtPsiFactory
@@ -318,7 +318,7 @@ class KotlinFirIntroduceParameterHandler(private val helper: KotlinIntroducePara
             callableDescriptor = targetParent,
             newParameterName = suggestedNames.first().quoteIfNeeded(),
             newParameterTypeText = analyze(physicalExpression) {
-                replacementType.render(KtTypeRendererForSource.WITH_QUALIFIED_NAMES.with {
+                replacementType.render(KaTypeRendererForSource.WITH_QUALIFIED_NAMES.with {
                     functionalTypeRenderer = KaFunctionalTypeRenderer.AS_FUNCTIONAL_TYPE
                 }, position = Variance.IN_VARIANCE)
             },

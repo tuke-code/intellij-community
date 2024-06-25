@@ -1,4 +1,4 @@
-// Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 
 package org.jetbrains.kotlin.idea.completion.contributors
 
@@ -10,13 +10,12 @@ import com.intellij.openapi.util.TextRange
 import com.intellij.psi.util.parentOfType
 import it.unimi.dsi.fastutil.Hash
 import it.unimi.dsi.fastutil.objects.ObjectOpenCustomHashSet
+import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
 import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.symbols.*
 import org.jetbrains.kotlin.analysis.api.symbols.markers.KaNamedSymbol
-import org.jetbrains.kotlin.analysis.api.symbols.markers.KaSymbolWithTypeParameters
-import org.jetbrains.kotlin.analysis.api.types.KtNonErrorClassType
-import org.jetbrains.kotlin.analysis.api.types.KtType
-import org.jetbrains.kotlin.descriptors.Modality
+import org.jetbrains.kotlin.analysis.api.types.KaClassType
+import org.jetbrains.kotlin.analysis.api.types.KaType
 import org.jetbrains.kotlin.idea.base.analysis.api.utils.resolveToExpandedSymbol
 import org.jetbrains.kotlin.idea.base.analysis.api.utils.shortenReferencesInRange
 import org.jetbrains.kotlin.idea.base.codeInsight.KotlinIconProvider.getIconFor
@@ -60,7 +59,7 @@ internal class FirWhenWithSubjectConditionContributor(
         val whenExpression = whenCondition.parentOfType<KtWhenExpression>() ?: return
         val subject = whenExpression.subjectExpression ?: return
         val allConditionsExceptCurrent = whenExpression.entries.flatMap { entry -> entry.conditions.filter { it != whenCondition } }
-        val subjectType = subject.getKtType() ?: return
+        val subjectType = subject.expressionType ?: return
         val classSymbol = getClassSymbol(subjectType)
         val visibilityChecker = CompletionVisibilityChecker.create(basicContext, positionContext)
         val isSingleCondition = whenCondition.isSingleConditionInEntry()
@@ -68,7 +67,7 @@ internal class FirWhenWithSubjectConditionContributor(
             classSymbol?.classKind == KaClassKind.ENUM_CLASS -> {
                 completeEnumEntries(weighingContext, classSymbol, allConditionsExceptCurrent, visibilityChecker, isSingleCondition)
             }
-            classSymbol?.modality == Modality.SEALED -> {
+            classSymbol?.modality == KaSymbolModality.SEALED -> {
                 completeSubClassesOfSealedClass(
                     weighingContext,
                     classSymbol,
@@ -87,14 +86,14 @@ internal class FirWhenWithSubjectConditionContributor(
     }
 
     context(KaSession)
-    private fun getClassSymbol(subjectType: KtType): KaNamedClassOrObjectSymbol? {
-        val classType = subjectType as? KtNonErrorClassType
+    private fun getClassSymbol(subjectType: KaType): KaNamedClassOrObjectSymbol? {
+        val classType = subjectType as? KaClassType
         return classType?.symbol as? KaNamedClassOrObjectSymbol
     }
 
 
     context(KaSession)
-    private fun addNullIfWhenExpressionCanReturnNull(context: WeighingContext, type: KtType?) {
+    private fun addNullIfWhenExpressionCanReturnNull(context: WeighingContext, type: KaType?) {
         if (type?.canBeNull == true) {
             val lookupElement = createKeywordElement(keyword = KtTokens.NULL_KEYWORD.value)
             applyWeighsAndAddElementToSink(context, lookupElement, symbolWithOrigin = null)
@@ -148,7 +147,7 @@ internal class FirWhenWithSubjectConditionContributor(
             is KaAnonymousObjectSymbol -> return false
             is KaNamedClassOrObjectSymbol -> onTypingIsKeyword || !symbol.classKind.isObject
             is KaTypeAliasSymbol -> {
-                (symbol.expandedType as? KtNonErrorClassType)?.symbol?.let { it is KaNamedSymbol && isPrefixNeeded(it) } == true
+                (symbol.expandedType as? KaClassType)?.symbol?.let { it is KaNamedSymbol && isPrefixNeeded(it) } == true
             }
 
             is KaTypeParameterSymbol -> true
@@ -165,7 +164,7 @@ internal class FirWhenWithSubjectConditionContributor(
         visibilityChecker: CompletionVisibilityChecker,
         isSingleCondition: Boolean,
     ) {
-        require(classSymbol.modality == Modality.SEALED)
+        require(classSymbol.modality == KaSymbolModality.SEALED)
         val handledCasesClassIds = getHandledClassIds(conditions)
         val allInheritors = getAllSealedInheritors(classSymbol)
 
@@ -185,7 +184,7 @@ internal class FirWhenWithSubjectConditionContributor(
                 )
             }
 
-        if (allInheritors.any { it.modality == Modality.ABSTRACT }) {
+        if (allInheritors.any { it.modality == KaSymbolModality.ABSTRACT }) {
             completeAllTypes(context, whenCondition, visibilityChecker, isSingleCondition)
         }
     }
@@ -211,7 +210,7 @@ internal class FirWhenWithSubjectConditionContributor(
         ) {
             classSymbol.sealedClassInheritors.forEach { inheritor ->
                 destination += inheritor
-                if (inheritor.modality == Modality.SEALED) {
+                if (inheritor.modality == KaSymbolModality.SEALED) {
                     getAllSealedInheritorsTo(inheritor, destination)
                 }
             }
@@ -276,7 +275,9 @@ internal class FirWhenWithSubjectConditionContributor(
         isSingleCondition: Boolean,
     ) {
         val isPrefixNeeded = isPrefixNeeded(symbol)
-        val typeArgumentsCount = (symbol as? KaSymbolWithTypeParameters)?.typeParameters?.size ?: 0
+
+        @OptIn(KaExperimentalApi::class)
+        val typeArgumentsCount = (symbol as? KaDeclarationSymbol)?.typeParameters?.size ?: 0
         val lookupObject = WhenConditionLookupObject(symbol.name, fqName, isPrefixNeeded, isSingleCondition, typeArgumentsCount)
 
         LookupElementBuilder.create(lookupObject, getIsPrefix(isPrefixNeeded) + lookupString)

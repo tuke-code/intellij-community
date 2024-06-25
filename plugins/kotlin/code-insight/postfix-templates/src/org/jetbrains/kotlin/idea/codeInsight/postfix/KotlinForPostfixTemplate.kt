@@ -108,7 +108,7 @@ internal abstract class AbstractKotlinForLoopNumbersPostfixTemplate(
     allExpressions(
         ValuedFilter,
         StatementFilter,
-        ExpressionTypeFilter { it is KtNonErrorClassType && !it.isMarkedNullable && it.classId == INT_CLASS_ID }),
+        ExpressionTypeFilter { it is KaClassType && !it.isMarkedNullable && it.classId == INT_CLASS_ID }),
     /* provider = */ provider
 ) {
     override fun setVariables(template: Template, element: PsiElement) {
@@ -150,13 +150,13 @@ private val ITERABLE_CLASS_IDS: Set<ClassId> = setOf(
 )
 
 context(KaSession)
-internal fun canBeIterated(type: KtType, checkNullability: Boolean = true): Boolean {
+internal fun canBeIterated(type: KaType, checkNullability: Boolean = true): Boolean {
     return when (type) {
-        is KtFlexibleType -> canBeIterated(type.lowerBoundIfFlexible())
-        is KtIntersectionType -> type.conjuncts.all { canBeIterated(it) }
-        is KtDefinitelyNotNullType -> canBeIterated(type.original, checkNullability = false)
-        is KtTypeParameterType -> type.symbol.upperBounds.any { canBeIterated(it) }
-        is KtNonErrorClassType -> {
+        is KaFlexibleType -> canBeIterated(type.lowerBoundIfFlexible())
+        is KaIntersectionType -> type.conjuncts.all { canBeIterated(it) }
+        is KaDefinitelyNotNullType -> canBeIterated(type.original, checkNullability = false)
+        is KaTypeParameterType -> type.symbol.upperBounds.any { canBeIterated(it) }
+        is KaClassType -> {
             (!checkNullability || !type.isMarkedNullable)
                     && (type.classId in ITERABLE_CLASS_IDS || type.getAllSuperTypes(true).any { canBeIterated(it) })
         }

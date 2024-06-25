@@ -11,7 +11,7 @@ import org.jetbrains.kotlin.analysis.api.analyze
 import org.jetbrains.kotlin.analysis.api.resolution.*
 import org.jetbrains.kotlin.analysis.api.symbols.*
 import org.jetbrains.kotlin.analysis.api.symbols.markers.KaNamedSymbol
-import org.jetbrains.kotlin.analysis.api.types.KtErrorType
+import org.jetbrains.kotlin.analysis.api.types.KaErrorType
 import org.jetbrains.kotlin.idea.base.resources.KotlinBundle
 import org.jetbrains.kotlin.idea.refactoring.conflicts.filterCandidates
 import org.jetbrains.kotlin.idea.refactoring.conflicts.registerRetargetJobOnPotentialCandidates
@@ -49,8 +49,8 @@ fun checkClassNameShadowing(
 
             val shortNameFragment = createTypeFragment(newName)
             val hasConflict = analyze(shortNameFragment) {
-                val typeByShortName = shortNameFragment.getContentElement()?.getKtType()
-                typeByShortName != null && typeByShortName !is KtErrorType
+                val typeByShortName = shortNameFragment.getContentElement()?.expressionType
+                typeByShortName != null && typeByShortName !is KaErrorType
             }
 
             if (hasConflict) {
@@ -115,9 +115,9 @@ fun checkCallableShadowing(
             //meaning that you can't change it without WA which is here not allowed, because conflict checking is under RA in progress
             val copyCallExpression =
                 PsiTreeUtil.getParentOfType(codeFragment.findElementAt(offsetInCopy.startOffset), false, callExpression.javaClass)
-            val resolveCall = copyCallExpression?.resolveCallOld()?.successfulCallOrNull<KaCallableMemberCall<*, *>>()
+            val resolveCall = copyCallExpression?.resolveToCall()?.successfulCallOrNull<KaCallableMemberCall<*, *>>()
             val resolvedSymbol = resolveCall?.partiallyAppliedSymbol?.symbol
-            if (resolvedSymbol is KtSyntheticJavaPropertySymbol) {
+            if (resolvedSymbol is KaSyntheticJavaPropertySymbol) {
                 val getter = resolvedSymbol.javaGetterSymbol.psi
                 externalDeclarations.addIfNotNull(getter)
                 externalDeclarations.addIfNotNull(resolvedSymbol.javaSetterSymbol?.psi)
@@ -257,12 +257,12 @@ private data class QualifiedState(val expression: KtExpression?, val explicitlyQ
 private fun createQualifiedExpression(callExpression: KtExpression, newName: String): QualifiedState? {
     val psiFactory = KtPsiFactory(callExpression.project)
     analyze(callExpression) {
-        val appliedSymbol = callExpression.resolveCallOld()?.successfulCallOrNull<KaCallableMemberCall<*, *>>()?.partiallyAppliedSymbol
+        val appliedSymbol = callExpression.resolveToCall()?.successfulCallOrNull<KaCallableMemberCall<*, *>>()?.partiallyAppliedSymbol
         val receiver = appliedSymbol?.extensionReceiver ?: appliedSymbol?.dispatchReceiver
 
         fun getThisQualifier(receiverValue: KaImplicitReceiverValue): String {
             val symbol = receiverValue.symbol
-            return if ((symbol as? KaClassOrObjectSymbol)?.classKind == KaClassKind.COMPANION_OBJECT) {
+            return if ((symbol as? KaClassSymbol)?.classKind == KaClassKind.COMPANION_OBJECT) {
                 //specify companion name to avoid clashes with enum entries
                 symbol.name!!.asString()
             } else if (symbol is KaClassifierSymbol && symbol !is KaAnonymousObjectSymbol) {
@@ -307,7 +307,7 @@ private fun createQualifiedExpression(callExpression: KtExpression, newName: Str
                 val symbol = appliedSymbol?.symbol
                 val containingSymbol = symbol?.containingSymbol
                 val containerFQN =
-                    if (containingSymbol is KaClassOrObjectSymbol) {
+                    if (containingSymbol is KaClassSymbol) {
                         containingSymbol.classId?.asSingleFqName()?.parent()
                     } else if (containingSymbol == null) {
                         (symbol?.psi as? KtElement)?.containingKtFile?.packageFqName

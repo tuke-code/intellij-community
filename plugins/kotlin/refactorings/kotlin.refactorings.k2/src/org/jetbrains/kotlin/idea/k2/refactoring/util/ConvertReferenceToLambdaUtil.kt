@@ -8,16 +8,9 @@ import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
 import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.resolution.successfulFunctionCallOrNull
 import org.jetbrains.kotlin.analysis.api.resolution.symbol
-import org.jetbrains.kotlin.analysis.api.symbols.KaCallableSymbol
-import org.jetbrains.kotlin.analysis.api.symbols.KaClassOrObjectSymbol
-import org.jetbrains.kotlin.analysis.api.symbols.KaFunctionSymbol
-import org.jetbrains.kotlin.analysis.api.symbols.KaNamedFunctionSymbol
-import org.jetbrains.kotlin.analysis.api.symbols.KaNamedClassOrObjectSymbol
-import org.jetbrains.kotlin.analysis.api.symbols.KtPropertySymbol
-import org.jetbrains.kotlin.analysis.api.symbols.KaValueParameterSymbol
-import org.jetbrains.kotlin.analysis.api.symbols.markers.KaNamedSymbol
-import org.jetbrains.kotlin.analysis.api.types.KtFunctionalType
-import org.jetbrains.kotlin.analysis.api.types.KtNonErrorClassType
+import org.jetbrains.kotlin.analysis.api.symbols.*
+import org.jetbrains.kotlin.analysis.api.types.KaFunctionType
+import org.jetbrains.kotlin.analysis.api.types.KaClassType
 import org.jetbrains.kotlin.builtins.StandardNames
 import org.jetbrains.kotlin.idea.base.analysis.api.utils.shortenReferences
 import org.jetbrains.kotlin.idea.base.codeInsight.KotlinNameSuggester
@@ -43,9 +36,9 @@ object ConvertReferenceToLambdaUtil {
     ): String? {
         val valueArgumentParent = element.parent as? KtValueArgument
         val callGrandParent = valueArgumentParent?.parent?.parent as? KtCallExpression
-        val resolvedCall = callGrandParent?.resolveCallOld()?.successfulFunctionCallOrNull()
+        val resolvedCall = callGrandParent?.resolveToCall()?.successfulFunctionCallOrNull()
         val matchingParameterType = resolvedCall?.argumentMapping?.get(element)?.returnType
-        val matchingParameterIsExtension = matchingParameterType is KtFunctionalType && matchingParameterType.receiverType != null
+        val matchingParameterIsExtension = matchingParameterType is KaFunctionType && matchingParameterType.receiverType != null
 
         val receiverExpression = element.receiverExpression
         val receiverType = element.getReceiverKtType()
@@ -57,7 +50,7 @@ object ConvertReferenceToLambdaUtil {
         }
 
         val receiverSymbol = receiverExpression?.getQualifiedElementSelector()?.mainReference?.resolveToSymbol()
-        val acceptsReceiverAsParameter = receiverSymbol is KaClassOrObjectSymbol &&
+        val acceptsReceiverAsParameter = receiverSymbol is KaClassSymbol &&
                 !matchingParameterIsExtension &&
                 (callableSymbol as? KaNamedFunctionSymbol)?.isStatic != true && !receiverSymbol.classKind.isObject &&
                 (callableSymbol?.containingSymbol != null || callableSymbol?.isExtension == true || symbol is KaNamedClassOrObjectSymbol && symbol.isInner)
@@ -67,7 +60,7 @@ object ConvertReferenceToLambdaUtil {
                 val paramNameAndTypes = callableSymbol.valueParameters.map { it.name.asString() to it.returnType }
                 if (matchingParameterType != null) {
                     val parameterSize =
-                        (matchingParameterType as KtNonErrorClassType).ownTypeArguments.size - (if (acceptsReceiverAsParameter) 2 else 1)
+                        (matchingParameterType as KaClassType).typeArguments.size - (if (acceptsReceiverAsParameter) 2 else 1)
                     if (parameterSize >= 0) paramNameAndTypes.take(parameterSize) else paramNameAndTypes
                 } else {
                     paramNameAndTypes
@@ -104,7 +97,7 @@ object ConvertReferenceToLambdaUtil {
             receiverExpression?.text != StandardNames.IMPLICIT_LAMBDA_PARAMETER_NAME.identifier
         ) {
             val body = if (acceptsReceiverAsParameter) {
-                if (callableSymbol is KtPropertySymbol) "it.$targetName"
+                if (callableSymbol is KaPropertySymbol) "it.$targetName"
                 else "it.$targetName()"
             } else {
                 "$receiverPrefix$targetName(${if (matchingParameterIsExtension) "this" else "it"})"
@@ -125,7 +118,7 @@ object ConvertReferenceToLambdaUtil {
                     if (valueArgumentParent != null) it.first
                     else it.first + ": " + it.second.render(position = Variance.IN_VARIANCE)
                 },
-                body = if (callableSymbol is KtPropertySymbol) {
+                body = if (callableSymbol is KaPropertySymbol) {
                     "$receiverPrefix$targetName"
                 } else {
                     args.joinToString(prefix = "$receiverPrefix$targetName(", separator = ", ", postfix = ")")

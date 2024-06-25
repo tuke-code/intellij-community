@@ -1744,6 +1744,7 @@ com.intellij.openapi.vcs.changes.ChangesViewModifier$ChangesViewModifierListener
 *:com.intellij.openapi.vcs.changes.ChangesViewNodeAction
 - sf:EP_NAME:com.intellij.openapi.extensions.ProjectExtensionPointName
 - a:createNodeHoverIcon(com.intellij.openapi.vcs.changes.ui.ChangesBrowserNode):com.intellij.openapi.vcs.changes.ui.HoverIcon
+- handleDoubleClick(com.intellij.openapi.vcs.changes.ui.ChangesBrowserNode):Z
 f:com.intellij.openapi.vcs.changes.ChangesViewPanel
 - com.intellij.util.ui.components.BorderLayoutPanel
 - <init>(com.intellij.openapi.vcs.changes.ui.ChangesListView):V
@@ -5290,7 +5291,7 @@ a:com.intellij.openapi.vcs.changes.ui.ChangesListView
 - uiDataSnapshot(com.intellij.openapi.actionSystem.DataSink):V
 a:com.intellij.openapi.vcs.changes.ui.ChangesTree
 - com.intellij.ui.treeStructure.Tree
-- com.intellij.openapi.actionSystem.EdtCompatibleDataProvider
+- com.intellij.openapi.actionSystem.UiCompatibleDataProvider
 - sf:ALWAYS_KEEP:com.intellij.openapi.vcs.changes.ui.ChangesTree$TreeStateStrategy
 - sf:ALWAYS_RESET:com.intellij.openapi.vcs.changes.ui.ChangesTree$TreeStateStrategy
 - sf:DEFAULT_GROUPING_KEYS:java.util.List

@@ -16,7 +16,7 @@ import org.jetbrains.kotlin.analysis.api.resolution.KaImplicitReceiverValue
 import org.jetbrains.kotlin.analysis.api.resolution.singleVariableAccessCall
 import org.jetbrains.kotlin.analysis.api.symbols.*
 import org.jetbrains.kotlin.analysis.api.symbols.pointers.KaSymbolPointer
-import org.jetbrains.kotlin.analysis.api.types.KtFunctionalType
+import org.jetbrains.kotlin.analysis.api.types.KaFunctionType
 import org.jetbrains.kotlin.descriptors.Modality
 import org.jetbrains.kotlin.idea.k2.codeinsight.inspections.dfa.KtClassDef.Companion.classDef
 import org.jetbrains.kotlin.idea.references.mainReference
@@ -26,7 +26,7 @@ import org.jetbrains.kotlin.psi.*
 
 class KtVariableDescriptor(
     val module: KaModule,
-    val pointer: KaSymbolPointer<KtVariableLikeSymbol>,
+    val pointer: KaSymbolPointer<KaVariableSymbol>,
     val type: DfType,
     val hash: Int
 ) : JvmVariableDescriptor() {
@@ -34,7 +34,7 @@ class KtVariableDescriptor(
         when (val result = analyze(module) {
             when (val symbol = pointer.restoreSymbol()) {
                 is KaValueParameterSymbol, is KaEnumEntrySymbol -> return@analyze true
-                is KtPropertySymbol -> return@analyze symbol.isVal
+                is KaPropertySymbol -> return@analyze symbol.isVal
                 is KaLocalVariableSymbol -> {
                     if (symbol.isVal) return@analyze true
                     val psiElement = symbol.psi?.parent as? KtElement
@@ -55,7 +55,10 @@ class KtVariableDescriptor(
 
     override fun canBeCapturedInClosure(): Boolean = analyze(module) {
         val symbol = pointer.restoreSymbol() ?: return@analyze false
-        return@analyze symbol is KtVariableSymbol && symbol.isVal
+        when (symbol) {
+            is KaPropertySymbol, is KaJavaFieldSymbol, is KaLocalVariableSymbol -> symbol.isVal
+            else -> false
+        }
     }
 
     override fun getDfType(qualifier: DfaVariableValue?): DfType = type
@@ -79,7 +82,7 @@ class KtVariableDescriptor(
 
         context(KaSession)
         fun getLambdaReceiver(factory: DfaValueFactory, lambda: KtLambdaExpression): DfaVariableValue? {
-            val receiverType = (lambda.functionLiteral.getFunctionalType() as? KtFunctionalType)?.receiverType ?: return null
+            val receiverType = (lambda.functionLiteral.functionType as? KaFunctionType)?.receiverType ?: return null
             val descriptor = KtLambdaThisVariableDescriptor(lambda.functionLiteral, receiverType.toDfType())
             return factory.varFactory.createVariableValue(descriptor)
         }
@@ -94,7 +97,7 @@ class KtVariableDescriptor(
         }
 
         context(KaSession)
-        internal fun KtVariableLikeSymbol.variableDescriptor(): KtVariableDescriptor {
+        internal fun KaVariableSymbol.variableDescriptor(): KtVariableDescriptor {
             return KtVariableDescriptor(useSiteModule, this.createPointer(), this.returnType.toDfType(), this.name.hashCode())
         }
 
@@ -133,14 +136,14 @@ class KtVariableDescriptor(
         fun createFromSimpleName(factory: DfaValueFactory, expr: KtExpression?): DfaVariableValue? {
             val varFactory = factory.varFactory
             if (expr !is KtSimpleNameExpression) return null
-            val symbol: KtVariableLikeSymbol = expr.mainReference.resolveToSymbol() as? KtVariableLikeSymbol ?: return null
+            val symbol: KaVariableSymbol = expr.mainReference.resolveToSymbol() as? KaVariableSymbol ?: return null
             if (symbol is KaValueParameterSymbol || symbol is KaLocalVariableSymbol) {
                 return varFactory.createVariableValue(symbol.variableDescriptor())
             }
             if (!isTrackableProperty(symbol)) return null
             val parent = expr.parent
             var qualifier: DfaVariableValue? = null
-            if ((symbol.containingSymbol as? KaClassOrObjectSymbol)?.classKind == KaClassKind.OBJECT) {
+            if ((symbol.containingSymbol as? KaClassSymbol)?.classKind == KaClassKind.OBJECT) {
                 // property in an object: singleton, can track
                 return varFactory.createVariableValue(symbol.variableDescriptor(), null)
             }
@@ -152,7 +155,7 @@ class KtVariableDescriptor(
                     // top-level declaration
                     return varFactory.createVariableValue(symbol.variableDescriptor(), null)
                 }
-                val receiverParameter = (expr.resolveCallOld()?.singleVariableAccessCall()
+                val receiverParameter = (expr.resolveToCall()?.singleVariableAccessCall()
                     ?.partiallyAppliedSymbol?.dispatchReceiver as? KaImplicitReceiverValue)?.symbol
                         as? KaReceiverParameterSymbol
                 val functionLiteral = receiverParameter?.psi as? KtFunctionLiteral
@@ -160,7 +163,7 @@ class KtVariableDescriptor(
                 if (functionLiteral != null && type != null) {
                     qualifier = varFactory.createVariableValue(KtLambdaThisVariableDescriptor(functionLiteral, type.toDfType()))
                 } else {
-                    val classOrObject = symbol.containingSymbol as? KaClassOrObjectSymbol
+                    val classOrObject = symbol.containingSymbol as? KaClassSymbol
                     if (classOrObject != null) {
                         val dfType = TypeConstraints.exactClass(classOrObject.classDef()).instanceOf().asDfType()
                         qualifier = varFactory.createVariableValue(KtThisDescriptor(dfType))
@@ -173,9 +176,9 @@ class KtVariableDescriptor(
             return null
         }
 
-        private fun isTrackableProperty(target: KtVariableLikeSymbol?) =
-            target is KtPropertySymbol && target.getter?.isDefault != false && target.setter?.isDefault != false
-                    && !target.isDelegatedProperty && target.modality == Modality.FINAL
+        private fun isTrackableProperty(target: KaVariableSymbol?) =
+            target is KaPropertySymbol && target.getter?.isDefault != false && target.setter?.isDefault != false
+                    && !target.isDelegatedProperty && target.modality == KaSymbolModality.FINAL
                     && !target.isExtension && target.backingFieldSymbol?.hasAnnotation(JvmStandardClassIds.VOLATILE_ANNOTATION_CLASS_ID) == false
     }
 }

@@ -15,10 +15,10 @@ import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.analyze
 import org.jetbrains.kotlin.analysis.api.annotations.annotations
 import org.jetbrains.kotlin.analysis.api.components.KaSubtypingErrorTypePolicy
-import org.jetbrains.kotlin.analysis.api.renderer.types.impl.KtTypeRendererForSource
-import org.jetbrains.kotlin.analysis.api.signatures.KtVariableLikeSignature
+import org.jetbrains.kotlin.analysis.api.renderer.types.impl.KaTypeRendererForSource
+import org.jetbrains.kotlin.analysis.api.signatures.KaVariableSignature
 import org.jetbrains.kotlin.analysis.api.symbols.KaValueParameterSymbol
-import org.jetbrains.kotlin.analysis.api.types.KtErrorType
+import org.jetbrains.kotlin.analysis.api.types.KaErrorType
 import org.jetbrains.kotlin.config.LanguageFeature
 import org.jetbrains.kotlin.descriptors.annotations.AnnotationUseSiteTarget
 import org.jetbrains.kotlin.idea.base.analysis.api.utils.CallParameterInfoProvider
@@ -170,8 +170,8 @@ abstract class KotlinHighLevelParameterInfoWithCallHandlerBase<TArgumentList : K
                 val valueParameters = candidateSignature.valueParameters.let { if (isArraySetCall) it.dropLast(1) else it }
 
                 // TODO: When resolvedCall is KtFunctionalTypeVariableCall, the candidate is FunctionN.invoke() and parameter names are "p1", "p2", etc.
-                // We need to get the type of the target variable, and retrieve the parameter names from the type (KtFunctionalType).
-                // The names need to be added to KtFunctionalType (currently only types are there) and populated in KtSymbolByFirBuilder.TypeBuilder.
+                // We need to get the type of the target variable, and retrieve the parameter names from the type (KaFunctionType).
+                // The names need to be added to KaFunctionType (currently only types are there) and populated in KtSymbolByFirBuilder.TypeBuilder.
 
                 val parameterToIndex = buildMap {
                     valueParameters.forEachIndexed { index, parameter -> put(parameter, index) }
@@ -254,7 +254,7 @@ abstract class KotlinHighLevelParameterInfoWithCallHandlerBase<TArgumentList : K
     context(KaSession)
     @OptIn(KaExperimentalApi::class)
     private fun renderParameter(
-        parameter: KtVariableLikeSignature<KaValueParameterSymbol>,
+        parameter: KaVariableSignature<KaValueParameterSymbol>,
         includeName: Boolean
     ): String {
         return buildString {
@@ -277,8 +277,8 @@ abstract class KotlinHighLevelParameterInfoWithCallHandlerBase<TArgumentList : K
                 append(": ")
             }
 
-            val returnType = parameter.returnType.takeUnless { it is KtErrorType } ?: parameter.symbol.returnType
-            append(returnType.render(KtTypeRendererForSource.WITH_SHORT_NAMES, position = Variance.INVARIANT))
+            val returnType = parameter.returnType.takeUnless { it is KaErrorType } ?: parameter.symbol.returnType
+            append(returnType.render(KaTypeRendererForSource.WITH_SHORT_NAMES, position = Variance.INVARIANT))
 
             parameter.symbol.defaultValue?.let { defaultValue ->
                 append(" = ")
@@ -291,8 +291,8 @@ abstract class KotlinHighLevelParameterInfoWithCallHandlerBase<TArgumentList : K
         arguments: List<KtExpression?>,
         currentArgumentIndex: Int,
         argumentToParameterIndex: Map<KtExpression, Int>,
-        argumentMapping: LinkedHashMap<KtExpression, KtVariableLikeSignature<KaValueParameterSymbol>>,
-        parameterToIndex: Map<KtVariableLikeSignature<KaValueParameterSymbol>, Int>
+        argumentMapping: LinkedHashMap<KtExpression, KaVariableSignature<KaValueParameterSymbol>>,
+        parameterToIndex: Map<KaVariableSignature<KaValueParameterSymbol>, Int>
     ): Int? {
         val afterTrailingComma = arguments.isNotEmpty() && currentArgumentIndex == arguments.size
         val highlightParameterIndex = when {

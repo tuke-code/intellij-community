@@ -17,10 +17,11 @@ import com.intellij.codeInspection.dataFlow.types.DfType
 import com.intellij.codeInspection.dataFlow.types.DfTypes
 import com.intellij.codeInspection.dataFlow.value.*
 import com.intellij.psi.PsiMethod
+import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
 import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.analyze
+import org.jetbrains.kotlin.analysis.api.contracts.description.KaContractConditionalContractEffectDeclaration
 import org.jetbrains.kotlin.analysis.api.resolution.*
-import org.jetbrains.kotlin.analysis.api.contracts.description.KtContractConditionalContractEffectDeclaration
 import org.jetbrains.kotlin.analysis.api.contracts.description.KaContractConstantValue
 import org.jetbrains.kotlin.analysis.api.contracts.description.KaContractEffectDeclaration
 import org.jetbrains.kotlin.analysis.api.contracts.description.KaContractReturnsContractEffectDeclaration.*
@@ -74,6 +75,7 @@ class KotlinFunctionCallInstruction(
     }
 
     context(KaSession)
+    @OptIn(KaExperimentalApi::class)
     private fun processContracts(
         interpreter: DataFlowInterpreter,
         stateBefore: DfaMemoryState,
@@ -82,11 +84,11 @@ class KotlinFunctionCallInstruction(
         result: MutableList<DfaInstructionState>
     ): DfaValue {
         val factory = resultValue.factory
-        val functionCall = call.resolveCallOld()?.singleFunctionCallOrNull() ?: return resultValue
+        val functionCall = call.resolveToCall()?.singleFunctionCallOrNull() ?: return resultValue
         val functionSymbol = functionCall.partiallyAppliedSymbol.symbol as? KaNamedFunctionSymbol ?: return resultValue
         val callEffects = functionSymbol.contractEffects
         for (effect in callEffects) {
-            if (effect !is KtContractConditionalContractEffectDeclaration) continue
+            if (effect !is KaContractConditionalContractEffectDeclaration) continue
             val crv = effect.effect.toContractReturnValue() ?: continue
             val condition = effect.condition.toCondition(factory, functionCall, arguments) ?: continue
             val notCondition = condition.negate()
@@ -112,29 +114,30 @@ class KotlinFunctionCallInstruction(
     }
 
     context(KaSession)
-    private fun KtContractBooleanExpression.toCondition(
+    @OptIn(KaExperimentalApi::class)
+    private fun KaContractBooleanExpression.toCondition(
         factory: DfaValueFactory,
         callDescriptor: KaFunctionCall<*>,
         arguments: DfaCallArguments
     ): DfaCondition? {
         return when (this) {
-            is KtContractBooleanConstantExpression -> if (booleanConstant) DfaCondition.getTrue() else DfaCondition.getFalse()
-            is KtContractBooleanValueParameterExpression -> {
+            is KaContractBooleanConstantExpression -> if (booleanConstant) DfaCondition.getTrue() else DfaCondition.getFalse()
+            is KaContractBooleanValueParameterExpression -> {
                 parameterSymbol.findDfaValue(callDescriptor, arguments)?.cond(RelationType.EQ, factory.fromDfType(DfTypes.TRUE))
             }
 
-            is KtContractLogicalNotExpression -> argument.toCondition(factory, callDescriptor, arguments)?.negate()
-            is KtContractIsNullPredicateExpression -> argument.parameterSymbol.findDfaValue(callDescriptor, arguments)
+            is KaContractLogicalNotExpression -> argument.toCondition(factory, callDescriptor, arguments)?.negate()
+            is KaContractIsNullPredicateExpression -> argument.parameterSymbol.findDfaValue(callDescriptor, arguments)
                 ?.cond(RelationType.equivalence(!isNegated), factory.fromDfType(DfTypes.NULL))
 
-            is KtContractIsInstancePredicateExpression -> argument.parameterSymbol.findDfaValue(callDescriptor, arguments)
+            is KaContractIsInstancePredicateExpression -> argument.parameterSymbol.findDfaValue(callDescriptor, arguments)
                 ?.cond(if (isNegated) RelationType.IS_NOT else RelationType.IS, factory.fromDfType(type.toDfType()))
 
             else -> null
         }
     }
 
-    private fun KtParameterSymbol.findDfaValue(
+    private fun KaParameterSymbol.findDfaValue(
         callDescriptor: KaFunctionCall<*>,
         arguments: DfaCallArguments
     ): DfaValue? {
@@ -149,6 +152,7 @@ class KotlinFunctionCallInstruction(
         }
     }
 
+    @OptIn(KaExperimentalApi::class)
     private fun KaContractEffectDeclaration.toContractReturnValue(): ContractReturnValue? {
         return when (this) {
             is KaContractReturnsNotNullEffectDeclaration -> ContractReturnValue.returnNotNull()
@@ -187,7 +191,7 @@ class KotlinFunctionCallInstruction(
                 }
             }
         }
-        val functionCall = call.resolveCallOld()?.singleFunctionCallOrNull()
+        val functionCall = call.resolveToCall()?.singleFunctionCallOrNull()
         var dfType = getExpressionDfType(call)
         if (functionCall != null) {
             val type = fromKnownDescriptor(functionCall, arguments, stateBefore)
@@ -262,15 +266,15 @@ class KotlinFunctionCallInstruction(
 
     context(KaSession)
     private fun getPsiMethod(): PsiMethod? {
-        return call.resolveCallOld()?.singleFunctionCallOrNull()?.partiallyAppliedSymbol?.symbol?.psi?.toLightMethods()?.singleOrNull()
+        return call.resolveToCall()?.singleFunctionCallOrNull()?.partiallyAppliedSymbol?.symbol?.psi?.toLightMethods()?.singleOrNull()
     }
 
     context(KaSession)
     private fun getExpressionDfType(expr: KtExpression): DfType {
-        val constructedClass = (((expr.resolveCallOld() as? KaSuccessCallInfo)
+        val constructedClass = (((expr.resolveToCall() as? KaSuccessCallInfo)
             ?.call as? KaCallableMemberCall<*, *>)
             ?.partiallyAppliedSymbol?.symbol as? KaConstructorSymbol)
-            ?.containingSymbol as? KaClassOrObjectSymbol
+            ?.containingSymbol as? KaClassSymbol
         if (constructedClass != null) {
             // Set exact class type for constructor
             return TypeConstraints.exactClass(constructedClass.classDef())

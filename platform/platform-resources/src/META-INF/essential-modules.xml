@@ -6,9 +6,9 @@
     <module name="intellij.platform.kernel"/>
     <module name="intellij.platform.kernel.backend"/>
     <!-- todo navbar is not essential-->
-    <module name="intellij.platform.navbar.compatibility"/>
+    <module name="intellij.platform.navbar"/>
     <module name="intellij.platform.navbar.backend"/>
-    <module name="intellij.platform.navbar.frontend.compatibility"/>
+    <module name="intellij.platform.navbar.frontend"/>
     <module name="intellij.platform.navbar.monolith"/>
     <module name="intellij.platform.clouds"/>
     <module name="intellij.platform.execution.dashboard"/>

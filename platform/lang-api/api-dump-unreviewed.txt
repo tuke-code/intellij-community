@@ -450,12 +450,14 @@ f:com.intellij.codeInsight.codeVision.settings.CodeVisionSettings
 - f:getCodeVisionEnabled():Z
 - f:getDefaultPosition():com.intellij.codeInsight.codeVision.CodeVisionAnchorKind
 - f:getDisabledCodeVisionProviderIds():java.util.Set
+- sf:getInstance():com.intellij.codeInsight.codeVision.settings.CodeVisionSettings
 - f:getPositionForGroup(java.lang.String):com.intellij.codeInsight.codeVision.CodeVisionAnchorKind
 - getState():com.intellij.codeInsight.codeVision.settings.CodeVisionSettings$State
 - f:getVisibleMetricsAboveDeclarationCount():I
 - f:getVisibleMetricsNextToDeclarationCount():I
 - f:isProviderEnabled(java.lang.String):Z
 - loadState(com.intellij.codeInsight.codeVision.settings.CodeVisionSettings$State):V
+- f:resetDefaultPosition():V
 - f:setAnchorLimit(com.intellij.codeInsight.codeVision.CodeVisionAnchorKind,I):V
 - f:setCodeVisionEnabled(Z):V
 - f:setDefaultPosition(com.intellij.codeInsight.codeVision.CodeVisionAnchorKind):V
@@ -492,7 +494,8 @@ f:com.intellij.codeInsight.codeVision.settings.CodeVisionSettings$State
 - f:setVisibleMetricsNextToDeclarationCount(I):V
 *:com.intellij.codeInsight.codeVision.settings.CodeVisionSettingsDefaults
 - *sf:Companion:com.intellij.codeInsight.codeVision.settings.CodeVisionSettingsDefaults$Companion
-- a:getDefaultEnablementForProviderId():java.util.Map
+- getDefaultEnablementForProviderId():java.util.Map
+- getDefaultPosition():com.intellij.codeInsight.codeVision.CodeVisionAnchorKind
 *f:com.intellij.codeInsight.codeVision.settings.CodeVisionSettingsDefaults$Companion
 - f:getInstance():com.intellij.codeInsight.codeVision.settings.CodeVisionSettingsDefaults
 a:com.intellij.codeInsight.completion.NextPrevParameterAction
@@ -630,7 +633,6 @@ a:com.intellij.codeInsight.daemon.LineMarkerSettings
 - a:setEnabled(com.intellij.codeInsight.daemon.GutterIconDescriptor,Z):V
 a:com.intellij.codeInsight.daemon.MergeableLineMarkerInfo
 - com.intellij.codeInsight.daemon.LineMarkerInfo
-- sf:PARENT_COMPONENT:com.intellij.openapi.util.Key
 - <init>(com.intellij.psi.PsiElement,com.intellij.openapi.util.TextRange,javax.swing.Icon,I,com.intellij.util.Function,com.intellij.codeInsight.daemon.GutterIconNavigationHandler,com.intellij.openapi.editor.markup.GutterIconRenderer$Alignment):V
 - <init>(com.intellij.psi.PsiElement,com.intellij.openapi.util.TextRange,javax.swing.Icon,com.intellij.util.Function,com.intellij.codeInsight.daemon.GutterIconNavigationHandler,com.intellij.openapi.editor.markup.GutterIconRenderer$Alignment):V
 - <init>(com.intellij.psi.PsiElement,com.intellij.openapi.util.TextRange,javax.swing.Icon,com.intellij.util.Function,com.intellij.codeInsight.daemon.GutterIconNavigationHandler,com.intellij.openapi.editor.markup.GutterIconRenderer$Alignment,java.util.function.Supplier):V
@@ -641,6 +643,7 @@ a:com.intellij.codeInsight.daemon.MergeableLineMarkerInfo
 - getCommonTooltip(java.util.List):com.intellij.util.Function
 - getElementPresentation(com.intellij.psi.PsiElement):java.lang.String
 - s:getMergedMarkers(com.intellij.codeInsight.daemon.LineMarkerInfo):java.util.List
+- getWeight():I
 - s:merge(java.util.List,I):java.util.List
 c:com.intellij.codeInsight.daemon.NavigateAction
 - com.intellij.openapi.actionSystem.AnAction

@@ -15764,7 +15764,7 @@ f:com.intellij.ide.impl.LangDataValidators
 f:com.intellij.ide.impl.ModuleStructureComponent
 - com.intellij.openapi.ui.SimpleToolWindowPanel
 - com.intellij.openapi.Disposable
-- com.intellij.openapi.actionSystem.EdtDataProvider
+- com.intellij.openapi.actionSystem.UiDataProvider
 - <init>(com.intellij.openapi.module.Module):V
 - dispose():V
 - uiDataSnapshot(com.intellij.openapi.actionSystem.DataSink):V
@@ -16213,7 +16213,7 @@ a:com.intellij.ide.projectView.impl.AbstractProjectTreeStructure
 - isAlwaysLeaf(java.lang.Object):Z
 a:com.intellij.ide.projectView.impl.AbstractProjectViewPane
 - com.intellij.openapi.Disposable
-- com.intellij.openapi.actionSystem.EdtCompatibleDataProvider
+- com.intellij.openapi.actionSystem.UiCompatibleDataProvider
 - com.intellij.openapi.util.BusyObject
 - sf:EP:com.intellij.openapi.extensions.ProjectExtensionPointName
 - pf:myProject:com.intellij.openapi.project.Project
@@ -16764,7 +16764,7 @@ f:com.intellij.ide.projectView.impl.ProjectViewToolWindowFactory
 - getIcon():javax.swing.Icon
 c:com.intellij.ide.projectView.impl.ProjectViewTree
 - com.intellij.ide.dnd.aware.DnDAwareTree
-- com.intellij.openapi.actionSystem.EdtDataProvider
+- com.intellij.openapi.actionSystem.UiDataProvider
 - com.intellij.ui.speedSearch.SpeedSearchSupply$SpeedSearchLocator
 - p:<init>(com.intellij.openapi.project.Project,javax.swing.tree.TreeModel):V
 - <init>(javax.swing.tree.TreeModel):V
@@ -17057,14 +17057,13 @@ c:com.intellij.ide.projectView.impl.nodes.PsiFileNode
 - canNavigate():Z
 - canRepresent(java.lang.Object):Z
 - contains(com.intellij.openapi.vfs.VirtualFile):Z
-- s:extension(com.intellij.psi.PsiFile):java.lang.String
 - getChildrenImpl():java.util.Collection
 - getNavigateActionText(Z):java.lang.String
 - getTitle():java.lang.String
 - getTypeSortKey():java.lang.Comparable
 - getWeight():I
-- p:isMarkReadOnly():Z
-- navigate(Z):V
+- pf:isMarkReadOnly():Z
+- f:navigate(Z):V
 - shouldDrillDownOnEmptyElement():Z
 - p:updateImpl(com.intellij.ide.projectView.PresentationData):V
 f:com.intellij.ide.projectView.impl.nodes.PsiFileNode$ExtensionSortKey
@@ -20798,7 +20797,7 @@ c:com.intellij.openapi.module.impl.ModuleConfigurationStateImpl
 c:com.intellij.openapi.module.impl.ModuleImpl
 - com.intellij.openapi.Disposable$Parent
 - com.intellij.openapi.components.ComponentManager
-- com.intellij.openapi.module.impl.ModuleEx
+- com.intellij.openapi.module.Module
 - com.intellij.openapi.ui.Queryable
 - com.intellij.openapi.util.UserDataHolderBase
 - canStoreSettings():Z
@@ -20846,17 +20845,6 @@ c:com.intellij.openapi.module.impl.ModuleTypeManagerImpl
 - registerModuleType(com.intellij.openapi.module.ModuleType):V
 - registerModuleType(com.intellij.openapi.module.ModuleType,Z):V
 - unregisterModuleType(com.intellij.openapi.module.ModuleType):V
-f:com.intellij.openapi.module.impl.ProjectLoadingErrorsHeadlessNotifier
-- com.intellij.openapi.module.ProjectLoadingErrorsNotifier
-- <init>():V
-- registerError(com.intellij.openapi.module.ConfigurationErrorDescription):V
-- registerErrors(java.util.Collection):V
-- s:setErrorHandler(com.intellij.openapi.Disposable,java.util.function.Consumer):V
-f:com.intellij.openapi.module.impl.ProjectLoadingErrorsNotifierImpl
-- com.intellij.openapi.module.ProjectLoadingErrorsNotifier
-- <init>(com.intellij.openapi.project.Project):V
-- registerError(com.intellij.openapi.module.ConfigurationErrorDescription):V
-- registerErrors(java.util.Collection):V
 f:com.intellij.openapi.module.impl.RemoveInvalidElementsDialog
 - com.intellij.openapi.ui.DialogWrapper
 - b:$$$getRootComponent$$$():javax.swing.JComponent
@@ -21013,6 +21001,9 @@ a:com.intellij.openapi.projectRoots.impl.DependentSdkType
 - pa:isValidDependency(com.intellij.openapi.projectRoots.Sdk):Z
 - showCustomCreateUI(com.intellij.openapi.projectRoots.SdkModel,javax.swing.JComponent,com.intellij.openapi.projectRoots.Sdk,com.intellij.util.Consumer):V
 - supportsCustomCreateUI():Z
+com.intellij.openapi.projectRoots.impl.FixWithConsent
+- a:giveConsent():V
+- a:hasConsent():Z
 a:com.intellij.openapi.projectRoots.impl.JavaHomeFinder
 - sf:DEFAULT_JAVA_LINUX_PATHS:java.lang.String[]
 - <init>():V
@@ -21164,10 +21155,13 @@ com.intellij.openapi.projectRoots.impl.UnknownSdkFixAction$Listener
 - a:onSdkNameResolved(com.intellij.openapi.projectRoots.Sdk):V
 - a:onSdkResolved(com.intellij.openapi.projectRoots.Sdk):V
 a:com.intellij.openapi.projectRoots.impl.UnknownSdkFixActionBase
+- com.intellij.openapi.projectRoots.impl.FixWithConsent
 - com.intellij.openapi.projectRoots.impl.UnknownSdkFixAction
 - <init>():V
 - f:addSuggestionListener(com.intellij.openapi.projectRoots.impl.UnknownSdkFixAction$Listener):V
 - pf:getMulticaster():com.intellij.openapi.projectRoots.impl.UnknownSdkFixAction$Listener
+- giveConsent():V
+- hasConsent():Z
 a:com.intellij.openapi.projectRoots.impl.UnknownSdkFixActionDownloadBase
 - com.intellij.openapi.projectRoots.impl.UnknownSdkFixActionBase
 - <init>():V
@@ -24393,33 +24387,6 @@ a:com.intellij.psi.impl.source.tree.injected.ConcatenationInjectorManager$BaseCo
 - <init>(com.intellij.openapi.project.Project):V
 - pa:computeAnchorAndOperands(com.intellij.psi.PsiElement):com.intellij.openapi.util.Pair
 - getLanguagesToInject(com.intellij.lang.injection.MultiHostRegistrar,com.intellij.psi.PsiElement):V
-a:com.intellij.psi.impl.source.tree.injected.FoldingRegionWindow
-- com.intellij.openapi.editor.FoldRegion
-- com.intellij.openapi.editor.ex.RangeMarkerEx
-- dispose():V
-- getDelegate():com.intellij.openapi.editor.ex.RangeMarkerEx
-- getDelegate():com.intellij.openapi.editor.impl.FoldRegionImpl
-- getDocument():com.intellij.openapi.editor.Document
-- getEditor():com.intellij.openapi.editor.Editor
-- getEndOffset():I
-- getGroup():com.intellij.openapi.editor.FoldingGroup
-- getId():J
-- s:getInjectedRegion(com.intellij.openapi.editor.FoldRegion):com.intellij.psi.impl.source.tree.injected.FoldingRegionWindow
-- getPlaceholderText():java.lang.String
-- getStartOffset():I
-- getUserData(com.intellij.openapi.util.Key):java.lang.Object
-- isExpanded():Z
-- isGreedyToLeft():Z
-- isGreedyToRight():Z
-- isGutterMarkEnabledForSingleLine():Z
-- isValid():Z
-- putUserData(com.intellij.openapi.util.Key,java.lang.Object):V
-- setExpanded(Z):V
-- setGreedyToLeft(Z):V
-- setGreedyToRight(Z):V
-- setGutterMarkEnabledForSingleLine(Z):V
-- setPlaceholderText(java.lang.String):V
-- shouldNeverExpand():Z
 f:com.intellij.psi.impl.source.tree.injected.InjectedCaret
 - com.intellij.openapi.editor.Caret
 - clone(Z):com.intellij.openapi.editor.Caret
@@ -28577,13 +28544,6 @@ f:com.intellij.util.indexing.TimestampsKeyDescriptor
 - isEqual(com.intellij.util.indexing.TimestampsImmutable,com.intellij.util.indexing.TimestampsImmutable):Z
 - read(java.io.DataInput):com.intellij.util.indexing.TimestampsImmutable
 - save(java.io.DataOutput,com.intellij.util.indexing.TimestampsImmutable):V
-f:com.intellij.util.indexing.UnindexedFilesIndexer
-- com.intellij.openapi.project.DumbModeTask
-- <init>(com.intellij.openapi.project.Project,java.util.Map,java.lang.String,it.unimi.dsi.fastutil.longs.LongSet):V
-- *:<init>(com.intellij.openapi.project.Project,java.util.Set,java.lang.String,it.unimi.dsi.fastutil.longs.LongSet):V
-- getIndexingReason():java.lang.String
-- performInDumbMode(com.intellij.openapi.progress.ProgressIndicator):V
-- tryMergeWith(com.intellij.openapi.project.DumbModeTask):com.intellij.util.indexing.UnindexedFilesIndexer
 f:com.intellij.util.indexing.UnindexedFilesUpdater
 - s:getAvailablePhysicalCoresNumber():I
 - s:getMaxNumberOfIndexingThreads():I

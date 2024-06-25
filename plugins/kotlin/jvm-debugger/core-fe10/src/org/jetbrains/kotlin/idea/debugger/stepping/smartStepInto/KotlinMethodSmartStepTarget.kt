@@ -14,21 +14,21 @@ import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
 import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.renderer.base.annotations.KaRendererAnnotationsFilter
 import org.jetbrains.kotlin.analysis.api.renderer.declarations.KaCallableReturnTypeFilter
-import org.jetbrains.kotlin.analysis.api.renderer.declarations.KtDeclarationRenderer
-import org.jetbrains.kotlin.analysis.api.renderer.declarations.impl.KtDeclarationRendererForSource
-import org.jetbrains.kotlin.analysis.api.renderer.declarations.modifiers.KtDeclarationModifiersRenderer
-import org.jetbrains.kotlin.analysis.api.renderer.declarations.modifiers.renderers.KtModifierListRenderer
-import org.jetbrains.kotlin.analysis.api.renderer.declarations.modifiers.renderers.KtRendererKeywordFilter
-import org.jetbrains.kotlin.analysis.api.renderer.declarations.renderers.KtTypeParameterRendererFilter
-import org.jetbrains.kotlin.analysis.api.renderer.declarations.renderers.callables.KtCallableReceiverRenderer
+import org.jetbrains.kotlin.analysis.api.renderer.declarations.KaDeclarationRenderer
+import org.jetbrains.kotlin.analysis.api.renderer.declarations.impl.KaDeclarationRendererForSource
+import org.jetbrains.kotlin.analysis.api.renderer.declarations.modifiers.KaDeclarationModifiersRenderer
+import org.jetbrains.kotlin.analysis.api.renderer.declarations.modifiers.renderers.KaModifierListRenderer
+import org.jetbrains.kotlin.analysis.api.renderer.declarations.modifiers.renderers.KaRendererKeywordFilter
+import org.jetbrains.kotlin.analysis.api.renderer.declarations.renderers.KaTypeParameterRendererFilter
+import org.jetbrains.kotlin.analysis.api.renderer.declarations.renderers.callables.KaCallableReceiverRenderer
 import org.jetbrains.kotlin.analysis.api.renderer.declarations.renderers.callables.KaConstructorSymbolRenderer
 import org.jetbrains.kotlin.analysis.api.renderer.declarations.renderers.callables.KaValueParameterSymbolRenderer
-import org.jetbrains.kotlin.analysis.api.renderer.types.impl.KtTypeRendererForSource
+import org.jetbrains.kotlin.analysis.api.renderer.types.impl.KaTypeRendererForSource
 import org.jetbrains.kotlin.analysis.api.renderer.types.renderers.KaFunctionalTypeRenderer
 import org.jetbrains.kotlin.analysis.api.symbols.KaCallableSymbol
 import org.jetbrains.kotlin.analysis.api.symbols.KaDeclarationSymbol
 import org.jetbrains.kotlin.analysis.api.symbols.KaReceiverParameterSymbol
-import org.jetbrains.kotlin.analysis.api.types.KtType
+import org.jetbrains.kotlin.analysis.api.types.KaType
 import org.jetbrains.kotlin.analysis.utils.printer.PrettyPrinter
 import org.jetbrains.kotlin.idea.KotlinIcons
 import org.jetbrains.kotlin.idea.debugger.core.getClassName
@@ -47,21 +47,21 @@ class KotlinMethodSmartStepTarget(
 ) : KotlinSmartStepTarget(label, highlightElement, false, lines), ForceSmartStepIntoSource {
     companion object {
         @KaExperimentalApi
-        private val renderer = KtDeclarationRendererForSource.WITH_QUALIFIED_NAMES.with {
+        private val renderer = KaDeclarationRendererForSource.WITH_QUALIFIED_NAMES.with {
             annotationRenderer = annotationRenderer.with {
                 annotationFilter = KaRendererAnnotationsFilter.NONE
             }
             keywordsRenderer = keywordsRenderer.with {
-                keywordFilter = KtRendererKeywordFilter.onlyWith(KtTokens.CONSTRUCTOR_KEYWORD, KtTokens.GET_KEYWORD, KtTokens.SET_KEYWORD)
+                keywordFilter = KaRendererKeywordFilter.onlyWith(KtTokens.CONSTRUCTOR_KEYWORD, KtTokens.GET_KEYWORD, KtTokens.SET_KEYWORD)
             }
             modifiersRenderer = modifiersRenderer.with {
                 modifierListRenderer = NO_MODIFIER_LIST
             }
-            typeRenderer = KtTypeRendererForSource.WITH_SHORT_NAMES.with {
+            typeRenderer = KaTypeRendererForSource.WITH_SHORT_NAMES.with {
                 functionalTypeRenderer = KaFunctionalTypeRenderer.AS_FUNCTIONAL_TYPE
             }
             returnTypeFilter = NO_RETURN_TYPE
-            typeParametersFilter = KtTypeParameterRendererFilter { _, _ -> false }
+            typeParametersFilter = KaTypeParameterRendererFilter { _, _ -> false }
             constructorRenderer = KaConstructorSymbolRenderer.AS_RAW_SIGNATURE
             valueParameterRenderer = KaValueParameterSymbolRenderer.TYPE_ONLY
             callableReceiverRenderer = NO_CALLABLE_RECEIVER
@@ -120,25 +120,25 @@ internal fun <T : PsiElement> SmartPsiElementPointer<T>?.getElementInReadAction(
 
 @KaExperimentalApi
 private val NO_RETURN_TYPE = object : KaCallableReturnTypeFilter {
-    override fun shouldRenderReturnType(analysisSession: KaSession, type: KtType, symbol: KaCallableSymbol): Boolean = false
+    override fun shouldRenderReturnType(analysisSession: KaSession, type: KaType, symbol: KaCallableSymbol): Boolean = false
 }
 
 @KaExperimentalApi
-private val NO_CALLABLE_RECEIVER = object : KtCallableReceiverRenderer {
+private val NO_CALLABLE_RECEIVER = object : KaCallableReceiverRenderer {
     override fun renderReceiver(
         analysisSession: KaSession,
         symbol: KaReceiverParameterSymbol,
-        declarationRenderer: KtDeclarationRenderer,
+        declarationRenderer: KaDeclarationRenderer,
         printer: PrettyPrinter
     ) {}
 }
 
 @KaExperimentalApi
-private val NO_MODIFIER_LIST = object : KtModifierListRenderer {
+private val NO_MODIFIER_LIST = object : KaModifierListRenderer {
     override fun renderModifiers(
         analysisSession: KaSession,
         symbol: KaDeclarationSymbol,
-        declarationModifiersRenderer: KtDeclarationModifiersRenderer,
+        declarationModifiersRenderer: KaDeclarationModifiersRenderer,
         printer: PrettyPrinter
     ) {}
 

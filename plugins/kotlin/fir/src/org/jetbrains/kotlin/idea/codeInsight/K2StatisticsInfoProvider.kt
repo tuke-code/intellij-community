@@ -4,14 +4,14 @@ package org.jetbrains.kotlin.idea.codeInsight
 import com.intellij.psi.statistics.StatisticsInfo
 import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
 import org.jetbrains.kotlin.analysis.api.KaSession
-import org.jetbrains.kotlin.analysis.api.renderer.base.KtKeywordsRenderer
+import org.jetbrains.kotlin.analysis.api.renderer.base.KaKeywordsRenderer
 import org.jetbrains.kotlin.analysis.api.renderer.base.annotations.KaRendererAnnotationsFilter
 import org.jetbrains.kotlin.analysis.api.renderer.declarations.KaCallableReturnTypeFilter
-import org.jetbrains.kotlin.analysis.api.renderer.declarations.KtDeclarationRenderer
-import org.jetbrains.kotlin.analysis.api.renderer.declarations.impl.KtDeclarationRendererForSource
+import org.jetbrains.kotlin.analysis.api.renderer.declarations.KaDeclarationRenderer
+import org.jetbrains.kotlin.analysis.api.renderer.declarations.impl.KaDeclarationRendererForSource
 import org.jetbrains.kotlin.analysis.api.renderer.declarations.renderers.callables.KaCallableSignatureRenderer
 import org.jetbrains.kotlin.analysis.api.symbols.*
-import org.jetbrains.kotlin.analysis.api.types.KtType
+import org.jetbrains.kotlin.analysis.api.types.KaType
 import org.jetbrains.kotlin.analysis.utils.printer.PrettyPrinter
 import org.jetbrains.kotlin.analysis.utils.printer.prettyPrint
 import org.jetbrains.kotlin.lexer.KtKeywordToken
@@ -24,12 +24,12 @@ object K2StatisticsInfoProvider {
      * The renderer skips some features of a declaration to provide concise (but still unambiguous) description of the declaration.
      */
     @KaExperimentalApi
-    private val renderer = KtDeclarationRendererForSource.WITH_QUALIFIED_NAMES.with {
+    private val renderer = KaDeclarationRendererForSource.WITH_QUALIFIED_NAMES.with {
         annotationRenderer = annotationRenderer.with { annotationFilter = KaRendererAnnotationsFilter.NONE }
-        modifiersRenderer = modifiersRenderer.with { keywordsRenderer = KtKeywordsRenderer.NONE }
+        modifiersRenderer = modifiersRenderer.with { keywordsRenderer = KaKeywordsRenderer.NONE }
 
         returnTypeFilter = object : KaCallableReturnTypeFilter {
-            override fun shouldRenderReturnType(analysisSession: KaSession, type: KtType, symbol: KaCallableSymbol): Boolean {
+            override fun shouldRenderReturnType(analysisSession: KaSession, type: KaType, symbol: KaCallableSymbol): Boolean {
                 return symbol !is KaFunctionSymbol
             }
         }
@@ -39,7 +39,7 @@ object K2StatisticsInfoProvider {
                 analysisSession: KaSession,
                 symbol: KaCallableSymbol,
                 keyword: KtKeywordToken?,
-                declarationRenderer: KtDeclarationRenderer,
+                declarationRenderer: KaDeclarationRenderer,
                 printer: PrettyPrinter
             ) {
                 return when (symbol) {

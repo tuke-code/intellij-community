@@ -11,8 +11,8 @@ import org.jetbrains.kotlin.analysis.api.permissions.KaAllowAnalysisOnEdt
 import org.jetbrains.kotlin.analysis.api.permissions.allowAnalysisFromWriteAction
 import org.jetbrains.kotlin.analysis.api.permissions.allowAnalysisOnEdt
 import org.jetbrains.kotlin.analysis.api.symbols.KaNamedFunctionSymbol
-import org.jetbrains.kotlin.analysis.api.symbols.KtSyntheticJavaPropertySymbol
-import org.jetbrains.kotlin.analysis.api.types.KtFunctionalType
+import org.jetbrains.kotlin.analysis.api.symbols.KaSyntheticJavaPropertySymbol
+import org.jetbrains.kotlin.analysis.api.types.KaFunctionType
 import org.jetbrains.kotlin.idea.base.analysis.api.utils.shortenReferences
 import org.jetbrains.kotlin.idea.base.codeInsight.KotlinNameSuggester
 import org.jetbrains.kotlin.idea.base.psi.imports.addImport
@@ -140,8 +140,8 @@ internal class K2ReferenceMutateService : KtReferenceMutateServiceBase() {
         if (isExtensionDeclaration()) return true
         return if (this is KtProperty) {
             analyze(this) {
-                val returnType = getReturnKtType()
-                returnType is KtFunctionalType && returnType.receiverType != null
+                val returnType = returnType
+                returnType is KaFunctionType && returnType.receiverType != null
             }
         } else false
     }
@@ -262,7 +262,7 @@ internal class K2ReferenceMutateService : KtReferenceMutateServiceBase() {
             allowAnalysisOnEdt {
                 analyze(ktReference.element) {
                     val symbol = ktReference.resolveToSymbol()
-                    if (symbol is KtSyntheticJavaPropertySymbol) {
+                    if (symbol is KaSyntheticJavaPropertySymbol) {
                         val newName = (ktReference as? KtSimpleReference<KtNameReferenceExpression>)?.getAdjustedNewName(newElementName)
                         if (newName == null) {
                             return (ktReference as? KtSimpleReference<KtNameReferenceExpression>)?.renameToOrdinaryMethod(newElementName)

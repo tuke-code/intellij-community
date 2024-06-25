@@ -12,7 +12,7 @@ import org.jetbrains.kotlin.analysis.api.analyze
 import org.jetbrains.kotlin.analysis.api.resolution.successfulFunctionCallOrNull
 import org.jetbrains.kotlin.analysis.api.resolution.successfulVariableAccessCall
 import org.jetbrains.kotlin.analysis.api.resolution.symbol
-import org.jetbrains.kotlin.analysis.api.symbols.KtSymbol
+import org.jetbrains.kotlin.analysis.api.symbols.KaSymbol
 import org.jetbrains.kotlin.analysis.api.symbols.markers.KaNamedSymbol
 import org.jetbrains.kotlin.builtins.StandardNames
 import org.jetbrains.kotlin.idea.base.psi.isMultiLine
@@ -271,7 +271,7 @@ private fun KtDotQualifiedExpression.isApplicable(parameterName: String): Boolea
         receiver is KtNameReferenceExpression
                 && receiver.getReferencedName() == parameterName
                 && !nameUsed(parameterName, except = receiver)
-    } && callExpression?.resolveCallOld()?.let {
+    } && callExpression?.resolveToCall()?.let {
         it.successfulFunctionCallOrNull() == null
                 && it.successfulVariableAccessCall() != null
     } != true
@@ -281,7 +281,7 @@ private fun KtDotQualifiedExpression.isApplicable(parameterName: String): Boolea
 context(KaSession)
 private fun KtDotQualifiedExpression.getHasNullableReceiverExtensionCall(): Boolean {
     val hasNullableType = selectorExpression
-        ?.resolveCallOld()
+        ?.resolveToCall()
         ?.successfulFunctionCallOrNull()
         ?.partiallyAppliedSymbol
         ?.extensionReceiver
@@ -309,7 +309,7 @@ private fun KtFunctionLiteral.valueParameterReferences(callExpression: KtCallExp
         .singleOrNull()
         ?: return emptyList()
 
-    val variableSymbolByName: Map<Name, KtSymbol> = valueParameters.singleOrNull()
+    val variableSymbolByName: Map<Name, KaSymbol> = valueParameters.singleOrNull()
         ?.destructuringDeclaration
         ?.entries
         ?.asSequence()
@@ -329,7 +329,7 @@ private fun KtFunctionLiteral.valueParameterReferences(callExpression: KtCallExp
     return arguments + callExpression.valueArguments.flatMap { valueArgument ->
         valueArgument.collectDescendantsOfType<KtNameReferenceExpression>().filter { referenceExpression ->
             variableSymbolByName[referenceExpression.getReferencedNameAsName()]?.takeIf {
-                it == referenceExpression.resolveCallOld()?.successfulVariableAccessCall()?.symbol
+                it == referenceExpression.resolveToCall()?.successfulVariableAccessCall()?.symbol
             } != null
         }
     }

@@ -365,7 +365,7 @@
 
     <dataValidators implementation="com.intellij.ide.impl.PlatformDataValidators"/>
 
-    <edtDataRule implementation="com.intellij.diff.actions.impl.DiffEdtDataRule"/>
+    <uiDataRule implementation="com.intellij.diff.actions.impl.DiffUiDataRule"/>
     <actionPromoter implementation="com.intellij.diff.DiffActionPromoter"/>
 
     <projectService serviceInterface="com.intellij.openapi.diff.DirDiffManager"
@@ -977,6 +977,7 @@
     <statistics.counterUsagesCollector
       implementationClass="com.intellij.openapi.updateSettings.impl.pluginsAdvertisement.PluginAdvertiserUsageCollector"/>
     <statistics.counterUsagesCollector implementationClass="com.intellij.ide.plugins.DynamicPluginsUsagesCollector"/>
+    <statistics.applicationUsagesCollector implementation="com.intellij.openapi.updateSettings.impl.PluginAutoUpdateFUSCollector"/>
     <statistics.counterUsagesCollector implementationClass="com.intellij.ui.EditorNotificationUsagesCollector"/>
 
     <statistics.counterUsagesCollector implementationClass="com.intellij.openapi.updateSettings.impl.UpdateInfoStatsCollector"/>
@@ -1100,7 +1101,7 @@
     <editorNotificationProvider implementation="com.intellij.ide.CommandLineWaitingManager$MyNotification"/>
     <editorNotificationProvider implementation="com.intellij.ide.trustedProjects.impl.UntrustedProjectNotificationProvider"/>
 
-    <edtDataRule implementation="com.intellij.ide.impl.dataRules.BasicEdtDataRule"/>
+    <uiDataRule implementation="com.intellij.ide.impl.dataRules.BasicUiDataRule"/>
     <getDataRule key="NavigatableArray" implementationClass="com.intellij.ide.impl.dataRules.NavigatableArrayRule"/>
     <getDataRule key="context.ProjectFileDirectory" implementationClass="com.intellij.ide.impl.dataRules.ProjectFileDirectoryRule"/>
 
@@ -1225,7 +1226,7 @@
     <registryKey key="jdk.downloader.reuse.downloading" defaultValue="true"
                  description="Allow to reuse currently downloading with the JDK Downloader JDK instead of downloading it again"/>
     <registryKey key="jdk.auto.run.configurations" defaultValue="true" description="Tries to find an SDK for a run configuration"/>
-    <registryKey key="jdk.installer.logs" defaultValue="false" description="Log the stacktrace for JDK downloads"/>
+    <registryKey key="jdk.download.consent" defaultValue="false" description="Prompts before downloading JDKs if false"/>
 
     <actionPromoter implementation="com.intellij.execution.testframework.TestTreeViewActionsPromoter"/>
     <smartSelectProvider implementation="com.intellij.ui.tree.TreeSmartSelectProvider"/>
@@ -1635,7 +1636,8 @@
     <advancedSetting id="search.everywhere.show.results.notification" default="true" groupKey="group.advanced.settings.se"/>
     <advancedSetting id="search.everywhere.contributors.wait.timeout" default="2000" groupKey="group.advanced.settings.se"/>
     <advancedSetting id="search.everywhere.recent.at.top" default="true" groupKey="group.advanced.settings.se"/>
-    <advancedSetting id="search.everywhere.send.search.history.statistics" default="true" groupKey="group.advanced.settings.se"/>
+    <advancedSetting id="federated.learning" default="true" groupKey="group.advanced.settings.federated.learning"/>
+    <advancedSetting id="federated.learning.search.everywhere" default="true" groupKey="group.advanced.settings.federated.learning"/>
 
     <applicationInitializedListener implementation="com.intellij.lang.documentation.ide.impl.QuickDocAutoPopupInEAPInitializer"/>
 
@@ -1827,6 +1829,8 @@
     <listener class="com.intellij.ide.plugins.DynamicPluginsFrameStateListener"
               topic="com.intellij.openapi.application.ApplicationActivationListener"/>
     <listener class="com.intellij.openapi.updateSettings.impl.UpdateCheckerService$MyAppLifecycleListener"
+              topic="com.intellij.ide.AppLifecycleListener"/>
+    <listener class="com.intellij.openapi.updateSettings.impl.PluginAutoUpdateService$PluginAutoUpdateAppLifecycleListener"
               topic="com.intellij.ide.AppLifecycleListener"/>
     <listener class="com.intellij.ide.actions.CreateLauncherScriptAction$ObsoleteScriptLookupTask"
               topic="com.intellij.ide.AppLifecycleListener"/>

@@ -1,6 +1,7 @@
 // Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.platform.ijent.community.impl.nio
 
+import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.platform.ijent.IjentId
 import com.intellij.platform.ijent.IjentSessionRegistry
 import com.intellij.platform.ijent.community.impl.IjentFsResultImpl
@@ -10,8 +11,7 @@ import com.intellij.platform.ijent.fs.*
 import com.intellij.platform.ijent.fs.IjentFileInfo.Type.*
 import com.intellij.platform.ijent.fs.IjentPosixFileInfo.Type.Symlink
 import kotlinx.coroutines.job
-import java.io.InputStream
-import java.io.OutputStream
+import java.io.IOException
 import java.net.URI
 import java.nio.channels.AsynchronousFileChannel
 import java.nio.channels.FileChannel
@@ -106,6 +106,7 @@ class IjentNioFileSystemProvider : FileSystemProvider() {
           fs,
           path.ijentPath,
           append = APPEND in options,
+          truncate = TRUNCATE_EXISTING in options,
           creationMode = when {
             CREATE_NEW in options -> IjentFileSystemApi.FileWriterCreationMode.ONLY_CREATE
             CREATE in options -> IjentFileSystemApi.FileWriterCreationMode.ALLOW_CREATE
@@ -152,15 +153,66 @@ class IjentNioFileSystemProvider : FileSystemProvider() {
   }
 
   override fun createDirectory(dir: Path, vararg attrs: FileAttribute<*>?) {
-    TODO("Not yet implemented")
+    ensureIjentNioPath(dir)
+    val path = dir.ijentPath
+    try {
+      ensurePathIsAbsolute(path)
+    } catch (e : IllegalArgumentException) {
+      throw IOException(e)
+    }
+    try {
+      dir.nioFs.fsBlocking {
+        when (val fsApi = dir.nioFs.ijent.fs) {
+          is IjentFileSystemPosixApi -> fsApi.createDirectory(path, emptyList())
+          is IjentFileSystemWindowsApi -> TODO()
+        }
+      }
+    } catch (e : IjentFileSystemPosixApi.CreateDirectoryException) {
+      when (e) {
+        is IjentFileSystemPosixApi.CreateDirectoryException.DirAlreadyExists, is IjentFileSystemPosixApi.CreateDirectoryException.FileAlreadyExists -> throw FileAlreadyExistsException(dir.toString())
+        else -> throw IOException(e)
+      }
+    }
   }
 
   override fun delete(path: Path) {
-    TODO("Not yet implemented")
+    ensureIjentNioPath(path)
+    path.nioFs.fsBlocking {
+      try {
+        path.nioFs.ijent.fs.deleteDirectory(path.ijentPath as IjentPath.Absolute, false)
+      } catch (e : IjentFileSystemApi.DeleteException.DirNotEmpty) {
+        val exception = DirectoryNotEmptyException(path.toString())
+        exception.addSuppressed(e)
+        throw exception
+      }
+    }
   }
 
-  override fun copy(source: Path, target: Path, vararg options: CopyOption?) {
-    TODO("Not yet implemented")
+  override fun copy(source: Path, target: Path, vararg options: CopyOption) {
+    if (StandardCopyOption.ATOMIC_MOVE in options) {
+      throw UnsupportedOperationException("Atomic move is not supported yet")
+    }
+    ensureIjentNioPath(source)
+    ensureIjentNioPath(target)
+    val sourcePath = source.ijentPath
+    val targetPath = target.ijentPath
+    ensurePathIsAbsolute(sourcePath)
+    ensurePathIsAbsolute(targetPath)
+    source.nioFs.fsBlocking {
+      var builder = source.nioFs.ijent.fs.copyOptionsBuilder(sourcePath, targetPath)
+      for (option in options) {
+        builder = when (option) {
+          StandardCopyOption.REPLACE_EXISTING -> builder.replaceExisting()
+          StandardCopyOption.COPY_ATTRIBUTES -> builder.copyAttributes()
+          StandardCopyOption.ATOMIC_MOVE -> builder.atomicMove()
+          else -> {
+            thisLogger().warn("Unknown copy option: $option. This option will be ignored.")
+            builder
+          }
+        }
+      }
+      source.nioFs.ijent.fs.copy(builder.build())
+    }
   }
 
   override fun move(source: Path, target: Path, vararg options: CopyOption?) {
@@ -274,14 +326,6 @@ class IjentNioFileSystemProvider : FileSystemProvider() {
     TODO("Not yet implemented")
   }
 
-  override fun newInputStream(path: Path?, vararg options: OpenOption?): InputStream {
-    TODO("Not yet implemented")
-  }
-
-  override fun newOutputStream(path: Path?, vararg options: OpenOption?): OutputStream {
-    TODO("Not yet implemented")
-  }
-
   override fun newAsynchronousFileChannel(
     path: Path?,
     options: MutableSet<out OpenOption>?,
@@ -296,10 +340,6 @@ class IjentNioFileSystemProvider : FileSystemProvider() {
   }
 
   override fun createLink(link: Path?, existing: Path?) {
-    TODO("Not yet implemented")
-  }
-
-  override fun deleteIfExists(path: Path?): Boolean {
     TODO("Not yet implemented")
   }
 

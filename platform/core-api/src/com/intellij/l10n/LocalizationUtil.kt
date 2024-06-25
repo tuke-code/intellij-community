@@ -3,11 +3,12 @@ package com.intellij.l10n
 
 import com.intellij.DynamicBundle
 import com.intellij.diagnostic.LoadingState
+import com.intellij.ide.plugins.IdeaPluginDescriptor
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.progress.ProcessCanceledException
 import com.intellij.openapi.util.io.FileUtil
-import org.jetbrains.annotations.ApiStatus
+import org.jetbrains.annotations.ApiStatus.Internal
 import java.io.InputStream
 import java.nio.file.Path
 import java.util.*
@@ -16,14 +17,49 @@ import kotlin.io.path.extension
 import kotlin.io.path.nameWithoutExtension
 import kotlin.io.path.pathString
 
-@ApiStatus.Internal
 object LocalizationUtil {
   @Volatile
   private var isL10nInitialized: Boolean = false
   private const val LOCALIZATION_FOLDER_NAME: String = "localization"
+  @Internal
   const val LOCALIZATION_KEY: String = "i18n.locale"
+  @Internal
   val l10nPluginIdToLanguageTag: Map<String, String> = mapOf("com.intellij.ja" to "ja", "com.intellij.ko" to "ko", "com.intellij.zh" to "zh-CN")
 
+  @Internal
+  fun getForcedLocale(): String? {
+    val languageTag = System.getProperty(LOCALIZATION_KEY)
+    if (languageTag.isNullOrEmpty()) {
+      return null
+    }
+    return languageTag
+  }
+
+  fun getLocale(): Locale {
+    val forcedLocale = getForcedLocale()
+    val languageTag = forcedLocale ?: LocalizationStateService.getInstance()?.getSelectedLocale() ?: return Locale.ENGLISH
+    val locale = Locale.forLanguageTag(languageTag)
+
+    if (forcedLocale == null) {
+      val englishTag = Locale.ENGLISH.toLanguageTag()
+      if (languageTag != englishTag && findLanguageBundle(locale) == null) {
+        LocalizationStateService.getInstance()?.setSelectedLocale(englishTag)
+        return Locale.ENGLISH
+      }
+    }
+
+    return locale
+  }
+
+  fun getLocaleOrNullForDefault(): Locale? {
+    val locale = getLocale()
+    if (Locale.ENGLISH.language == locale.language) {
+      return null
+    }
+    return locale
+  }
+
+  @Internal
   @JvmOverloads
   fun getPluginClassLoader(defaultLoader: ClassLoader? = null): ClassLoader? {
     val langBundle = findLanguageBundle()
@@ -63,6 +99,7 @@ object LocalizationUtil {
     return result
   }
 
+  @Internal
   @JvmOverloads
   fun getResourceAsStream(defaultLoader: ClassLoader?, path: Path, specialLocale: Locale? = null): InputStream? {
     val locale = specialLocale ?: getLocale()
@@ -75,6 +112,7 @@ object LocalizationUtil {
     return null
   }
 
+  @Internal
   @JvmOverloads
   fun getLocalizedPaths(path: Path, specialLocale: Locale? = null): List<Path> {
     val locale = specialLocale ?: getLocale()
@@ -96,6 +134,7 @@ object LocalizationUtil {
     ).distinct()
   }
 
+  @Internal
   fun getLocalizationSuffixes(specialLocale: Locale? = null): List<String> {
     val locale = specialLocale ?: getLocaleOrNullForDefault() ?: return emptyList()
     val result = mutableListOf<String>()
@@ -108,6 +147,7 @@ object LocalizationUtil {
     return result
   }
 
+  @Internal
   @JvmOverloads
   fun getFolderLocalizedPaths(path: Path, specialLocale: Locale? = null): List<Path> {
     val locale = specialLocale ?: getLocaleOrNullForDefault() ?: return emptyList()
@@ -119,6 +159,7 @@ object LocalizationUtil {
       path.convertToLocalizationFolderUsage(locale, false)).distinct()
   }
 
+  @Internal
   @JvmOverloads
   fun getSuffixLocalizedPaths(path: Path, specialLocale: Locale? = null): List<String> {
     val locale = specialLocale ?: getLocale()
@@ -131,45 +172,18 @@ object LocalizationUtil {
       .map { FileUtil.toSystemIndependentName(it.toString()) }
   }
 
-  fun getLocaleOrNullForDefault(): Locale? {
-    val locale = getLocale()
-    if (Locale.ENGLISH.language == locale.language) {
-      return null
-    }
-    return locale
-  }
-
+  @Internal
   fun setLocalizationInitialized() {
     isL10nInitialized = true
   }
 
+  @Internal
   fun isLocalizationInitialized(): Boolean {
     return isL10nInitialized
   }
 
-  fun getForcedLocale(): String? {
-    val languageTag = System.getProperty(LOCALIZATION_KEY)
-    if (languageTag.isNullOrEmpty()) {
-      return null
-    }
-    return languageTag
-  }
 
-  fun getLocale(): Locale {
-    val forcedLocale = getForcedLocale()
-    val languageTag = forcedLocale ?: LocalizationStateService.getInstance()?.getSelectedLocale() ?: return Locale.ENGLISH
-    val locale = Locale.forLanguageTag(languageTag)
-
-    if (forcedLocale == null) {
-      val englishTag = Locale.ENGLISH.toLanguageTag()
-      if (languageTag != englishTag && findLanguageBundle(locale) == null) {
-        return Locale.ENGLISH
-      }
-    }
-
-    return locale
-  }
-
+  @Internal
   @JvmOverloads
   fun findLanguageBundle(locale: Locale = getLocale()): DynamicBundle.LanguageBundleEP? {
     return getAllLanguageBundleExtensions().find {
@@ -179,6 +193,7 @@ object LocalizationUtil {
     }
   }
 
+  @Internal
   private fun getAllLanguageBundleExtensions(): List<DynamicBundle.LanguageBundleEP> {
     try {
       if (!LoadingState.COMPONENTS_REGISTERED.isOccurred) {
@@ -200,6 +215,7 @@ object LocalizationUtil {
     }
   }
 
+  @Internal
   fun getAllAvailableLocales(): Pair<List<Locale>, Map<Locale, String>> {
     val list = ArrayList<Locale>()
     val map = HashMap<Locale, String>()
@@ -218,4 +234,7 @@ object LocalizationUtil {
 
     return list to map
   }
+
+  @Internal
+  fun isInactiveLocalizationPlugin(descriptor: IdeaPluginDescriptor): Boolean = LocalizationPluginHelper.getInstance()?.isInactiveLocalizationPlugin(descriptor) ?: false
 }

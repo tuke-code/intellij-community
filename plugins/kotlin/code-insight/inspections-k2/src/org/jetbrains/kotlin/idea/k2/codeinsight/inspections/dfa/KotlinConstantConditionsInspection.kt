@@ -31,11 +31,11 @@ import org.jetbrains.kotlin.analysis.api.analyze
 import org.jetbrains.kotlin.analysis.api.resolution.KaFunctionCall
 import org.jetbrains.kotlin.analysis.api.resolution.singleFunctionCallOrNull
 import org.jetbrains.kotlin.analysis.api.resolution.symbol
-import org.jetbrains.kotlin.analysis.api.components.KtDiagnosticCheckerFilter
+import org.jetbrains.kotlin.analysis.api.components.KaDiagnosticCheckerFilter
 import org.jetbrains.kotlin.analysis.api.symbols.KaEnumEntrySymbol
 import org.jetbrains.kotlin.analysis.api.symbols.KaNamedFunctionSymbol
-import org.jetbrains.kotlin.analysis.api.types.KtIntersectionType
-import org.jetbrains.kotlin.analysis.api.types.KtTypeParameterType
+import org.jetbrains.kotlin.analysis.api.types.KaIntersectionType
+import org.jetbrains.kotlin.analysis.api.types.KaTypeParameterType
 import org.jetbrains.kotlin.builtins.StandardNames
 import org.jetbrains.kotlin.fir.analysis.diagnostics.FirErrors
 import org.jetbrains.kotlin.idea.base.facet.platform.platform
@@ -322,8 +322,8 @@ class KotlinConstantConditionsInspection : AbstractKotlinInspection() {
         if (!entry.isElse && whenExpr.entries.any { it.isElse }) return false
         val expression = entry.expression ?: return false
         return analyze(expression) {
-            val missingCases = whenExpr.getMissingCases()
-            missingCases.isEmpty() && expression.getKtType()?.isNothing == true
+            val missingCases = whenExpr.computeMissingCases()
+            missingCases.isEmpty() && expression.expressionType?.isNothing == true
         }
     }
 
@@ -431,7 +431,7 @@ class KotlinConstantConditionsInspection : AbstractKotlinInspection() {
         @OptIn(KaExperimentalApi::class)
         private fun isCompilationWarning(anchor: KtElement): Boolean {
             val hasWarning = analyze(anchor) {
-                anchor.getDiagnostics(KtDiagnosticCheckerFilter.ONLY_COMMON_CHECKERS)
+                anchor.diagnostics(KaDiagnosticCheckerFilter.ONLY_COMMON_CHECKERS)
                     .any { diagnostic -> diagnostic.factoryName in REPEATING_COMPILATION_WARNINGS }
             }
             if (hasWarning) return true
@@ -441,7 +441,7 @@ class KotlinConstantConditionsInspection : AbstractKotlinInspection() {
 
         private fun isCallToBuiltInMethod(call: KtCallExpression, methodName: String): Boolean {
             return analyze(call) {
-                val functionCall: KaFunctionCall<*> = call.resolveCallOld()?.singleFunctionCallOrNull() ?: return@analyze false
+                val functionCall: KaFunctionCall<*> = call.resolveToCall()?.singleFunctionCallOrNull() ?: return@analyze false
                 val target: KaNamedFunctionSymbol = functionCall.partiallyAppliedSymbol.symbol as? KaNamedFunctionSymbol ?: return@analyze false
                 if (target.name.asString() != methodName) return@analyze false
                 return StandardNames.BUILT_INS_PACKAGE_FQ_NAME == target.callableId?.packageName
@@ -481,7 +481,7 @@ class KotlinConstantConditionsInspection : AbstractKotlinInspection() {
                     if (!value) return false
                     val valueArgList = parent.parent as? KtValueArgumentList ?: return false
                     val call = valueArgList.parent as? KtCallExpression ?: return false
-                    val functionCall: KaFunctionCall<*> = call.resolveCallOld()?.singleFunctionCallOrNull() ?: return false
+                    val functionCall: KaFunctionCall<*> = call.resolveToCall()?.singleFunctionCallOrNull() ?: return false
                     val target: KaNamedFunctionSymbol = functionCall.partiallyAppliedSymbol.symbol as? KaNamedFunctionSymbol ?: return false
                     val name = target.name.asString()
                     if (name != "assert" && name != "require" && name != "check") return false
@@ -554,13 +554,13 @@ class KotlinConstantConditionsInspection : AbstractKotlinInspection() {
                 // Could be caused by code like return x?.let { return ... } ?: true
                 // While inner "return" is redundant, the "always true" warning is confusing
                 // probably separate inspection could report extra "return"
-                val ktType = expression.left?.getKtType()
+                val ktType = expression.left?.expressionType
                 if (ktType != null && ktType.isNothing && ktType.isMarkedNullable) {
                     return true
                 }
             }
             if (isAlsoChain(expression) || isLetConstant(expression) || isUpdateChain(expression)) return true
-            val kotlinType = expression.getKtType() ?: return false
+            val kotlinType = expression.expressionType ?: return false
             when (value) {
                 ConstantValue.TRUE -> {
                     //if (isUselessIsCheck(expression)) return true
@@ -620,8 +620,8 @@ class KotlinConstantConditionsInspection : AbstractKotlinInspection() {
                         return true
                     }
                     val typeParameterType = when (kotlinType) {
-                        is KtTypeParameterType -> kotlinType
-                        is KtIntersectionType -> kotlinType.conjuncts.find { it is KtTypeParameterType }
+                        is KaTypeParameterType -> kotlinType
+                        is KaIntersectionType -> kotlinType.conjuncts.find { it is KaTypeParameterType }
                         else -> null
                     }
                     if (typeParameterType != null && expression.expectedType == typeParameterType) {
@@ -674,7 +674,7 @@ class KotlinConstantConditionsInspection : AbstractKotlinInspection() {
         context(KaSession)
         private fun isAndOrConditionWithNothingOperand(expression: KtExpression, token: KtSingleValueToken): Boolean {
             if (expression !is KtBinaryExpression || expression.operationToken != token) return false
-            val type = expression.right?.getKtType()
+            val type = expression.right?.expressionType
             return type != null && type.isNothing
         }
     }

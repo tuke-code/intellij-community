@@ -9,7 +9,7 @@ import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
 import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.analyze
 import org.jetbrains.kotlin.analysis.api.base.KaConstantValue
-import org.jetbrains.kotlin.analysis.api.components.KtDiagnosticCheckerFilter
+import org.jetbrains.kotlin.analysis.api.components.KaDiagnosticCheckerFilter
 import org.jetbrains.kotlin.analysis.api.fir.diagnostics.KaFirDiagnostic
 
 import org.jetbrains.kotlin.idea.codeinsight.api.classic.quickfixes.CleanupFix
@@ -50,7 +50,7 @@ class MayBeConstantInspection : MayBeConstantInspectionBase() {
                     val constant = initializer.getConstantValue() ?: return Status.NONE
                     val erroneousConstant = initializer.usesNonConstValAsConstant()
 
-                    if (constant is KaConstantValue.KaNullConstantValue || constant is KaConstantValue.KaErrorConstantValue) return Status.NONE
+                    if (constant is KaConstantValue.NullValue || constant is KaConstantValue.ErrorValue) return Status.NONE
                     matchStatus(withJvmField, erroneousConstant)
                 }
             }
@@ -61,7 +61,7 @@ class MayBeConstantInspection : MayBeConstantInspectionBase() {
 
     context(KaSession)
     private fun KtProperty.hasPrimitiveOrStringType(): Boolean {
-        val type = this.getReturnKtType()
+        val type = this.returnType
         return type.isPrimitive || type.isString
     }
 
@@ -73,7 +73,7 @@ class MayBeConstantInspection : MayBeConstantInspectionBase() {
     context(KaSession)
     @OptIn(KaExperimentalApi::class)
     private fun KtExpression.usesNonConstValAsConstant(): Boolean {
-        val diagnostics = getDiagnostics(KtDiagnosticCheckerFilter.ONLY_COMMON_CHECKERS)
+        val diagnostics = diagnostics(KaDiagnosticCheckerFilter.ONLY_COMMON_CHECKERS)
         return diagnostics.find { it is KaFirDiagnostic.NonConstValUsedInConstantExpression } != null
     }
 

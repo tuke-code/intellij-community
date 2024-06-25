@@ -17,6 +17,7 @@ import com.intellij.ui.components.JBScrollPane;
 import com.intellij.util.concurrency.ThreadingAssertions;
 import com.intellij.util.containers.ContainerUtil;
 import com.intellij.util.ui.JBUI;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -254,6 +255,7 @@ public final class EditorEmbeddedComponentManager {
     }
   }
 
+  @ApiStatus.Internal
   public static final class FullEditorWidthRenderer extends MyRenderer {
 
     FullEditorWidthRenderer(@NotNull JComponent component,
@@ -323,7 +325,9 @@ public final class EditorEmbeddedComponentManager {
       });
 
       // If validation is postponed, visual artifacts can appear while typing text.
-      renderer.validate();
+      if (!myEditor.getInlayModel().isInBatchMode()) {
+        renderer.validate();
+      }
 
       return inlay;
     }

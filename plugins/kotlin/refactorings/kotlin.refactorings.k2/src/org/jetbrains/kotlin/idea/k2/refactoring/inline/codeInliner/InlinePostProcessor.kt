@@ -9,8 +9,8 @@ import org.jetbrains.kotlin.analysis.api.components.ShortenOptions
 import org.jetbrains.kotlin.analysis.api.resolution.singleFunctionCallOrNull
 import org.jetbrains.kotlin.analysis.api.resolution.successfulFunctionCallOrNull
 import org.jetbrains.kotlin.analysis.api.resolution.symbol
+import org.jetbrains.kotlin.analysis.api.symbols.KaFunctionSymbol
 import org.jetbrains.kotlin.analysis.api.symbols.KaValueParameterSymbol
-import org.jetbrains.kotlin.analysis.api.symbols.KtFunctionLikeSymbol
 import org.jetbrains.kotlin.idea.base.analysis.api.utils.defaultValue
 import org.jetbrains.kotlin.idea.base.codeInsight.ShortenReferencesFacility
 import org.jetbrains.kotlin.idea.codeinsight.utils.RemoveExplicitTypeArgumentsUtils
@@ -142,7 +142,7 @@ object InlinePostProcessor: AbstractInlinePostProcessor() {
 
         result.forEachDescendantOfType<KtCallElement> { callExpression ->
             analyze(callExpression) {
-                val functionCall = callExpression.resolveCallOld()?.singleFunctionCallOrNull() ?: return@forEachDescendantOfType
+                val functionCall = callExpression.resolveToCall()?.singleFunctionCallOrNull() ?: return@forEachDescendantOfType
 
                 val arguments = functionCall.argumentMapping.entries.toList()
                 val callableSymbol = functionCall.partiallyAppliedSymbol.symbol
@@ -153,7 +153,7 @@ object InlinePostProcessor: AbstractInlinePostProcessor() {
                     val defaultValue = param.symbol.defaultValue
                         ?: callableSymbol.allOverriddenSymbols
                             .mapNotNull {
-                                val params = (it as? KtFunctionLikeSymbol)?.valueParameters
+                                val params = (it as? KaFunctionSymbol)?.valueParameters
                                 params?.getOrNull(idx)?.defaultValue
                             }.firstOrNull()
 
@@ -233,7 +233,7 @@ object InlinePostProcessor: AbstractInlinePostProcessor() {
 
         analyze(element) {
             for (callExpression in callsToProcess) {
-                val resolvedCall = callExpression.resolveCallOld()?.successfulFunctionCallOrNull() ?: return
+                val resolvedCall = callExpression.resolveToCall()?.successfulFunctionCallOrNull() ?: return
 
                 val argumentsToMakeNamed = callExpression.valueArguments.dropWhile { it.getCopyableUserData(MAKE_ARGUMENT_NAMED_KEY) == null }
                 for (argument in argumentsToMakeNamed) {

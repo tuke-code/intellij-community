@@ -16,7 +16,7 @@ import org.jetbrains.annotations.Nls
 import org.jetbrains.kotlin.analysis.api.analyze
 import org.jetbrains.kotlin.analysis.api.permissions.KaAllowAnalysisOnEdt
 import org.jetbrains.kotlin.analysis.api.permissions.allowAnalysisOnEdt
-import org.jetbrains.kotlin.analysis.api.types.KtType
+import org.jetbrains.kotlin.analysis.api.types.KaType
 import org.jetbrains.kotlin.idea.base.psi.unifier.toRange
 import org.jetbrains.kotlin.idea.base.resources.KotlinBundle
 import org.jetbrains.kotlin.idea.codeinsights.impl.base.CallableReturnTypeUpdaterUtils
@@ -111,10 +111,10 @@ class KotlinIntroducePropertyHandler(
             }
 
             val engine = object :
-                IExtractionEngine<KtType, ExtractionData, ExtractionGeneratorConfiguration, ExtractionResult, ExtractableCodeDescriptor, ExtractableCodeDescriptorWithConflicts>(
+                IExtractionEngine<KaType, ExtractionData, ExtractionGeneratorConfiguration, ExtractionResult, ExtractableCodeDescriptor, ExtractableCodeDescriptorWithConflicts>(
                     helper
                 ) {
-                override fun performAnalysis(extractionData: ExtractionData): AnalysisResult<KtType> {
+                override fun performAnalysis(extractionData: ExtractionData): AnalysisResult<KaType> {
                     return ExtractionDataAnalyzer(extractionData).performAnalysis()
                 }
             }
@@ -122,7 +122,7 @@ class KotlinIntroducePropertyHandler(
             engine.run(editor, extractionData) {
                 val property = it.declaration as KtProperty
                 val descriptor = it.config.descriptor
-                val exprType = allowAnalysisOnEdt { analyze (property) { CallableReturnTypeUpdaterUtils.TypeInfo.createByKtTypes(property.getReturnKtType()) } }
+                val exprType = allowAnalysisOnEdt { analyze (property) { CallableReturnTypeUpdaterUtils.TypeInfo.createByKtTypes(property.returnType) } }
 
                 editor.caretModel.moveToOffset(property.textOffset)
                 editor.selectionModel.removeSelection()

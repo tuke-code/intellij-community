@@ -33,13 +33,13 @@ internal class KotlinRecursiveCallLineMarkerProvider : LineMarkerProvider {
             val symbol = target.symbol
             val targetDeclaration = target.symbol.psi as? KtDeclaration ?: return@process
 
-            if (symbol.origin == KtSymbolOrigin.SOURCE_MEMBER_GENERATED || !targetDeclaration.isAncestor(target.caller)) {
+            if (symbol.origin == KaSymbolOrigin.SOURCE_MEMBER_GENERATED || !targetDeclaration.isAncestor(target.caller)) {
                 return@process
             }
 
             if (isRecursiveCall(target, targetDeclaration)) {
                 @NlsSafe val declarationName = when (symbol) {
-                    is KtVariableLikeSymbol -> symbol.name.asString()
+                  is KaVariableSymbol -> symbol.name.asString()
                     is KaNamedFunctionSymbol -> symbol.name.asString() + "()"
                     is KaPropertyGetterSymbol -> "get()"
                     is KaPropertySetterSymbol -> "set()"
@@ -78,7 +78,7 @@ private fun checkDispatchReceiver(target: CallTarget): Boolean {
             dispatchReceiver = dispatchReceiver.original
         }
 
-        val containingClass = target.symbol.containingSymbol as? KaClassOrObjectSymbol ?: return true
+        val containingClass = target.symbol.containingSymbol as? KaClassSymbol ?: return true
 
         if (dispatchReceiver is KaExplicitReceiverValue) {
             if (dispatchReceiver.isSafeNavigation) {
@@ -94,7 +94,7 @@ private fun checkDispatchReceiver(target: CallTarget): Boolean {
                                 && containingClass.classKind.isObject
                                 && receiverSymbol.containingSymbol == containingClass
                     }
-                    is KaClassOrObjectSymbol -> {
+                    is KaClassSymbol -> {
                         receiverSymbol.classKind.isObject
                                 && receiverSymbol == containingClass
                     }

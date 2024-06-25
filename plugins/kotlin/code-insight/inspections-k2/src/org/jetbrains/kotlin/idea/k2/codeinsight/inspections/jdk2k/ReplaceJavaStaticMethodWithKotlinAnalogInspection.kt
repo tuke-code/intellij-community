@@ -47,7 +47,7 @@ internal class ReplaceJavaStaticMethodWithKotlinAnalogInspection :
             it.isApplicable(element)
         }
 
-        val javaMethodFqName = element.resolveCallOld()
+        val javaMethodFqName = element.resolveToCall()
             ?.singleFunctionCallOrNull()?.partiallyAppliedSymbol?.symbol?.callableId?.asSingleFqName()
 
         return replacements.filter {
@@ -134,7 +134,7 @@ private object Holder {
                         val singleArgument = valueArguments.single().getArgumentExpression()
                         if (singleArgument != null) {
                             analyze(call) {
-                                singleArgument.getKtType()?.isChar
+                              singleArgument.expressionType?.isChar
                             } == true
                         } else {
                             false

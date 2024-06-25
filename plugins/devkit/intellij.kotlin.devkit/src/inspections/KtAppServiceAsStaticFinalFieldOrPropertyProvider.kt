@@ -23,10 +23,10 @@ import org.jetbrains.kotlin.analysis.api.resolution.symbol
 import org.jetbrains.kotlin.analysis.api.permissions.allowAnalysisFromWriteAction
 import org.jetbrains.kotlin.analysis.api.permissions.allowAnalysisOnEdt
 import org.jetbrains.kotlin.analysis.api.symbols.KaConstructorSymbol
-import org.jetbrains.kotlin.analysis.api.symbols.KtPropertySymbol
+import org.jetbrains.kotlin.analysis.api.symbols.KaPropertySymbol
 import org.jetbrains.kotlin.analysis.api.symbols.KaSamConstructorSymbol
-import org.jetbrains.kotlin.analysis.api.types.KtNonErrorClassType
-import org.jetbrains.kotlin.analysis.api.types.KtTypeNullability
+import org.jetbrains.kotlin.analysis.api.types.KaClassType
+import org.jetbrains.kotlin.analysis.api.types.KaTypeNullability
 import org.jetbrains.kotlin.idea.base.codeInsight.KotlinNameSuggester
 import org.jetbrains.kotlin.idea.base.codeInsight.KotlinNameSuggestionProvider
 import org.jetbrains.kotlin.idea.base.codeInsight.ShortenReferencesFacility
@@ -52,12 +52,12 @@ internal class KtAppServiceAsStaticFinalFieldOrPropertyVisitorProvider : AppServ
         val typeClassElement = allowAnalysisOnEdt {
           analyze(property) {
             // return if it's an explicit constructor call
-            val resolveSymbol = property.initializer?.resolveCallOld()?.singleFunctionCallOrNull()?.symbol
+            val resolveSymbol = property.initializer?.resolveToCall()?.singleFunctionCallOrNull()?.symbol
             val isConstructorCall = resolveSymbol is KaSamConstructorSymbol || resolveSymbol is KaConstructorSymbol
             if (isConstructorCall) return
 
             // can be KtClass or PsiClass
-            property.getReturnKtType().withNullability(KtTypeNullability.UNKNOWN).expandedSymbol?.psi ?: return
+            property.returnType.withNullability(KaTypeNullability.UNKNOWN).expandedSymbol?.psi ?: return
           }
         }
 
@@ -111,7 +111,7 @@ internal class KtAppServiceAsStaticFinalFieldOrPropertyVisitorProvider : AppServ
       val property = this
 
       analyze(property) {
-        val propertySymbol = property.getVariableSymbol() as? KtPropertySymbol ?: return false
+        val propertySymbol = property.getVariableSymbol() as? KaPropertySymbol ?: return false
         return propertySymbol.hasBackingField
       }
     }
@@ -134,8 +134,8 @@ private class KtWrapInSupplierQuickFix(ktProperty: KtProperty) : WrapInSupplierQ
       @OptIn(KaAllowAnalysisFromWriteAction::class)
       allowAnalysisFromWriteAction {
         analyze(element) {
-          val returnType = element.getReturnKtType().lowerBoundIfFlexible()
-          (returnType as? KtNonErrorClassType)?.classId
+          val returnType = element.returnType.lowerBoundIfFlexible()
+          (returnType as? KaClassType)?.classId
         }
       }
     }

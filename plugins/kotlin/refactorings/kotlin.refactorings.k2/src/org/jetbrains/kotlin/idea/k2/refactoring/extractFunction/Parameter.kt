@@ -5,52 +5,52 @@ import com.intellij.psi.PsiNamedElement
 import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.analyze
 import org.jetbrains.kotlin.analysis.api.symbols.KaAnonymousObjectSymbol
-import org.jetbrains.kotlin.analysis.api.types.KtFlexibleType
-import org.jetbrains.kotlin.analysis.api.types.KtNonErrorClassType
-import org.jetbrains.kotlin.analysis.api.types.KtType
-import org.jetbrains.kotlin.analysis.api.types.KtTypeNullability
+import org.jetbrains.kotlin.analysis.api.types.KaFlexibleType
+import org.jetbrains.kotlin.analysis.api.types.KaClassType
+import org.jetbrains.kotlin.analysis.api.types.KaType
+import org.jetbrains.kotlin.analysis.api.types.KaTypeNullability
 import org.jetbrains.kotlin.idea.k2.refactoring.introduce.extractionEngine.isResolvableInScope
 import org.jetbrains.kotlin.idea.refactoring.introduce.extractionEngine.ControlFlow
 import org.jetbrains.kotlin.idea.refactoring.introduce.extractionEngine.IMutableParameter
 import org.jetbrains.kotlin.idea.refactoring.introduce.extractionEngine.IParameter
 import org.jetbrains.kotlin.psi.KtElement
 
-interface Parameter : IParameter<KtType> {
+interface Parameter : IParameter<KaType> {
     val originalDescriptor: PsiNamedElement
 }
 
 internal sealed class TypePredicate {
     context(KaSession)
-    abstract fun isApplicable(ktType: KtType): Boolean
+    abstract fun isApplicable(ktType: KaType): Boolean
 }
 
-internal class SubTypePredicate(private val type: KtType) : TypePredicate() {
+internal class SubTypePredicate(private val type: KaType) : TypePredicate() {
     context(KaSession)
-    override fun isApplicable(ktType: KtType): Boolean = ktType.isSubTypeOf(type)
+    override fun isApplicable(ktType: KaType): Boolean = ktType.isSubTypeOf(type)
 }
 
-internal class SuperTypePredicate(private val type: KtType) : TypePredicate() {
+internal class SuperTypePredicate(private val type: KaType) : TypePredicate() {
     context(KaSession)
-    override fun isApplicable(ktType: KtType): Boolean = ktType.isSubTypeOf(type)
+    override fun isApplicable(ktType: KaType): Boolean = ktType.isSubTypeOf(type)
 }
 
-internal class ExactTypePredicate(private val type: KtType) : TypePredicate() {
+internal class ExactTypePredicate(private val type: KaType) : TypePredicate() {
     context(KaSession)
-    override fun isApplicable(ktType: KtType): Boolean = ktType.isEqualTo(type)
+    override fun isApplicable(ktType: KaType): Boolean = ktType.isEqualTo(type)
 }
 
 internal class AndPredicate(val predicates: Set<TypePredicate>) : TypePredicate() {
     context(KaSession)
-    override fun isApplicable(ktType: KtType): Boolean = predicates.all { it.isApplicable(ktType) }
+    override fun isApplicable(ktType: KaType): Boolean = predicates.all { it.isApplicable(ktType) }
 }
 
 internal class MutableParameter(
     override val argumentText: String,
     override val originalDescriptor: PsiNamedElement,
     override val receiverCandidate: Boolean,
-    private val originalType: KtType,
+    private val originalType: KaType,
     private val scope: KtElement
-) : Parameter, IMutableParameter<KtType> {
+) : Parameter, IMutableParameter<KaType> {
 
     private val typePredicates = mutableSetOf<TypePredicate>()
 
@@ -65,18 +65,18 @@ internal class MutableParameter(
     override var mirrorVarName: String? = null
 
     context(KaSession)
-    private fun allParameterTypeCandidates(): List<KtType> {
+    private fun allParameterTypeCandidates(): List<KaType> {
         val andPredicate = AndPredicate(typePredicates)
-        val typeSet = if (originalType is KtFlexibleType) {
+        val typeSet = if (originalType is KaFlexibleType) {
             val lower = originalType.lowerBound
             val upper = originalType.upperBound
-            LinkedHashSet<KtType>().apply {
+            LinkedHashSet<KaType>().apply {
                 if (andPredicate.isApplicable(upper)) add(upper)
                 if (andPredicate.isApplicable(lower)) add(lower)
             }
         } else linkedSetOf(originalType)
 
-        val addNullableTypes = originalType is KtFlexibleType &&
+        val addNullableTypes = originalType is KaFlexibleType &&
                 originalType.lowerBound.nullability != originalType.upperBound.nullability &&
                 typeSet.size > 1
         val superTypes = originalType.getAllSuperTypes().filter {
@@ -85,7 +85,7 @@ internal class MutableParameter(
 
         for (superType in superTypes) {
             if (addNullableTypes) {
-                typeSet.add(superType.withNullability(KtTypeNullability.NULLABLE))
+                typeSet.add(superType.withNullability(KaTypeNullability.NULLABLE))
             }
             typeSet.add(superType)
         }
@@ -93,20 +93,20 @@ internal class MutableParameter(
         return typeSet.toList()
     }
 
-    override fun getParameterTypeCandidates(): List<KtType> {
+    override fun getParameterTypeCandidates(): List<KaType> {
         analyze(scope) {
             return allParameterTypeCandidates().filter {
-                !(it is KtNonErrorClassType && it.symbol is KaAnonymousObjectSymbol) &&
+                !(it is KaClassType && it.symbol is KaAnonymousObjectSymbol) &&
                         isResolvableInScope(it, scope, mutableSetOf())
             }
         }
     }
 
-    override val parameterType: KtType
+    override val parameterType: KaType
         get() = getParameterTypeCandidates().firstOrNull() ?: originalType
 }
 
-val ControlFlow<KtType>.possibleReturnTypes: List<KtType>
+val ControlFlow<KaType>.possibleReturnTypes: List<KaType>
     get() {
         return listOf(outputValueBoxer.returnType)
     }

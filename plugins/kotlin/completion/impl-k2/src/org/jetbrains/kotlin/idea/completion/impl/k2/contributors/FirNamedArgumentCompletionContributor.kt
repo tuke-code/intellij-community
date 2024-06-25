@@ -6,11 +6,13 @@
 package org.jetbrains.kotlin.idea.completion.contributors
 
 import org.jetbrains.kotlin.analysis.api.KaSession
+import org.jetbrains.kotlin.analysis.api.analyzeCopy
+import org.jetbrains.kotlin.analysis.api.projectStructure.KaDanglingFileResolutionMode
 import org.jetbrains.kotlin.analysis.api.resolution.KaFunctionCall
 import org.jetbrains.kotlin.analysis.api.resolution.symbol
-import org.jetbrains.kotlin.analysis.api.signatures.KtVariableLikeSignature
+import org.jetbrains.kotlin.analysis.api.signatures.KaVariableSignature
 import org.jetbrains.kotlin.analysis.api.symbols.KaValueParameterSymbol
-import org.jetbrains.kotlin.analysis.api.types.KtType
+import org.jetbrains.kotlin.analysis.api.types.KaType
 import org.jetbrains.kotlin.idea.base.analysis.api.utils.CallParameterInfoProvider
 import org.jetbrains.kotlin.idea.base.analysis.api.utils.collectCallCandidates
 import org.jetbrains.kotlin.idea.completion.FirCompletionSessionParameters
@@ -43,42 +45,53 @@ internal class FirNamedArgumentCompletionContributor(basicContext: FirBasicCompl
 
         if (valueArgument.getArgumentName() != null) return
 
-        val candidates = collectCallCandidates(callElement)
-            .mapNotNull { it.candidate as? KaFunctionCall<*> }
-            .filter { it.partiallyAppliedSymbol.symbol.hasStableParameterNames }
+        // with `analyze` invoked on `fakeKtFile`:
+        // - use-site is `fakeKtFile`;
+        // - `collectCallCandidates` collects functions from `originalKtFile`.
+        // if a function has `private` modifier then collected call candidate hav INVISIBLE_REFERENCE diagnostic, which leads to KTIJ-29748;
+        // TODO: when KT-68929 is implemented, rewrite `KotlinFirCompletionProvider` so that it uses `analyzeCopy` with `IGNORE_ORIGIN`
+        // as a temporary workaround, use `analyzeCopy` while collecting call candidate for named argument completion
+        val lookupElements = analyzeCopy(callElement, resolutionMode = KaDanglingFileResolutionMode.PREFER_SELF) {
+            val candidates = collectCallCandidates(callElement)
+                .mapNotNull { it.candidate as? KaFunctionCall<*> }
+                .filter { it.partiallyAppliedSymbol.symbol.hasStableParameterNames }
 
-        val namedArgumentInfos = buildList {
-            val (candidatesWithTypeMismatches, candidatesWithNoTypeMismatches) = candidates.partition {
-                CallParameterInfoProvider.hasTypeMismatchBeforeCurrent(callElement, it.argumentMapping, currentArgumentIndex)
+            val namedArgumentInfos = buildList {
+                val (candidatesWithTypeMismatches, candidatesWithNoTypeMismatches) = candidates.partition {
+                    CallParameterInfoProvider.hasTypeMismatchBeforeCurrent(callElement, it.argumentMapping, currentArgumentIndex)
+                }
+
+                addAll(collectNamedArgumentInfos(callElement, candidatesWithNoTypeMismatches, currentArgumentIndex))
+                // if no candidates without type mismatches have any candidate parameters, try searching among remaining candidates
+                if (isEmpty()) {
+                    addAll(collectNamedArgumentInfos(callElement, candidatesWithTypeMismatches, currentArgumentIndex))
+                }
             }
 
-            addAll(collectNamedArgumentInfos(callElement, candidatesWithNoTypeMismatches, currentArgumentIndex))
-            // if no candidates without type mismatches have any candidate parameters, try searching among remaining candidates
-            if (isEmpty()) {
-                addAll(collectNamedArgumentInfos(callElement, candidatesWithTypeMismatches, currentArgumentIndex))
-            }
-        }
-
-        for ((name, indexedTypes) in namedArgumentInfos) {
             val elements = buildList {
-                with(lookupElementFactory) {
-                    add(createNamedArgumentLookupElement(name, indexedTypes.map { it.value }))
+                for ((name, indexedTypes) in namedArgumentInfos) {
+                    with(lookupElementFactory) {
+                        add(createNamedArgumentLookupElement(name, indexedTypes.map { it.value }))
 
-                    // suggest default values only for types from parameters with matching positions to not clutter completion
-                    val typesAtCurrentPosition = indexedTypes.filter { it.index == currentArgumentIndex }.map { it.value }
-                    if (typesAtCurrentPosition.any { it.isBoolean }) {
-                        add(createNamedArgumentWithValueLookupElement(name, KtTokens.TRUE_KEYWORD.value))
-                        add(createNamedArgumentWithValueLookupElement(name, KtTokens.FALSE_KEYWORD.value))
-                    }
-                    if (typesAtCurrentPosition.any { it.isMarkedNullable }) {
-                        add(createNamedArgumentWithValueLookupElement(name, KtTokens.NULL_KEYWORD.value))
+                        // suggest default values only for types from parameters with matching positions to not clutter completion
+                        val typesAtCurrentPosition = indexedTypes.filter { it.index == currentArgumentIndex }.map { it.value }
+                        if (typesAtCurrentPosition.any { it.isBoolean }) {
+                            add(createNamedArgumentWithValueLookupElement(name, KtTokens.TRUE_KEYWORD.value))
+                            add(createNamedArgumentWithValueLookupElement(name, KtTokens.FALSE_KEYWORD.value))
+                        }
+                        if (typesAtCurrentPosition.any { it.isMarkedNullable }) {
+                            add(createNamedArgumentWithValueLookupElement(name, KtTokens.NULL_KEYWORD.value))
+                        }
                     }
                 }
             }
-            elements.forEach { Weighers.applyWeighsToLookupElement(weighingContext, it, symbolWithOrigin = null) }
 
-            sink.addAllElements(elements)
+            elements
         }
+
+        lookupElements.forEach { Weighers.applyWeighsToLookupElement(weighingContext, it, symbolWithOrigin = null) }
+
+        sink.addAllElements(lookupElements)
     }
 
     /**
@@ -86,7 +99,7 @@ internal class FirNamedArgumentCompletionContributor(basicContext: FirBasicCompl
      */
     private data class NamedArgumentInfo(
         val name: Name,
-        val indexedTypes: List<IndexedValue<KtType>>
+        val indexedTypes: List<IndexedValue<KaType>>
     )
 
     context(KaSession)
@@ -97,7 +110,7 @@ internal class FirNamedArgumentCompletionContributor(basicContext: FirBasicCompl
     ): List<NamedArgumentInfo> {
         val argumentsBeforeCurrent = callElement.valueArgumentList?.arguments?.take(currentArgumentIndex) ?: return emptyList()
 
-        val nameToTypes = mutableMapOf<Name, MutableSet<IndexedValue<KtType>>>()
+        val nameToTypes = mutableMapOf<Name, MutableSet<IndexedValue<KaType>>>()
         for (candidate in candidates) {
             val indexedParameterCandidates = collectNotUsedIndexedParameterCandidates(callElement, candidate, argumentsBeforeCurrent)
             indexedParameterCandidates.forEach { (index, parameter) ->
@@ -112,7 +125,7 @@ internal class FirNamedArgumentCompletionContributor(basicContext: FirBasicCompl
         callElement: KtCallElement,
         candidate: KaFunctionCall<*>,
         argumentsBeforeCurrent: List<KtValueArgument>
-    ): List<IndexedValue<KtVariableLikeSignature<KaValueParameterSymbol>>> {
+    ): List<IndexedValue<KaVariableSignature<KaValueParameterSymbol>>> {
         val signature = candidate.partiallyAppliedSymbol.signature
         val argumentMapping = candidate.argumentMapping
 

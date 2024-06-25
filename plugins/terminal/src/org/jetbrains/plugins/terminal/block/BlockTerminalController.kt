@@ -18,6 +18,7 @@ import org.jetbrains.plugins.terminal.block.output.*
 import org.jetbrains.plugins.terminal.block.output.BlockTerminalSearchSession.Companion.isSearchInBlock
 import org.jetbrains.plugins.terminal.block.prompt.TerminalPromptController
 import org.jetbrains.plugins.terminal.block.prompt.TerminalPromptRenderingInfo
+import org.jetbrains.plugins.terminal.block.prompt.clearCommandAndResetUndoRedoStack
 import org.jetbrains.plugins.terminal.block.session.BlockTerminalSession
 import org.jetbrains.plugins.terminal.block.session.CommandFinishedEvent
 import org.jetbrains.plugins.terminal.block.session.ShellCommandListener
@@ -61,7 +62,16 @@ internal class BlockTerminalController(
         finishCommandBlock(event.exitCode)
         TerminalUsageTriggerCollector.triggerCommandFinished(project, event.command, event.exitCode, event.duration)
       }
+
+      override fun commandStarted(command: String) {
+        invokeLater(getDisposed(), ModalityState.any()) {
+          if (!outputController.isCommandRunning()) {
+            startCommandBlock(command, promptController.model.renderingInfo)
+          }
+        }
+      }
     })
+
     session.commandExecutionManager.addListener(object : ShellCommandSentListener {
       override fun userCommandSent(userCommand: String) {
         invokeLaterIfNeeded(getDisposed(), ModalityState.any()) {
@@ -89,7 +99,7 @@ internal class BlockTerminalController(
   @RequiresEdt
   fun startCommandExecution(command: String) {
     if (command.isBlank()) {
-      promptController.model.reset()
+      promptController.model.clearCommandAndResetUndoRedoStack()
       outputController.insertEmptyLine()
     }
     else {
@@ -101,7 +111,10 @@ internal class BlockTerminalController(
   }
 
   @RequiresEdt(generateAssertion = false)
-  private fun startCommandBlock(command: String?, prompt: TerminalPromptRenderingInfo?) {
+  private fun startCommandBlock(
+    command: String?,
+    prompt: TerminalPromptRenderingInfo?,
+  ) {
     outputController.startCommandBlock(command, prompt)
     // Hide the prompt only when the new block is created, so it will look like the prompt is replaced with a block atomically.
     // If the command is finished very fast, the prompt will be shown back before repainting.
@@ -122,7 +135,7 @@ internal class BlockTerminalController(
     session.model.isCommandRunning = false
 
     invokeLater(getDisposed(), ModalityState.any()) {
-      promptController.model.reset()
+      promptController.model.clearCommandAndResetUndoRedoStack()
       promptController.promptIsVisible = true
     }
   }

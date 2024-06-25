@@ -12,8 +12,8 @@ import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
 import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.resolution.*
 import org.jetbrains.kotlin.analysis.api.renderer.base.annotations.KaRendererAnnotationsFilter
-import org.jetbrains.kotlin.analysis.api.renderer.declarations.KtDeclarationRenderer
-import org.jetbrains.kotlin.analysis.api.renderer.declarations.impl.KtDeclarationRendererForSource
+import org.jetbrains.kotlin.analysis.api.renderer.declarations.KaDeclarationRenderer
+import org.jetbrains.kotlin.analysis.api.renderer.declarations.impl.KaDeclarationRendererForSource
 import org.jetbrains.kotlin.analysis.api.symbols.KaCallableSymbol
 import org.jetbrains.kotlin.analysis.api.symbols.KaClassLikeSymbol
 import org.jetbrains.kotlin.analysis.api.symbols.KaConstructorSymbol
@@ -78,8 +78,8 @@ internal class KotlinK2FindUsagesSupport : KotlinFindUsagesSupport {
     }
 
     @KaExperimentalApi
-    private fun noAnnotationsShortNameRenderer(): KtDeclarationRenderer {
-        return KtDeclarationRendererForSource.WITH_SHORT_NAMES.with {
+    private fun noAnnotationsShortNameRenderer(): KaDeclarationRenderer {
+        return KaDeclarationRendererForSource.WITH_SHORT_NAMES.with {
             annotationRenderer = annotationRenderer.with {
                 annotationFilter = KaRendererAnnotationsFilter.NONE
             }

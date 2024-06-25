@@ -36,6 +36,7 @@
       "profileMemory.svg": "actions/profileMemory.svg",
       "profileRed.svg": "actions/profileRed.svg",
       "projectDirectory.svg": "actions/projectDirectory.svg",
+      "replace.svg": "actions/replace.svg",
       "runAll.svg": "actions/runAll.svg",
       "selectAll.svg": "actions/selectall.svg",
       "shortcutFilter.svg": "actions/shortcutFilter.svg",
@@ -169,6 +170,24 @@
       "magicResolveToolbar.svg": "diff/magicResolveToolbar.svg",
       "remove@14x14.svg": "diff/remove.svg",
       "revert@14x14.svg": "diff/revert.svg"
+    },
+    "duplicates": {
+      "sendToTheLeft.svg": [
+        "sendToTheLeft.png",
+        "sendToTheLeft@2x.png"
+      ],
+      "sendToTheLeftGrayed.svg": [
+        "sendToTheLeftGrayed.png",
+        "sendToTheLeftGrayed@2x.png"
+      ],
+      "sendToTheRight.svg": [
+        "sendToTheRight.png",
+        "sendToTheRight@2x.png"
+      ],
+      "sendToTheRightGrayed.svg": [
+        "sendToTheRightGrayed.png",
+        "sendToTheRightGrayed@2x.png"
+      ]
     },
     "codeInsight": {
       "inlayGlobe.svg": "actions/inlayGlobe.svg",
@@ -666,9 +685,12 @@
       "tabAlert.svg": "nodes/tabAlert.svg"
     },
     "objectBrowser": {
+      "abbreviatePackageNames.svg": "objectBrowser/abbreviatePackageNames.svg",
       "compactEmptyPackages.svg": "objectBrowser/compactEmptyPackages.svg",
       "flattenModules.svg": "objectBrowser/flattenModules.svg",
       "flattenPackages.svg": "objectBrowser/flattenPackages.svg",
+      "showLibraryContents.svg": "objectBrowser/showLibraryContents.svg",
+      "showMembers.svg": "objectBrowser/showMembers.svg",
       "sortAlphabetically.svg": "objectBrowser/sorted.svg",
       "sortByType.svg": "objectBrowser/sortByType.svg",
       "sortByUsage.svg": "objectBrowser/sortedByUsage.svg",

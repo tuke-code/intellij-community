@@ -2,9 +2,9 @@
 package org.jetbrains.kotlin.idea.codeinsight.utils
 
 import org.jetbrains.kotlin.analysis.api.KaSession
-import org.jetbrains.kotlin.analysis.api.components.KtImplicitReceiver
+import org.jetbrains.kotlin.analysis.api.components.KaImplicitReceiver
 import org.jetbrains.kotlin.analysis.api.symbols.*
-import org.jetbrains.kotlin.analysis.api.types.KtFunctionalType
+import org.jetbrains.kotlin.analysis.api.types.KaFunctionType
 import org.jetbrains.kotlin.idea.references.mainReference
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.psi.*
@@ -28,19 +28,19 @@ fun KtExpression.getImplicitReceiverInfo(): ImplicitReceiverInfo? {
     val declarationAssociatedClass = getAssociatedClass(declarationSymbol) ?: return null
 
     // Getting the implicit receiver
-    val allImplicitReceivers = reference.containingKtFile.getScopeContextForPosition(reference).implicitReceivers
+    val allImplicitReceivers = reference.containingKtFile.scopeContext(reference).implicitReceivers
     return getImplicitReceiverInfoOfClass(allImplicitReceivers, declarationAssociatedClass)
 }
 
 context(KaSession)
-private fun getAssociatedClass(symbol: KtSymbol): KaClassOrObjectSymbol? {
+private fun getAssociatedClass(symbol: KaSymbol): KaClassSymbol? {
     // both variables and functions are callable, and only they can be referenced by "this"
     if (symbol !is KaCallableSymbol) return null
     return when (symbol) {
-        is KaNamedFunctionSymbol, is KtPropertySymbol ->
-            if (symbol.isExtension) symbol.receiverType?.expandedSymbol else symbol.containingSymbol as? KaClassOrObjectSymbol
-        is KtVariableLikeSymbol -> {
-            val variableType = symbol.returnType as? KtFunctionalType
+        is KaNamedFunctionSymbol, is KaPropertySymbol ->
+            if (symbol.isExtension) symbol.receiverType?.expandedSymbol else symbol.containingSymbol as? KaClassSymbol
+        is KaVariableSymbol -> {
+            val variableType = symbol.returnType as? KaFunctionType
             variableType?.receiverType?.expandedSymbol
         }
         else -> null
@@ -49,7 +49,7 @@ private fun getAssociatedClass(symbol: KtSymbol): KaClassOrObjectSymbol? {
 
 context(KaSession)
 private fun getImplicitReceiverInfoOfClass(
-    implicitReceivers: List<KtImplicitReceiver>, associatedClass: KaClassOrObjectSymbol
+    implicitReceivers: List<KaImplicitReceiver>, associatedClass: KaClassSymbol
 ): ImplicitReceiverInfo? {
     // We can't use "this" with label if the label is already taken
     val alreadyReservedLabels = mutableListOf<Name>()
@@ -73,10 +73,10 @@ private fun getImplicitReceiverInfoOfClass(
 }
 
 context(KaSession)
-private fun getImplicitReceiverClassAndTag(receiver: KtImplicitReceiver): Pair<KaClassOrObjectSymbol, Name?>? {
+private fun getImplicitReceiverClassAndTag(receiver: KaImplicitReceiver): Pair<KaClassSymbol, Name?>? {
     val associatedClass = receiver.type.expandedSymbol ?: return null
     val associatedTag: Name? = when (val receiverSymbol = receiver.ownerSymbol) {
-        is KaClassOrObjectSymbol -> receiverSymbol.name
+        is KaClassSymbol -> receiverSymbol.name
         is KaAnonymousFunctionSymbol -> {
             val receiverPsi = receiverSymbol.psi
             val potentialLabeledPsi = receiverPsi?.parent?.parent

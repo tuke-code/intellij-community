@@ -11,22 +11,21 @@ import com.intellij.openapi.roots.ui.configuration.actions.ModuleDeleteProvider
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.platform.navbar.NavBarVmItem
 import com.intellij.platform.navbar.backend.NavBarItem
-import com.intellij.platform.navbar.compatibility.extensionData
+import com.intellij.platform.navbar.impl.extensionData
 import com.intellij.pom.Navigatable
 import com.intellij.psi.PsiDirectory
 import com.intellij.psi.PsiElement
 import com.intellij.psi.util.PsiUtilCore
 import com.intellij.util.containers.toArray
 
-internal class NavBarBgtDataRule : EdtDataRule {
+internal class NavBarBgtDataRule : UiDataRule {
 
   override fun uiDataSnapshot(sink: DataSink, snapshot: DataSnapshot) {
     val project = snapshot[CommonDataKeys.PROJECT] ?: return
     val selection = snapshot[NavBarVmItem.SELECTED_ITEMS] ?: return
-    val pointers = selection.mapNotNull {
-      (it as? IdeNavBarVmItem)?.pointer
-    }
+    val pointers = selection.mapNotNull { (it as? IdeNavBarVmItem)?.pointer }
     if (pointers.isEmpty()) return
+
     sink.lazy(LangDataKeys.IDE_VIEW) {
       NavBarIdeView(pointers)
     }

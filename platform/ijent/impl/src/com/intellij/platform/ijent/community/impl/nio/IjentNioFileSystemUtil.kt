@@ -5,6 +5,7 @@ package com.intellij.platform.ijent.community.impl.nio
 
 import com.intellij.platform.ijent.fs.*
 import com.intellij.util.text.nullize
+import java.io.IOException
 import java.nio.file.*
 
 /**
@@ -42,9 +43,13 @@ internal fun IjentFsError.throwFileSystemException(): Nothing {
     is IjentFsError.DoesNotExist, is IjentFsError.NotFile -> NoSuchFileException(where.toString(), null, message.nullize())
     is IjentFsError.PermissionDenied -> AccessDeniedException(where.toString(), null, message.nullize())
     is IjentFsError.NotDirectory -> NotDirectoryException(where.toString())
+    is IjentFsError.AlreadyDeleted -> NoSuchFileException(where.toString())
+    is IjentFsError.AlreadyExists -> FileAlreadyExistsException(where.toString())
+    is IjentFsError.FileNotOpened -> IOException("File is not opened")
     is IjentOpenedFile.SeekError.InvalidValue -> TODO()
     is IjentFsError.Other -> FileSystemException(where.toString(), null, message.nullize())
     is IjentOpenedFile.Reader.ReadError.InvalidValue -> TODO()
+    is IjentFileSystemApi.DeleteException.DirNotEmpty -> DirectoryNotEmptyException(where.toString())
   }
 }
 

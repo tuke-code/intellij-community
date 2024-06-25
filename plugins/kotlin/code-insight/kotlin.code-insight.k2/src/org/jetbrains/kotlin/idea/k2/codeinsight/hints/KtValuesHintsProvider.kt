@@ -10,7 +10,7 @@ import org.jetbrains.kotlin.analysis.api.resolution.singleFunctionCallOrNull
 import org.jetbrains.kotlin.analysis.api.resolution.symbol
 import org.jetbrains.kotlin.analysis.api.components.DefaultTypeClassIds
 import org.jetbrains.kotlin.analysis.api.symbols.KaCallableSymbol
-import org.jetbrains.kotlin.analysis.api.types.KtNonErrorClassType
+import org.jetbrains.kotlin.analysis.api.types.KaClassType
 import org.jetbrains.kotlin.builtins.StandardNames
 import org.jetbrains.kotlin.idea.codeInsight.hints.getRangeLeftAndRightSigns
 import org.jetbrains.kotlin.idea.references.mainReference
@@ -50,7 +50,7 @@ class KtValuesHintsProvider : AbstractKtInlayHintsProvider() {
 
     context(KaSession)
     private fun isApplicable(binaryExpression: KtBinaryExpression, leftExp: KtExpression, rightExp: KtExpression): Boolean {
-        val functionCallOrNull = binaryExpression.resolveCallOld()?.singleFunctionCallOrNull()
+        val functionCallOrNull = binaryExpression.resolveToCall()?.singleFunctionCallOrNull()
         functionCallOrNull?.symbol?.takeIf {
             val packageName = it.callableId?.packageName
             packageName == StandardNames.RANGES_PACKAGE_FQ_NAME || packageName == StandardNames.BUILT_INS_PACKAGE_FQ_NAME
@@ -65,12 +65,12 @@ class KtValuesHintsProvider : AbstractKtInlayHintsProvider() {
             is KtConstantExpression -> true
             is KtBinaryExpression -> left?.isComparable() == true && right?.isComparable() == true
             else -> {
-                val type = resolveCallOld()?.singleFunctionCallOrNull()?.symbol?.returnType
+                val type = resolveToCall()?.singleFunctionCallOrNull()?.symbol?.returnType
                     ?: ((this as? KtNameReferenceExpression)?.mainReference?.resolveToSymbol() as? KaCallableSymbol)?.returnType
-                (type is KtNonErrorClassType) && (
+                (type is KaClassType) && (
                         type.classId in DefaultTypeClassIds.PRIMITIVES ||
                                 type.getAllSuperTypes(true).any {
-                                    val classTypeWithClassId = it.isClassTypeWithClassId(StandardClassIds.Comparable)
+                                    val classTypeWithClassId = it.isClassType(StandardClassIds.Comparable)
                                     classTypeWithClassId
                                 })
             }

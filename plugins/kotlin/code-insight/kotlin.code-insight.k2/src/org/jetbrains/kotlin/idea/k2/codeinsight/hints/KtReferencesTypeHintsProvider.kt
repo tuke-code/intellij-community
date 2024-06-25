@@ -12,14 +12,10 @@ import org.jetbrains.kotlin.analysis.api.analyze
 import org.jetbrains.kotlin.analysis.api.resolution.singleConstructorCallOrNull
 import org.jetbrains.kotlin.analysis.api.resolution.singleFunctionCallOrNull
 import org.jetbrains.kotlin.analysis.api.resolution.symbol
-import org.jetbrains.kotlin.analysis.api.symbols.KaClassLikeSymbol
-import org.jetbrains.kotlin.analysis.api.symbols.KaEnumEntrySymbol
-import org.jetbrains.kotlin.analysis.api.symbols.KtPackageSymbol
-import org.jetbrains.kotlin.analysis.api.symbols.KaSamConstructorSymbol
-import org.jetbrains.kotlin.analysis.api.symbols.KtSymbol
-import org.jetbrains.kotlin.analysis.api.types.KtErrorType
-import org.jetbrains.kotlin.analysis.api.types.KtType
-import org.jetbrains.kotlin.analysis.api.types.KtUsualClassType
+import org.jetbrains.kotlin.analysis.api.symbols.*
+import org.jetbrains.kotlin.analysis.api.types.KaErrorType
+import org.jetbrains.kotlin.analysis.api.types.KaType
+import org.jetbrains.kotlin.analysis.api.types.KaUsualClassType
 import org.jetbrains.kotlin.idea.base.psi.getLineNumber
 import org.jetbrains.kotlin.idea.base.psi.isMultiLine
 import org.jetbrains.kotlin.idea.base.psi.isOneLiner
@@ -286,15 +282,15 @@ private fun isMultilineLocalProperty(element: PsiElement): Boolean {
 }
 
 context(KaSession)
-private fun renderKtTypeHint(element: KtCallableDeclaration, multilineLocalProperty: Boolean): KtType? =
-    calculateAllTypes<KtType>(element) { declarationType, allTypes, cannotBeNull ->
-        if (declarationType is KtErrorType) return@calculateAllTypes null
+private fun renderKtTypeHint(element: KtCallableDeclaration, multilineLocalProperty: Boolean): KaType? =
+    calculateAllTypes<KaType>(element) { declarationType, allTypes, cannotBeNull ->
+        if (declarationType is KaErrorType) return@calculateAllTypes null
 
         if (declarationType.isUnit && multilineLocalProperty) {
             return@calculateAllTypes null
         }
 
-        val name = (declarationType as? KtUsualClassType)?.classId?.relativeClassName?.shortName()
+        val name = (declarationType as? KaUsualClassType)?.classId?.relativeClassName?.shortName()
         val ktType = when {
             name == SpecialNames.NO_NAME_PROVIDED -> {
                 if (element is KtProperty && element.isLocal) {
@@ -320,7 +316,7 @@ private fun renderKtTypeHint(element: KtCallableDeclaration, multilineLocalPrope
     }
 
 context(KaSession)
-private fun isUnclearType(type: KtType, element: KtCallableDeclaration): Boolean {
+private fun isUnclearType(type: KaType, element: KtCallableDeclaration): Boolean {
     if (element !is KtProperty) return true
 
     val initializer = element.initializer ?: return true
@@ -335,7 +331,7 @@ private fun isUnclearType(type: KtType, element: KtCallableDeclaration): Boolean
         val selectorExpression = initializer.selectorExpression
         if (type.isEnum()) {
             // Do not show type for enums if initializer has enum entry with explicit enum name: val p = Enum.ENTRY
-            val symbol: KtSymbol? = selectorExpression?.mainReference?.resolveToSymbol()
+            val symbol: KaSymbol? = selectorExpression?.mainReference?.resolveToSymbol()
             if (symbol is KaEnumEntrySymbol) {
                 return false
             }
@@ -353,7 +349,7 @@ internal fun collectLambdaTypeHint(lambdaExpression: KtExpression, sink: InlayTr
     val functionLiteral = lambdaExpression.getStrictParentOfType<KtFunctionLiteral>() ?: return
 
     analyze(lambdaExpression) {
-        val functionCall = functionLiteral.resolveCallOld()?.singleFunctionCallOrNull() ?: return
+        val functionCall = functionLiteral.resolveToCall()?.singleFunctionCallOrNull() ?: return
         sink.addPresentation(InlineInlayPosition(lambdaExpression.endOffset, true), hasBackground = true) {
             text(": ")
             printKtType(functionCall.symbol.returnType)
@@ -365,7 +361,7 @@ internal fun collectLambdaTypeHint(lambdaExpression: KtExpression, sink: InlayTr
 context(KaSession)
 private fun isConstructorCall(initializer: KtExpression?): Boolean {
     val callExpression = initializer as? KtCallExpression ?: return false
-    val resolveCall = initializer.resolveCallOld() ?: return false
+    val resolveCall = initializer.resolveToCall() ?: return false
     val functionCall = resolveCall.singleFunctionCallOrNull()
     if (functionCall?.symbol is KaSamConstructorSymbol) {
         return true
@@ -380,7 +376,7 @@ private fun KtExpression.isClassOrPackageReference(): Boolean =
     when (this) {
         is KtNameReferenceExpression ->
             this.mainReference.resolveToSymbol()
-                .let { it is KaClassLikeSymbol || it is KtPackageSymbol }
+                .let { it is KaClassLikeSymbol || it is KaPackageSymbol }
         is KtDotQualifiedExpression -> this.selectorExpression?.isClassOrPackageReference() ?: false
         else -> false
     }

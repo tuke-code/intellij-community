@@ -1,4 +1,4 @@
-// Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.kotlin.idea.base.codeInsight
 
 import com.intellij.psi.PsiElement
@@ -16,7 +16,7 @@ import javax.swing.Icon
 @ApiStatus.Internal
 object KotlinIconProvider {
     context(KaSession)
-    fun getIconFor(symbol: KtSymbol): Icon? {
+    fun getIconFor(symbol: KaSymbol): Icon? {
         symbol.psi?.let { referencedPsi ->
             if (referencedPsi !is KtElement) {
                 return getIconForJavaDeclaration(referencedPsi)
@@ -24,7 +24,7 @@ object KotlinIconProvider {
         }
 
         if (symbol is KaNamedFunctionSymbol) {
-            val isAbstract = symbol.modality == Modality.ABSTRACT
+            val isAbstract = symbol.modality == KaSymbolModality.ABSTRACT
 
             return when {
                 symbol.isExtension -> {
@@ -37,8 +37,8 @@ object KotlinIconProvider {
             }
         }
 
-        if (symbol is KaClassOrObjectSymbol) {
-            val isAbstract = (symbol as? KaNamedClassOrObjectSymbol)?.modality == Modality.ABSTRACT
+        if (symbol is KaClassSymbol) {
+            val isAbstract = (symbol as? KaNamedClassOrObjectSymbol)?.modality == KaSymbolModality.ABSTRACT
 
             return when (symbol.classKind) {
                 KaClassKind.CLASS -> if (isAbstract) KotlinIcons.ABSTRACT_CLASS else KotlinIcons.CLASS
@@ -53,7 +53,7 @@ object KotlinIconProvider {
         return when (symbol) {
             is KaValueParameterSymbol -> KotlinIcons.PARAMETER
             is KaLocalVariableSymbol -> if (symbol.isVal) KotlinIcons.VAL else KotlinIcons.VAR
-            is KtPropertySymbol -> if (symbol.isVal) KotlinIcons.FIELD_VAL else KotlinIcons.FIELD_VAR
+            is KaPropertySymbol -> if (symbol.isVal) KotlinIcons.FIELD_VAL else KotlinIcons.FIELD_VAR
             is KaTypeParameterSymbol -> IconManager.getInstance().getPlatformIcon(PlatformIcons.Class)
             is KaTypeAliasSymbol -> KotlinIcons.TYPE_ALIAS
             is KaEnumEntrySymbol -> KotlinIcons.ENUM

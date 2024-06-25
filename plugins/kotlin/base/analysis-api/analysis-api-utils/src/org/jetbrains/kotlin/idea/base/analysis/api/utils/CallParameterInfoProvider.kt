@@ -6,9 +6,8 @@ package org.jetbrains.kotlin.idea.base.analysis.api.utils
 
 import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.components.KaSubtypingErrorTypePolicy
-import org.jetbrains.kotlin.analysis.api.signatures.KtFunctionLikeSignature
-import org.jetbrains.kotlin.analysis.api.signatures.KtVariableLikeSignature
-import org.jetbrains.kotlin.analysis.api.symbols.KtSymbolOrigin
+import org.jetbrains.kotlin.analysis.api.signatures.KaFunctionSignature
+import org.jetbrains.kotlin.analysis.api.signatures.KaVariableSignature
 import org.jetbrains.kotlin.analysis.api.symbols.KaValueParameterSymbol
 import org.jetbrains.kotlin.config.LanguageFeature
 import org.jetbrains.kotlin.config.LanguageVersionSettings
@@ -27,14 +26,14 @@ object CallParameterInfoProvider {
     context(KaSession)
     fun hasTypeMismatchBeforeCurrent(
         sourceElement: KtElement,
-        argumentMapping: Map<KtExpression, KtVariableLikeSignature<KaValueParameterSymbol>>,
+        argumentMapping: Map<KtExpression, KaVariableSignature<KaValueParameterSymbol>>,
         currentArgumentIndex: Int,
         subtypingErrorTypePolicy: KaSubtypingErrorTypePolicy = KaSubtypingErrorTypePolicy.STRICT,
     ): Boolean {
         val argumentExpressionsBeforeCurrent = getArgumentOrIndexExpressions(sourceElement).take(currentArgumentIndex).filterNotNull()
         for (argumentExpression in argumentExpressionsBeforeCurrent) {
             val parameterForArgument = argumentMapping[argumentExpression] ?: continue
-            val argumentType = argumentExpression.getKtType() ?: error("Argument should have a KtType")
+            val argumentType = argumentExpression.expressionType ?: error("Argument should have a KaType")
             if (argumentType.isNotSubTypeOf(parameterForArgument.returnType, subtypingErrorTypePolicy)) {
                 return true
             }
@@ -48,8 +47,8 @@ object CallParameterInfoProvider {
     context(KaSession)
     fun mapArgumentsToParameterIndices(
         sourceElement: KtElement,
-        signature: KtFunctionLikeSignature<*>,
-        argumentMapping: Map<KtExpression, KtVariableLikeSignature<KaValueParameterSymbol>>
+        signature: KaFunctionSignature<*>,
+        argumentMapping: Map<KtExpression, KaVariableSignature<KaValueParameterSymbol>>
     ): Map<KtExpression, Int> {
         val isArraySetCall = isArraySetCall(sourceElement, signature)
         val parameterToIndex = mapParametersToIndices(signature, isArraySetCall)
@@ -69,7 +68,7 @@ object CallParameterInfoProvider {
      * ```
      */
     context(KaSession)
-    fun isArraySetCall(sourceElement: KtElement, signature: KtFunctionLikeSignature<*>): Boolean {
+    fun isArraySetCall(sourceElement: KtElement, signature: KaFunctionSignature<*>): Boolean {
         val callableId = signature.symbol.callableId ?: return false
         val isSet = callableId.callableName == OperatorNameConventions.SET
         return isSet && sourceElement is KtArrayAccessExpression
@@ -91,8 +90,8 @@ object CallParameterInfoProvider {
     context(KaSession)
     fun firstArgumentInNamedMode(
         sourceCallElement: KtCallElement,
-        signature: KtFunctionLikeSignature<*>,
-        argumentMapping: Map<KtExpression, KtVariableLikeSignature<KaValueParameterSymbol>>,
+        signature: KaFunctionSignature<*>,
+        argumentMapping: Map<KtExpression, KaVariableSignature<KaValueParameterSymbol>>,
         languageVersionSettings: LanguageVersionSettings
     ): KtValueArgument? {
         val valueArguments = sourceCallElement.valueArgumentList?.arguments ?: return null
@@ -121,9 +120,9 @@ object CallParameterInfoProvider {
      */
     context(KaSession)
     private fun mapParametersToIndices(
-        signature: KtFunctionLikeSignature<*>,
+        signature: KaFunctionSignature<*>,
         isArraySetCall: Boolean
-    ): Map<KtVariableLikeSignature<KaValueParameterSymbol>, Int> {
+    ): Map<KaVariableSignature<KaValueParameterSymbol>, Int> {
         val valueParameters = signature.valueParameters.let { if (isArraySetCall) it.dropLast(1) else it }
         return valueParameters.mapIndexed { index, parameter -> parameter to index }.toMap()
     }
@@ -134,8 +133,8 @@ object CallParameterInfoProvider {
      */
     context(KaSession)
     fun isJavaArgumentWithNonDefaultName(
-        signature: KtFunctionLikeSignature<*>,
-        argumentMapping: Map<KtExpression, KtVariableLikeSignature<KaValueParameterSymbol>>,
+        signature: KaFunctionSignature<*>,
+        argumentMapping: Map<KtExpression, KaVariableSignature<KaValueParameterSymbol>>,
         currentArgument: KtValueArgument,
     ): Boolean {
         if (!currentArgument.isInsideAnnotationEntryArgumentList()) return false

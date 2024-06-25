@@ -82,7 +82,9 @@ class PrecomputedFlow(@JvmField val model: EditorCompositeModel) : Flow<EditorCo
   }
 }
 
-private val INITIAL_EMPTY = ArrayList<FileEditorWithProvider>()
+private val INITIAL_EMPTY = object : ArrayList<FileEditorWithProvider>() {
+  override fun equals(other: Any?) = other === this
+}
 
 /**
  * An abstraction over one or several file editors opened in the same tab (e.g., designer and code-behind).
@@ -177,6 +179,7 @@ open class EditorComposite internal constructor(
     if (fileEditorWithProviders.isEmpty()) {
       withContext(Dispatchers.EDT) {
         compositePanel.removeAll()
+        this@EditorComposite.fileEditorWithProviders.value = emptyList()
         _selectedEditorWithProvider.value = null
       }
       return
@@ -556,10 +559,10 @@ open class EditorComposite internal constructor(
     tabbedPaneWrapper!!.selectedIndex = index
   }
 
+  /**
+   * @return component which represents a set of file editors in the UI
+   */
   open val component: JComponent
-    /**
-     * @return component which represents a set of file editors in the UI
-     */
     get() = compositePanel
 
   open val focusComponent: JComponent?
@@ -735,7 +738,7 @@ open class EditorComposite internal constructor(
   override fun toString() = "EditorComposite(identityHashCode=${System.identityHashCode(this)}, file=$file)"
 }
 
-internal class EditorCompositePanel(@JvmField val composite: EditorComposite) : JPanel(BorderLayout()), EdtDataProvider {
+internal class EditorCompositePanel(@JvmField val composite: EditorComposite) : JPanel(BorderLayout()), UiDataProvider {
   var focusComponent: () -> JComponent? = { null }
     private set
 
@@ -765,6 +768,13 @@ internal class EditorCompositePanel(@JvmField val composite: EditorComposite) : 
       override fun getDefaultComponent(aContainer: Container) = composite.focusComponent
     }
     isFocusCycleRoot = true
+  }
+
+  override fun updateUI() {
+    super.updateUI()
+
+    // IJPL-157100 Avoid using a light background for editor with a dark scheme in light IDE
+    background = EditorColorsManager.getInstance().globalScheme.defaultBackground
   }
 
   fun setComponent(newComponent: JComponent, focusComponent: () -> JComponent?) {

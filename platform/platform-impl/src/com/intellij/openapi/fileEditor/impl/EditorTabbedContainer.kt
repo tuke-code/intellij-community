@@ -20,7 +20,6 @@ import com.intellij.openapi.application.readAction
 import com.intellij.openapi.command.CommandProcessor
 import com.intellij.openapi.components.service
 import com.intellij.openapi.editor.FileDropManager
-import com.intellij.openapi.editor.colors.EditorColorsManager
 import com.intellij.openapi.editor.containsFileDropTargets
 import com.intellij.openapi.editor.markup.TextAttributes
 import com.intellij.openapi.fileEditor.FileEditor
@@ -110,7 +109,7 @@ class EditorTabbedContainer internal constructor(
     editorTabs.component.isFocusable = false
     editorTabs.component.transferHandler = EditorTabbedContainerTransferHandler(window)
     @Suppress("UsagesOfObsoleteApi")
-    editorTabs.setDataProvider(object : EdtCompatibleDataProvider {
+    editorTabs.setDataProvider(object : UiCompatibleDataProvider {
       override fun uiDataSnapshot(sink: DataSink) {
         sink[CommonDataKeys.PROJECT] = window.manager.project
         sink[CommonDataKeys.VIRTUAL_FILE] = window.selectedComposite?.file
@@ -126,9 +125,7 @@ class EditorTabbedContainer internal constructor(
         /* addNavigationGroup = */ false
       )
       .addTabMouseListener(TabMouseListener(window = window, editorTabs = editorTabs)).presentation
-      .setTabDraggingEnabled(true)
       .setTabLabelActionsMouseDeadzone(TimedDeadzone.NULL).setTabLabelActionsAutoHide(false)
-      .setActiveTabFillIn(EditorColorsManager.getInstance().globalScheme.defaultBackground).setPaintFocus(false)
 
     editorTabs.setSelectionChangeHandler { _, _, doChangeSelection ->
       if (window.isDisposed) {
@@ -535,6 +532,7 @@ private class EditorTabs(
     supportCompression = true,
     singleRow = UISettings.getInstance().scrollTabLayoutInEditor,
     requestFocusOnLastFocusedComponent = true,
+    isTabDraggingEnabled = true,
   ),
 ), ComponentWithMnemonics, EditorWindowHolder, DataProvider {
   private val _entryPointActionGroup: DefaultActionGroup

@@ -366,9 +366,9 @@ class KotlinMatchingVisitor(private val myMatchingVisitor: GlobalMatchingVisitor
                 params[i] = null
                 if (curParam.isVarArg) {
                     analyze(arg) {
-                        val varArgType = arg.getArgumentExpression()?.getKtType()
+                        val varArgType = arg.getArgumentExpression()?.expressionType
                         var curArg: KtValueArgument? = arg
-                        while (varArgType != null && varArgType == curArg?.getArgumentExpression()?.getKtType() || curArg?.isSpread == true) {
+                        while (varArgType != null && varArgType == curArg?.getArgumentExpression()?.expressionType || curArg?.isSpread == true) {
                             i++
                             curArg = getOrNull(i)
 
@@ -386,7 +386,7 @@ class KotlinMatchingVisitor(private val myMatchingVisitor: GlobalMatchingVisitor
 
     private fun KtCallElement.resolveParameters(): List<KtParameter> {
         return analyze(this) {
-            val callInfo = resolveCallOld()?.successfulFunctionCallOrNull() ?: return emptyList()
+            val callInfo = resolveToCall()?.successfulFunctionCallOrNull() ?: return emptyList()
             return callInfo.partiallyAppliedSymbol.signature.valueParameters.mapNotNull { it.symbol.psi as? KtParameter? }
         }
     }

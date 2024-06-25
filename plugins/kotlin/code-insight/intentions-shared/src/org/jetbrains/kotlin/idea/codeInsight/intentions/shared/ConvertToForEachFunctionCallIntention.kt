@@ -9,8 +9,8 @@ import com.intellij.openapi.util.TextRange
 import com.intellij.psi.PsiElement
 import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.symbols.KaNamedFunctionSymbol
-import org.jetbrains.kotlin.analysis.api.types.KtType
-import org.jetbrains.kotlin.analysis.api.types.KtUsualClassType
+import org.jetbrains.kotlin.analysis.api.types.KaType
+import org.jetbrains.kotlin.analysis.api.types.KaUsualClassType
 import org.jetbrains.kotlin.idea.base.resources.KotlinBundle
 import org.jetbrains.kotlin.idea.codeinsight.api.applicable.asUnit
 import org.jetbrains.kotlin.idea.codeinsight.api.applicable.intentions.KotlinApplicableModCommandAction
@@ -66,7 +66,7 @@ internal class ConvertToForEachFunctionCallIntention :
             if (symbol.callableId?.asSingleFqName() !in withIndexedFunctionFqNames) return null
         }
 
-        return loopRange.getKtType()
+        return loopRange.expressionType
             ?.isLoopRangeType()
             ?.asUnit
     }
@@ -93,8 +93,8 @@ internal class ConvertToForEachFunctionCallIntention :
     }
 
     context(KaSession)
-    private fun KtType.isLoopRangeType(): Boolean {
-        fun KtType.fqNameMatches() = (this as? KtUsualClassType)?.classId?.asSingleFqName() in loopRangeTypeFqNames
+    private fun KaType.isLoopRangeType(): Boolean {
+        fun KaType.fqNameMatches() = (this as? KaUsualClassType)?.classId?.asSingleFqName() in loopRangeTypeFqNames
 
         return fqNameMatches() || getAllSuperTypes().any { it.fqNameMatches() }
     }

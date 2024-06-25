@@ -5,13 +5,13 @@ import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.resolution.KaFunctionCall
 import org.jetbrains.kotlin.analysis.api.resolution.singleFunctionCallOrNull
 import org.jetbrains.kotlin.analysis.api.resolution.symbol
-import org.jetbrains.kotlin.analysis.api.signatures.KtVariableLikeSignature
+import org.jetbrains.kotlin.analysis.api.signatures.KaVariableSignature
 import org.jetbrains.kotlin.analysis.api.symbols.KaTypeParameterSymbol
 import org.jetbrains.kotlin.analysis.api.symbols.KaValueParameterSymbol
-import org.jetbrains.kotlin.analysis.api.types.KtNonErrorClassType
-import org.jetbrains.kotlin.analysis.api.types.KtType
-import org.jetbrains.kotlin.analysis.api.types.KtTypeNullability
-import org.jetbrains.kotlin.analysis.api.types.KtTypeParameterType
+import org.jetbrains.kotlin.analysis.api.types.KaClassType
+import org.jetbrains.kotlin.analysis.api.types.KaType
+import org.jetbrains.kotlin.analysis.api.types.KaTypeNullability
+import org.jetbrains.kotlin.analysis.api.types.KaTypeParameterType
 import org.jetbrains.kotlin.idea.codeinsight.utils.TypeParameterUtils.collectTypeParametersOnWhichReturnTypeDepends
 import org.jetbrains.kotlin.idea.codeinsight.utils.TypeParameterUtils.returnTypeOfCallDependsOnTypeParameters
 import org.jetbrains.kotlin.idea.codeinsight.utils.singleReturnExpressionOrNull
@@ -34,7 +34,7 @@ import org.jetbrains.kotlin.psi.psiUtil.parentsWithSelf
 context(KaSession)
 fun areTypeArgumentsRedundant(element: KtTypeArgumentList): Boolean {
     val callExpression = element.parent as? KtCallExpression ?: return false
-    val resolvedCall = callExpression.resolveCallOld()?.singleFunctionCallOrNull() ?: return false
+    val resolvedCall = callExpression.resolveToCall()?.singleFunctionCallOrNull() ?: return false
 
     val typesInferredFromArguments = collectTypesInferredFromArguments(resolvedCall) ?: return false
     val typesInferredFromExtensionReceiver = collectTypesInferredFromExtensionReceiver(resolvedCall)
@@ -43,7 +43,7 @@ fun areTypeArgumentsRedundant(element: KtTypeArgumentList): Boolean {
 
     if (uninferredTypes.isEmpty()) return true
 
-    val callExpressionType = callExpression.getKtType() ?: return false
+    val callExpressionType = callExpression.expressionType ?: return false
     val typesPotentiallyInferredFromContext = collectTypeParametersOnWhichReturnTypeDepends(callExpression)
     if ((uninferredTypes - typesPotentiallyInferredFromContext).isNotEmpty()) return false
     val expectedType = findExpectedType(callExpression)
@@ -64,11 +64,11 @@ private fun collectTypesInferredFromArguments(resolvedCall: KaFunctionCall<*>): 
         if (argumentExpression is KtLambdaExpression && argumentExpression.isExplicitTypeArgumentsNeededForTypeInference(sig)) {
             return null
         }
-        val argumentType = argumentExpression.getKtType() ?: continue
+        val argumentType = argumentExpression.expressionType ?: continue
         if (!argumentType.isSubTypeOf(sig.returnType)) return null
         if (isApplicableType(argumentType, sig.returnType)) {
             val collectTypeParameterTypes = if (argumentExpression is KtCallExpression && argumentExpression.typeArgumentList == null) {
-                val resolvedArgumentCall = argumentExpression.resolveCallOld()?.singleFunctionCallOrNull() ?: continue
+                val resolvedArgumentCall = argumentExpression.resolveToCall()?.singleFunctionCallOrNull() ?: continue
                 val collectTypesInferredFromArguments = collectTypesInferredFromArguments(resolvedArgumentCall) ?: continue
                 if (collectTypesInferredFromArguments.containsAll(resolvedArgumentCall.typeArgumentsMapping.keys)) {
                     collectTypeParameterTypes(sig.symbol.returnType).map { it.symbol }
@@ -101,12 +101,12 @@ private fun collectTypesInferredFromExtensionReceiver(resolvedCall: KaFunctionCa
 }
 
 context(KaSession)
-private fun buildType(type: KtType, typeArgumentsMapping: Map<KaTypeParameterSymbol, KtType>): KtType? {
+private fun buildType(type: KaType, typeArgumentsMapping: Map<KaTypeParameterSymbol, KaType>): KaType? {
     return when (type) {
-        is KtTypeParameterType -> typeArgumentsMapping[type.symbol]
+        is KaTypeParameterType -> typeArgumentsMapping[type.symbol]
 
-        is KtNonErrorClassType -> buildClassType(type.symbol) {
-            type.ownTypeArguments.mapNotNull { it.type }.forEach {
+        is KaClassType -> buildClassType(type.symbol) {
+            type.typeArguments.mapNotNull { it.type }.forEach {
                 val builtType = buildType(it, typeArgumentsMapping)
                 if (builtType != null) argument(builtType)
             }
@@ -117,35 +117,35 @@ private fun buildType(type: KtType, typeArgumentsMapping: Map<KaTypeParameterSym
 }
 
 context(KaSession)
-private fun isApplicableType(type: KtType, expectedType: KtType): Boolean {
+private fun isApplicableType(type: KaType, expectedType: KaType): Boolean {
     return type.isEqualTo(expectedType) ||
-            (expectedType.isMarkedNullable && type.withNullability(KtTypeNullability.NULLABLE).isEqualTo(expectedType))
+            (expectedType.isMarkedNullable && type.withNullability(KaTypeNullability.NULLABLE).isEqualTo(expectedType))
 }
 
 context(KaSession)
-private fun findExpectedType(callExpression: KtCallExpression): KtType? {
+private fun findExpectedType(callExpression: KtCallExpression): KaType? {
     for (element in callExpression.parentsWithSelf) {
         if (element !is KtExpression) continue
 
         when (val parent = element.parent) {
             is KtNamedFunction -> {
                 if (element != parent.bodyExpression || !parent.hasDeclaredReturnType()) return null
-                if (!parent.hasBlockBody()) return parent.getReturnKtType()
+                if (!parent.hasBlockBody()) return parent.returnType
                 val returnedExpression = parent.singleReturnExpressionOrNull?.returnedExpression
 
                 return if (returnedExpression != null && extractReturnExpressions(returnedExpression).contains(callExpression)) {
-                    parent.getReturnKtType()
+                    parent.returnType
                 } else {
                     null
                 }
             }
 
             is KtVariableDeclaration -> {
-                return if (element == parent.initializer && parent.typeReference != null) parent.getReturnKtType() else null
+                return if (element == parent.initializer && parent.typeReference != null) parent.returnType else null
             }
 
             is KtParameter -> {
-                return if (element == parent.defaultValue) parent.getReturnKtType() else null
+                return if (element == parent.defaultValue) parent.returnType else null
             }
 
             is KtPropertyAccessor -> {
@@ -153,7 +153,7 @@ private fun findExpectedType(callExpression: KtCallExpression): KtType? {
                 return when {
                     element != parent.bodyExpression || parent.hasBlockBody() -> null
                     property.typeReference == null -> null
-                    else -> parent.getReturnKtType()
+                    else -> parent.returnType
                 }
             }
 
@@ -161,7 +161,7 @@ private fun findExpectedType(callExpression: KtCallExpression): KtType? {
 
             is KtValueArgument -> {
                 val parentCallExpression = parent.getParentOfType<KtCallExpression>(true) ?: return null
-                val resolvedParentCall = parentCallExpression.resolveCallOld()?.singleFunctionCallOrNull() ?: return null
+                val resolvedParentCall = parentCallExpression.resolveToCall()?.singleFunctionCallOrNull() ?: return null
                 val parameter = resolvedParentCall.argumentMapping[callExpression] ?: return null
                 val parameterType = parameter.symbol.returnType
                 return if (collectTypeParameterTypes(parameterType).isEmpty()) {
@@ -188,8 +188,8 @@ private fun extractReturnExpressions(expression: KtExpression): Set<KtExpression
 
 context(KaSession)
 private fun canTypesInferredFromOuterCall(outerCallExpression: KtCallExpression, argumentExpression: KtCallExpression): Boolean {
-    val argumentType = argumentExpression.getKtType() ?: return false
-    val resolvedCall = outerCallExpression.resolveCallOld()?.singleFunctionCallOrNull() ?: return false
+    val argumentType = argumentExpression.expressionType ?: return false
+    val resolvedCall = outerCallExpression.resolveToCall()?.singleFunctionCallOrNull() ?: return false
     val argumentMapping = resolvedCall.argumentMapping
     if (!argumentMapping.contains(argumentExpression)) return false
     val parameterType = argumentMapping[argumentExpression]?.symbol?.returnType ?: return false
@@ -219,12 +219,12 @@ private fun canTypesInferredFromAnotherArguments(
     for ((anotherArgumentExpression, sig) in argumentMapping) {
         if (anotherArgumentExpression == argumentExpression) continue
         val builtType = buildType(sig.symbol.returnType, typeArgumentsMapping)
-        val anotherArgumentType = anotherArgumentExpression.getKtType() ?: continue
+        val anotherArgumentType = anotherArgumentExpression.expressionType ?: continue
         if (builtType == null || !isApplicableType(anotherArgumentType, builtType)) continue
         if (anotherArgumentExpression !is KtCallExpression || anotherArgumentExpression.typeArgumentList != null) {
             collectTypeParameterTypes.removeAll(collectTypeParameterTypes(sig.symbol.returnType))
         } else {
-            val anotherResolvedCall = anotherArgumentExpression.resolveCallOld()?.singleFunctionCallOrNull() ?: continue
+            val anotherResolvedCall = anotherArgumentExpression.resolveToCall()?.singleFunctionCallOrNull() ?: continue
             val typeParametersInferredFromArguments = collectTypesInferredFromArguments(anotherResolvedCall) ?: continue
             val typeParametersOnWhichReturnTypeDepends = collectTypeParametersOnWhichReturnTypeDepends(anotherArgumentExpression)
             if (typeParametersInferredFromArguments.containsAll(typeParametersOnWhichReturnTypeDepends)) {
@@ -236,13 +236,13 @@ private fun canTypesInferredFromAnotherArguments(
 }
 
 context(KaSession)
-private fun collectTypeParameterTypes(type: KtType): Set<KtTypeParameterType> {
-    val result = mutableSetOf<KtTypeParameterType>()
+private fun collectTypeParameterTypes(type: KaType): Set<KaTypeParameterType> {
+    val result = mutableSetOf<KaTypeParameterType>()
 
-    fun collect(type: KtType) {
+    fun collect(type: KaType) {
         when (type) {
-            is KtTypeParameterType -> result.add(type)
-            is KtNonErrorClassType -> type.ownTypeArguments.mapNotNull { it.type }.forEach { collect(it) }
+            is KaTypeParameterType -> result.add(type)
+            is KaClassType -> type.typeArguments.mapNotNull { it.type }.forEach { collect(it) }
             else -> {}
         }
     }
@@ -256,7 +256,7 @@ private fun collectTypeParameterTypes(type: KtType): Set<KtTypeParameterType> {
  */
 context(KaSession)
 private fun KtLambdaExpression.isExplicitTypeArgumentsNeededForTypeInference(
-    parameter: KtVariableLikeSignature<KaValueParameterSymbol>
+    parameter: KaVariableSignature<KaValueParameterSymbol>
 ): Boolean {
     if (!parameter.returnType.isFunctionType) return false
     val parameterType = parameter.symbol.returnType

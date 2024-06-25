@@ -8,14 +8,14 @@ import com.intellij.codeInsight.lookup.LookupElementBuilder
 import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
 import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.renderer.base.annotations.KaRendererAnnotationsFilter
-import org.jetbrains.kotlin.analysis.api.renderer.types.impl.KtTypeRendererForSource
+import org.jetbrains.kotlin.analysis.api.renderer.types.impl.KaTypeRendererForSource
 import org.jetbrains.kotlin.analysis.api.symbols.KaClassLikeSymbol
 import org.jetbrains.kotlin.analysis.api.symbols.KaClassifierSymbol
 import org.jetbrains.kotlin.analysis.api.symbols.KaTypeParameterSymbol
-import org.jetbrains.kotlin.analysis.api.types.KtFunctionalType
-import org.jetbrains.kotlin.analysis.api.types.KtType
-import org.jetbrains.kotlin.analysis.api.types.KtTypeParameterType
-import org.jetbrains.kotlin.analysis.api.types.KtUsualClassType
+import org.jetbrains.kotlin.analysis.api.types.KaFunctionType
+import org.jetbrains.kotlin.analysis.api.types.KaType
+import org.jetbrains.kotlin.analysis.api.types.KaTypeParameterType
+import org.jetbrains.kotlin.analysis.api.types.KaUsualClassType
 import org.jetbrains.kotlin.idea.KotlinIcons
 import org.jetbrains.kotlin.idea.completion.lookups.TailTextProvider.getTailText
 import org.jetbrains.kotlin.idea.completion.lookups.factories.insertAndShortenReferencesInStringUsingTemporarySuffix
@@ -25,7 +25,7 @@ import org.jetbrains.kotlin.types.Variance
 class TypeLookupElementFactory {
     context(KaSession)
     @OptIn(KaExperimentalApi::class)
-    fun createLookup(type: KtType): LookupElement? {
+    fun createLookup(type: KaType): LookupElement? {
         val renderedType = type.render(TYPE_RENDERING_OPTIONS_SHORT_NAMES, position = Variance.INVARIANT)
         val lookupObject = TypeLookupObject(type.render(TYPE_RENDERING_OPTIONS, position = Variance.INVARIANT))
 
@@ -36,14 +36,14 @@ class TypeLookupElementFactory {
             .let { if (symbol != null) withClassifierSymbolInfo(symbol, it) else it }
 
         return when (type) {
-            is KtTypeParameterType -> element
+            is KaTypeParameterType -> element
 
-            is KtUsualClassType -> {
+            is KaUsualClassType -> {
                 val tailText = getTailText(type.symbol, usePackageFqName = true, addTypeParameters = false)
                 element.withTailText(tailText)
             }
 
-            is KtFunctionalType -> element.withIcon(KotlinIcons.LAMBDA)
+            is KaFunctionType -> element.withIcon(KotlinIcons.LAMBDA)
 
             else -> null
         }
@@ -68,19 +68,19 @@ class TypeLookupElementFactory {
             .withTailText(tailText)
     }
 
-    private fun KtType.getSymbolIfTypeParameterOrUsualClass(): KaClassifierSymbol? = when (this) {
-        is KtTypeParameterType -> symbol
-        is KtUsualClassType -> symbol
+    private fun KaType.getSymbolIfTypeParameterOrUsualClass(): KaClassifierSymbol? = when (this) {
+        is KaTypeParameterType -> symbol
+        is KaUsualClassType -> symbol
         else -> null
     }
 
     @KaExperimentalApi
-    private val TYPE_RENDERING_OPTIONS_SHORT_NAMES = KtTypeRendererForSource.WITH_SHORT_NAMES.with {
+    private val TYPE_RENDERING_OPTIONS_SHORT_NAMES = KaTypeRendererForSource.WITH_SHORT_NAMES.with {
         annotationsRenderer = annotationsRenderer.with { annotationFilter = KaRendererAnnotationsFilter.NONE }
     }
 
     @KaExperimentalApi
-    private val TYPE_RENDERING_OPTIONS = KtTypeRendererForSource.WITH_QUALIFIED_NAMES.with {
+    private val TYPE_RENDERING_OPTIONS = KaTypeRendererForSource.WITH_QUALIFIED_NAMES.with {
         annotationsRenderer = annotationsRenderer.with { annotationFilter = KaRendererAnnotationsFilter.NONE }
     }
 }

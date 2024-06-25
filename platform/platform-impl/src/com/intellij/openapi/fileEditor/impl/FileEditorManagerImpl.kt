@@ -6,6 +6,7 @@ package com.intellij.openapi.fileEditor.impl
 
 import com.intellij.codeInsight.intention.preview.IntentionPreviewUtils
 import com.intellij.codeWithMe.ClientId
+import com.intellij.codeWithMe.asContextElement
 import com.intellij.featureStatistics.fusCollectors.FileEditorCollector
 import com.intellij.ide.IdeEventQueue
 import com.intellij.ide.actions.SplitAction
@@ -258,7 +259,7 @@ open class FileEditorManagerImpl(
 
           val publisher = project.messageBus.syncPublisher(FileEditorManagerListener.FILE_EDITOR_MANAGER)
           // expected in EDT
-          withContext(Dispatchers.EDT) {
+          withContext(Dispatchers.EDT + ClientId.current.asContextElement()) {
             runCatching {
               fireSelectionChanged(
                 newState = state,
@@ -1094,6 +1095,10 @@ open class FileEditorManagerImpl(
       val composite = open()
       if (composite is EditorComposite) {
         blockingWaitForCompositeFileOpen(composite)
+        if (composite.providerSequence.none()) {
+          closeFile(window = window, composite = composite, runChecks = false)
+          return FileEditorComposite.EMPTY
+        }
       }
       return composite
     }
@@ -1104,6 +1109,12 @@ open class FileEditorManagerImpl(
         }
         if (composite is EditorComposite) {
           composite.waitForAvailable()
+          if (composite.providerSequence.none()) {
+            withContext(Dispatchers.EDT) {
+              closeFile(window = window, composite = composite, runChecks = false)
+            }
+            return@runBlockingCancellable FileEditorComposite.EMPTY
+          }
         }
         composite
       }

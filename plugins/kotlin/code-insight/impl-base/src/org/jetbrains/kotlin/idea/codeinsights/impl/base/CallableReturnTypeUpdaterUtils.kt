@@ -17,11 +17,11 @@ import com.intellij.psi.util.endOffset
 import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
 import org.jetbrains.kotlin.analysis.api.KaSession
-import org.jetbrains.kotlin.analysis.api.renderer.types.impl.KtTypeRendererForSource
+import org.jetbrains.kotlin.analysis.api.renderer.types.impl.KaTypeRendererForSource
 import org.jetbrains.kotlin.analysis.api.symbols.KaCallableSymbol
-import org.jetbrains.kotlin.analysis.api.types.KtErrorType
-import org.jetbrains.kotlin.analysis.api.types.KtType
-import org.jetbrains.kotlin.analysis.api.types.KtTypeNullability
+import org.jetbrains.kotlin.analysis.api.types.KaErrorType
+import org.jetbrains.kotlin.analysis.api.types.KaType
+import org.jetbrains.kotlin.analysis.api.types.KaTypeNullability
 import org.jetbrains.kotlin.idea.base.analysis.api.utils.shortenReferences
 import org.jetbrains.kotlin.idea.codeinsight.utils.ChooseValueExpression
 import org.jetbrains.kotlin.idea.codeinsights.impl.base.CallableReturnTypeUpdaterUtils.TypeInfo.Companion.createByKtTypes
@@ -140,8 +140,8 @@ object CallableReturnTypeUpdaterUtils {
     context(KaSession)
     @OptIn(KaExperimentalApi::class)
     @ApiStatus.Internal
-    fun <T> calculateAllTypes(declaration: KtCallableDeclaration, allTypesConsumer: (KtType, Sequence<KtType>, Boolean) -> T?): T? {
-        val declarationType = declaration.getReturnKtType()
+    fun <T> calculateAllTypes(declaration: KtCallableDeclaration, allTypesConsumer: (KaType, Sequence<KaType>, Boolean) -> T?): T? {
+        val declarationType = declaration.returnType
         val overriddenTypes = (declaration.symbol as? KaCallableSymbol)?.directlyOverriddenSymbols
             ?.map { it.returnType }
             ?.distinct()
@@ -158,9 +158,9 @@ object CallableReturnTypeUpdaterUtils {
             .distinct()
             .let { types ->
                 when {
-                    cannotBeNull -> types.map { it.withNullability(KtTypeNullability.NON_NULLABLE) }.distinct()
+                    cannotBeNull -> types.map { it.withNullability(KaTypeNullability.NON_NULLABLE) }.distinct()
                     declarationType.hasFlexibleNullability -> types.flatMap { type ->
-                        listOf(type.withNullability(KtTypeNullability.NON_NULLABLE), type.withNullability(KtTypeNullability.NULLABLE))
+                        listOf(type.withNullability(KaTypeNullability.NON_NULLABLE), type.withNullability(KaTypeNullability.NULLABLE))
                     }
 
                     else -> types
@@ -178,7 +178,7 @@ object CallableReturnTypeUpdaterUtils {
             }
 
             val approximatedDefaultType = declarationType.approximateToSuperPublicDenotableOrSelf(approximateLocalTypes = true).let {
-                if (cannotBeNull) it.withNullability(KtTypeNullability.NON_NULLABLE)
+                if (cannotBeNull) it.withNullability(KaTypeNullability.NON_NULLABLE)
                 else it
             }
             createByKtTypes(
@@ -195,7 +195,7 @@ object CallableReturnTypeUpdaterUtils {
     context(KaSession)
     private fun selectForUnitTest(
         declaration: KtCallableDeclaration,
-        allTypes: List<KtType>
+        allTypes: List<KaType>
     ): TypeInfo? {
         // This helps to be sure no nullable types are suggested
         if (declaration.containingKtFile.findDescendantOfType<PsiComment>()?.takeIf {
@@ -226,18 +226,18 @@ object CallableReturnTypeUpdaterUtils {
         companion object {
             context(KaSession)
             fun createByKtTypes(
-                ktType: KtType,
-                otherTypes: Sequence<KtType> = emptySequence(),
+                ktType: KaType,
+                otherTypes: Sequence<KaType> = emptySequence(),
                 useTemplate: Boolean = false
             ): TypeInfo = TypeInfo(createTypeByKtType(ktType), otherTypes.map { createTypeByKtType(it) }.toList(), useTemplate)
 
             context(KaSession)
             @OptIn(KaExperimentalApi::class)
-            private fun createTypeByKtType(ktType: KtType): Type = Type(
+            private fun createTypeByKtType(ktType: KaType): Type = Type(
                 isUnit = ktType.isUnit,
-                isError = ktType is KtErrorType,
-                longTypeRepresentation = ktType.render(KtTypeRendererForSource.WITH_QUALIFIED_NAMES, position = Variance.OUT_VARIANCE),
-                shortTypeRepresentation = ktType.render(KtTypeRendererForSource.WITH_SHORT_NAMES, position = Variance.OUT_VARIANCE),
+                isError = ktType is KaErrorType,
+                longTypeRepresentation = ktType.render(KaTypeRendererForSource.WITH_QUALIFIED_NAMES, position = Variance.OUT_VARIANCE),
+                shortTypeRepresentation = ktType.render(KaTypeRendererForSource.WITH_SHORT_NAMES, position = Variance.OUT_VARIANCE),
             )
 
             val UNIT = Type(isUnit = true, isError = false, longTypeRepresentation = "kotlin.Unit", shortTypeRepresentation = "Unit")

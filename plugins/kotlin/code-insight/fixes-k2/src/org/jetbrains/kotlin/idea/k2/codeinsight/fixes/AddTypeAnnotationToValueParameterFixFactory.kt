@@ -7,9 +7,9 @@ import com.intellij.modcommand.Presentation
 import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
 import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.fir.diagnostics.KaFirDiagnostic
-import org.jetbrains.kotlin.analysis.api.renderer.types.impl.KtTypeRendererForSource
-import org.jetbrains.kotlin.analysis.api.types.KtNonErrorClassType
-import org.jetbrains.kotlin.analysis.api.types.KtType
+import org.jetbrains.kotlin.analysis.api.renderer.types.impl.KaTypeRendererForSource
+import org.jetbrains.kotlin.analysis.api.types.KaClassType
+import org.jetbrains.kotlin.analysis.api.types.KaType
 import org.jetbrains.kotlin.idea.base.resources.KotlinBundle
 import org.jetbrains.kotlin.idea.codeinsight.api.applicable.intentions.KotlinPsiUpdateModCommandAction
 import org.jetbrains.kotlin.idea.codeinsight.api.applicators.fixes.KotlinQuickFixFactory
@@ -35,7 +35,7 @@ internal object AddTypeAnnotationToValueParameterFixFactory {
 
     context(KaSession)
     private fun getTypeName(element: KtParameter, defaultValue: KtExpression): String? {
-        val type = defaultValue.getKtType() ?: return null
+        val type = defaultValue.expressionType ?: return null
 
         if (type.isArrayOrPrimitiveArray) {
             if (element.hasModifier(KtTokens.VARARG_KEYWORD)) {
@@ -44,7 +44,7 @@ internal object AddTypeAnnotationToValueParameterFixFactory {
             } else if (defaultValue is KtCollectionLiteralExpression) {
                 val elementType = type.arrayElementType
                 if (elementType?.isPrimitive == true) {
-                    val classId = (elementType as KtNonErrorClassType).classId
+                    val classId = (elementType as KaClassType).classId
                     val arrayTypeName = "${classId.shortClassName}Array"
                     return arrayTypeName
                 }
@@ -55,9 +55,9 @@ internal object AddTypeAnnotationToValueParameterFixFactory {
 
     context(KaSession)
     @OptIn(KaExperimentalApi::class)
-    private fun getTypeName(type: KtType): String {
+    private fun getTypeName(type: KaType): String {
         val typeName = type.render(
-            KtTypeRendererForSource.WITH_SHORT_NAMES,
+            KaTypeRendererForSource.WITH_SHORT_NAMES,
             Variance.INVARIANT
         )
         return typeName

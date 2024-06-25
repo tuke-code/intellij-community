@@ -13,13 +13,13 @@ import org.jetbrains.kotlin.analysis.api.analyze
 import org.jetbrains.kotlin.analysis.api.annotations.hasAnnotation
 import org.jetbrains.kotlin.analysis.api.resolution.singleFunctionCallOrNull
 import org.jetbrains.kotlin.analysis.api.resolution.symbol
-import org.jetbrains.kotlin.analysis.api.symbols.KaClassOrObjectSymbol
+import org.jetbrains.kotlin.analysis.api.symbols.KaClassSymbol
 import org.jetbrains.kotlin.analysis.api.symbols.KaNamedFunctionSymbol
-import org.jetbrains.kotlin.analysis.api.symbols.KtSymbol
+import org.jetbrains.kotlin.analysis.api.symbols.KaSymbol
 import org.jetbrains.kotlin.analysis.api.symbols.markers.KaNamedSymbol
-import org.jetbrains.kotlin.analysis.api.types.KtFunctionalType
-import org.jetbrains.kotlin.analysis.api.types.KtType
-import org.jetbrains.kotlin.analysis.api.types.KtUsualClassType
+import org.jetbrains.kotlin.analysis.api.types.KaFunctionType
+import org.jetbrains.kotlin.analysis.api.types.KaType
+import org.jetbrains.kotlin.analysis.api.types.KaUsualClassType
 import org.jetbrains.kotlin.idea.base.codeInsight.ShortenReferencesFacility
 import org.jetbrains.kotlin.idea.base.utils.fqname.isImported
 import org.jetbrains.kotlin.idea.util.ImportInsertHelperImpl
@@ -86,7 +86,7 @@ internal class ForbiddenInSuspectContextMethodInspection : LocalInspectionTool()
 
       override fun visitLambdaExpression(lambdaExpression: KtLambdaExpression) {
         analyze(lambdaExpression) {
-          val type = lambdaExpression.getKtType()
+          val type = lambdaExpression.expressionType
           if (type?.isSuspendFunctionType == true && !isSuspensionRestricted(type)) {
             lambdaExpression.bodyExpression?.accept(blockingContextCallsVisitor)
             return
@@ -101,12 +101,12 @@ internal class ForbiddenInSuspectContextMethodInspection : LocalInspectionTool()
   private class BlockingContextMethodsCallsVisitor(
     private val holder: ProblemsHolder,
   ) : BlockingContextFunctionBodyVisitor() {
-    private val visitedSymbols = mutableSetOf<KtSymbol>()
+    private val visitedSymbols = mutableSetOf<KaSymbol>()
     private var callingElement: KtCallExpression? = null
 
     override fun visitCallExpression(expression: KtCallExpression) {
       analyze(expression) {
-        val functionCall = expression.resolveCallOld()?.singleFunctionCallOrNull()
+        val functionCall = expression.resolveToCall()?.singleFunctionCallOrNull()
         val calledSymbol = functionCall?.partiallyAppliedSymbol?.symbol
 
         if (calledSymbol !is KaNamedSymbol) return
@@ -202,10 +202,10 @@ internal class ForbiddenInSuspectContextMethodInspection : LocalInspectionTool()
         val implicitReceiverTypesAtPosition = getImplicitReceiverTypesAtPosition(callExpression)
         val coroutineScopeClass = ClassId.topLevel(FqName(COROUTINE_SCOPE))
         val hasCoroutineScope = implicitReceiverTypesAtPosition.any { type ->
-          type is KtUsualClassType &&
+          type is KaUsualClassType &&
           (
             type.classId == coroutineScopeClass ||
-            type.getAllSuperTypes().any { superType -> superType is KtUsualClassType && superType.classId == coroutineScopeClass }
+            type.getAllSuperTypes().any { superType -> superType is KaUsualClassType && superType.classId == coroutineScopeClass }
           )
         }
         if (hasCoroutineScope) {
@@ -354,17 +354,17 @@ private fun isSuspensionRestricted(function: KtNamedFunction): Boolean {
     }
 
     val receiverType = function.receiverTypeReference
-    val receiverTypeSymbol = receiverType?.getKtType()?.expandedSymbol
+    val receiverTypeSymbol = receiverType?.type?.expandedSymbol
     return receiverTypeSymbol != null && restrictsSuspension(receiverTypeSymbol)
   }
 }
 
-private fun KaSession.isSuspensionRestricted(lambdaType: KtType): Boolean {
+private fun KaSession.isSuspensionRestricted(lambdaType: KaType): Boolean {
   assert(lambdaType.isSuspendFunctionType)
 
-  val receiverTypeSymbol = (lambdaType as? KtFunctionalType)?.receiverType?.expandedSymbol
+  val receiverTypeSymbol = (lambdaType as? KaFunctionType)?.receiverType?.expandedSymbol
   return receiverTypeSymbol != null && restrictsSuspension(receiverTypeSymbol)
 }
 
-private fun restrictsSuspension(symbol: KaClassOrObjectSymbol): Boolean =
+private fun restrictsSuspension(symbol: KaClassSymbol): Boolean =
   symbol.hasAnnotation(ClassId.topLevel(restrictsSuspensionName))

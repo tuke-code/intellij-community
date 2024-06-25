@@ -64,11 +64,11 @@ internal class ImportMemberIntention :
 
 context(KaSession)
 @OptIn(KaIdeApi::class)
-private fun computeContext(psi: KtNameReferenceExpression, symbol: KtSymbol): ImportMemberIntention.Context? {
+private fun computeContext(psi: KtNameReferenceExpression, symbol: KaSymbol): ImportMemberIntention.Context? {
     return when (symbol) {
         is KaConstructorSymbol,
-        is KaClassOrObjectSymbol -> {
-            val classId = if (symbol is KaClassOrObjectSymbol) {
+        is KaClassSymbol -> {
+            val classId = if (symbol is KaClassSymbol) {
                 symbol.classId
             } else {
                 (symbol as KaConstructorSymbol).containingClassId

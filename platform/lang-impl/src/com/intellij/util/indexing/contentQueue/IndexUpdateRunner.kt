@@ -6,7 +6,6 @@ import com.intellij.openapi.application.ReadAction
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.fileTypes.FileTypeRegistry
 import com.intellij.openapi.progress.*
-import com.intellij.openapi.progress.impl.ProgressSuspender
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.NlsSafe
 import com.intellij.openapi.util.io.FileUtil
@@ -20,6 +19,7 @@ import com.intellij.openapi.vfs.newvfs.impl.CachedFileType
 import com.intellij.util.PathUtil
 import com.intellij.util.indexing.*
 import com.intellij.util.indexing.IndexingFlag.unlockFile
+import com.intellij.util.indexing.PerProjectIndexingQueue.QueuedFiles
 import com.intellij.util.indexing.dependencies.FileIndexingStamp
 import com.intellij.util.indexing.dependencies.IndexingRequestToken
 import com.intellij.util.indexing.diagnostic.IndexingFileSetStatistics
@@ -31,6 +31,7 @@ import kotlinx.coroutines.channels.consumeEach
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import org.jetbrains.annotations.ApiStatus
+import org.jetbrains.annotations.TestOnly
 import java.io.FileNotFoundException
 import java.io.IOException
 import java.nio.file.NoSuchFileException
@@ -56,35 +57,31 @@ class IndexUpdateRunner(fileBasedIndex: FileBasedIndexImpl,
    */
   class IndexingInterruptedException(cause: Throwable) : Exception(cause)
 
-  class FileSet(project: Project, val debugName: String, internal val filesOriginal: Collection<FileIndexingRequest>) {
+  class FileSet(
+    project: Project, val debugName: String,
+    internal val filesOriginal: QueuedFiles,
+    val shouldPause: () -> Boolean,
+  ) {
+    @TestOnly
+    constructor(project: Project, debugName: String, filesOriginal: QueuedFiles) : this(project, debugName, filesOriginal, { false })
     val statistics: IndexingFileSetStatistics = IndexingFileSetStatistics(project, debugName)
 
-    fun isEmpty(): Boolean = filesOriginal.isEmpty()
+    fun isEmpty(): Boolean = filesOriginal.isEmpty
     fun size(): Int = filesOriginal.size
 
-    fun asChannel(cs: CoroutineScope): Channel<FileIndexingRequest> {
-      val channel = Channel<FileIndexingRequest>(INDEXING_THREADS_NUMBER * 2)
-      cs.async {
-        try {
-          filesOriginal.forEach {
-            channel.send(it)
-          }
-        }
-        finally {
-          channel.close()
-        }
-      }
-      return channel
-    }
+    fun asChannel(cs: CoroutineScope): Channel<FileIndexingRequest> = filesOriginal.asChannel(cs, INDEXING_THREADS_NUMBER * 2)
   }
 
   @Throws(IndexingInterruptedException::class)
-  fun indexFiles(project: Project,
-                 fileSet: FileSet,
-                 projectDumbIndexingHistory: ProjectDumbIndexingHistoryImpl) {
+  fun indexFiles(
+    project: Project,
+    fileSet: FileSet,
+    projectDumbIndexingHistory: ProjectDumbIndexingHistoryImpl,
+    progressReporter: IndexingProgressReporter2,
+  ) {
     val startTime = System.nanoTime()
     try {
-      doIndexFiles(project, fileSet)
+      doIndexFiles(project, fileSet, progressReporter)
     }
     catch (e: RuntimeException) {
       throw IndexingInterruptedException(e)
@@ -100,20 +97,17 @@ class IndexUpdateRunner(fileBasedIndex: FileBasedIndexImpl,
     }
   }
 
-  private fun doIndexFiles(project: Project, fileSet: FileSet) {
+  private fun doIndexFiles(
+    project: Project, fileSet: FileSet,
+    progressReporter: IndexingProgressReporter2,
+  ) {
     if (fileSet.isEmpty()) {
       return
     }
 
-    val indicator = ProgressManager.getGlobalProgressIndicator()
-    indicator.checkCanceled()
-    indicator.isIndeterminate = false
-
     val contentLoader: CachedFileContentLoader = CurrentProjectHintedCachedFileContentLoader(project)
-    val originalSuspender = ProgressSuspender.getSuspender(unwrapAll(indicator))
-    val progressReporter = IndexingProgressReporter2(indicator, fileSet.size())
 
-    runConcurrently(project, fileSet, originalSuspender) { fileIndexingRequest ->
+    runConcurrently(project, fileSet) { fileIndexingRequest ->
       blockingContext {
         val presentableLocation = getPresentableLocationBeingIndexed(project, fileIndexingRequest.file)
         progressReporter.setLocationBeingIndexed(presentableLocation)
@@ -131,8 +125,7 @@ class IndexUpdateRunner(fileBasedIndex: FileBasedIndexImpl,
   private fun runConcurrently(
     project: Project,
     fileSet: FileSet,
-    originalSuspender: ProgressSuspender?,
-    task: suspend (FileIndexingRequest) -> Unit
+    task: suspend (FileIndexingRequest) -> Unit,
   ) {
     runBlockingCancellable {
       val channel = fileSet.asChannel(this)
@@ -140,7 +133,7 @@ class IndexUpdateRunner(fileBasedIndex: FileBasedIndexImpl,
         launch(Dispatchers.IO + CoroutineName("Indexing(${project.locationHash},$threadNr)")) {
           channel.consumeEach { fileIndexingJob ->
             ensureActive()
-            while (originalSuspender?.isSuspended == true) delay(1) // TODO: get rid of legacy suspender
+            while (fileSet.shouldPause()) delay(1) // TODO: get rid of legacy suspender
 
             GLOBAL_INDEXING_SEMAPHORE.withPermit {
               task(fileIndexingJob)
@@ -459,15 +452,6 @@ class IndexUpdateRunner(fileBasedIndex: FileBasedIndexImpl,
         }
       }
       return file.path
-    }
-
-    private fun unwrapAll(indicator: ProgressIndicator): ProgressIndicator {
-      // Can't use "ProgressWrapper.unwrapAll" here because it unwraps "ProgressWrapper"s only (not any "WrappedProgressIndicator")
-      var unwrapped = indicator
-      while (unwrapped is WrappedProgressIndicator) {
-        unwrapped = unwrapped.originalProgressIndicator
-      }
-      return unwrapped
     }
   }
 }

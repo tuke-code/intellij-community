@@ -78,7 +78,7 @@
       <with attribute="implementationClass" implements="com.intellij.ide.impl.dataRules.GetDataRule"/>
     </extensionPoint>
 
-    <extensionPoint name="edtDataRule" interface="com.intellij.openapi.actionSystem.EdtDataRule" dynamic="true"/>
+    <extensionPoint name="uiDataRule" interface="com.intellij.openapi.actionSystem.UiDataRule" dynamic="true"/>
 
     <extensionPoint name="dataValidators" interface="com.intellij.ide.impl.DataValidators" dynamic="true"/>
 
@@ -474,6 +474,8 @@
     <extensionPoint name="newProjectWizard.language" interface="com.intellij.ide.wizard.LanguageNewProjectWizard" dynamic="true"/>
     <extensionPoint name="newProjectWizard.languageGenerator" interface="com.intellij.ide.wizard.language.LanguageGeneratorNewProjectWizard" dynamic="true"/>
 
+    <extensionPoint name="newProjectWizard.generator" interface="com.intellij.ide.wizard.GeneratorNewProjectWizard" dynamic="true"/>
+
     <extensionPoint name="newProject.onboarding.tips" interface="com.intellij.ide.wizard.NewProjectOnboardingTips" dynamic="true"/>
 
     <extensionPoint name="projectOriginInfoProvider" interface="com.intellij.ide.impl.ProjectOriginInfoProvider" dynamic="true"/>
@@ -560,5 +562,6 @@
     <extensionPoint name="cefDelegate" interface="com.intellij.ui.jcef.CefDelegate"/>
 
     <extensionPoint name="proxySettingsOverrideProvider" interface="com.intellij.util.net.ProxySettingsOverrideProvider" dynamic="true"/>
+    <extensionPoint name="navbarLeftSide" dynamic="true" interface="com.intellij.ide.navigationToolbar.NavBarLeftSideExtension"/>
   </extensionPoints>
 </idea-plugin>

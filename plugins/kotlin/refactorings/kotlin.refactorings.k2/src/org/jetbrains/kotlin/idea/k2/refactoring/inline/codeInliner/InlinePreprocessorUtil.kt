@@ -16,7 +16,7 @@ import org.jetbrains.kotlin.analysis.api.permissions.allowAnalysisOnEdt
 import org.jetbrains.kotlin.analysis.api.symbols.*
 import org.jetbrains.kotlin.analysis.api.symbols.markers.KaNamedSymbol
 import org.jetbrains.kotlin.analysis.api.symbols.markers.KaSymbolWithMembers
-import org.jetbrains.kotlin.analysis.api.types.KtFunctionalType
+import org.jetbrains.kotlin.analysis.api.types.KaFunctionType
 import org.jetbrains.kotlin.idea.codeinsight.utils.addTypeArguments
 import org.jetbrains.kotlin.idea.codeinsight.utils.getRenderedTypeArguments
 import org.jetbrains.kotlin.idea.k2.refactoring.util.ConvertReferenceToLambdaUtil
@@ -168,7 +168,7 @@ internal fun insertExplicitTypeArguments(codeToInline: MutableCodeToInline) {
 internal fun removeContracts(codeToInline: MutableCodeToInline) {
     for (statement in codeToInline.statementsBefore) {
         analyze(statement) {
-            if (statement.resolveCallOld()?.singleFunctionCallOrNull()?.symbol?.callableId?.asSingleFqName()?.asString() == "kotlin.contracts.contract"
+            if (statement.resolveToCall()?.singleFunctionCallOrNull()?.symbol?.callableId?.asSingleFqName()?.asString() == "kotlin.contracts.contract"
             ) {
                 codeToInline.addPreCommitAction(statement) {
                     codeToInline.statementsBefore.remove(it)
@@ -245,7 +245,7 @@ internal fun encodeInternalReferences(codeToInline: MutableCodeToInline, origina
         val receiverExpression = expression.getReceiverExpression()
         if (receiverExpression == null) {
             val (receiverValue, isSameReceiverType) = analyze(expression) {
-                val resolveCall = expression.resolveCallOld()
+                val resolveCall = expression.resolveToCall()
                 val partiallyAppliedSymbol =
                     (resolveCall?.singleFunctionCallOrNull() ?: resolveCall?.singleVariableAccessCall())?.partiallyAppliedSymbol
 
@@ -256,9 +256,9 @@ internal fun encodeInternalReferences(codeToInline: MutableCodeToInline, origina
                 val originalSymbolDispatchType = originalSymbol?.dispatchReceiverType
                 if (value != null) {
                     getThisQualifier(value) to (originalSymbolReceiverType != null && value.type.isEqualTo(originalSymbolReceiverType) ||
-                                                 originalSymbolDispatchType != null && value.type.isEqualTo(originalSymbolDispatchType))
+                                                originalSymbolDispatchType != null && value.type.isEqualTo(originalSymbolDispatchType))
                 } else {
-                    val functionalType = (partiallyAppliedSymbol?.symbol as? KtVariableLikeSymbol)?.returnType as? KtFunctionalType
+                    val functionalType = (partiallyAppliedSymbol?.symbol as? KaVariableSymbol)?.returnType as? KaFunctionType
                     val receiverType = functionalType?.receiverType
                     if (receiverType == null) {
                         null to true
@@ -299,7 +299,7 @@ internal fun specifyNullTypeExplicitly(codeToInline: MutableCodeToInline, origin
     if (mainExpression?.isNull() == true) {
         val useSiteKtElement = originalDeclaration
         val nullCast = analyze(useSiteKtElement) {
-            "null as ${useSiteKtElement.getReturnKtType().render(position = Variance.OUT_VARIANCE)}"
+            "null as ${useSiteKtElement.returnType.render(position = Variance.OUT_VARIANCE)}"
         }
 
         codeToInline.addPreCommitAction(mainExpression) {
@@ -311,7 +311,7 @@ internal fun specifyNullTypeExplicitly(codeToInline: MutableCodeToInline, origin
 context(KaSession)
 internal fun getThisQualifier(receiverValue: KaImplicitReceiverValue): String {
     val symbol = receiverValue.symbol
-    return if ((symbol as? KaClassOrObjectSymbol)?.classKind == KaClassKind.COMPANION_OBJECT) {
+    return if ((symbol as? KaClassSymbol)?.classKind == KaClassKind.COMPANION_OBJECT) {
         (symbol.containingSymbol as KaClassifierSymbol).name!!.asString() + "." + symbol.name!!.asString()
     }
     else {

@@ -13,14 +13,15 @@ import org.jetbrains.kotlin.analysis.api.permissions.KaAllowAnalysisFromWriteAct
 import org.jetbrains.kotlin.analysis.api.permissions.KaAllowAnalysisOnEdt
 import org.jetbrains.kotlin.analysis.api.permissions.allowAnalysisFromWriteAction
 import org.jetbrains.kotlin.analysis.api.permissions.allowAnalysisOnEdt
-import org.jetbrains.kotlin.analysis.api.renderer.types.KtTypeRenderer
-import org.jetbrains.kotlin.analysis.api.renderer.types.impl.KtTypeRendererForSource
-import org.jetbrains.kotlin.analysis.api.renderer.types.renderers.KtTypeErrorTypeRenderer
-import org.jetbrains.kotlin.analysis.api.symbols.KaClassOrObjectSymbol
-import org.jetbrains.kotlin.analysis.api.types.KtDefinitelyNotNullType
+import org.jetbrains.kotlin.analysis.api.renderer.types.KaTypeRenderer
+import org.jetbrains.kotlin.analysis.api.renderer.types.impl.KaTypeRendererForSource
+import org.jetbrains.kotlin.analysis.api.renderer.types.renderers.KaErrorTypeRenderer
+import org.jetbrains.kotlin.analysis.api.symbols.KaClassSymbol
+import org.jetbrains.kotlin.analysis.api.symbols.typeParameters
+import org.jetbrains.kotlin.analysis.api.types.KaDefinitelyNotNullType
 import org.jetbrains.kotlin.analysis.api.types.KaSubstitutor
-import org.jetbrains.kotlin.analysis.api.types.KtType
-import org.jetbrains.kotlin.analysis.api.types.KtTypeErrorType
+import org.jetbrains.kotlin.analysis.api.types.KaType
+import org.jetbrains.kotlin.analysis.api.types.KaErrorType
 import org.jetbrains.kotlin.analysis.utils.printer.PrettyPrinter
 import org.jetbrains.kotlin.asJava.toLightMethods
 import org.jetbrains.kotlin.psi.*
@@ -28,17 +29,17 @@ import org.jetbrains.kotlin.types.Variance
 
 data class KotlinTypeInfo(var text: String?, val context: KtElement) {
     @OptIn(KaExperimentalApi::class)
-    constructor(ktType: KtType, context: KtElement): this(analyze(context) { ktType.render(errorIgnoringRenderer, Variance.INVARIANT) }, context)
+    constructor(ktType: KaType, context: KtElement): this(analyze(context) { ktType.render(errorIgnoringRenderer, Variance.INVARIANT) }, context)
 }
 
 @KaExperimentalApi
 @OptIn(KaAnalysisNonPublicApi::class)
-private val errorIgnoringRenderer: KtTypeRenderer = KtTypeRendererForSource.WITH_QUALIFIED_NAMES.with {
-    errorTypeRenderer = object : KtTypeErrorTypeRenderer {
+private val errorIgnoringRenderer: KaTypeRenderer = KaTypeRendererForSource.WITH_QUALIFIED_NAMES.with {
+    errorTypeRenderer = object : KaErrorTypeRenderer {
         override fun renderType(
             analysisSession: KaSession,
-            type: KtTypeErrorType,
-            typeRenderer: KtTypeRenderer,
+            type: KaErrorType,
+            typeRenderer: KaTypeRenderer,
             printer: PrettyPrinter
         ) {
             type.presentableText?.let {
@@ -75,15 +76,15 @@ internal fun KtPsiFactory.createType(
                         val targetType =
                             substitutor?.substitute(JavaPsiFacade.getElementFactory(baseFunction.project).createTypeFromText(typeText, baseFunction))
 
-                        return createType(targetType?.asKtType(inheritedCallable)?.render(position = variance) ?: typeText)
+                        return createType(targetType?.asKaType(inheritedCallable)?.render(position = variance) ?: typeText)
                     }
 
                     val ktSubstitutor = createSubstitutor(inheritedCallable, baseFunction)
-                    val ktType = createTypeCodeFragment(typeText, baseFunction).getContentElement()?.getKtType()
+                    val ktType = createTypeCodeFragment(typeText, baseFunction).getContentElement()?.type
                     if (ktType != null) {
                         val type = ktSubstitutor?.substitute(ktType) ?: ktType
                         val substitutedType = type.render(position = variance)
-                        if (isReceiver && type is KtDefinitelyNotNullType) {
+                        if (isReceiver && type is KaDefinitelyNotNullType) {
                             return createType("($substitutedType)")
                         }
                         return createType(substitutedType)
@@ -103,7 +104,7 @@ private fun createSubstitutor(inheritorDeclaration: KtDeclaration, baseFunction:
         ?: (baseFunction as? PsiMember)?.callableSymbol ?: return null
     val inheritor = inheritorCallable.containingSymbol
     val base = baseCallable.containingSymbol
-    return if (inheritor is KaClassOrObjectSymbol && base is KaClassOrObjectSymbol) {
+    return if (inheritor is KaClassSymbol && base is KaClassSymbol) {
         createInheritanceTypeSubstitutor(inheritor, base)?.let { iSubstitutor ->
             buildSubstitutor {
                 base.typeParameters.forEach {

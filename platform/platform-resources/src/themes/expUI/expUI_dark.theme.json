@@ -569,6 +569,13 @@
       "selectedPressedBackground": "Blue4"
     },
 
+    "Slider": {
+      "buttonColor": "Gray9",
+      "buttonBorderColor": "Gray2",
+      "tickColor": "Gray8",
+      "trackColor": "Gray6"
+    },
+
     "SpeedSearch": {
       "background": "Gray1",
       "borderColor": "Gray3",
@@ -855,6 +862,15 @@
           "Start": "#5FAD65",
           "End": "#3D968B"
         }
+      }
+    },
+
+    "LicenseDialog": {
+      "termsAndConditionsForeground": "Gray7",
+      "separatorColor": "Gray3",
+      "LicenseList": {
+        "licenseDetailsForeground": "Gray9",
+        "separatorColor": "Gray6"
       }
     },
 

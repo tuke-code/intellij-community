@@ -6,7 +6,7 @@ import com.intellij.refactoring.util.RefactoringUIUtil
 import com.intellij.usageView.UsageInfo
 import org.jetbrains.kotlin.analysis.api.analyze
 import org.jetbrains.kotlin.analysis.api.resolution.*
-import org.jetbrains.kotlin.analysis.api.symbols.KaClassOrObjectSymbol
+import org.jetbrains.kotlin.analysis.api.symbols.KaClassSymbol
 import org.jetbrains.kotlin.analysis.api.symbols.KaValueParameterSymbol
 import org.jetbrains.kotlin.idea.base.resources.KotlinBundle
 import org.jetbrains.kotlin.idea.base.util.useScope
@@ -69,19 +69,19 @@ internal object KotlinChangeSignatureUsageSearcher {
     internal fun findReceiverReferences(ktCallableDeclaration: KtCallableDeclaration, result: MutableList<in UsageInfo>, changeInfo: KotlinChangeInfo) {
         analyze(ktCallableDeclaration) {
             val originalReceiverInfo = changeInfo.oldReceiverInfo
-            val originalReceiverType = ktCallableDeclaration.receiverTypeReference?.getKtType()
+            val originalReceiverType = ktCallableDeclaration.receiverTypeReference?.type
             ktCallableDeclaration.accept(object : KtTreeVisitorVoid() {
 
                 override fun visitSimpleNameExpression(expression: KtSimpleNameExpression) {
                     super.visitSimpleNameExpression(expression)
 
-                    val call = expression.resolveCallOld()
+                    val call = expression.resolveToCall()
 
                     if (call == null && originalReceiverType != null) {
                         //deleted or changed receiver, must be preserved as simple parameter
                         val parentExpression = expression.parent
                         if (parentExpression is KtThisExpression && parentExpression.parent !is KtDotQualifiedExpression &&
-                            parentExpression.getKtType()?.let { originalReceiverType.isEqualTo(it) } == true) {
+                            parentExpression.expressionType?.let { originalReceiverType.isEqualTo(it) } == true) {
                             result.add(
                                 KotlinParameterUsage(parentExpression, originalReceiverInfo!!)
                             )
@@ -103,7 +103,7 @@ internal object KotlinChangeSignatureUsageSearcher {
                                 if (receiverValue.type.isSubTypeOf(originalReceiverType)) {
                                     if (receiverExpression is KtThisExpression) {
                                         val targetLabel = receiverExpression.getTargetLabel()
-                                        if (targetLabel == null || targetLabel.getKtType()?.let { originalReceiverType.isEqualTo(it) } == true) {
+                                        if (targetLabel == null || targetLabel.expressionType?.let { originalReceiverType.isEqualTo(it) } == true) {
                                             result.add(KotlinParameterUsage(receiverExpression, originalReceiverInfo!!))
                                         }
                                     }
@@ -112,7 +112,7 @@ internal object KotlinChangeSignatureUsageSearcher {
                                     }
                                 }
                             } else {
-                                val name = (containingSymbol as? KaClassOrObjectSymbol)?.name
+                                val name = (containingSymbol as? KaClassSymbol)?.name
                                 if (name != null) {
                                     if (receiverExpression is KtThisExpression) {
                                         result.add(KotlinNonQualifiedOuterThisUsage(receiverExpression, name))

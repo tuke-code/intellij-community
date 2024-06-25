@@ -4,10 +4,12 @@ package org.jetbrains.kotlin.idea.k2.codeinsight.intentions
 import com.intellij.modcommand.ActionContext
 import com.intellij.modcommand.ModPsiUpdater
 import com.intellij.openapi.util.TextRange
+import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
 import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.symbols.markers.KaSymbolWithVisibility
 import org.jetbrains.kotlin.analysis.api.symbols.receiverType
-import org.jetbrains.kotlin.analysis.api.types.KtErrorType
+import org.jetbrains.kotlin.analysis.api.symbols.typeParameters
+import org.jetbrains.kotlin.analysis.api.types.KaErrorType
 import org.jetbrains.kotlin.config.AnalysisFlags
 import org.jetbrains.kotlin.config.ExplicitApiMode
 import org.jetbrains.kotlin.idea.base.projectStructure.languageVersionSettings
@@ -55,7 +57,7 @@ internal class RemoveExplicitTypeIntention :
     context(KaSession)
     override fun prepareContext(element: KtDeclaration): Unit? = when {
         element is KtParameter -> true
-        element is KtNamedFunction && element.hasBlockBody() -> element.getReturnKtType().isUnit
+        element is KtNamedFunction && element.hasBlockBody() -> element.returnType.isUnit
         element is KtCallableDeclaration && publicReturnTypeShouldBePresentInApiMode(element) -> false
         else -> !element.isExplicitTypeReferenceNeededForTypeInferenceByAnalyze()
     }.asUnit
@@ -86,7 +88,7 @@ internal class RemoveExplicitTypeIntention :
     private fun KtDeclaration.isExplicitTypeReferenceNeededForTypeInferenceByAnalyze(): Boolean {
         val typeReference = typeReference ?: return false
         val initializer = getInitializerOrGetterInitializer() ?: return true
-        val explicitType = getReturnKtType()
+        val explicitType = returnType
 
         // The initializer may require an explicit type, but an error type is definitely not it. The intention makes a conscious decision to
         // allow the user to quickly remove completely erroneous explicit types.
@@ -94,11 +96,11 @@ internal class RemoveExplicitTypeIntention :
         // The situation is more fuzzy with errors in type arguments. Here, it makes sense not to remove the type, but rather to fix it. And
         // with a little bit of type information, the intention has a better chance of deciding whether the initializer needs that explicit
         // type. So we don't check the `explicitType` for nested errors.
-        if (explicitType is KtErrorType) return false
+        if (explicitType is KaErrorType) return false
 
         if (!isInitializerTypeContextIndependent(initializer, typeReference)) return true
 
-        val initializerType = initializer.getKtType() ?: return true
+        val initializerType = initializer.expressionType ?: return true
         val typeCanBeRemoved = if (isVar) {
             initializerType.isEqualTo(explicitType)
         } else {
@@ -122,7 +124,7 @@ internal class RemoveExplicitTypeIntention :
         is KtConstantExpression -> {
             val classId = initializer.getClassId()
             val let = classId?.let { buildClassType(it) }
-            val superType = typeReference.getKtType()
+            val superType = typeReference.type
             val subTypeOf = let?.isSubTypeOf(superType)
             subTypeOf == true
         }
@@ -161,6 +163,7 @@ internal class RemoveExplicitTypeIntention :
 
         val symbol = resolved.getFunctionLikeSymbol()
 
+        @OptIn(KaExperimentalApi::class)
         val typeParameters = symbol.typeParameters
         if (typeParameters.isEmpty()) return true
 

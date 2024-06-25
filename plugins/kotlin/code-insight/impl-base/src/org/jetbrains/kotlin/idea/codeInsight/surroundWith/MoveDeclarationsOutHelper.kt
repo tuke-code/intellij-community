@@ -13,8 +13,8 @@ import org.jetbrains.kotlin.analysis.api.permissions.KaAllowAnalysisFromWriteAct
 import org.jetbrains.kotlin.analysis.api.permissions.KaAllowAnalysisOnEdt
 import org.jetbrains.kotlin.analysis.api.permissions.allowAnalysisFromWriteAction
 import org.jetbrains.kotlin.analysis.api.permissions.allowAnalysisOnEdt
-import org.jetbrains.kotlin.analysis.api.renderer.declarations.impl.KtDeclarationRendererForSource
-import org.jetbrains.kotlin.analysis.api.types.KtErrorType
+import org.jetbrains.kotlin.analysis.api.renderer.declarations.impl.KaDeclarationRendererForSource
+import org.jetbrains.kotlin.analysis.api.types.KaErrorType
 import org.jetbrains.kotlin.idea.base.codeInsight.ShortenReferencesFacility
 import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.types.Variance
@@ -122,7 +122,7 @@ private fun createVariableDeclaration(property: KtProperty, generateDefaultIniti
         @OptIn(KaAllowAnalysisFromWriteAction::class)
         allowAnalysisFromWriteAction {
             analyze(property) {
-                val propertyType = property.getReturnKtType()
+                val propertyType = property.returnType
 
                 var defaultInitializer: String? = null
                 if (generateDefaultInitializers && property.isVar) {
@@ -132,8 +132,8 @@ private fun createVariableDeclaration(property: KtProperty, generateDefaultIniti
                 val typeRef = property.typeReference
                 val typeString = when {
                     typeRef != null -> typeRef.text
-                    propertyType !is KtErrorType -> propertyType.render(
-                        KtDeclarationRendererForSource.WITH_QUALIFIED_NAMES.typeRenderer, Variance.INVARIANT
+                    propertyType !is KaErrorType -> propertyType.render(
+                        KaDeclarationRendererForSource.WITH_QUALIFIED_NAMES.typeRenderer, Variance.INVARIANT
                     )
 
                     else -> null

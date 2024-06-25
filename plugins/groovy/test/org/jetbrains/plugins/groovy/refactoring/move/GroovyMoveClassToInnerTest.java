@@ -1,18 +1,5 @@
-/*
- * Copyright 2000-2016 JetBrains s.r.o.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+
 package org.jetbrains.plugins.groovy.refactoring.move;
 
 import com.intellij.application.options.CodeStyle;
@@ -105,23 +92,23 @@ public class GroovyMoveClassToInnerTest extends GroovyMoveTestBase {
     doTest("pack2.A", "pack1.Class1");
   }
 
-  void _testPackageLocalClass() throws Exception {
-    doTestConflicts("pack1.Class1", "pack2.A", "Field <b><code>Class1.c2</code></b> uses a package-private class <b><code>pack1.Class2</code></b>.");
+  public void testPackageLocalClass() {
+    doTest("pack2.A", "pack1.Class1");
   }
 
-  void _testMoveIntoPackageLocalClass() throws Exception {
-    doTestConflicts("pack1.Class1", "pack2.A", "Class <b><code>Class1</code></b> will no longer be accessible from field <b><code>Class2.c1</code></b>");
+  public void testMoveIntoPackageLocalClass() {
+    doTestConflicts("pack1.Class1", "pack2.A", "Class <b><code>pack1.Class1</code></b> will no longer be accessible from class <b><code>pack1.Class2</code></b>");
   }
 
-  void _testMoveOfPackageLocalClass() throws Exception {
-    doTestConflicts("pack1.Class1", "pack2.A", "Class <b><code>Class1</code></b> will no longer be accessible from field <b><code>Class2.c1</code></b>");
+  public void testMoveOfPackageLocalClass() {
+    doTestConflicts("pack1.Class1", "pack2.A", "Class <b><code>pack1.Class1</code></b> will no longer be accessible from class <b><code>pack1.Class2</code></b>");
   }
 
-  public void testMoveIntoPrivateInnerClass() throws Exception {
+  public void testMoveIntoPrivateInnerClass() {
     doTestConflicts("pack1.Class1", "pack1.A.PrivateInner", "Class <b><code>pack1.Class1</code></b> will no longer be accessible from class <b><code>pack1.Class2</code></b>");
   }
 
-  void _testMoveWithPackageLocalMember() throws Exception {
+  public void testMoveWithPackageLocalMember() {
     doTestConflicts("pack1.Class1", "pack2.A", "Method <b><code>Class1.doStuff()</code></b> will no longer be accessible from method <b><code>Class2.test()</code></b>");
   }
 

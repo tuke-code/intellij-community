@@ -11,9 +11,9 @@ import org.jetbrains.kotlin.analysis.api.KaImplementationDetail
 import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.analyze
 import org.jetbrains.kotlin.analysis.api.resolution.*
-import org.jetbrains.kotlin.analysis.api.signatures.KtCallableSignature
-import org.jetbrains.kotlin.analysis.api.signatures.KtFunctionLikeSignature
-import org.jetbrains.kotlin.analysis.api.signatures.KtVariableLikeSignature
+import org.jetbrains.kotlin.analysis.api.signatures.KaCallableSignature
+import org.jetbrains.kotlin.analysis.api.signatures.KaFunctionSignature
+import org.jetbrains.kotlin.analysis.api.signatures.KaVariableSignature
 import org.jetbrains.kotlin.analysis.api.symbols.*
 import org.jetbrains.kotlin.idea.references.mainReference
 import org.jetbrains.kotlin.kdoc.psi.api.KDoc
@@ -23,7 +23,7 @@ import org.jetbrains.kotlin.psi.*
 sealed interface CallTarget {
     val caller: KtElement
     val call: KaCall
-    val partiallyAppliedSymbol: KaPartiallyAppliedSymbol<KaCallableSymbol, KtCallableSignature<KaCallableSymbol>>
+    val partiallyAppliedSymbol: KaPartiallyAppliedSymbol<KaCallableSymbol, KaCallableSignature<KaCallableSymbol>>
     val symbol: KaCallableSymbol
 
     val anchor: PsiElement
@@ -40,7 +40,7 @@ sealed interface CallTarget {
         }
 }
 
-sealed interface TypedCallTarget<out S : KaCallableSymbol, out C : KtCallableSignature<S>> : CallTarget {
+sealed interface TypedCallTarget<out S : KaCallableSymbol, out C : KaCallableSignature<S>> : CallTarget {
     override val partiallyAppliedSymbol: KaPartiallyAppliedSymbol<S, C>
     override val symbol: S
 }
@@ -48,9 +48,9 @@ sealed interface TypedCallTarget<out S : KaCallableSymbol, out C : KtCallableSig
 class VariableCallTarget(
     override val caller: KtElement,
     override val call: KaCall,
-    override val partiallyAppliedSymbol: KaPartiallyAppliedVariableSymbol<KtVariableLikeSymbol>
-) : TypedCallTarget<KtVariableLikeSymbol, KtVariableLikeSignature<KtVariableLikeSymbol>> {
-    override val symbol: KtVariableLikeSymbol
+    override val partiallyAppliedSymbol: KaPartiallyAppliedVariableSymbol<KaVariableSymbol>
+) : TypedCallTarget<KaVariableSymbol, KaVariableSignature<KaVariableSymbol>> {
+    override val symbol: KaVariableSymbol
         get() = partiallyAppliedSymbol.symbol
 }
 
@@ -58,7 +58,7 @@ class FunctionCallTarget(
     override val caller: KtElement,
     override val call: KaCall,
     override val partiallyAppliedSymbol: KaPartiallyAppliedFunctionSymbol<KaFunctionSymbol>
-) : TypedCallTarget<KaFunctionSymbol, KtFunctionLikeSignature<KaFunctionSymbol>> {
+) : TypedCallTarget<KaFunctionSymbol, KaFunctionSignature<KaFunctionSymbol>> {
     override val symbol: KaFunctionSymbol
         get() = partiallyAppliedSymbol.symbol
 }
@@ -158,7 +158,7 @@ object KotlinCallProcessor {
     @OptIn(KaExperimentalApi::class)
     private fun handle(element: KtElement, processor: KotlinCallTargetProcessor): Boolean {
         analyze(element) {
-            fun handleSpecial(element: KtElement, filter: (KtSymbol) -> Boolean): Boolean {
+            fun handleSpecial(element: KtElement, filter: (KaSymbol) -> Boolean): Boolean {
                 val symbols = element.mainReference?.resolveToSymbols() ?: return true
                 for (symbol in symbols) {
                     if (!filter(symbol)) {
@@ -175,7 +175,7 @@ object KotlinCallProcessor {
                                 processCallTarget(FunctionCallTarget(element, call, partiallyAppliedSymbol))
                             }
 
-                            is KtVariableLikeSymbol -> {
+                            is KaVariableSymbol -> {
                                 val signature = symbol.asSignature()
                                 val partiallyAppliedSymbol = KaPartiallyAppliedVariableSymbol(signature, null, null)
                                 val call = KaSimpleVariableAccessCall(partiallyAppliedSymbol, linkedMapOf(), KaSimpleVariableAccess.Read)
@@ -200,7 +200,7 @@ object KotlinCallProcessor {
                 return handleSpecial(element) { !(it is KaLocalVariableSymbol && it.psi == element) }
             }
 
-            val callInfo = element.resolveCallOld()
+            val callInfo = element.resolveToCall()
             val call = callInfo?.successfulCallOrNull<KaCall>()
 
             return with(processor) {

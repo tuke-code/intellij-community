@@ -13,7 +13,7 @@ import org.jetbrains.kotlin.analysis.api.permissions.allowAnalysisOnEdt
 import org.jetbrains.kotlin.analysis.api.projectStructure.KaSourceModule
 import org.jetbrains.kotlin.analysis.api.resolution.KaCallableMemberCall
 import org.jetbrains.kotlin.analysis.api.symbols.*
-import org.jetbrains.kotlin.analysis.api.symbols.markers.KtAnnotatedSymbol
+import org.jetbrains.kotlin.analysis.api.symbols.markers.KaAnnotatedSymbol
 import org.jetbrains.kotlin.analysis.api.types.*
 import org.jetbrains.kotlin.asJava.*
 import org.jetbrains.kotlin.asJava.classes.lazyPub
@@ -61,7 +61,7 @@ internal fun containingKtClass(
 
 context(KaSession)
 internal fun toPsiClass(
-    ktType: KtType,
+    ktType: KaType,
     source: UElement?,
     context: KtElement,
     typeOwnerKind: TypeOwnerKind,
@@ -86,7 +86,7 @@ internal fun toPsiMethod(
 ): PsiMethod? {
     // `inline` w/ `reified` type param from binary dependency,
     // which we can't find source PSI, so fake it
-    if (functionSymbol.origin == KtSymbolOrigin.LIBRARY &&
+    if (functionSymbol.origin == KaSymbolOrigin.LIBRARY &&
         (functionSymbol as? KaNamedFunctionSymbol)?.isInline == true &&
         functionSymbol.typeParameters.any { it.isReified }
     ) {
@@ -133,7 +133,7 @@ internal fun toPsiMethod(
             when {
                 psi.isLocal ->
                     handleLocalOrSynthetic(psi)
-                functionSymbol.unwrapFakeOverrides.origin == KtSymbolOrigin.LIBRARY ->
+                functionSymbol.fakeOverrideOriginal.origin == KaSymbolOrigin.LIBRARY ->
                     // PSI to regular libraries should be handled by [DecompiledPsiDeclarationProvider]
                     // That is, this one is a deserialized declaration (in Lint/UAST IDE).
                     toPsiMethodForDeserialized(functionSymbol, context, psi)
@@ -169,7 +169,7 @@ private fun toPsiMethodForDeserialized(
                 context,
                 PsiTypeConversionConfiguration(
                     TypeOwnerKind.DECLARATION,
-                    typeMappingMode = KtTypeMappingMode.VALUE_PARAMETER,
+                    typeMappingMode = KaTypeMappingMode.VALUE_PARAMETER,
                 )
             )
 
@@ -182,7 +182,7 @@ private fun toPsiMethodForDeserialized(
             context,
             PsiTypeConversionConfiguration(
                 TypeOwnerKind.DECLARATION,
-                typeMappingMode = KtTypeMappingMode.RETURN_TYPE,
+                typeMappingMode = KaTypeMappingMode.RETURN_TYPE,
             )
         )
 
@@ -195,10 +195,10 @@ private fun toPsiMethodForDeserialized(
                 constructors.filter { it.parameterList.parameters.size == functionSymbol.valueParameters.size }
             else {
                 val jvmName = when (functionSymbol) {
-                    is KtPropertyGetterSymbol -> {
+                    is KaPropertyGetterSymbol -> {
                         functionSymbol.getJvmNameFromAnnotation(allowedUseSiteTargets = setOf(PROPERTY_GETTER, null))
                     }
-                    is KtPropertySetterSymbol -> {
+                    is KaPropertySetterSymbol -> {
                         functionSymbol.getJvmNameFromAnnotation(allowedUseSiteTargets = setOf(PROPERTY_SETTER, null))
                     }
                     else -> {
@@ -263,12 +263,12 @@ private fun toPsiMethodForDeserialized(
  *
  * @param allowedUseSiteTargets If non-empty, only annotations with the specified use-site targets are checked.
  */
-private fun KtAnnotatedSymbol.getJvmNameFromAnnotation(allowedUseSiteTargets: Set<AnnotationUseSiteTarget?> = emptySet()): String? {
+private fun KaAnnotatedSymbol.getJvmNameFromAnnotation(allowedUseSiteTargets: Set<AnnotationUseSiteTarget?> = emptySet()): String? {
     for (annotation in annotations[JvmStandardClassIds.JVM_NAME_CLASS_ID]) {
         if (allowedUseSiteTargets.isEmpty() || annotation.useSiteTarget in allowedUseSiteTargets) {
             val firstArgumentExpression = annotation.arguments.firstOrNull()?.expression
             if (firstArgumentExpression is KaConstantAnnotationValue) {
-                return firstArgumentExpression.constantValue.value as? String
+                return firstArgumentExpression.value.value as? String
             }
             break
         }
@@ -279,7 +279,7 @@ private fun KtAnnotatedSymbol.getJvmNameFromAnnotation(allowedUseSiteTargets: Se
 
 context(KaSession)
 internal fun toPsiType(
-    ktType: KtType,
+    ktType: KaType,
     source: UElement?,
     context: KtElement,
     config: PsiTypeConversionConfiguration,
@@ -294,12 +294,12 @@ internal fun toPsiType(
 context(KaSession)
 @OptIn(KaExperimentalApi::class)
 internal fun toPsiType(
-    ktType: KtType,
+    ktType: KaType,
     containingLightDeclaration: PsiModifierListOwner?,
     context: KtElement,
     config: PsiTypeConversionConfiguration,
 ): PsiType {
-    if (ktType is KtNonErrorClassType && ktType.ownTypeArguments.isEmpty()) {
+    if (ktType is KaClassType && ktType.typeArguments.isEmpty()) {
         fun PsiPrimitiveType.orBoxed() = if (config.isBoxed) getBoxedType(context) else this
         val psiType = when (ktType.classId) {
             StandardClassIds.Int -> PsiTypes.intType().orBoxed()
@@ -334,7 +334,7 @@ internal fun receiverType(
     val ktType = ktCall.partiallyAppliedSymbol.signature.receiverType
         ?: ktCall.partiallyAppliedSymbol.extensionReceiver?.type
         ?: ktCall.partiallyAppliedSymbol.dispatchReceiver?.type
-    if (ktType == null || ktType is KtErrorType) return null
+    if (ktType == null || ktType is KaErrorType) return null
     return toPsiType(
         ktType,
         source,
@@ -347,34 +347,34 @@ internal fun receiverType(
 }
 
 context(KaSession)
-internal val KtType.typeForValueClass: Boolean
+internal val KaType.typeForValueClass: Boolean
     get() {
         val symbol = expandedSymbol as? KaNamedClassOrObjectSymbol ?: return false
         return symbol.isInline
     }
 
 context(KaSession)
-internal fun isInheritedGenericType(ktType: KtType?): Boolean {
+internal fun isInheritedGenericType(ktType: KaType?): Boolean {
     if (ktType == null) return false
-    return ktType is KtTypeParameterType &&
+    return ktType is KaTypeParameterType &&
         // explicitly nullable, e.g., T?
         !ktType.isMarkedNullable &&
         // non-null upper bound, e.g., T : Any
-        nullability(ktType) != KtTypeNullability.NON_NULLABLE
+        nullability(ktType) != KaTypeNullability.NON_NULLABLE
 }
 
 context(KaSession)
-internal fun nullability(ktType: KtType?): KtTypeNullability? {
+internal fun nullability(ktType: KaType?): KaTypeNullability? {
     if (ktType == null) return null
-    if (ktType is KtErrorType) return null
+    if (ktType is KaErrorType) return null
     return if (ktType.fullyExpandedType.canBeNull)
-        KtTypeNullability.NULLABLE
+        KaTypeNullability.NULLABLE
     else
-        KtTypeNullability.NON_NULLABLE
+        KaTypeNullability.NON_NULLABLE
 }
 
 context(KaSession)
-internal fun getKtType(ktCallableDeclaration: KtCallableDeclaration): KtType? {
+internal fun getKtType(ktCallableDeclaration: KtCallableDeclaration): KaType? {
     return (ktCallableDeclaration.symbol as? KaCallableSymbol)?.returnType
 }
 
@@ -382,15 +382,15 @@ internal fun getKtType(ktCallableDeclaration: KtCallableDeclaration): KtType? {
  * Finds Java stub-based [PsiElement] for symbols that refer to declarations in [KaLibraryModule].
  */
 context(KaSession)
-internal tailrec fun psiForUast(symbol: KtSymbol): PsiElement? {
-    if (symbol.origin == KtSymbolOrigin.LIBRARY) {
+internal tailrec fun psiForUast(symbol: KaSymbol): PsiElement? {
+    if (symbol.origin == KaSymbolOrigin.LIBRARY) {
         val psiProvider = FirKotlinUastLibraryPsiProviderService.getInstance()
         return with(psiProvider) { provide(symbol) }
     }
 
     if (symbol is KaCallableSymbol) {
-        if (symbol.origin == KtSymbolOrigin.INTERSECTION_OVERRIDE || symbol.origin == KtSymbolOrigin.SUBSTITUTION_OVERRIDE) {
-            val originalSymbol = symbol.unwrapFakeOverrides
+        if (symbol.origin == KaSymbolOrigin.INTERSECTION_OVERRIDE || symbol.origin == KaSymbolOrigin.SUBSTITUTION_OVERRIDE) {
+            val originalSymbol = symbol.fakeOverrideOriginal
             if (originalSymbol !== symbol) {
                 return psiForUast(originalSymbol)
             }

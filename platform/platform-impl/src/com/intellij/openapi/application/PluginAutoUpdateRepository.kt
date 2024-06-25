@@ -2,19 +2,13 @@
 package com.intellij.openapi.application
 
 import com.intellij.ide.plugins.IdeaPluginDescriptorImpl
-import com.intellij.ide.plugins.PluginInstaller
-import com.intellij.ide.plugins.PluginLoadingResult
 import com.intellij.ide.plugins.PluginManagerCore
-import com.intellij.ide.plugins.isBrokenPlugin
-import com.intellij.ide.plugins.loadDescriptorFromArtifact
-import com.intellij.ide.plugins.loadDescriptors
 import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.application.PluginAutoUpdateRepository.PluginUpdateInfo
 import com.intellij.openapi.application.PluginAutoUpdateRepository.PluginUpdatesData
 import com.intellij.openapi.application.PluginAutoUpdateRepository.getAutoUpdateDirPath
-import com.intellij.openapi.application.impl.ApplicationInfoImpl
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.Logger
@@ -23,9 +17,6 @@ import com.intellij.openapi.extensions.PluginId
 import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogWrapper
-import com.intellij.openapi.updateSettings.impl.PluginDownloader
-import com.intellij.platform.diagnostic.telemetry.impl.span
-import com.intellij.platform.ide.bootstrap.ZipFilePoolImpl
 import com.intellij.ui.ComboboxSpeedSearch
 import com.intellij.ui.dsl.builder.AlignX
 import com.intellij.ui.dsl.builder.panel
@@ -35,11 +26,9 @@ import com.intellij.util.cancelOnDispose
 import com.intellij.util.io.copy
 import com.intellij.util.io.createDirectories
 import com.intellij.util.io.delete
-import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -51,6 +40,7 @@ import org.jetbrains.annotations.ApiStatus
 import java.awt.Dimension
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.Collections
 import javax.swing.JComponent
 import kotlin.Result
 import kotlin.io.path.absolutePathString
@@ -61,8 +51,11 @@ import kotlin.io.path.isRegularFile
 
 @ApiStatus.Internal
 object PluginAutoUpdateRepository {
+  const val SKIP_PLUGIN_AUTO_UPDATE_PROPERTY: String = "ide.skip.plugin.auto.update"
   const val PLUGIN_AUTO_UPDATE_DIRECTORY_NAME: String = "plugins-auto-update"
   private const val STATE_FILE_NAME: String = ".autoupdate.data"
+
+  fun shouldSkipAutoUpdate(): Boolean = System.getProperty(SKIP_PLUGIN_AUTO_UPDATE_PROPERTY) == "true"
 
   fun getAutoUpdateDirPath(): Path = PathManager.getStartupScriptDir().resolve(PLUGIN_AUTO_UPDATE_DIRECTORY_NAME)
 
@@ -77,14 +70,16 @@ object PluginAutoUpdateRepository {
 
   @Synchronized
   internal fun clearUpdates() {
-    getAutoUpdateDirPath().delete(recursively = true)
+    if (getAutoUpdateDirPath().exists()) {
+      getAutoUpdateDirPath().delete(recursively = true)
+    }
   }
 
   @Synchronized
   fun readUpdates(): Map<PluginId, PluginUpdateInfo> {
     val stateFile = getAutoUpdateStatePath()
     if (!stateFile.isReadable()) {
-      return emptyMap()
+      return Collections.emptyMap<PluginId, PluginUpdateInfo>()
     }
     val updatesRaw = Files.readString(stateFile)
     return json.decodeFromString<PluginUpdatesData>(updatesRaw).updates.mapKeys { PluginId.getId(it.key) }
@@ -117,129 +112,6 @@ object PluginAutoUpdateRepository {
   }
 
   /**
-   * This method is called during startup, before the plugins are loaded.
-   */
-  suspend fun applyPluginUpdates(logDeferred: Deferred<Logger>) {
-    val updates = safeConsumeUpdates(logDeferred).filter { (_, info) ->
-      runCatching {
-        Path.of(info.pluginPath).exists() && getAutoUpdateDirPath().resolve(info.updateFilename).exists()
-      }.getOrElse { e ->
-        logDeferred.await().warn(e)
-        false
-      }
-    }
-    runCatching {
-      applyPluginUpdates(updates, logDeferred)
-    }.getOrLogException { e ->
-      logDeferred.await().error("Error occurred during application of plugin updates", e)
-    }
-    runCatching {
-      clearUpdates()
-    }.getOrLogException { e ->
-      logDeferred.await().warn("Failed to clear plugin auto update directory", e)
-    }
-  }
-
-  private suspend fun applyPluginUpdates(updates: Map<PluginId, PluginUpdateInfo>, logDeferred: Deferred<Logger>) {
-    if (updates.isEmpty()) {
-      return
-    }
-    logDeferred.await().info("There are ${updates.size} prepared updates for plugins. Applying...")
-    val autoupdatesDir = getAutoUpdateDirPath()
-
-    val currentDescriptors = span("loading existing descriptors") {
-      val pool = ZipFilePoolImpl()
-      val result = loadDescriptors(
-        CompletableDeferred(pool),
-        CompletableDeferred(PluginAutoUpdateRepository::class.java.classLoader)
-      )
-      pool.clear()
-      result.second
-    }
-    // shadowing intended
-    val updates = updates.filter { (id, _) ->
-      (!PluginManagerCore.isDisabled(id) && (currentDescriptors.getIdMap()[id] != null || currentDescriptors.getIncompleteIdMap()[id] != null))
-        .also { pluginForUpdateExists ->
-          if (!pluginForUpdateExists) logDeferred.await().warn("Update for plugin $id is declined since the plugin is not going to be loaded")
-        }
-    }
-    val updateDescriptors = span("update descriptors loading") {
-      updates.mapValues { (_, info) ->
-        val updateFile = autoupdatesDir.resolve(info.updateFilename)
-        async(Dispatchers.IO) {
-          runCatching { loadDescriptorFromArtifact(updateFile, null) }
-        }
-      }.mapValues { it.value.await() }
-    }.filter {
-      (it.value.getOrNull() != null).also { loaded ->
-        if (!loaded) logDeferred.await().warn("Update for plugin ${it.key} has failed to load", it.value.exceptionOrNull())
-      }
-    }.mapValues { it.value.getOrNull()!! }
-
-    val updateCheck = determineValidUpdates(currentDescriptors, updateDescriptors)
-    updateCheck.rejectedUpdates.forEach { (id, reason) ->
-      logDeferred.await().warn("Update for plugin $id has been rejected: $reason")
-    }
-    for (id in updateCheck.updatesToApply) {
-      val update = updates[id]!!
-      runCatching {
-        val pluginPath = Path.of(update.pluginPath)
-        if (pluginPath.exists()) {
-          pluginPath.delete(true)
-        }
-        PluginInstaller.unpackPlugin(getAutoUpdateDirPath().resolve(update.updateFilename), pluginPath.parent)
-      }.onFailure {
-        logDeferred.await().warn("Failed to apply update for plugin $id", it)
-      }.onSuccess {
-        logDeferred.await().info("Plugin $id has been successfully updated: " +
-                                 "version ${currentDescriptors.getIdMap()[id]?.version} -> ${updateDescriptors[id]!!.version}")
-      }
-    }
-  }
-
-  private data class UpdateCheckResult(
-    val updatesToApply: Set<PluginId>,
-    val rejectedUpdates: Map<PluginId, String>,
-  )
-
-  private fun determineValidUpdates(
-    currentDescriptors: PluginLoadingResult,
-    updates: Map<PluginId, IdeaPluginDescriptorImpl>,
-  ): UpdateCheckResult {
-    val updatesToApply = mutableSetOf<PluginId>()
-    val rejectedUpdates = mutableMapOf<PluginId, String>()
-    // checks mostly duplicate what is written in com.intellij.ide.plugins.PluginInstaller.installFromDisk. FIXME, I guess
-    for ((id, updateDesc) in updates) {
-      val existingDesc = currentDescriptors.getIdMap()[id] ?: currentDescriptors.getIncompleteIdMap()[id]
-      if (existingDesc == null) {
-        rejectedUpdates[id] = "plugin $id is not installed"
-        continue
-      }
-      // no third-party plugin check, settings are not available at this point; that check must be done when downloading the updates
-      if (PluginManagerCore.isIncompatible(updateDesc)) {
-        rejectedUpdates[id] = "plugin $id of version ${updateDesc.version} is not compatible with current IDE build"
-        continue
-      }
-      if (isBrokenPlugin(updateDesc)) {
-        rejectedUpdates[id] = "plugin $id of version ${updateDesc.version} is known to be broken"
-        continue
-      }
-      if (ApplicationInfoImpl.getShadowInstance().isEssentialPlugin(id)) {
-        rejectedUpdates[id] = "plugin $id is part of the IDE distribution and cannot be updated without IDE update"
-        continue
-      }
-      if (PluginDownloader.compareVersionsSkipBrokenAndIncompatible(updateDesc.version, existingDesc) <= 0) {
-        rejectedUpdates[id] = "plugin $id has same or newer version installed (${existingDesc.version} vs update version ${updateDesc.version})"
-        continue
-      }
-      // TODO check plugin dependencies are satisfied ? such functionality must be extracted into a single place
-      // TODO check signature ? com.intellij.ide.plugins.marketplace.PluginSignatureChecker; probably also should be done after download
-      updatesToApply.add(id)
-    }
-    return UpdateCheckResult(updatesToApply, rejectedUpdates)
-  }
-
-  /**
    * @param updates key is the plugin id
    */
   @Serializable
@@ -258,7 +130,6 @@ object PluginAutoUpdateRepository {
 /**
  * Internal action for debugging purposes
  */
-@Suppress("unused")
 private class PluginsAutoUpdateRepositoryViewAction : AnAction() {
   override fun actionPerformed(e: AnActionEvent) {
     ApplicationManager.getApplication().invokeLater({ Viewer(e.project).showAndGet() }, ModalityState.nonModal())
@@ -280,7 +151,7 @@ private class PluginsAutoUpdateRepositoryViewAction : AnAction() {
       updateState()
     }
 
-    private fun updateState() {
+    fun updateState() {
       cs.launch(Dispatchers.IO) {
         _state.value = runCatching { PluginAutoUpdateRepository.readUpdates() }
       }
@@ -308,6 +179,7 @@ private class PluginsAutoUpdateRepositoryViewAction : AnAction() {
   private class Viewer(val project: Project?) : DialogWrapper(project) {
     init {
       init()
+      service<ViewModel>().updateState()
     }
 
     override fun createCenterPanel(): JComponent? = panel {

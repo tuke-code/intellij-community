@@ -237,13 +237,13 @@
     },
     {
       "id": "go",
-      "experimentBucketsCount": 4,
-      "includeGroups": [28, 36, 24, 33],
+      "experimentBucketsCount": 2,
+      "includeGroups": [28, 22],
       "shouldLogElementFeatures": true
     },
     {
       "id": "rust",
-      "experimentBucketsCount": 16,
+      "experimentBucketsCount": 2,
       "includeGroups": [8, 22],
       "shouldLogElementFeatures": true
     },
@@ -274,7 +274,7 @@
     {
       "id": "C++",
       "experimentBucketsCount": 4,
-      "includeGroups": [7, 22],
+      "includeGroups": [7, 22, 24],
       "shouldLogElementFeatures": false
     },
     {
@@ -285,7 +285,7 @@
     },
     {
       "id": "css",
-      "experimentBucketsCount": 4,
+      "experimentBucketsCount": 2,
       "includeGroups": [31, 24],
       "shouldLogElementFeatures": true
     },

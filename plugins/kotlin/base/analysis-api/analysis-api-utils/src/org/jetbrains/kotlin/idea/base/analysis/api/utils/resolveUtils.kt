@@ -4,29 +4,16 @@ package org.jetbrains.kotlin.idea.base.analysis.api.utils
 import org.jetbrains.kotlin.analysis.api.KaAnalysisApiInternals
 import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
 import org.jetbrains.kotlin.analysis.api.KaSession
-import org.jetbrains.kotlin.analysis.api.KtStarTypeProjection
-import org.jetbrains.kotlin.analysis.api.annotations.KtConstantAnnotationValue
-import org.jetbrains.kotlin.analysis.api.annotations.annotationsByClassId
+import org.jetbrains.kotlin.analysis.api.annotations.KaAnnotationValue
 import org.jetbrains.kotlin.analysis.api.base.KaConstantValue
-import org.jetbrains.kotlin.analysis.api.resolution.KtCallCandidateInfo
-import org.jetbrains.kotlin.analysis.api.resolution.KaCallableMemberCall
-import org.jetbrains.kotlin.analysis.api.resolution.KaFunctionCall
-import org.jetbrains.kotlin.analysis.api.resolution.KaImplicitReceiverValue
-import org.jetbrains.kotlin.analysis.api.resolution.KaReceiverValue
-import org.jetbrains.kotlin.analysis.api.resolution.KaSmartCastedReceiverValue
-import org.jetbrains.kotlin.analysis.api.resolution.singleFunctionCallOrNull
 import org.jetbrains.kotlin.analysis.api.components.KaSubtypingErrorTypePolicy
-import org.jetbrains.kotlin.analysis.api.signatures.KtFunctionLikeSignature
-import org.jetbrains.kotlin.analysis.api.symbols.KtFileSymbol
-import org.jetbrains.kotlin.analysis.api.symbols.KaFunctionSymbol
-import org.jetbrains.kotlin.analysis.api.symbols.KaNamedClassOrObjectSymbol
-import org.jetbrains.kotlin.analysis.api.symbols.KtPackageSymbol
-import org.jetbrains.kotlin.analysis.api.symbols.KtSymbol
-import org.jetbrains.kotlin.analysis.api.symbols.KaTypeAliasSymbol
+import org.jetbrains.kotlin.analysis.api.resolution.*
+import org.jetbrains.kotlin.analysis.api.signatures.KaFunctionSignature
+import org.jetbrains.kotlin.analysis.api.symbols.*
 import org.jetbrains.kotlin.analysis.api.symbols.markers.KaAnnotatedSymbol
 import org.jetbrains.kotlin.analysis.api.symbols.markers.KaSymbolWithVisibility
-import org.jetbrains.kotlin.analysis.api.types.KtType
-import org.jetbrains.kotlin.analysis.api.types.KtTypeNullability
+import org.jetbrains.kotlin.analysis.api.types.KaType
+import org.jetbrains.kotlin.analysis.api.types.KaTypeNullability
 import org.jetbrains.kotlin.builtins.StandardNames
 import org.jetbrains.kotlin.idea.references.KtReference
 import org.jetbrains.kotlin.idea.references.mainReference
@@ -40,28 +27,28 @@ import org.jetbrains.kotlin.resolve.ArrayFqNames
 // Analogous to Call.resolveCandidates() in plugins/kotlin/core/src/org/jetbrains/kotlin/idea/core/Utils.kt
 context(KaSession)
 @OptIn(KaAnalysisApiInternals::class)
-fun collectCallCandidates(callElement: KtElement): List<KtCallCandidateInfo> {
+fun collectCallCandidates(callElement: KtElement): List<KaCallCandidateInfo> {
     val (candidates, explicitReceiver) = when (callElement) {
         is KtCallElement -> {
             val explicitReceiver = callElement.getQualifiedExpressionForSelector()?.receiverExpression
-            callElement.collectCallCandidatesOld() to explicitReceiver
+            callElement.resolveToCallCandidates() to explicitReceiver
         }
 
-        is KtArrayAccessExpression -> callElement.collectCallCandidatesOld() to callElement.arrayExpression
+        is KtArrayAccessExpression -> callElement.resolveToCallCandidates() to callElement.arrayExpression
         else -> return emptyList()
     }
 
     if (candidates.isEmpty()) return emptyList()
-    val fileSymbol = callElement.containingKtFile.let { it.getOriginalKtFile() ?: it }.getFileSymbol()
+    val fileSymbol = callElement.containingKtFile.getFileSymbol()
 
     return candidates.filter { filterCandidate(it, callElement, fileSymbol, explicitReceiver) }
 }
 
 context(KaSession)
 private fun filterCandidate(
-    candidateInfo: KtCallCandidateInfo,
+    candidateInfo: KaCallCandidateInfo,
     callElement: KtElement,
-    fileSymbol: KtFileSymbol,
+    fileSymbol: KaFileSymbol,
     explicitReceiver: KtExpression?
 ): Boolean {
     val candidateCall = candidateInfo.candidate
@@ -73,9 +60,9 @@ private fun filterCandidate(
 context(KaSession)
 @OptIn(KaExperimentalApi::class)
 fun filterCandidateByReceiverTypeAndVisibility(
-    signature: KtFunctionLikeSignature<KaFunctionSymbol>,
+    signature: KaFunctionSignature<KaFunctionSymbol>,
     callElement: KtElement,
-    fileSymbol: KtFileSymbol,
+    fileSymbol: KaFileSymbol,
     explicitReceiver: KtExpression?,
     subtypingErrorTypePolicy: KaSubtypingErrorTypePolicy = KaSubtypingErrorTypePolicy.STRICT,
 ): Boolean {
@@ -117,32 +104,32 @@ fun filterCandidateByReceiverTypeAndVisibility(
  * If explicit receiver is present and can be resolved, returns its type. Otherwise, returns empty list.
  */
 context(KaSession)
-fun collectReceiverTypesForElement(callElement: KtElement, explicitReceiver: KtExpression?): List<KtType> {
+fun collectReceiverTypesForElement(callElement: KtElement, explicitReceiver: KtExpression?): List<KaType> {
     return if (explicitReceiver != null) {
         collectReceiverTypesForExplicitReceiverExpression(explicitReceiver)
     } else {
-        val scopeContext = callElement.containingKtFile.getScopeContextForPosition(callElement)
+        val scopeContext = callElement.containingKtFile.scopeContext(callElement)
         scopeContext.implicitReceivers.map { it.type }
     }
 }
 
 context(KaSession)
-fun collectReceiverTypesForExplicitReceiverExpression(explicitReceiver: KtExpression): List<KtType> {
+fun collectReceiverTypesForExplicitReceiverExpression(explicitReceiver: KtExpression): List<KaType> {
     explicitReceiver.referenceExpression()?.mainReference?.let { receiverReference ->
         val receiverSymbol = receiverReference.resolveToExpandedSymbol()
-        if (receiverSymbol == null || receiverSymbol is KtPackageSymbol) return emptyList()
+        if (receiverSymbol == null || receiverSymbol is KaPackageSymbol) return emptyList()
 
         if (receiverSymbol is KaNamedClassOrObjectSymbol && explicitReceiver.parent is KtCallableReferenceExpression) {
             val receiverSymbolType = receiverSymbol.buildClassTypeBySymbolWithTypeArgumentsFromExpression(explicitReceiver)
-            return listOfNotNull(receiverSymbolType, receiverSymbol.companionObject?.buildSelfClassType())
+            return listOfNotNull(receiverSymbolType, receiverSymbol.companionObject?.defaultType)
         }
     }
 
     val isSafeCall = explicitReceiver.parent is KtSafeQualifiedExpression
 
-    val explicitReceiverType = explicitReceiver.getKtType() ?: error("Receiver should have a KtType")
+    val explicitReceiverType = explicitReceiver.expressionType ?: error("Receiver should have a KaType")
     val adjustedType = if (isSafeCall) {
-        explicitReceiverType.withNullability(KtTypeNullability.NON_NULLABLE)
+        explicitReceiverType.withNullability(KaTypeNullability.NON_NULLABLE)
     } else {
         explicitReceiverType
     }
@@ -150,15 +137,16 @@ fun collectReceiverTypesForExplicitReceiverExpression(explicitReceiver: KtExpres
 }
 
 context(KaSession)
-private fun KaNamedClassOrObjectSymbol.buildClassTypeBySymbolWithTypeArgumentsFromExpression(expression: KtExpression): KtType =
+@OptIn(KaExperimentalApi::class)
+private fun KaNamedClassOrObjectSymbol.buildClassTypeBySymbolWithTypeArgumentsFromExpression(expression: KtExpression): KaType =
     buildClassType(this) {
         if (expression is KtCallExpression) {
-            val typeArgumentTypes = expression.typeArguments.map { it.typeReference?.getKtType() }
+            val typeArgumentTypes = expression.typeArguments.map { it.typeReference?.type }
             for (typeArgument in typeArgumentTypes) {
                 if (typeArgument != null) {
                     argument(typeArgument)
                 } else {
-                    argument(KtStarTypeProjection(token))
+                    argument(buildStarTypeProjection())
                 }
             }
         }
@@ -170,7 +158,7 @@ private val ARRAY_OF_FUNCTION_NAMES: Set<Name> = setOf(ArrayFqNames.ARRAY_OF_FUN
 
 context(KaSession)
 fun isArrayOfCall(callElement: KtCallElement): Boolean {
-    val resolvedCall = callElement.resolveCallOld()?.singleFunctionCallOrNull() ?: return false
+    val resolvedCall = callElement.resolveToCall()?.singleFunctionCallOrNull() ?: return false
     val callableId = resolvedCall.partiallyAppliedSymbol.signature.callableId ?: return false
     return callableId.packageName == StandardNames.BUILT_INS_PACKAGE_FQ_NAME && callableId.callableName in ARRAY_OF_FUNCTION_NAMES
 }
@@ -180,14 +168,14 @@ fun isArrayOfCall(callElement: KtCallElement): Boolean {
  */
 context(KaSession)
 fun getJvmName(symbol: KaAnnotatedSymbol): String? {
-    val jvmNameAnnotation = symbol.annotationsByClassId(JvmStandardClassIds.Annotations.JvmName).firstOrNull() ?: return null
-    val annotationValue = jvmNameAnnotation.arguments.singleOrNull()?.expression as? KtConstantAnnotationValue ?: return null
-    val stringValue = annotationValue.constantValue as? KaConstantValue.KaStringConstantValue ?: return null
+    val jvmNameAnnotation = symbol.annotations[JvmStandardClassIds.Annotations.JvmName].firstOrNull() ?: return null
+    val annotationValue = jvmNameAnnotation.arguments.singleOrNull()?.expression as? KaAnnotationValue.ConstantValue ?: return null
+    val stringValue = annotationValue.value as? KaConstantValue.StringValue ?: return null
     return stringValue.value
 }
 
 context(KaSession)
-fun KtReference.resolveToExpandedSymbol(): KtSymbol? = when (val symbol = resolveToSymbol()) {
+fun KtReference.resolveToExpandedSymbol(): KaSymbol? = when (val symbol = resolveToSymbol()) {
     is KaTypeAliasSymbol -> symbol.expandedType.expandedSymbol
     else -> symbol
 }

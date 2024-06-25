@@ -33,7 +33,6 @@ import org.jetbrains.kotlin.idea.kdoc.KDocRenderer.createHighlightingManager
 import org.jetbrains.kotlin.idea.kdoc.KDocRenderer.generateJavadoc
 import org.jetbrains.kotlin.idea.kdoc.KDocRenderer.renderKDoc
 import org.jetbrains.kotlin.idea.references.mainReference
-import org.jetbrains.kotlin.idea.search.ExpectActualSupport
 import org.jetbrains.kotlin.kdoc.psi.api.KDoc
 import org.jetbrains.kotlin.kdoc.psi.impl.KDocSection
 import org.jetbrains.kotlin.lexer.KtTokens
@@ -197,10 +196,10 @@ private fun @receiver:Nls StringBuilder.renderEnumSpecialFunction(
         // element is not an KtReferenceExpression, but KtClass of enum
         // so reference extracted from originalElement
         analyze(referenceExpression) {
-            val symbol = referenceExpression.resolveCallOld()?.successfulFunctionCallOrNull()?.partiallyAppliedSymbol?.symbol as? KaNamedSymbol
+            val symbol = referenceExpression.resolveToCall()?.successfulFunctionCallOrNull()?.partiallyAppliedSymbol?.symbol as? KaNamedSymbol
             val name = symbol?.name?.asString()
             if (name != null && symbol is KaDeclarationSymbol) {
-                val containingClass = symbol.containingSymbol as? KaClassOrObjectSymbol
+                val containingClass = symbol.containingSymbol as? KaClassSymbol
                 val superClasses = containingClass?.superTypes?.mapNotNull { t -> t.expandedSymbol }
                 val kdoc = superClasses?.firstNotNullOfOrNull { superClass ->
                     val navigationElement = superClass.psi?.navigationElement
@@ -242,7 +241,7 @@ internal fun PsiElement?.isModifier() =
 private fun @receiver:Nls StringBuilder.renderKotlinDeclaration(
     declaration: KtDeclaration,
     onlyDefinition: Boolean,
-    symbolFinder: KaSession.(KtSymbol) -> KtSymbol? = { it },
+    symbolFinder: KaSession.(KaSymbol) -> KaSymbol? = { it },
     preBuild: KDocTemplate.() -> Unit = {}
 ) {
     analyze(declaration) {
@@ -268,7 +267,7 @@ private fun @receiver:Nls StringBuilder.renderKotlinDeclaration(
 
 context(KaSession)
 private fun renderKDoc(
-    symbol: KtSymbol,
+    symbol: KaSymbol,
     stringBuilder: StringBuilder,
 ) {
     val declaration = symbol.psi as? KtElement
@@ -294,7 +293,7 @@ private fun renderKDoc(
 
 context(KaSession)
 @OptIn(KaExperimentalApi::class)
-private fun findKDoc(symbol: KtSymbol): KDocContent? {
+private fun findKDoc(symbol: KaSymbol): KDocContent? {
     val ktElement = symbol.psi?.navigationElement as? KtElement
     ktElement?.findKDocByPsi()?.let {
         return it

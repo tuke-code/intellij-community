@@ -5,70 +5,43 @@ import com.google.common.html.HtmlEscapers
 import com.intellij.codeInsight.documentation.DocumentationManagerUtil
 import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
 import org.jetbrains.kotlin.analysis.api.KaSession
-import org.jetbrains.kotlin.analysis.api.KtStarTypeProjection
-import org.jetbrains.kotlin.analysis.api.KtTypeArgumentWithVariance
-import org.jetbrains.kotlin.analysis.api.annotations.KtAnnotated
-import org.jetbrains.kotlin.analysis.api.annotations.KtAnnotationApplication
-import org.jetbrains.kotlin.analysis.api.annotations.KtAnnotationApplicationValue
-import org.jetbrains.kotlin.analysis.api.annotations.KtAnnotationApplicationWithArgumentsInfo
-import org.jetbrains.kotlin.analysis.api.annotations.KtAnnotationValue
-import org.jetbrains.kotlin.analysis.api.annotations.KtArrayAnnotationValue
-import org.jetbrains.kotlin.analysis.api.annotations.KtConstantAnnotationValue
-import org.jetbrains.kotlin.analysis.api.annotations.KtEnumEntryAnnotationValue
-import org.jetbrains.kotlin.analysis.api.annotations.KtKClassAnnotationValue
-import org.jetbrains.kotlin.analysis.api.annotations.KtNamedAnnotationValue
-import org.jetbrains.kotlin.analysis.api.annotations.KtUnsupportedAnnotationValue
-import org.jetbrains.kotlin.analysis.api.annotations.annotations
-import org.jetbrains.kotlin.analysis.api.renderer.base.KtKeywordRenderer
-import org.jetbrains.kotlin.analysis.api.renderer.base.KtKeywordsRenderer
-import org.jetbrains.kotlin.analysis.api.renderer.base.annotations.KtAnnotationRenderer
-import org.jetbrains.kotlin.analysis.api.renderer.base.annotations.renderers.KtAnnotationArgumentsRenderer
-import org.jetbrains.kotlin.analysis.api.renderer.base.annotations.renderers.KtAnnotationListRenderer
-import org.jetbrains.kotlin.analysis.api.renderer.base.annotations.renderers.KtAnnotationQualifierRenderer
+import org.jetbrains.kotlin.analysis.api.annotations.*
+import org.jetbrains.kotlin.analysis.api.renderer.base.KaKeywordRenderer
+import org.jetbrains.kotlin.analysis.api.renderer.base.KaKeywordsRenderer
+import org.jetbrains.kotlin.analysis.api.renderer.base.annotations.KaAnnotationRenderer
+import org.jetbrains.kotlin.analysis.api.renderer.base.annotations.renderers.KaAnnotationArgumentsRenderer
+import org.jetbrains.kotlin.analysis.api.renderer.base.annotations.renderers.KaAnnotationListRenderer
+import org.jetbrains.kotlin.analysis.api.renderer.base.annotations.renderers.KaAnnotationQualifierRenderer
 import org.jetbrains.kotlin.analysis.api.renderer.declarations.KaCallableReturnTypeFilter
 import org.jetbrains.kotlin.analysis.api.renderer.declarations.KaRendererTypeApproximator
-import org.jetbrains.kotlin.analysis.api.renderer.declarations.KtDeclarationRenderer
+import org.jetbrains.kotlin.analysis.api.renderer.declarations.KaDeclarationRenderer
 import org.jetbrains.kotlin.analysis.api.renderer.declarations.bodies.KaRendererBodyMemberScopeProvider
-import org.jetbrains.kotlin.analysis.api.renderer.declarations.bodies.KtParameterDefaultValueRenderer
-import org.jetbrains.kotlin.analysis.api.renderer.declarations.impl.KtDeclarationRendererForSource
-import org.jetbrains.kotlin.analysis.api.renderer.declarations.modifiers.KtDeclarationModifiersRenderer
+import org.jetbrains.kotlin.analysis.api.renderer.declarations.bodies.KaParameterDefaultValueRenderer
+import org.jetbrains.kotlin.analysis.api.renderer.declarations.impl.KaDeclarationRendererForSource
+import org.jetbrains.kotlin.analysis.api.renderer.declarations.modifiers.KaDeclarationModifiersRenderer
 import org.jetbrains.kotlin.analysis.api.renderer.declarations.modifiers.renderers.KaRendererModalityModifierProvider
 import org.jetbrains.kotlin.analysis.api.renderer.declarations.modifiers.renderers.KaRendererVisibilityModifierProvider
-import org.jetbrains.kotlin.analysis.api.renderer.declarations.modifiers.renderers.KtRendererOtherModifiersProvider
+import org.jetbrains.kotlin.analysis.api.renderer.declarations.modifiers.renderers.KaRendererOtherModifiersProvider
 import org.jetbrains.kotlin.analysis.api.renderer.declarations.renderAnnotationsModifiersAndContextReceivers
-import org.jetbrains.kotlin.analysis.api.renderer.declarations.renderers.KtCallableParameterRenderer
-import org.jetbrains.kotlin.analysis.api.renderer.declarations.renderers.KtDeclarationNameRenderer
-import org.jetbrains.kotlin.analysis.api.renderer.declarations.renderers.KtTypeParametersRenderer
+import org.jetbrains.kotlin.analysis.api.renderer.declarations.renderers.KaCallableParameterRenderer
+import org.jetbrains.kotlin.analysis.api.renderer.declarations.renderers.KaDeclarationNameRenderer
+import org.jetbrains.kotlin.analysis.api.renderer.declarations.renderers.KaTypeParametersRenderer
 import org.jetbrains.kotlin.analysis.api.renderer.declarations.renderers.callables.KaPropertyAccessorsRenderer
 import org.jetbrains.kotlin.analysis.api.renderer.declarations.renderers.callables.KaValueParameterSymbolRenderer
-import org.jetbrains.kotlin.analysis.api.renderer.declarations.renderers.callables.KtCallableReturnTypeRenderer
-import org.jetbrains.kotlin.analysis.api.renderer.declarations.renderers.callables.KtCallableSignatureRenderer
-import org.jetbrains.kotlin.analysis.api.renderer.declarations.renderers.classifiers.KtSingleTypeParameterSymbolRenderer
+import org.jetbrains.kotlin.analysis.api.renderer.declarations.renderers.callables.KaCallableReturnTypeRenderer
+import org.jetbrains.kotlin.analysis.api.renderer.declarations.renderers.callables.KaCallableSignatureRenderer
+import org.jetbrains.kotlin.analysis.api.renderer.declarations.renderers.classifiers.KaSingleTypeParameterSymbolRenderer
 import org.jetbrains.kotlin.analysis.api.renderer.declarations.superTypes.KaSuperTypesCallArgumentsRenderer
-import org.jetbrains.kotlin.analysis.api.renderer.types.KtTypeRenderer
-import org.jetbrains.kotlin.analysis.api.renderer.types.renderers.KtClassTypeQualifierRenderer
-import org.jetbrains.kotlin.analysis.api.renderer.types.renderers.KtFunctionalTypeRenderer
-import org.jetbrains.kotlin.analysis.api.renderer.types.renderers.KtTypeNameRenderer
-import org.jetbrains.kotlin.analysis.api.renderer.types.renderers.KtTypeParameterTypeRenderer
-import org.jetbrains.kotlin.analysis.api.renderer.types.renderers.KtUsualClassTypeRenderer
-import org.jetbrains.kotlin.analysis.api.symbols.KaAnonymousObjectSymbol
-import org.jetbrains.kotlin.analysis.api.symbols.KaCallableSymbol
-import org.jetbrains.kotlin.analysis.api.symbols.KaClassKind
-import org.jetbrains.kotlin.analysis.api.symbols.KaClassOrObjectSymbol
-import org.jetbrains.kotlin.analysis.api.symbols.KaConstructorSymbol
-import org.jetbrains.kotlin.analysis.api.symbols.KaDeclarationSymbol
-import org.jetbrains.kotlin.analysis.api.symbols.KaEnumEntrySymbol
-import org.jetbrains.kotlin.analysis.api.symbols.KaFunctionSymbol
-import org.jetbrains.kotlin.analysis.api.symbols.KaNamedFunctionSymbol
-import org.jetbrains.kotlin.analysis.api.symbols.KaNamedClassOrObjectSymbol
-import org.jetbrains.kotlin.analysis.api.symbols.KtPackageSymbol
-import org.jetbrains.kotlin.analysis.api.symbols.KtParameterSymbol
-import org.jetbrains.kotlin.analysis.api.symbols.KtPropertySymbol
-import org.jetbrains.kotlin.analysis.api.symbols.KaTypeAliasSymbol
-import org.jetbrains.kotlin.analysis.api.symbols.KaTypeParameterSymbol
-import org.jetbrains.kotlin.analysis.api.symbols.KaValueParameterSymbol
+import org.jetbrains.kotlin.analysis.api.renderer.types.KaTypeRenderer
+import org.jetbrains.kotlin.analysis.api.renderer.types.renderers.KaClassTypeQualifierRenderer
+import org.jetbrains.kotlin.analysis.api.renderer.types.renderers.KaFunctionalTypeRenderer
+import org.jetbrains.kotlin.analysis.api.renderer.types.renderers.KaTypeNameRenderer
+import org.jetbrains.kotlin.analysis.api.renderer.types.renderers.KaTypeParameterTypeRenderer
+import org.jetbrains.kotlin.analysis.api.renderer.types.renderers.KaUsualClassTypeRenderer
+import org.jetbrains.kotlin.analysis.api.symbols.*
 import org.jetbrains.kotlin.analysis.api.symbols.markers.KaNamedSymbol
 import org.jetbrains.kotlin.analysis.api.symbols.markers.KaSymbolWithVisibility
+import org.jetbrains.kotlin.analysis.api.symbols.typeParameters
 import org.jetbrains.kotlin.analysis.api.types.*
 import org.jetbrains.kotlin.analysis.utils.printer.PrettyPrinter
 import org.jetbrains.kotlin.analysis.utils.printer.prettyPrint
@@ -97,14 +70,14 @@ internal class KotlinIdeDeclarationRenderer(
     @OptIn(KaExperimentalApi::class)
     internal fun renderFunctionTypeParameter(parameter: KtParameter): String? = prettyPrint {
         parameter.nameAsName?.let { name -> withSuffix(highlight(": ") { asColon }) { append(highlight(name.renderName()) { asParameter }) } }
-        parameter.typeReference?.getKtType()?.let { type ->
+        parameter.typeReference?.type?.let { type ->
             renderer.typeRenderer.renderType(analysisSession, type, this)
         }
 
     }
 
     @KaExperimentalApi
-    internal val renderer = KtDeclarationRendererForSource.WITH_SHORT_NAMES.with {
+    internal val renderer = KaDeclarationRendererForSource.WITH_SHORT_NAMES.with {
         nameRenderer = createNameRenderer()
         superTypesArgumentRenderer = KaSuperTypesCallArgumentsRenderer.NO_ARGS
         valueParametersRenderer = createValueParametersRenderer()
@@ -115,7 +88,7 @@ internal class KotlinIdeDeclarationRenderer(
         returnTypeFilter = KaCallableReturnTypeFilter.ALWAYS
         propertyAccessorsRenderer = KaPropertyAccessorsRenderer.NONE
         bodyMemberScopeProvider = KaRendererBodyMemberScopeProvider.NONE
-        parameterDefaultValueRenderer = object : KtParameterDefaultValueRenderer {
+        parameterDefaultValueRenderer = object : KaParameterDefaultValueRenderer {
             override fun renderDefaultValue(analysisSession: KaSession, symbol: KaValueParameterSymbol, printer: PrettyPrinter) {
                 val defaultValue = with(analysisSession) { symbol.defaultValue }
                 if (defaultValue != null) {
@@ -132,7 +105,7 @@ internal class KotlinIdeDeclarationRenderer(
             override fun renderSymbol(
                 analysisSession: KaSession,
                 symbol: KaValueParameterSymbol,
-                declarationRenderer: KtDeclarationRenderer,
+                declarationRenderer: KaDeclarationRenderer,
                 printer: PrettyPrinter
             ): Unit = printer {
                 highlight(" = ") { asOperationSign }.separated(
@@ -175,13 +148,13 @@ internal class KotlinIdeDeclarationRenderer(
     }
 
     @KaExperimentalApi
-    private fun KtKeywordsRenderer.keywordsRenderer(): KtKeywordsRenderer = with {
-        keywordRenderer = object : KtKeywordRenderer {
+    private fun KaKeywordsRenderer.keywordsRenderer(): KaKeywordsRenderer = with {
+        keywordRenderer = object : KaKeywordRenderer {
             override fun renderKeyword(
                 analysisSession: KaSession,
                 keyword: KtKeywordToken,
-                owner: KtAnnotated,
-                keywordsRenderer: KtKeywordsRenderer,
+                owner: KaAnnotated,
+                keywordsRenderer: KaKeywordsRenderer,
                 printer: PrettyPrinter
             ) {
                 if (keywordFilter.filter(analysisSession, keyword, owner)) {
@@ -192,15 +165,15 @@ internal class KotlinIdeDeclarationRenderer(
     }
 
     @KaExperimentalApi
-    private fun KtAnnotationRenderer.annotationRenderer(): KtAnnotationRenderer = with {
-        annotationListRenderer = object : KtAnnotationListRenderer {
+    private fun KaAnnotationRenderer.annotationRenderer(): KaAnnotationRenderer = with {
+        annotationListRenderer = object : KaAnnotationListRenderer {
             override fun renderAnnotations(
                 analysisSession: KaSession,
-                owner: KtAnnotated,
-                annotationRenderer: KtAnnotationRenderer,
+                owner: KaAnnotated,
+                annotationRenderer: KaAnnotationRenderer,
                 printer: PrettyPrinter
             ) {
-                val backingFieldAnnotations = (owner as? KtPropertySymbol)?.backingFieldSymbol?.annotations
+                val backingFieldAnnotations = (owner as? KaPropertySymbol)?.backingFieldSymbol?.annotations
                 val annotations = (backingFieldAnnotations?.let { owner.annotations + it } ?: owner.annotations).filter {
                     annotationFilter.filter(analysisSession, it, owner)
                 }.ifEmpty { return }
@@ -222,15 +195,15 @@ internal class KotlinIdeDeclarationRenderer(
                 }
             }
         }
-        annotationArgumentsRenderer = object : KtAnnotationArgumentsRenderer {
+        annotationArgumentsRenderer = object : KaAnnotationArgumentsRenderer {
             override fun renderAnnotationArguments(
                 analysisSession: KaSession,
-                annotation: KtAnnotationApplication,
-                owner: KtAnnotated,
-                annotationRenderer: KtAnnotationRenderer,
+                annotation: KaAnnotation,
+                owner: KaAnnotated,
+                annotationRenderer: KaAnnotationRenderer,
                 printer: PrettyPrinter
             ) {
-                if (annotation !is KtAnnotationApplicationWithArgumentsInfo) return
+                if (annotation !is KaAnnotation) return
 
                 if (annotation.arguments.isEmpty()) return
                 printer.printCollection(annotation.arguments, prefix = "(", postfix = ")") { argument ->
@@ -241,12 +214,12 @@ internal class KotlinIdeDeclarationRenderer(
                 }
             }
         }
-        annotationsQualifiedNameRenderer = object : KtAnnotationQualifierRenderer {
+        annotationsQualifiedNameRenderer = object : KaAnnotationQualifierRenderer {
             override fun renderQualifier(
                 analysisSession: KaSession,
-                annotation: KtAnnotationApplication,
-                owner: KtAnnotated,
-                annotationRenderer: KtAnnotationRenderer,
+                annotation: KaAnnotation,
+                owner: KaAnnotated,
+                annotationRenderer: KaAnnotationRenderer,
                 printer: PrettyPrinter
             ): Unit = printer {
                 val classId = annotation.classId
@@ -268,14 +241,14 @@ internal class KotlinIdeDeclarationRenderer(
     }
 
     @KaExperimentalApi
-    private fun KtDeclarationModifiersRenderer.modifiersRenderer(): KtDeclarationModifiersRenderer = with {
+    private fun KaDeclarationModifiersRenderer.modifiersRenderer(): KaDeclarationModifiersRenderer = with {
         visibilityProvider = KaRendererVisibilityModifierProvider.WITH_IMPLICIT_VISIBILITY
         modalityProvider = KaRendererModalityModifierProvider.WITH_IMPLICIT_MODALITY.onlyIf { symbol ->
             when {
-                symbol is KaClassOrObjectSymbol -> !(symbol.classKind == KaClassKind.INTERFACE && symbol.modality == Modality.ABSTRACT || symbol.classKind.isObject && symbol.modality == Modality.FINAL)
+                symbol is KaClassSymbol -> !(symbol.classKind == KaClassKind.INTERFACE && symbol.modality == KaSymbolModality.ABSTRACT || symbol.classKind.isObject && symbol.modality == KaSymbolModality.FINAL)
 
                 symbol is KaCallableSymbol -> {
-                    symbol.modality == Modality.OPEN || symbol.containingSymbol != null && symbol.modality == Modality.FINAL || symbol.modality == Modality.ABSTRACT
+                    symbol.modality == KaSymbolModality.OPEN || symbol.containingSymbol != null && symbol.modality == KaSymbolModality.FINAL || symbol.modality == KaSymbolModality.ABSTRACT
                 }
 
                 else -> false
@@ -284,7 +257,7 @@ internal class KotlinIdeDeclarationRenderer(
 
         fun KaDeclarationSymbol.isInlineClassOrObject(): Boolean = this is KaNamedClassOrObjectSymbol && isInline
 
-        val valueModifierRenderer = object : KtRendererOtherModifiersProvider {
+        val valueModifierRenderer = object : KaRendererOtherModifiersProvider {
             override fun getOtherModifiers(analysisSession: KaSession, symbol: KaDeclarationSymbol): List<KtModifierKeywordToken> {
                 if (symbol.isInlineClassOrObject()) {
                     (symbol.psi as? KtClass)?.let { klass ->
@@ -300,18 +273,18 @@ internal class KotlinIdeDeclarationRenderer(
             }
         }
         otherModifiersProvider = otherModifiersProvider.onlyIf { symbol ->
-            !(symbol is KaNamedFunctionSymbol && symbol.isOverride || symbol is KtPropertySymbol && symbol.isOverride) && !symbol.isInlineClassOrObject()
+          !(symbol is KaNamedFunctionSymbol && symbol.isOverride || symbol is KaPropertySymbol && symbol.isOverride) && !symbol.isInlineClassOrObject()
         }.and(valueModifierRenderer)
         keywordsRenderer = keywordsRenderer.keywordsRenderer()
     }
 
     @KaExperimentalApi
-    private fun createFunctionalTypeRenderer(): KtFunctionalTypeRenderer {
-        return object : KtFunctionalTypeRenderer {
+    private fun createFunctionalTypeRenderer(): KaFunctionalTypeRenderer {
+        return object : KaFunctionalTypeRenderer {
             override fun renderType(
                 analysisSession: KaSession,
-                type: KtFunctionalType,
-                typeRenderer: KtTypeRenderer,
+                type: KaFunctionType,
+                typeRenderer: KaTypeRenderer,
                 printer: PrettyPrinter
             ): Unit = printer {
                 if (type.isReflectType) {
@@ -319,7 +292,7 @@ internal class KotlinIdeDeclarationRenderer(
                         { typeRenderer.annotationsRenderer.renderAnnotations(analysisSession, type, printer) },
                         {
                             typeRenderer.classIdRenderer.renderClassTypeQualifier(analysisSession, type, type.qualifiers, typeRenderer, printer)
-                            if (type.nullability == KtTypeNullability.NULLABLE) {
+                            if (type.nullability == KaTypeNullability.NULLABLE) {
                                 append(highlight("?") { asNullityMarker })
                             }
                         },
@@ -332,7 +305,7 @@ internal class KotlinIdeDeclarationRenderer(
                 }
 
                 if (annotationsRendered) printer.append(" ")
-                if (annotationsRendered || type.nullability == KtTypeNullability.NULLABLE) append(highlight("(") { asParentheses })
+                if (annotationsRendered || type.nullability == KaTypeNullability.NULLABLE) append(highlight("(") { asParentheses })
                 " ".separated(
                     {
                         if (type.isSuspend) {
@@ -358,24 +331,24 @@ internal class KotlinIdeDeclarationRenderer(
                         typeRenderer.renderType(analysisSession, type.returnType, printer)
                     },
                 )
-                if (annotationsRendered || type.nullability == KtTypeNullability.NULLABLE) printer.append(highlight(")") { asParentheses })
-                if (type.nullability == KtTypeNullability.NULLABLE) printer.append(highlight("?") { asNullityMarker })
+                if (annotationsRendered || type.nullability == KaTypeNullability.NULLABLE) printer.append(highlight(")") { asParentheses })
+                if (type.nullability == KaTypeNullability.NULLABLE) printer.append(highlight("?") { asNullityMarker })
             }
         }
     }
 
     @KaExperimentalApi
-    fun createTypeParameterTypeRenderer(): KtTypeParameterTypeRenderer {
-        return object : KtTypeParameterTypeRenderer {
+    fun createTypeParameterTypeRenderer(): KaTypeParameterTypeRenderer {
+        return object : KaTypeParameterTypeRenderer {
             override fun renderType(
                 analysisSession: KaSession,
-                type: KtTypeParameterType,
-                typeRenderer: KtTypeRenderer,
+                type: KaTypeParameterType,
+                typeRenderer: KaTypeRenderer,
                 printer: PrettyPrinter
             ): Unit = printer {
                 " ".separated({ typeRenderer.annotationsRenderer.renderAnnotations(analysisSession, type, printer) }, {
                     typeRenderer.typeNameRenderer.renderName(analysisSession, type.name, type, typeRenderer, printer)
-                    if (type.nullability == KtTypeNullability.NULLABLE) {
+                    if (type.nullability == KaTypeNullability.NULLABLE) {
                         printer.append(highlight("?") { asNullityMarker })
                     }
                 })
@@ -385,19 +358,19 @@ internal class KotlinIdeDeclarationRenderer(
     }
 
     @KaExperimentalApi
-    fun createUsualClassTypeRenderer(): KtUsualClassTypeRenderer {
-        return object : KtUsualClassTypeRenderer {
+    fun createUsualClassTypeRenderer(): KaUsualClassTypeRenderer {
+        return object : KaUsualClassTypeRenderer {
             override fun renderType(
                 analysisSession: KaSession,
-                type: KtUsualClassType,
-                typeRenderer: KtTypeRenderer,
+                type: KaUsualClassType,
+                typeRenderer: KaTypeRenderer,
                 printer: PrettyPrinter
             ): Unit = printer {
                 " ".separated(
                     { typeRenderer.annotationsRenderer.renderAnnotations(analysisSession, type, printer) },
                     {
                         typeRenderer.classIdRenderer.renderClassTypeQualifier(analysisSession, type, type.qualifiers, typeRenderer, printer)
-                        if (type.nullability == KtTypeNullability.NULLABLE) {
+                        if (type.nullability == KaTypeNullability.NULLABLE) {
                             append(highlight("?") { asNullityMarker })
                         }
                     },
@@ -407,13 +380,13 @@ internal class KotlinIdeDeclarationRenderer(
     }
 
     @KaExperimentalApi
-    fun createClassIdRenderer(): KtClassTypeQualifierRenderer {
-        return object : KtClassTypeQualifierRenderer {
+    fun createClassIdRenderer(): KaClassTypeQualifierRenderer {
+        return object : KaClassTypeQualifierRenderer {
             override fun renderClassTypeQualifier(
                 analysisSession: KaSession,
-                type: KtType,
-                qualifiers: List<KtClassTypeQualifier>,
-                typeRenderer: KtTypeRenderer,
+                type: KaType,
+                qualifiers: List<KaClassTypeQualifier>,
+                typeRenderer: KaTypeRenderer,
                 printer: PrettyPrinter
             ): Unit = printer {
                 printCollection(qualifiers, separator = highlight(".") { asDot }) { qualifier ->
@@ -429,16 +402,16 @@ internal class KotlinIdeDeclarationRenderer(
     }
 
     @KaExperimentalApi
-    fun createTypeNameRenderer(): KtTypeNameRenderer {
-        return object : KtTypeNameRenderer {
+    fun createTypeNameRenderer(): KaTypeNameRenderer {
+        return object : KaTypeNameRenderer {
             override fun renderName(
                 analysisSession: KaSession,
                 name: Name,
-                owner: KtType,
-                typeRenderer: KtTypeRenderer,
+                owner: KaType,
+                typeRenderer: KaTypeRenderer,
                 printer: PrettyPrinter
             ): Unit = with(analysisSession) {
-                if (owner is KtNonErrorClassType) {
+                if (owner is KaClassType) {
                     val superTypes = (owner.expandedSymbol as? KaAnonymousObjectSymbol)?.superTypes
                     if (superTypes != null) {
                         printer.append("<".escape())
@@ -451,8 +424,8 @@ internal class KotlinIdeDeclarationRenderer(
                     }
                 }
                 val qName = when (owner) {
-                    is KtNonErrorClassType -> owner.classId.asSingleFqName()
-                    is KtTypeParameterType -> owner.symbol.containingSymbol?.getFqNameIfPackageOrNonLocal()?.child(name)
+                    is KaClassType -> owner.classId.asSingleFqName()
+                    is KaTypeParameterType -> owner.symbol.containingSymbol?.getFqNameIfPackageOrNonLocal()?.child(name)
                         ?: FqName.topLevel(name)
 
                     else -> FqName.topLevel(name)
@@ -463,19 +436,19 @@ internal class KotlinIdeDeclarationRenderer(
                 val buffer = StringBuilder()
                 DocumentationManagerUtil.createHyperlink(buffer, qualifiedName, name.renderName(), true, false)
 
-                printer.append(highlight(buffer.toString()) { if (owner is KtTypeParameterType) asTypeParameterName else asClassName })
+                printer.append(highlight(buffer.toString()) { if (owner is KaTypeParameterType) asTypeParameterName else asClassName })
             }
         }
     }
 
     @KaExperimentalApi
-    fun createCallableSignatureRenderer(): KtCallableSignatureRenderer {
-        return object : KtCallableSignatureRenderer {
+    fun createCallableSignatureRenderer(): KaCallableSignatureRenderer {
+        return object : KaCallableSignatureRenderer {
             override fun renderCallableSignature(
                 analysisSession: KaSession,
                 symbol: KaCallableSymbol,
                 keyword: KtKeywordToken?,
-                declarationRenderer: KtDeclarationRenderer,
+                declarationRenderer: KaDeclarationRenderer,
                 printer: PrettyPrinter
             ) = with(analysisSession) {
                 printer {
@@ -487,14 +460,14 @@ internal class KotlinIdeDeclarationRenderer(
                             }
                         },
                         {
-                            if (callableSymbol is KaSymbolWithVisibility && callableSymbol.visibility == Visibilities.Local) {
+                            if (callableSymbol is KaSymbolWithVisibility && callableSymbol.visibility == KaSymbolVisibility.LOCAL) {
                                 printer.append(highlight("local") { asKeyword })
                             }
                         },
                         {
                             val replacedKeyword = when {
                                 keyword != null -> keyword
-                                callableSymbol is KtPropertySymbol -> if (callableSymbol.isVal) KtTokens.VAL_KEYWORD else KtTokens.VAR_KEYWORD
+                              callableSymbol is KaPropertySymbol -> if (callableSymbol.isVal) KtTokens.VAL_KEYWORD else KtTokens.VAR_KEYWORD
                                 else -> null
                             }
                             if (replacedKeyword != null) {
@@ -511,7 +484,7 @@ internal class KotlinIdeDeclarationRenderer(
                             val receiverSymbol = callableSymbol.receiverParameter
                             if (receiverSymbol != null) {
                                 withSuffix(highlight(".") { asDot }) {
-                                    val isFunctional = receiverSymbol.type is KaFunctionalType
+                                    val isFunctional = receiverSymbol.type is KaFunctionType
                                     if (isFunctional) {
                                         append(highlight("(") { asParentheses })
                                     }
@@ -550,12 +523,12 @@ internal class KotlinIdeDeclarationRenderer(
     }
 
     @KaExperimentalApi
-    fun createSingleTypeParameterRenderer(): KtSingleTypeParameterSymbolRenderer {
-        return object : KtSingleTypeParameterSymbolRenderer {
+    fun createSingleTypeParameterRenderer(): KaSingleTypeParameterSymbolRenderer {
+        return object : KaSingleTypeParameterSymbolRenderer {
             override fun renderSymbol(
                 analysisSession: KaSession,
                 symbol: KaTypeParameterSymbol,
-                declarationRenderer: KtDeclarationRenderer,
+                declarationRenderer: KaDeclarationRenderer,
                 printer: PrettyPrinter
             ) {
                 printer.append(highlight("<".escape()) { asOperationSign })
@@ -583,12 +556,12 @@ internal class KotlinIdeDeclarationRenderer(
     }
 
     @KaExperimentalApi
-    fun createTypeParametersRenderer(): KtTypeParametersRenderer {
-        return object : KtTypeParametersRenderer {
+    fun createTypeParametersRenderer(): KaTypeParametersRenderer {
+        return object : KaTypeParametersRenderer {
             override fun renderTypeParameters(
                 analysisSession: KaSession,
                 symbol: KaDeclarationSymbol,
-                declarationRenderer: KtDeclarationRenderer,
+                declarationRenderer: KaDeclarationRenderer,
                 printer: PrettyPrinter
             ) {
                 val typeParameters = symbol.typeParameters
@@ -617,7 +590,7 @@ internal class KotlinIdeDeclarationRenderer(
             override fun renderWhereClause(
                 analysisSession: KaSession,
                 symbol: KaDeclarationSymbol,
-                declarationRenderer: KtDeclarationRenderer,
+                declarationRenderer: KaDeclarationRenderer,
                 printer: PrettyPrinter
             ): Unit = printer {
                 val allBounds = symbol.typeParameters.filter {
@@ -655,12 +628,12 @@ internal class KotlinIdeDeclarationRenderer(
     }
 
     @KaExperimentalApi
-    fun createValueParametersRenderer(): KtCallableParameterRenderer {
-        return object : KtCallableParameterRenderer {
+    fun createValueParametersRenderer(): KaCallableParameterRenderer {
+        return object : KaCallableParameterRenderer {
             override fun renderValueParameters(
                 analysisSession: KaSession,
                 symbol: KaCallableSymbol,
-                declarationRenderer: KtDeclarationRenderer,
+                declarationRenderer: KaDeclarationRenderer,
                 printer: PrettyPrinter
             ) {
                 val valueParameters = when (symbol) {
@@ -681,17 +654,17 @@ internal class KotlinIdeDeclarationRenderer(
     }
 
     @KaExperimentalApi
-    fun createNameRenderer(): KtDeclarationNameRenderer {
-        return object : KtDeclarationNameRenderer {
+    fun createNameRenderer(): KaDeclarationNameRenderer {
+        return object : KaDeclarationNameRenderer {
             override fun renderName(
                 analysisSession: KaSession,
                 name: Name,
                 symbol: KaNamedSymbol?,
-                declarationRenderer: KtDeclarationRenderer,
+                declarationRenderer: KaDeclarationRenderer,
                 printer: PrettyPrinter
             ): Unit = with(analysisSession) {
-                if (symbol is KaClassOrObjectSymbol && symbol.classKind == KaClassKind.COMPANION_OBJECT && symbol.name == SpecialNames.DEFAULT_NAME_FOR_COMPANION_OBJECT) {
-                    val className = (symbol.containingSymbol as? KaClassOrObjectSymbol)?.name
+                if (symbol is KaClassSymbol && symbol.classKind == KaClassKind.COMPANION_OBJECT && symbol.name == SpecialNames.DEFAULT_NAME_FOR_COMPANION_OBJECT) {
+                    val className = (symbol.containingSymbol as? KaClassSymbol)?.name
                     if (className != null) {
                         printer.append(highlight("of ") { asInfo } )
                         printer.append(highlight(className.renderName()) { asClassName } )
@@ -704,7 +677,7 @@ internal class KotlinIdeDeclarationRenderer(
                 }
                 printer.append(highlight(name.renderName()) {
                     when (symbol) {
-                        is KaClassOrObjectSymbol -> {
+                        is KaClassSymbol -> {
                             if (symbol.classKind.isObject) {
                                 asObjectName
                             } else if (symbol.classKind == KaClassKind.ENUM_CLASS || symbol.classKind == KaClassKind.CLASS || symbol.classKind == KaClassKind.INTERFACE) {
@@ -714,11 +687,11 @@ internal class KotlinIdeDeclarationRenderer(
                             }
                         }
 
-                        is KtParameterSymbol -> asParameter
-                        is KtPackageSymbol -> asPackageName
+                        is KaParameterSymbol -> asParameter
+                        is KaPackageSymbol -> asPackageName
                         is KaTypeParameterSymbol -> asTypeParameterName
                         is KaTypeAliasSymbol -> asTypeAlias
-                        is KtPropertySymbol -> asInstanceProperty
+                        is KaPropertySymbol -> asInstanceProperty
                         else -> asFunDeclaration
                     }
                 })
@@ -739,12 +712,12 @@ internal class KotlinIdeDeclarationRenderer(
     }
 
     @KaExperimentalApi
-    fun createReturnTypeRenderer(): KtCallableReturnTypeRenderer {
-        return object : KtCallableReturnTypeRenderer {
+    fun createReturnTypeRenderer(): KaCallableReturnTypeRenderer {
+        return object : KaCallableReturnTypeRenderer {
             override fun renderReturnType(
                 analysisSession: KaSession,
                 symbol: KaCallableSymbol,
-                declarationRenderer: KtDeclarationRenderer,
+                declarationRenderer: KaDeclarationRenderer,
                 printer: PrettyPrinter
             ) {
                 if (symbol is KaConstructorSymbol) return
@@ -753,40 +726,40 @@ internal class KotlinIdeDeclarationRenderer(
         }
     }
 
-    private fun PrettyPrinter.renderConstantValue(value: KtAnnotationValue) {
+    private fun PrettyPrinter.renderConstantValue(value: KaAnnotationValue) {
         when (value) {
-            is KtAnnotationApplicationValue -> {
+            is KaAnnotationValue.NestedAnnotationValue -> {
                 renderAnnotationConstantValue(value)
             }
 
-            is KtArrayAnnotationValue -> {
+            is KaAnnotationValue.ArrayValue -> {
                 renderArrayConstantValue(value)
             }
 
-            is KtEnumEntryAnnotationValue -> {
+            is KaAnnotationValue.EnumEntryValue -> {
                 renderEnumEntryConstantValue(value)
             }
 
-            is KtConstantAnnotationValue -> {
+            is KaAnnotationValue.ConstantValue -> {
                 renderConstantAnnotationValue(value)
             }
 
-            is KtUnsupportedAnnotationValue -> {
+            is KaAnnotationValue.UnsupportedValue -> {
                 append("error(\"non-annotation value\")")
             }
 
-            is KtKClassAnnotationValue -> {
+            is KaAnnotationValue.ClassLiteralValue -> {
                 renderKClassAnnotationValue(value)
             }
         }
     }
 
-    private fun PrettyPrinter.renderKClassAnnotationValue(value: KtKClassAnnotationValue) {
+    private fun PrettyPrinter.renderKClassAnnotationValue(value: KaAnnotationValue.ClassLiteralValue) {
         renderType(value.type)
         append("::class")
     }
 
-    private fun PrettyPrinter.renderType(type: KtType) {
+    private fun PrettyPrinter.renderType(type: KaType) {
         if (type.annotations.isNotEmpty()) {
             for (annotation in type.annotations) {
                 append('@')
@@ -796,7 +769,7 @@ internal class KotlinIdeDeclarationRenderer(
         }
 
         when (type) {
-            is KtUsualClassType -> {
+            is KaUsualClassType -> {
                 val classId = type.classId
                 if (classId.isLocal) {
                     append(classId.shortClassName.render())
@@ -804,16 +777,16 @@ internal class KotlinIdeDeclarationRenderer(
                     append(classId.asSingleFqName().render())
                 }
 
-                if (type.ownTypeArguments.isNotEmpty()) {
-                    printCollection(type.ownTypeArguments, ", ", prefix = "<", postfix = ">") { typeProjection ->
+                if (type.typeArguments.isNotEmpty()) {
+                    printCollection(type.typeArguments, ", ", prefix = "<", postfix = ">") { typeProjection ->
                         when (typeProjection) {
-                            is KtStarTypeProjection -> append('*')
-                            is KtTypeArgumentWithVariance -> renderType(typeProjection.type)
+                            is KaStarTypeProjection -> append('*')
+                            is KaTypeArgumentWithVariance -> renderType(typeProjection.type)
                         }
                     }
                 }
             }
-            is KtClassErrorType -> {
+            is KaClassErrorType -> {
                 append("UNRESOLVED_CLASS")
             }
             else -> {
@@ -822,15 +795,15 @@ internal class KotlinIdeDeclarationRenderer(
         }
     }
 
-    private fun PrettyPrinter.renderConstantAnnotationValue(value: KtConstantAnnotationValue) {
+    private fun PrettyPrinter.renderConstantAnnotationValue(value: KaAnnotationValue.ConstantValue) {
         with(highlightingManager) {
             val builder = StringBuilder()
-            builder.appendCodeSnippetHighlightedByLexer(value.constantValue.renderAsKotlinConstant())
+            builder.appendCodeSnippetHighlightedByLexer(value.value.render())
             append(builder)
         }
     }
 
-    private fun PrettyPrinter.renderEnumEntryConstantValue(value: KtEnumEntryAnnotationValue) {
+    private fun PrettyPrinter.renderEnumEntryConstantValue(value: KaAnnotationValue.EnumEntryValue) {
         val callableId = value.callableId
         if (callableId != null) {
             append(highlight(callableId.classId!!.shortClassName.renderName()) { asClassName})
@@ -839,11 +812,11 @@ internal class KotlinIdeDeclarationRenderer(
         }
     }
 
-    private fun PrettyPrinter.renderAnnotationConstantValue(application: KtAnnotationApplicationValue) {
+    private fun PrettyPrinter.renderAnnotationConstantValue(application: KaAnnotationValue.NestedAnnotationValue) {
         renderAnnotationApplication(application.annotationValue)
     }
 
-    private fun PrettyPrinter.renderAnnotationApplication(value: KtAnnotationApplicationWithArgumentsInfo) {
+    private fun PrettyPrinter.renderAnnotationApplication(value: KaAnnotation) {
         val shortClassName = value.classId?.shortClassName
         if (shortClassName != null) {
             append(highlight("@$shortClassName") {
@@ -857,19 +830,19 @@ internal class KotlinIdeDeclarationRenderer(
         }
     }
 
-    private fun PrettyPrinter.renderArrayConstantValue(value: KtArrayAnnotationValue) {
+    private fun PrettyPrinter.renderArrayConstantValue(value: KaAnnotationValue.ArrayValue) {
         append(highlight("[") { asBrackets } )
         renderConstantValueList(value.values)
         append(highlight("]") { asBrackets } )
     }
 
-    private fun PrettyPrinter.renderConstantValueList(list: Collection<KtAnnotationValue>) {
+    private fun PrettyPrinter.renderConstantValueList(list: Collection<KaAnnotationValue>) {
         printCollection(list, ", ") { constantValue ->
             renderConstantValue(constantValue)
         }
     }
 
-    private fun PrettyPrinter.renderNamedConstantValueList(list: Collection<KtNamedAnnotationValue>) {
+    private fun PrettyPrinter.renderNamedConstantValueList(list: Collection<KaNamedAnnotationValue>) {
         printCollection(list, ", ") { namedValue ->
             append(highlight(namedValue.name.renderName()) { asParameter } )
             append(highlight(" = ") { asOperationSign } )

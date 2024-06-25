@@ -13,11 +13,11 @@ import com.intellij.util.concurrency.AppExecutorUtil
 import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
 import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.analyze
-import org.jetbrains.kotlin.analysis.api.renderer.declarations.impl.KtDeclarationRendererForSource
+import org.jetbrains.kotlin.analysis.api.renderer.declarations.impl.KaDeclarationRendererForSource
 import org.jetbrains.kotlin.analysis.api.renderer.declarations.modifiers.renderers.KaRendererKeywordFilter
-import org.jetbrains.kotlin.analysis.api.symbols.KaClassOrObjectSymbol
+import org.jetbrains.kotlin.analysis.api.symbols.KaClassSymbol
 import org.jetbrains.kotlin.analysis.api.symbols.KaDeclarationSymbol
-import org.jetbrains.kotlin.analysis.api.symbols.KtSymbol
+import org.jetbrains.kotlin.analysis.api.symbols.KaSymbol
 import org.jetbrains.kotlin.idea.base.codeInsight.KotlinIconProvider.getIconFor
 import org.jetbrains.kotlin.idea.core.KotlinPluginDisposable
 import org.jetbrains.kotlin.psi.*
@@ -42,7 +42,7 @@ class KotlinPsiElementMemberChooserObject(
 
     companion object {
         @KaExperimentalApi
-        private val renderer = KtDeclarationRendererForSource.WITH_SHORT_NAMES.with {
+        private val renderer = KaDeclarationRendererForSource.WITH_SHORT_NAMES.with {
             modifiersRenderer = modifiersRenderer.with {
                 keywordsRenderer = keywordsRenderer.with { keywordFilter = KaRendererKeywordFilter.NONE }
             }
@@ -78,8 +78,8 @@ class KotlinPsiElementMemberChooserObject(
 
         context(KaSession)
         @OptIn(KaExperimentalApi::class)
-        private fun getChooserText(symbol: KtSymbol): @NlsSafe String {
-            if (symbol is KaClassOrObjectSymbol) {
+        private fun getChooserText(symbol: KaSymbol): @NlsSafe String {
+            if (symbol is KaClassSymbol) {
                 val classId = symbol.classId
                 if (classId != null) {
                     return classId.asFqNameString()
@@ -94,7 +94,7 @@ class KotlinPsiElementMemberChooserObject(
         }
 
         context(KaSession)
-        private fun getChooserIcon(element: PsiElement, symbol: KtSymbol): Icon? {
+        private fun getChooserIcon(element: PsiElement, symbol: KaSymbol): Icon? {
             val isClass = element is KtClass || element is PsiClass
             val flags = if (isClass) 0 else Iconable.ICON_FLAG_VISIBILITY
 

@@ -18,13 +18,13 @@ import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
 import org.jetbrains.kotlin.analysis.api.analyze
 import org.jetbrains.kotlin.analysis.api.resolution.KaCallableMemberCall
 import org.jetbrains.kotlin.analysis.api.resolution.singleCallOrNull
-import org.jetbrains.kotlin.analysis.api.components.KtDiagnosticCheckerFilter
+import org.jetbrains.kotlin.analysis.api.components.KaDiagnosticCheckerFilter
 import org.jetbrains.kotlin.analysis.api.fir.diagnostics.KaFirDiagnostic
 import org.jetbrains.kotlin.analysis.api.permissions.KaAllowAnalysisFromWriteAction
 import org.jetbrains.kotlin.analysis.api.permissions.KaAllowAnalysisOnEdt
 import org.jetbrains.kotlin.analysis.api.permissions.allowAnalysisFromWriteAction
 import org.jetbrains.kotlin.analysis.api.permissions.allowAnalysisOnEdt
-import org.jetbrains.kotlin.analysis.api.symbols.KtSymbolOrigin
+import org.jetbrains.kotlin.analysis.api.symbols.KaSymbolOrigin
 import org.jetbrains.kotlin.analysis.api.symbols.KaValueParameterSymbol
 import org.jetbrains.kotlin.idea.base.analysis.api.utils.analyzeInModalWindow
 import org.jetbrains.kotlin.idea.base.analysis.api.utils.getImplicitReceivers
@@ -97,7 +97,7 @@ object K2IntroduceVariableHandler : KotlinIntroduceVariableHandler() {
                 @OptIn(KaAllowAnalysisFromWriteAction::class)
                 allowAnalysisFromWriteAction {
                     analyze(property) {
-                        val propertyRenderedType = property.getReturnKtType().render(position = Variance.INVARIANT)
+                        val propertyRenderedType = property.returnType.render(position = Variance.INVARIANT)
                         if (propertyRenderedType == expressionRenderedType) {
                             renderedTypeArgumentsIfMightBeNeeded = null
                         } else if (!areTypeArgumentsNeededForCorrectTypeInference(initializer)) {
@@ -203,7 +203,7 @@ object K2IntroduceVariableHandler : KotlinIntroduceVariableHandler() {
             val substringInfo = expression.extractableSubstringInfo as? K2ExtractableSubstringInfo
             val physicalExpression = expression.substringContextOrThis
 
-            val expressionType = substringInfo?.guessLiteralType() ?: physicalExpression.getKtType()
+            val expressionType = substringInfo?.guessLiteralType() ?: physicalExpression.expressionType
             if (expressionType != null && expressionType.isUnit) return@analyzeInModalWindow null
             (expressionType ?: builtinTypes.ANY).render(position = Variance.INVARIANT)
         } ?: return showErrorHint(project, editor, KotlinBundle.message("cannot.refactor.expression.has.unit.type"))
@@ -377,7 +377,7 @@ object K2IntroduceVariableHandler : KotlinIntroduceVariableHandler() {
         if (call.typeArgumentList != null) return false
         val callee = call.calleeExpression ?: return false
         val diagnostics = analyzeInModalWindow(callee, KotlinBundle.message("find.usages.prepare.dialog.progress")) {
-            callee.getDiagnostics(KtDiagnosticCheckerFilter.ONLY_COMMON_CHECKERS)
+            callee.diagnostics(KaDiagnosticCheckerFilter.ONLY_COMMON_CHECKERS)
         }
         return (diagnostics.any { diagnostic -> diagnostic is KaFirDiagnostic.NewInferenceNoInformationForParameter })
     }
@@ -391,14 +391,14 @@ object K2IntroduceVariableHandler : KotlinIntroduceVariableHandler() {
             val psiToCheck = referencesFromExpressionToExtract.flatMap { reference ->
                 // in case of an unresolved reference consider all containers applicable
                 val symbol = reference.mainReference.resolveToSymbol() ?: return@flatMap emptyList()
-                val implicitReceivers = reference.resolveCallOld()
+                val implicitReceivers = reference.resolveToCall()
                     ?.singleCallOrNull<KaCallableMemberCall<*, *>>()
                     ?.getImplicitReceivers()
 
                 buildList {
                     implicitReceivers?.forEach { addIfNotNull(it.symbol.psi) }
 
-                    if (symbol.origin == KtSymbolOrigin.SOURCE) {
+                    if (symbol.origin == KaSymbolOrigin.SOURCE) {
                         addIfNotNull(symbol.psi)
                     } else if (symbol is KaValueParameterSymbol && symbol.isImplicitLambdaParameter) {
                         addIfNotNull(symbol.getFunctionLiteralByImplicitLambdaParameterSymbol())

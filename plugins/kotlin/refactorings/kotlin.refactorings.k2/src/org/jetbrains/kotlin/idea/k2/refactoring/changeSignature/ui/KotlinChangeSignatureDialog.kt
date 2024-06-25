@@ -21,9 +21,9 @@ import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.analyze
 import org.jetbrains.kotlin.analysis.api.permissions.KaAllowAnalysisOnEdt
 import org.jetbrains.kotlin.analysis.api.permissions.allowAnalysisOnEdt
-import org.jetbrains.kotlin.analysis.api.renderer.types.impl.KtTypeRendererForSource
-import org.jetbrains.kotlin.analysis.api.types.KtErrorType
-import org.jetbrains.kotlin.analysis.api.types.KtType
+import org.jetbrains.kotlin.analysis.api.renderer.types.impl.KaTypeRendererForSource
+import org.jetbrains.kotlin.analysis.api.types.KaErrorType
+import org.jetbrains.kotlin.analysis.api.types.KaType
 import org.jetbrains.kotlin.descriptors.Visibilities
 import org.jetbrains.kotlin.descriptors.Visibility
 import org.jetbrains.kotlin.idea.base.analysis.api.utils.analyzeInModalWindow
@@ -55,8 +55,8 @@ internal class KotlinChangeSignatureDialog(
         val typeRef = getContentElement() ?: return false
         return allowAnalysisOnEdt {
             analyze(typeRef) {
-                val ktType = typeRef.getKtType()
-                return ktType !is KtErrorType
+                val ktType = typeRef.type
+                return ktType !is KaErrorType
             }
         }
     }
@@ -88,7 +88,7 @@ internal class KotlinChangeSignatureDialog(
             val contentElement = psiFactory.createTypeCodeFragment(resultParameterInfo.typeText, typeContext).getContentElement()
             val presentableText = if (resultParameterInfo.typeText.isNotEmpty() && contentElement != null) {
                 analyzeInModalWindow(contentElement, KotlinBundle.message("fix.change.signature.prepare")) {
-                    contentElement.getKtType().getPresentableText()
+                    contentElement.type.getPresentableText()
                 }
             } else {
                 resultParameterInfo.typeText
@@ -189,7 +189,7 @@ internal class KotlinChangeSignatureDialog(
         return KtPsiFactory(project).createTypeCodeFragment(
             allowAnalysisOnEdt {
                 analyze(method) {
-                    method.getReturnKtType().getPresentableText()
+                    method.returnType.getPresentableText()
                 }
             },
             KotlinCallableParameterTableModel.getTypeCodeFragmentContext(myMethod.baseDeclaration)
@@ -279,7 +279,7 @@ internal fun KtTypeCodeFragment.getCanonicalText(forPreview: Boolean): String {
     val contextElement = getContentElement()
     if (contextElement != null && !forPreview) {
         analyze(contextElement) {
-            return contextElement.getKtType().render(position = Variance.INVARIANT)
+            return contextElement.type.render(position = Variance.INVARIANT)
         }
     } else {
         return text
@@ -288,4 +288,4 @@ internal fun KtTypeCodeFragment.getCanonicalText(forPreview: Boolean): String {
 
 context(KaSession)
 @OptIn(KaExperimentalApi::class)
-private fun KtType.getPresentableText(): String = render(KtTypeRendererForSource.WITH_SHORT_NAMES, position = Variance.INVARIANT)
+private fun KaType.getPresentableText(): String = render(KaTypeRendererForSource.WITH_SHORT_NAMES, position = Variance.INVARIANT)

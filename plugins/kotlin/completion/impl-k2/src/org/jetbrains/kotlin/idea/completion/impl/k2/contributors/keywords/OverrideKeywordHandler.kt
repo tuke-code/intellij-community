@@ -1,4 +1,4 @@
-// Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 
 package org.jetbrains.kotlin.idea.completion.contributors.keywords
 
@@ -12,14 +12,14 @@ import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
 import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.analyze
 import org.jetbrains.kotlin.analysis.api.renderer.base.annotations.KaRendererAnnotationsFilter
-import org.jetbrains.kotlin.analysis.api.renderer.declarations.impl.KtDeclarationRendererForSource
-import org.jetbrains.kotlin.analysis.api.renderer.declarations.modifiers.renderers.KtRendererKeywordFilter
+import org.jetbrains.kotlin.analysis.api.renderer.declarations.impl.KaDeclarationRendererForSource
+import org.jetbrains.kotlin.analysis.api.renderer.declarations.modifiers.renderers.KaRendererKeywordFilter
 import org.jetbrains.kotlin.analysis.api.symbols.KaCallableSymbol
 import org.jetbrains.kotlin.analysis.api.symbols.KaNamedFunctionSymbol
-import org.jetbrains.kotlin.analysis.api.symbols.KtVariableSymbol
+import org.jetbrains.kotlin.analysis.api.symbols.KaSymbolModality
+import org.jetbrains.kotlin.analysis.api.symbols.KaVariableSymbol
 import org.jetbrains.kotlin.analysis.api.symbols.markers.KaNamedSymbol
 import org.jetbrains.kotlin.analysis.api.symbols.markers.KaSymbolWithModality
-import org.jetbrains.kotlin.descriptors.Modality
 import org.jetbrains.kotlin.idea.KtIconProvider.getBaseIcon
 import org.jetbrains.kotlin.idea.base.analysis.api.utils.shortenReferencesInRange
 import org.jetbrains.kotlin.idea.completion.OverridesCompletionLookupElementDecorator
@@ -86,7 +86,7 @@ internal class OverrideKeywordHandler(
     ): Boolean = when (declaration) {
         is KtFunction -> symbolToOverride is KaNamedFunctionSymbol
         is KtValVarKeywordOwner -> {
-            if (symbolToOverride !is KtVariableSymbol) {
+            if (symbolToOverride !is KaVariableSymbol) {
                 false
             } else {
                 // val cannot override var
@@ -113,12 +113,12 @@ internal class OverrideKeywordHandler(
 
         val text = getSymbolTextForLookupElement(memberSymbol)
         val baseIcon = getBaseIcon(memberSymbol)
-        val isImplement = (memberSymbol as? KaSymbolWithModality)?.modality == Modality.ABSTRACT
+        val isImplement = (memberSymbol as? KaSymbolWithModality)?.modality == KaSymbolModality.ABSTRACT
         val additionalIcon = if (isImplement) AllIcons.Gutter.ImplementingMethod else AllIcons.Gutter.OverridingMethod
         val icon = RowIcon(baseIcon, additionalIcon)
         val isSuspendFunction = (memberSymbol as? KaNamedFunctionSymbol)?.isSuspend == true
 
-        val containingSymbol = memberSymbol.unwrapFakeOverrides.originalContainingClassForOverride
+        val containingSymbol = memberSymbol.fakeOverrideOriginal.originalContainingClassForOverride
         val baseClassName = containingSymbol?.name?.asString()
         val baseClassIcon = member.memberInfo.containingSymbolIcon
 
@@ -179,12 +179,12 @@ internal class OverrideKeywordHandler(
     companion object {
         @KaExperimentalApi
         private val renderingOptionsForLookupElementRendering =
-            KtDeclarationRendererForSource.WITH_SHORT_NAMES.with {
+            KaDeclarationRendererForSource.WITH_SHORT_NAMES.with {
                 annotationRenderer = annotationRenderer.with {
                     annotationFilter = KaRendererAnnotationsFilter.NONE
                 }
                 modifiersRenderer = modifiersRenderer.with {
-                    keywordsRenderer = keywordsRenderer.with { keywordFilter = KtRendererKeywordFilter.onlyWith(KtTokens.TYPE_MODIFIER_KEYWORDS) }
+                    keywordsRenderer = keywordsRenderer.with { keywordFilter = KaRendererKeywordFilter.onlyWith(KtTokens.TYPE_MODIFIER_KEYWORDS) }
                 }
             }
     }

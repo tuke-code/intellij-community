@@ -9,14 +9,15 @@ import com.jetbrains.jsonSchema.ide.JsonSchemaService
 import com.jetbrains.jsonSchema.impl.IfThenElse
 import com.jetbrains.jsonSchema.impl.JsonSchemaObject
 import com.jetbrains.jsonSchema.impl.JsonSchemaType
+import com.jetbrains.jsonSchema.impl.MergedJsonSchemaObject
 import com.jetbrains.jsonSchema.impl.light.legacy.LegacyJsonSchemaObjectMerger
 import com.jetbrains.jsonSchema.impl.light.versions.JsonSchemaInterpretationStrategy
 
 internal class MergedJsonSchemaObjectView(
-  val base: JsonSchemaObject,
-  val other: JsonSchemaObject,
-  private val pointTo: JsonSchemaObject
-) : JsonSchemaObject() {
+  override val base: JsonSchemaObject,
+  override val other: JsonSchemaObject,
+  private val pointTo: JsonSchemaObject,
+) : JsonSchemaObject(), MergedJsonSchemaObject {
 
   private fun getMergedSchemaInterpretationStrategy(): JsonSchemaInterpretationStrategy? {
     return pointTo.rootSchemaObject.asSafely<RootJsonSchemaObjectBackedByJackson>()?.schemaInterpretationStrategy
@@ -377,9 +378,11 @@ internal class MergedJsonSchemaObjectView(
     return other.resolveRefSchema(service)
   }
 
-  override fun mergeTypes(selfType: JsonSchemaType?,
-                          otherType: JsonSchemaType?,
-                          otherTypeVariants: MutableSet<JsonSchemaType>?): JsonSchemaType? {
+  override fun mergeTypes(
+    selfType: JsonSchemaType?,
+    otherType: JsonSchemaType?,
+    otherTypeVariants: MutableSet<JsonSchemaType>?,
+  ): JsonSchemaType? {
     throw UnsupportedOperationException("Must not call mergeTypes on light aggregated object")
   }
 
@@ -398,4 +401,32 @@ internal class MergedJsonSchemaObjectView(
   override fun getDefinitionsMap(): Map<String, JsonSchemaObject>? {
     throw UnsupportedOperationException("Must not call definitionsMap on light aggregated object")
   }
+}
+
+private fun <T, V> MergedJsonSchemaObjectView.baseIfConditionOrOtherWithArgument(
+  memberReference: JsonSchemaObject.(V) -> T,
+  argument: V,
+  condition: (T) -> Boolean,
+): T {
+  return baseIfConditionOrOtherWithArgument(base, other, memberReference, argument, condition)
+}
+
+private fun <T> MergedJsonSchemaObjectView.baseIfConditionOrOther(memberReference: JsonSchemaObject.() -> T, condition: (T) -> Boolean): T {
+  return baseIfConditionOrOther(base, other, memberReference, condition)
+}
+
+private fun <V> MergedJsonSchemaObjectView.booleanOrWithArgument(memberReference: JsonSchemaObject.(V) -> Boolean, argument: V): Boolean {
+  return booleanOrWithArgument(base, other, memberReference, argument)
+}
+
+private fun MergedJsonSchemaObjectView.booleanAndNullable(memberReference: JsonSchemaObject.() -> Boolean?): Boolean? {
+  return booleanAndNullable(base, other, memberReference)
+}
+
+private fun MergedJsonSchemaObjectView.booleanAnd(memberReference: JsonSchemaObject.() -> Boolean): Boolean {
+  return booleanAnd(base, other, memberReference)
+}
+
+private fun MergedJsonSchemaObjectView.booleanOr(memberReference: JsonSchemaObject.() -> Boolean): Boolean {
+  return booleanOr(base, other, memberReference)
 }

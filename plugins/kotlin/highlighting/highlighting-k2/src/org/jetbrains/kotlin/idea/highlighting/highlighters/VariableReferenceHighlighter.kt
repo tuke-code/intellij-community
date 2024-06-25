@@ -29,21 +29,21 @@ internal class VariableReferenceHighlighter(holder: HighlightInfoHolder) : Kotli
         if (expression.parent is KtInstanceExpressionWithLabel) return emptyList()
 
         return when (val symbol = expression.mainReference.resolveToSymbol()) {
-            is KtBackingFieldSymbol -> highlightBackingField(symbol, expression)
-            is KtKotlinPropertySymbol -> highlightProperty(symbol, expression)
+            is KaBackingFieldSymbol -> highlightBackingField(symbol, expression)
+            is KaKotlinPropertySymbol -> highlightProperty(symbol, expression)
             is KaLocalVariableSymbol -> {
                 val result = mutableListOf<HighlightInfo.Builder>()
                 result.addIfNotNull(symbol.getHighlightingForMutableVar(expression))
                 HighlightingFactory.highlightName(expression, KotlinHighlightInfoTypeSemanticNames.LOCAL_VARIABLE)?.let { result.add(it) }
                 result
             }
-            is KtSyntheticJavaPropertySymbol -> buildList {
+            is KaSyntheticJavaPropertySymbol -> buildList {
                 addIfNotNull(HighlightingFactory.highlightName(expression, KotlinHighlightInfoTypeSemanticNames.SYNTHETIC_EXTENSION_PROPERTY))
                 addIfNotNull(symbol.getHighlightingForMutableVar(expression))
             }
             is KaValueParameterSymbol -> listOfNotNull(highlightValueParameter (symbol, expression))
             is KaEnumEntrySymbol -> listOfNotNull(HighlightingFactory.highlightName (expression, KotlinHighlightInfoTypeSemanticNames.ENUM_ENTRY))
-            is KtJavaFieldSymbol -> buildList {
+            is KaJavaFieldSymbol -> buildList {
                 if (symbol.isStatic) {
                     addIfNotNull(HighlightingFactory.highlightName(expression, KotlinHighlightInfoTypeSemanticNames.PACKAGE_PROPERTY))
                 } else {
@@ -55,7 +55,7 @@ internal class VariableReferenceHighlighter(holder: HighlightInfoHolder) : Kotli
         }
     }
 
-    private fun KtVariableSymbol.getHighlightingForMutableVar(expression: KtSimpleNameExpression): HighlightInfo.Builder? {
+    private fun KaVariableSymbol.getHighlightingForMutableVar(expression: KtSimpleNameExpression): HighlightInfo.Builder? {
         return if (isVal) {
             null
         } else {
@@ -78,7 +78,7 @@ internal class VariableReferenceHighlighter(holder: HighlightInfoHolder) : Kotli
     }
 
     private fun highlightProperty(
-        symbol: KtKotlinPropertySymbol,
+        symbol: KaKotlinPropertySymbol,
         expression: KtSimpleNameExpression
     ): List<HighlightInfo.Builder> {
         val result = mutableListOf<HighlightInfo.Builder>()
@@ -102,7 +102,7 @@ internal class VariableReferenceHighlighter(holder: HighlightInfoHolder) : Kotli
         return result
     }
 
-    private fun highlightBackingField(symbol: KtBackingFieldSymbol, expression: KtSimpleNameExpression): List<HighlightInfo.Builder> {
+    private fun highlightBackingField(symbol: KaBackingFieldSymbol, expression: KtSimpleNameExpression): List<HighlightInfo.Builder> {
         val result = mutableListOf<HighlightInfo.Builder>()
         if (!symbol.owningProperty.isVal) {
             HighlightingFactory.highlightName(expression, KotlinHighlightInfoTypeSemanticNames.MUTABLE_VARIABLE)?.let { result.add(it) }

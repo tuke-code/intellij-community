@@ -5,9 +5,9 @@ import com.intellij.psi.util.PsiTreeUtil
 import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.analyze
 import org.jetbrains.kotlin.analysis.api.resolution.singleFunctionCallOrNull
-import org.jetbrains.kotlin.analysis.api.types.KtDynamicType
-import org.jetbrains.kotlin.analysis.api.types.KtFunctionalType
-import org.jetbrains.kotlin.analysis.api.types.KtType
+import org.jetbrains.kotlin.analysis.api.types.KaDynamicType
+import org.jetbrains.kotlin.analysis.api.types.KaFunctionType
+import org.jetbrains.kotlin.analysis.api.types.KaType
 import org.jetbrains.kotlin.builtins.StandardNames
 import org.jetbrains.kotlin.idea.base.psi.previousStatement
 import org.jetbrains.kotlin.name.StandardClassIds
@@ -51,7 +51,7 @@ fun isRedundantUnit(referenceExpression: KtReferenceExpression): Boolean {
             if (prev.isUnitLiteral()) return true
             if (prev is KtDeclaration && isDynamicCall(parent)) return false
             analyze(prev) {
-                val ktType = prev.getKtType()
+                val ktType = prev.expressionType
                 if (ktType != null) {
                     return ktType.isUnit && !ktType.isMarkedNullable && prev.canBeUsedAsValue()
                 }
@@ -69,21 +69,21 @@ fun isRedundantUnit(referenceExpression: KtReferenceExpression): Boolean {
 }
 
 
-private fun isDynamicCall(parent: KtBlockExpression): Boolean = parent.getStrictParentOfType<KtFunctionLiteral>()?.findLambdaReturnType() is KtDynamicType
+private fun isDynamicCall(parent: KtBlockExpression): Boolean = parent.getStrictParentOfType<KtFunctionLiteral>()?.findLambdaReturnType() is KaDynamicType
 
-private fun KtReturnExpression.expectedReturnType(): KtType? = analyze(this) {
-    getReturnTargetSymbol()?.let {
+private fun KtReturnExpression.expectedReturnType(): KaType? = analyze(this) {
+    targetSymbol?.let {
         (it.psi as? KtFunctionLiteral)?.findLambdaReturnType() ?: it.returnType
     }
 }
 
-private fun KtFunctionLiteral.findLambdaReturnType(): KtType? {
+private fun KtFunctionLiteral.findLambdaReturnType(): KaType? {
     val callExpression = getStrictParentOfType<KtCallExpression>() ?: return null
     val valueArgument = getStrictParentOfType<KtValueArgument>() ?: return null
     analyze(this) {
-        val functionCallOrNull = callExpression.resolveCallOld()?.singleFunctionCallOrNull() ?: return null
+        val functionCallOrNull = callExpression.resolveToCall()?.singleFunctionCallOrNull() ?: return null
         val variableLikeSignature = functionCallOrNull.argumentMapping[valueArgument.getArgumentExpression()] ?: return null
-        return (variableLikeSignature.returnType as? KtFunctionalType)?.returnType
+        return (variableLikeSignature.returnType as? KaFunctionType)?.returnType
     }
 }
 
@@ -95,7 +95,7 @@ private fun KtExpression.canBeUsedAsValue(): Boolean {
             if (elseExpression is KtIfExpression) elseExpression.canBeUsedAsValue() else elseExpression != null
         }
         is KtWhenExpression ->
-            entries.lastOrNull()?.elseKeyword != null || getMissingCases().isEmpty()
+            entries.lastOrNull()?.elseKeyword != null || computeMissingCases().isEmpty()
         else ->
             true
     }

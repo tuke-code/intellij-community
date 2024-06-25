@@ -11798,6 +11798,11 @@ public abstract class K1QuickFixTestGenerated extends AbstractK1QuickFixTest {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
 
+        @TestMetadata("importList.kt")
+        public void testImportList() throws Exception {
+            runTest("testData/quickfix/moveTypeAliasToTopLevel/importList.kt");
+        }
+
         @TestMetadata("inClass.kt")
         public void testInClass() throws Exception {
             runTest("testData/quickfix/moveTypeAliasToTopLevel/inClass.kt");
@@ -11816,6 +11821,11 @@ public abstract class K1QuickFixTestGenerated extends AbstractK1QuickFixTest {
         @TestMetadata("inFunction2.kt")
         public void testInFunction2() throws Exception {
             runTest("testData/quickfix/moveTypeAliasToTopLevel/inFunction2.kt");
+        }
+
+        @TestMetadata("package.kt")
+        public void testPackage() throws Exception {
+            runTest("testData/quickfix/moveTypeAliasToTopLevel/package.kt");
         }
     }
 
@@ -17711,6 +17721,16 @@ public abstract class K1QuickFixTestGenerated extends AbstractK1QuickFixTest {
                 runTest("testData/quickfix/typeMismatch/convertCollection/arrayToSequence.kt");
             }
 
+            @TestMetadata("assignment.kt")
+            public void testAssignment() throws Exception {
+                runTest("testData/quickfix/typeMismatch/convertCollection/assignment.kt");
+            }
+
+            @TestMetadata("initializer.kt")
+            public void testInitializer() throws Exception {
+                runTest("testData/quickfix/typeMismatch/convertCollection/initializer.kt");
+            }
+
             @TestMetadata("iterableToArray.kt")
             public void testIterableToArray() throws Exception {
                 runTest("testData/quickfix/typeMismatch/convertCollection/iterableToArray.kt");
@@ -18915,9 +18935,19 @@ public abstract class K1QuickFixTestGenerated extends AbstractK1QuickFixTest {
                 KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
 
+            @TestMetadata("assignment.kt")
+            public void testAssignment() throws Exception {
+                runTest("testData/quickfix/typeMismatch/wrapWithCollectionLiteral/assignment.kt");
+            }
+
             @TestMetadata("inAnnotation.kt")
             public void testInAnnotation() throws Exception {
                 runTest("testData/quickfix/typeMismatch/wrapWithCollectionLiteral/inAnnotation.kt");
+            }
+
+            @TestMetadata("initializer.kt")
+            public void testInitializer() throws Exception {
+                runTest("testData/quickfix/typeMismatch/wrapWithCollectionLiteral/initializer.kt");
             }
 
             @TestMetadata("noMutableList.kt")

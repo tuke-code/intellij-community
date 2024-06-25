@@ -11,10 +11,10 @@ import org.jetbrains.kotlin.analysis.api.resolution.KaErrorCallInfo
 import org.jetbrains.kotlin.analysis.api.resolution.KaFunctionCall
 import org.jetbrains.kotlin.analysis.api.resolution.symbol
 import org.jetbrains.kotlin.analysis.api.fir.diagnostics.KaFirDiagnostic
-import org.jetbrains.kotlin.analysis.api.renderer.types.impl.KtTypeRendererForSource
+import org.jetbrains.kotlin.analysis.api.renderer.types.impl.KaTypeRendererForSource
 import org.jetbrains.kotlin.analysis.api.symbols.KaConstructorSymbol
-import org.jetbrains.kotlin.analysis.api.types.KtType
-import org.jetbrains.kotlin.analysis.api.types.KtTypeNullability
+import org.jetbrains.kotlin.analysis.api.types.KaType
+import org.jetbrains.kotlin.analysis.api.types.KaTypeNullability
 import org.jetbrains.kotlin.idea.base.resources.KotlinBundle
 import org.jetbrains.kotlin.idea.codeinsight.api.applicators.fixes.KotlinQuickFixFactory
 import org.jetbrains.kotlin.idea.codeinsight.api.classic.quickfixes.KotlinQuickFixAction
@@ -33,16 +33,16 @@ object ChangeParameterTypeFixFactory {
     }
 
     val nullForNotNullTypeFactory = KotlinQuickFixFactory.IntentionBased { diagnostic: KaFirDiagnostic.NullForNonnullType ->
-       createTypeMismatchFixes(diagnostic.psi, diagnostic.expectedType.withNullability(KtTypeNullability.NULLABLE))
+       createTypeMismatchFixes(diagnostic.psi, diagnostic.expectedType.withNullability(KaTypeNullability.NULLABLE))
     }
 
     context(KaSession)
     @OptIn(KaExperimentalApi::class)
-    private fun createTypeMismatchFixes(psi: PsiElement, targetType: KtType): List<KotlinQuickFixAction<*>> {
+    private fun createTypeMismatchFixes(psi: PsiElement, targetType: KaType): List<KotlinQuickFixAction<*>> {
         val valueArgument = psi.parent as? KtValueArgument ?: return emptyList()
 
         val callElement = valueArgument.parentOfType<KtCallElement>() ?: return emptyList()
-        val memberCall = (callElement.resolveCallOld() as? KaErrorCallInfo)?.candidateCalls?.firstOrNull() as? KaFunctionCall<*>
+        val memberCall = (callElement.resolveToCall() as? KaErrorCallInfo)?.candidateCalls?.firstOrNull() as? KaFunctionCall<*>
         val functionLikeSymbol = memberCall?.symbol ?: return emptyList()
 
         val paramSymbol = memberCall.argumentMapping[valueArgument.getArgumentExpression()]
@@ -52,7 +52,7 @@ object ChangeParameterTypeFixFactory {
 
         val approximatedType = targetType.approximateToSuperPublicDenotableOrSelf(true)
 
-        val typePresentation = approximatedType.render(KtTypeRendererForSource.WITH_SHORT_NAMES, position = Variance.IN_VARIANCE)
+        val typePresentation = approximatedType.render(KaTypeRendererForSource.WITH_SHORT_NAMES, position = Variance.IN_VARIANCE)
         val typeFQNPresentation = approximatedType.render(position = Variance.IN_VARIANCE)
 
         return listOf(ChangeParameterTypeFix(

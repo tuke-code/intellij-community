@@ -20,8 +20,8 @@ import org.jetbrains.kotlin.psi.KtDeclaration
 import org.jetbrains.kotlin.psi.KtElement
 import org.jetbrains.kotlin.psi.psiUtil.parentsWithSelf
 
-class KtResolveExtensionProviderForTests : KtResolveExtensionProvider() {
-    override fun provideExtensionsFor(module: KaModule): List<KtResolveExtension> {
+class KtResolveExtensionProviderForTests : KaResolveExtensionProvider() {
+    override fun provideExtensionsFor(module: KaModule): List<KaResolveExtension> {
         return when (module) {
             is KaSourceModule -> {
                 val ideaModule = module.ideaModule
@@ -38,7 +38,7 @@ class KtResolveExtensionProviderForTests : KtResolveExtensionProvider() {
     }
 }
 
-private class ExtensionForTests(private val xmlFile: XmlFile) : KtResolveExtension() {
+private class ExtensionForTests(private val xmlFile: XmlFile) : KaResolveExtension() {
     private val packageName by lazy {
         xmlFile.rootTag?.findFirstSubTag("package")?.value?.text?.let(::FqName)
     }
@@ -52,12 +52,12 @@ private class ExtensionForTests(private val xmlFile: XmlFile) : KtResolveExtensi
         return setOfNotNull(packageName)
     }
 
-    override fun getKtFiles(): List<KtResolveExtensionFile> {
+    override fun getKtFiles(): List<KaResolveExtensionFile> {
         return files
     }
 }
 
-private class ExtensionFileForTest(private val rootTag: XmlTag, private val packageName: FqName) : KtResolveExtensionFile() {
+private class ExtensionFileForTest(private val rootTag: XmlTag, private val packageName: FqName) : KaResolveExtensionFile() {
     private val functionNames by lazy {
         rootTag.findSubTags("function").mapTo(mutableSetOf()) { Name.identifier(it.getAttributeValue("name")!!) }
     }
@@ -93,8 +93,8 @@ private class ExtensionFileForTest(private val rootTag: XmlTag, private val pack
         }
     }
 
-    override fun createNavigationTargetsProvider(): KtResolveExtensionNavigationTargetsProvider {
-        return object : KtResolveExtensionNavigationTargetsProvider() {
+    override fun createNavigationTargetsProvider(): KaResolveExtensionNavigationTargetsProvider {
+        return object : KaResolveExtensionNavigationTargetsProvider() {
             override fun KaSession.getNavigationTargets(element: KtElement): Collection<PsiElement> =
                 element.parentsWithSelf
                     .filterIsInstance<KtDeclaration>()

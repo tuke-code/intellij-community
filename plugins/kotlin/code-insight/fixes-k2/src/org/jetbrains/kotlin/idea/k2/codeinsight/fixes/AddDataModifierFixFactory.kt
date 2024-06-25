@@ -10,9 +10,9 @@ import org.jetbrains.kotlin.analysis.api.resolution.KaCallableMemberCall
 import org.jetbrains.kotlin.analysis.api.resolution.successfulCallOrNull
 import org.jetbrains.kotlin.analysis.api.resolution.symbol
 import org.jetbrains.kotlin.analysis.api.symbols.KaNamedClassOrObjectSymbol
+import org.jetbrains.kotlin.analysis.api.symbols.KaSymbolModality
 import org.jetbrains.kotlin.analysis.api.symbols.markers.KaSymbolWithVisibility
-import org.jetbrains.kotlin.analysis.api.types.KaNonErrorClassType
-import org.jetbrains.kotlin.analysis.api.types.KtNonErrorClassType
+import org.jetbrains.kotlin.analysis.api.types.KaClassType
 import org.jetbrains.kotlin.descriptors.Modality
 import org.jetbrains.kotlin.idea.base.resources.KotlinBundle
 import org.jetbrains.kotlin.idea.codeinsight.api.applicable.intentions.KotlinPsiUpdateModCommandAction
@@ -27,17 +27,17 @@ internal object AddDataModifierFixFactory {
         val callableSymbol = if (element is KtParameter && element.firstChild is KtDestructuringDeclaration) {
             (element as? KtParameter)?.getParameterSymbol()
         } else {
-            element.resolveCallOld()?.successfulCallOrNull<KaCallableMemberCall<*, *>>()?.symbol
+            element.resolveToCall()?.successfulCallOrNull<KaCallableMemberCall<*, *>>()?.symbol
         }
 
-        val type = (callableSymbol?.returnType as? KtNonErrorClassType)?.typeArguments?.firstOrNull()?.type
+        val type = (callableSymbol?.returnType as? KaClassType)?.typeArguments?.firstOrNull()?.type
             ?: callableSymbol?.returnType
 
-        val classSymbol = (type as? KaNonErrorClassType)?.symbol as? KaNamedClassOrObjectSymbol
+        val classSymbol = (type as? KaClassType)?.symbol as? KaNamedClassOrObjectSymbol
             ?: return@ModCommandBased emptyList()
 
         val modality = classSymbol.modality
-        if (modality != Modality.FINAL || classSymbol.isInner) return@ModCommandBased emptyList()
+        if (modality != KaSymbolModality.FINAL || classSymbol.isInner) return@ModCommandBased emptyList()
         val constructors = classSymbol.declaredMemberScope.constructors
         val ctorParams = constructors.firstOrNull { it.isPrimary }?.valueParameters ?: return@ModCommandBased emptyList()
         if (ctorParams.isEmpty()) return@ModCommandBased emptyList()

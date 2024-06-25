@@ -9,8 +9,8 @@ import com.intellij.codeInsight.lookup.LookupElementWeigher
 import com.intellij.openapi.util.Key
 import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.symbols.KaFunctionSymbol
-import org.jetbrains.kotlin.analysis.api.symbols.KtSymbol
-import org.jetbrains.kotlin.analysis.api.symbols.KtVariableLikeSymbol
+import org.jetbrains.kotlin.analysis.api.symbols.KaSymbol
+import org.jetbrains.kotlin.analysis.api.symbols.KaVariableSymbol
 import org.jetbrains.kotlin.psi.UserDataProperty
 
 object VariableOrFunctionWeigher {
@@ -23,9 +23,9 @@ object VariableOrFunctionWeigher {
     private var LookupElement.variableOrFunction by UserDataProperty(Key<Weight>("KOTLIN_VARIABLE_OR_FUNCTION_WEIGHT"))
 
     context(KaSession)
-fun addWeight(lookupElement: LookupElement, symbol: KtSymbol) {
+fun addWeight(lookupElement: LookupElement, symbol: KaSymbol) {
         when (symbol) {
-            is KtVariableLikeSymbol -> {
+            is KaVariableSymbol -> {
                 lookupElement.variableOrFunction = Weight.VARIABLE
             }
             is KaFunctionSymbol -> {

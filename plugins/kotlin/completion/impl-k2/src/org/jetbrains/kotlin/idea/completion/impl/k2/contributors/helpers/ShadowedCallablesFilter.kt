@@ -1,16 +1,18 @@
 // Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.kotlin.idea.completion.contributors.helpers
 
+import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
 import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.components.KaScopeKind
-import org.jetbrains.kotlin.analysis.api.signatures.KtCallableSignature
-import org.jetbrains.kotlin.analysis.api.signatures.KtFunctionLikeSignature
-import org.jetbrains.kotlin.analysis.api.signatures.KtVariableLikeSignature
+import org.jetbrains.kotlin.analysis.api.signatures.KaCallableSignature
+import org.jetbrains.kotlin.analysis.api.signatures.KaFunctionSignature
+import org.jetbrains.kotlin.analysis.api.signatures.KaVariableSignature
 import org.jetbrains.kotlin.analysis.api.symbols.KaCallableSymbol
 import org.jetbrains.kotlin.analysis.api.symbols.markers.KaSymbolKind
 import org.jetbrains.kotlin.analysis.api.symbols.markers.KaNamedSymbol
-import org.jetbrains.kotlin.analysis.api.types.KtFunctionalType
-import org.jetbrains.kotlin.analysis.api.types.KtType
+import org.jetbrains.kotlin.analysis.api.symbols.typeParameters
+import org.jetbrains.kotlin.analysis.api.types.KaFunctionType
+import org.jetbrains.kotlin.analysis.api.types.KaType
 import org.jetbrains.kotlin.idea.completion.checkers.ApplicableExtension
 import org.jetbrains.kotlin.idea.completion.lookups.CallableInsertionOptions
 import org.jetbrains.kotlin.idea.completion.lookups.CallableInsertionStrategy
@@ -22,7 +24,7 @@ import org.jetbrains.kotlin.name.Name
 internal class ShadowedCallablesFilter {
     data class FilterResult(val excludeFromCompletion: Boolean, val updatedInsertionOptions: CallableInsertionOptions)
 
-    private val processedSignatures: MutableSet<KtCallableSignature<*>> = HashSet()
+    private val processedSignatures: MutableSet<KaCallableSignature<*>> = HashSet()
     private val processedSimplifiedSignatures: MutableMap<SimplifiedSignature, CompletionSymbolOrigin> = HashMap()
 
     /**
@@ -36,13 +38,13 @@ internal class ShadowedCallablesFilter {
      */
     context(KaSession)
     fun excludeFromCompletion(
-        callable: KtCallableSignature<*>,
+        callable: KaCallableSignature<*>,
         options: CallableInsertionOptions,
         symbolOrigin: CompletionSymbolOrigin,
         isAlreadyImported: Boolean,
         typeArgumentsAreRequired: Boolean,
     ): FilterResult {
-        // there is no need to create simplified signature if `KtCallableSignature<*>` is already processed
+        // there is no need to create simplified signature if `KaCallableSignature<*>` is already processed
         if (callable in processedSignatures) return FilterResult(excludeFromCompletion = true, options)
         processedSignatures.add(callable)
 
@@ -63,14 +65,14 @@ internal class ShadowedCallablesFilter {
 
     context(KaSession)
     private fun processSignatureConsideringOptions(
-        callable: KtCallableSignature<*>,
+        callable: KaCallableSignature<*>,
         insertionOptions: CallableInsertionOptions,
         symbolOrigin: CompletionSymbolOrigin,
         typeArgumentsAreRequired: Boolean,
     ): Boolean {
         val (importingStrategy, insertionStrategy) = insertionOptions
 
-        val isVariableCall = callable is KtVariableLikeSignature<*> && insertionStrategy is CallableInsertionStrategy.AsCall
+        val isVariableCall = callable is KaVariableSignature<*> && insertionStrategy is CallableInsertionStrategy.AsCall
 
         return when (importingStrategy) {
             is ImportStrategy.DoNothing ->
@@ -118,7 +120,7 @@ internal class ShadowedCallablesFilter {
 
     context(KaSession)
     private fun processSignature(
-        callable: KtCallableSignature<*>,
+        callable: KaCallableSignature<*>,
         symbolOrigin: CompletionSymbolOrigin,
         considerContainer: Boolean,
         isVariableCall: Boolean,
@@ -152,7 +154,7 @@ internal class ShadowedCallablesFilter {
         context(KaSession)
         fun sortExtensions(
             extensions: Collection<ApplicableExtension>,
-            receiversFromContext: List<KtType>
+            receiversFromContext: List<KaType>
         ): Collection<ApplicableExtension> {
             if (extensions.isEmpty()) return emptyList()
 
@@ -174,8 +176,8 @@ internal class ShadowedCallablesFilter {
                     val signature = applicableExtension.signature
                     val insertionStrategy = applicableExtension.insertionOptions.insertionStrategy
                     val receiverType = when {
-                        signature is KtVariableLikeSignature<*> && insertionStrategy is CallableInsertionStrategy.AsCall ->
-                            (signature.returnType as? KtFunctionalType)?.receiverType
+                        signature is KaVariableSignature<*> && insertionStrategy is CallableInsertionStrategy.AsCall ->
+                            (signature.returnType as? KaFunctionType)?.receiverType
 
                         else -> signature.receiverType
                     }
@@ -185,7 +187,7 @@ internal class ShadowedCallablesFilter {
                 .sortedWith(compareBy(
                     { (_, receiverId) -> indexOfReceiverFromContext[receiverId] ?: Int.MAX_VALUE },
                     { (_, receiverId) -> indexInClassHierarchy[receiverId] ?: Int.MAX_VALUE },
-                    { (applicableExtension, _) -> applicableExtension.signature is KtVariableLikeSignature<*> }
+                    { (applicableExtension, _) -> applicableExtension.signature is KaVariableSignature<*> }
                 ))
                 .map { (applicableExtension, _) -> applicableExtension }
         }
@@ -196,7 +198,7 @@ internal class ShadowedCallablesFilter {
 
             companion object {
                 context(KaSession)
-                fun create(type: KtType): ReceiverId? {
+                fun create(type: KaType): ReceiverId? {
                     val expandedClassSymbol = type.expandedSymbol ?: return null
                     val name = expandedClassSymbol.name ?: return null
 
@@ -229,7 +231,7 @@ private sealed class SimplifiedSignature {
     companion object {
         context(KaSession)
         fun create(
-            callableSignature: KtCallableSignature<*>,
+            callableSignature: KaCallableSignature<*>,
             considerContainer: Boolean,
             isVariableCall: Boolean,
             typeArgumentsAreRequired: Boolean
@@ -239,9 +241,10 @@ private sealed class SimplifiedSignature {
 
             val containerFqName = if (considerContainer) symbol.getContainerFqName() else null
 
+            @OptIn(KaExperimentalApi::class)
             return when (callableSignature) {
-                is KtVariableLikeSignature<*> -> createSimplifiedSignature(callableSignature, isVariableCall, containerFqName)
-                is KtFunctionLikeSignature<*> -> FunctionLikeSimplifiedSignature(
+                is KaVariableSignature<*> -> createSimplifiedSignature(callableSignature, isVariableCall, containerFqName)
+                is KaFunctionSignature<*> -> FunctionLikeSimplifiedSignature(
                     symbol.name,
                     containerFqName,
                     requiredTypeArgumentsCount = if (typeArgumentsAreRequired) callableSignature.symbol.typeParameters.size else 0,
@@ -254,7 +257,7 @@ private sealed class SimplifiedSignature {
 
         context(KaSession)
         private fun createSimplifiedSignature(
-            signature: KtVariableLikeSignature<*>,
+            signature: KaVariableSignature<*>,
             isFunctionalVariableCall: Boolean,
             containerFqName: FqName?,
         ): SimplifiedSignature = when {
@@ -264,7 +267,7 @@ private sealed class SimplifiedSignature {
                     containerFqName,
                     requiredTypeArgumentsCount = 0,
                     lazy(LazyThreadSafetyMode.NONE) {
-                        val functionalType = signature.returnType as? KtFunctionalType ?: error("Unexpected ${signature.returnType::class}")
+                        val functionalType = signature.returnType as? KaFunctionType ?: error("Unexpected ${signature.returnType::class}")
                         functionalType.parameterTypes
                     },
                     varargValueParameterIndices = emptyList(),
@@ -303,7 +306,7 @@ private class FunctionLikeSimplifiedSignature(
     override val name: Name,
     override val containerFqName: FqName?,
     private val requiredTypeArgumentsCount: Int,
-    private val valueParameterTypes: Lazy<List<KtType>>,
+    private val valueParameterTypes: Lazy<List<KaType>>,
     private val varargValueParameterIndices: List<Int>,
     private val analysisSession: KaSession,
 ) : SimplifiedSignature() {
@@ -324,7 +327,7 @@ private class FunctionLikeSimplifiedSignature(
             areValueParameterTypesEqualTo(other)
 
     /**
-     * We need to use semantic type equality instead of the default structural equality of [KtType] to check if two signatures overlap.
+     * We need to use semantic type equality instead of the default structural equality of [KaType] to check if two signatures overlap.
      */
     private fun areValueParameterTypesEqualTo(other: FunctionLikeSimplifiedSignature): Boolean {
         val types1 = other.valueParameterTypes.value

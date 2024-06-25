@@ -1,4 +1,4 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.kotlin.idea.highlighting
 
 import com.intellij.codeInsight.daemon.impl.analysis.HighlightUtil
@@ -16,6 +16,7 @@ import com.intellij.psi.search.searches.DefinitionsScopedSearch
 import com.intellij.psi.search.searches.MethodReferencesSearch
 import com.intellij.psi.search.searches.ReferencesSearch
 import com.intellij.util.Processor
+import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
 import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.resolution.singleFunctionCallOrNull
 import org.jetbrains.kotlin.analysis.api.resolution.symbol
@@ -121,10 +122,11 @@ object KotlinUnusedSymbolUtil {
   }
 
   context(KaSession)
+  @OptIn(KaExperimentalApi::class)
   fun getPsiToReportProblem(declaration: KtNamedDeclaration, isJavaEntryPointInspection: UnusedDeclarationInspectionBase): PsiElement? {
       val symbol = declaration.symbol
       if (declaration.languageVersionSettings.getFlag(
-          AnalysisFlags.explicitApiMode) != ExplicitApiMode.DISABLED && (symbol as? KaSymbolWithVisibility)?.visibility?.isPublicAPI == true) {
+          AnalysisFlags.explicitApiMode) != ExplicitApiMode.DISABLED && (symbol as? KaSymbolWithVisibility)?.compilerVisibility?.isPublicAPI == true) {
           return null
       }
       if (symbol is KaNamedFunctionSymbol && symbol.isOperator) return null
@@ -142,7 +144,7 @@ object KotlinUnusedSymbolUtil {
           declarationContainingClass?.mustHaveNonEmptyPrimaryConstructor() == true
       ) return null
       // experimental annotations
-      if (symbol is KaClassOrObjectSymbol && symbol.classKind == KaClassKind.ANNOTATION_CLASS) {
+      if (symbol is KaClassSymbol && symbol.classKind == KaClassKind.ANNOTATION_CLASS) {
           val fqName = symbol.nameOrAnonymous.asString()
           val languageVersionSettings = declaration.languageVersionSettings
           if (fqName in languageVersionSettings.getFlag(AnalysisFlags.optIn)) return null
@@ -437,7 +439,7 @@ object KotlinUnusedSymbolUtil {
               (isCheapEnoughToSearchUsages(declarationContainingClass) == PsiSearchHelper.SearchCostResult.TOO_MANY_OCCURRENCES ||
               ReferencesSearch.search(KotlinReferencesSearchParameters(declarationContainingClass, useScope)).any {
                   it.element.getStrictParentOfType<KtTypeAlias>() != null || it.element.getStrictParentOfType<KtCallExpression>()
-                      ?.resolveCallOld()?.singleFunctionCallOrNull()?.partiallyAppliedSymbol?.symbol == symbol
+                      ?.resolveToCall()?.singleFunctionCallOrNull()?.partiallyAppliedSymbol?.symbol == symbol
               })
           ) {
               return true
@@ -586,7 +588,7 @@ object KotlinUnusedSymbolUtil {
   }
 
   context(KaSession)
-  private fun KtImportDirective.resolveReferenceToSymbol(): KtSymbol? = when(importedReference) {
+  private fun KtImportDirective.resolveReferenceToSymbol(): KaSymbol? = when (importedReference) {
       is KtReferenceExpression -> importedReference as KtReferenceExpression
       else -> importedReference?.getChildOfType<KtReferenceExpression>()
   }?.mainReference?.resolveToSymbol()
@@ -595,7 +597,7 @@ object KotlinUnusedSymbolUtil {
   private fun KtImportDirective.isUsedStarImportOfEnumStaticFunctions(): Boolean {
       if (importPath?.isAllUnder != true) return false
       val importedEnumFqName = this.importedFqName ?: return false
-      val importedClass = resolveReferenceToSymbol() as? KaClassOrObjectSymbol ?: return false
+      val importedClass = resolveReferenceToSymbol() as? KaClassSymbol ?: return false
       if (importedClass.classKind != KaClassKind.ENUM_CLASS) return false
 
       val enumStaticMethods = ENUM_STATIC_METHOD_NAMES_WITH_ENTRIES.map { FqName("$importedEnumFqName.$it") }
@@ -658,13 +660,13 @@ object KotlinUnusedSymbolUtil {
       val ownerClass = declaration.containingClassOrObject as? KtClass ?: return false
       if (!ownerClass.isInheritable()) return false
       val callableSymbol = symbol as? KaCallableSymbol ?: return false
-      if ((callableSymbol as? KaSymbolWithModality)?.modality == Modality.ABSTRACT) return false
+      if ((callableSymbol as? KaSymbolWithModality)?.modality == KaSymbolModality.ABSTRACT) return false
       return ownerClass.findAllInheritors(useScope).any { element: PsiElement ->
           when (element) {
               is KtClassOrObject -> {
                   val overridingCallableSymbol = element.getClassOrObjectSymbol()?.memberScope
                       ?.getCallableSymbols { name -> name == callableSymbol.callableId?.callableName }?.filter {
-                          it.unwrapFakeOverrides == callableSymbol
+                          it.fakeOverrideOriginal == callableSymbol
                       }?.singleOrNull() ?: return@any false
                   overridingCallableSymbol != callableSymbol && overridingCallableSymbol.intersectionOverriddenSymbols
                       .any { it != callableSymbol }

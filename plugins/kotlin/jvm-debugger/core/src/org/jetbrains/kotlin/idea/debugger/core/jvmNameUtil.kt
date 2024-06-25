@@ -6,7 +6,7 @@ import com.intellij.util.concurrency.annotations.RequiresReadLock
 import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.analyze
-import org.jetbrains.kotlin.analysis.api.annotations.KtConstantAnnotationValue
+import org.jetbrains.kotlin.analysis.api.annotations.KaAnnotationValue
 import org.jetbrains.kotlin.analysis.api.annotations.annotations
 import org.jetbrains.kotlin.analysis.api.base.KaConstantValue
 import org.jetbrains.kotlin.analysis.api.symbols.*
@@ -23,8 +23,8 @@ fun KaNamedFunctionSymbol.getByteCodeMethodName(): String {
         .filter { it.classId?.asFqNameString() == "kotlin.jvm.JvmName" }
         .firstNotNullOfOrNull {
             it.arguments.singleOrNull { a -> a.name.asString() == "name" }
-                ?.expression?.asSafely<KtConstantAnnotationValue>()
-                ?.constantValue?.asSafely<KaConstantValue.KaStringConstantValue>()?.value
+                ?.expression?.asSafely<KaAnnotationValue.ConstantValue>()
+                ?.value?.asSafely<KaConstantValue.StringValue>()?.value
         }
     if (jvmName != null) return jvmName
     return name.asString()
@@ -57,10 +57,10 @@ fun KaFunctionSymbol.getJvmInternalClassName(): String? {
 
 context(KaSession)
 @ApiStatus.Internal
-fun KaFunctionSymbol.getContainingClassOrObjectSymbol(): KaClassOrObjectSymbol? {
+fun KaFunctionSymbol.getContainingClassOrObjectSymbol(): KaClassSymbol? {
     var symbol = containingSymbol
     while (symbol != null) {
-        if (symbol is KaClassOrObjectSymbol) return symbol
+        if (symbol is KaClassSymbol) return symbol
         symbol = symbol.containingSymbol
     }
     return null

@@ -4,10 +4,10 @@ package org.jetbrains.kotlin.idea.base.fir.codeInsight.tooling
 import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.analyze
 import org.jetbrains.kotlin.analysis.api.annotations.hasAnnotation
-import org.jetbrains.kotlin.analysis.api.symbols.KaClassOrObjectSymbol
+import org.jetbrains.kotlin.analysis.api.symbols.KaClassSymbol
+import org.jetbrains.kotlin.analysis.api.symbols.KaSymbolVisibility
 import org.jetbrains.kotlin.analysis.api.symbols.markers.KaAnnotatedSymbol
 import org.jetbrains.kotlin.analysis.api.symbols.markers.KaSymbolWithVisibility
-import org.jetbrains.kotlin.descriptors.Visibilities
 import org.jetbrains.kotlin.idea.base.codeInsight.KotlinTestAvailabilityChecker
 import org.jetbrains.kotlin.idea.base.codeInsight.tooling.AbstractGenericTestIconProvider
 import org.jetbrains.kotlin.psi.KtClassOrObject
@@ -31,9 +31,9 @@ internal object SymbolBasedGenericTestIconProvider : AbstractGenericTestIconProv
     private fun isTestDeclaration(symbol: KaAnnotatedSymbol): Boolean {
         return when {
             isIgnored(symbol) -> false
-            (symbol as? KaSymbolWithVisibility)?.visibility != Visibilities.Public -> false
+            (symbol as? KaSymbolWithVisibility)?.visibility != KaSymbolVisibility.PUBLIC -> false
             symbol.hasAnnotation(KotlinTestAvailabilityChecker.TEST_FQ_NAME) -> true
-            symbol is KaClassOrObjectSymbol -> symbol.declaredMemberScope.getCallableSymbols().any { isTestDeclaration(it) }
+            symbol is KaClassSymbol -> symbol.declaredMemberScope.getCallableSymbols().any { isTestDeclaration(it) }
             else -> false
         }
     }
@@ -44,7 +44,7 @@ internal object SymbolBasedGenericTestIconProvider : AbstractGenericTestIconProv
             return true
         }
 
-        val containingSymbol = symbol.containingSymbol as? KaClassOrObjectSymbol ?: return false
+        val containingSymbol = symbol.containingSymbol as? KaClassSymbol ?: return false
         return isIgnored(containingSymbol)
     }
 }

@@ -148,7 +148,7 @@ private object AnalysisApiBasedKotlinEditorTextProvider : KotlinEditorTextProvid
             reference is KtOperationReferenceExpression && reference.operationSignTokenType == KtTokens.ELVIS -> return true
             reference is KtCollectionLiteralExpression -> return false
             reference is KtCallExpression -> {
-                val callInfo = reference.resolveCallOld() as? KaSuccessCallInfo ?: return false
+                val callInfo = reference.resolveToCall() as? KaSuccessCallInfo ?: return false
 
                 return when (val call = callInfo.call) {
                     is KaAnnotationCall -> {
@@ -173,11 +173,11 @@ private object AnalysisApiBasedKotlinEditorTextProvider : KotlinEditorTextProvid
         }
     }
 
-    private fun isSymbolAllowed(symbol: KtSymbol, allowMethodCalls: Boolean): Boolean {
+    private fun isSymbolAllowed(symbol: KaSymbol, allowMethodCalls: Boolean): Boolean {
         return when (symbol) {
-            is KaClassOrObjectSymbol -> symbol.classKind.isObject
+            is KaClassSymbol -> symbol.classKind.isObject
             is KaFunctionSymbol -> allowMethodCalls
-            is KtVariableSymbol, is KaValueParameterSymbol, is KaEnumEntrySymbol -> true
+            is KaPropertySymbol, is KaJavaFieldSymbol, is KaLocalVariableSymbol, is KaValueParameterSymbol, is KaEnumEntrySymbol -> true
             else -> false
         }
     }

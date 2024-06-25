@@ -1,4 +1,4 @@
-// Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 
 package org.jetbrains.kotlin.idea.core.overrideImplement
 
@@ -7,8 +7,8 @@ import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
 import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.analyze
-import org.jetbrains.kotlin.analysis.api.lifetime.KtLifetimeOwner
-import org.jetbrains.kotlin.analysis.api.lifetime.KtLifetimeToken
+import org.jetbrains.kotlin.analysis.api.lifetime.KaLifetimeOwner
+import org.jetbrains.kotlin.analysis.api.lifetime.KaLifetimeToken
 import org.jetbrains.kotlin.analysis.api.symbols.*
 import org.jetbrains.kotlin.analysis.api.symbols.markers.KaSymbolWithModality
 import org.jetbrains.kotlin.descriptors.Modality
@@ -46,7 +46,7 @@ private fun collectMembers(classOrObject: KtClassOrObject): List<KtClassMember> 
 
 context(KaSession)
 @OptIn(KaExperimentalApi::class)
-private fun getOverridableMembers(classOrObjectSymbol: KaClassOrObjectSymbol): List<OverrideMember> {
+private fun getOverridableMembers(classOrObjectSymbol: KaClassSymbol): List<OverrideMember> {
         return buildList {
             classOrObjectSymbol.memberScope.getCallableSymbols().forEach { symbol ->
                 if (!symbol.isVisibleInClass(classOrObjectSymbol)) return@forEach
@@ -57,7 +57,7 @@ private fun getOverridableMembers(classOrObjectSymbol: KaClassOrObjectSymbol): L
                 val symbolsToProcess = if (intersectionSymbols.size <= 1) {
                     listOf(symbol)
                 } else {
-                    val nonAbstractMembers = intersectionSymbols.filter { (it as? KaSymbolWithModality)?.modality != Modality.ABSTRACT }
+                    val nonAbstractMembers = intersectionSymbols.filter { (it as? KaSymbolWithModality)?.modality != KaSymbolModality.ABSTRACT }
                     // If there are non-abstract members, we only want to show override for these non-abstract members. Otherwise, show any
                     // abstract member to override.
                     nonAbstractMembers.ifEmpty {
@@ -67,7 +67,7 @@ private fun getOverridableMembers(classOrObjectSymbol: KaClassOrObjectSymbol): L
 
                 val hasNoSuperTypesExceptAny = classOrObjectSymbol.superTypes.singleOrNull()?.isAny == true
                 for (symbolToProcess in symbolsToProcess) {
-                    val originalOverriddenSymbol = symbolToProcess.unwrapFakeOverrides
+                    val originalOverriddenSymbol = symbolToProcess.fakeOverrideOriginal
                     val containingSymbol = originalOverriddenSymbol.originalContainingClassForOverride
 
                     val bodyType = when {
@@ -88,7 +88,7 @@ private fun getOverridableMembers(classOrObjectSymbol: KaClassOrObjectSymbol): L
                                 BodyType.Super
                             }
                         }
-                        (originalOverriddenSymbol as? KaSymbolWithModality)?.modality == Modality.ABSTRACT ->
+                        (originalOverriddenSymbol as? KaSymbolWithModality)?.modality == KaSymbolModality.ABSTRACT ->
                             BodyType.FromTemplate
                         symbolsToProcess.size > 1 ->
                             BodyType.QualifiedSuper
@@ -108,9 +108,9 @@ private fun getOverridableMembers(classOrObjectSymbol: KaClassOrObjectSymbol): L
     private data class OverrideMember(
         val symbol: KaCallableSymbol,
         val bodyType: BodyType,
-        val containingSymbol: KaClassOrObjectSymbol?,
-        override val token: KtLifetimeToken
-    ) : KtLifetimeOwner
+        val containingSymbol: KaClassSymbol?,
+        override val token: KaLifetimeToken
+    ) : KaLifetimeOwner
 
     override fun getChooserTitle() = KotlinIdeaCoreBundle.message("override.members.handler.title")
 

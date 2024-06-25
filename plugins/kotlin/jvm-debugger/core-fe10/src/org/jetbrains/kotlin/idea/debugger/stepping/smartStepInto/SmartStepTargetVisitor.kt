@@ -1,4 +1,4 @@
-// Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
+// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 
 package org.jetbrains.kotlin.idea.debugger.stepping.smartStepInto
 
@@ -13,13 +13,12 @@ import org.jetbrains.annotations.VisibleForTesting
 import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
 import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.analyze
-import org.jetbrains.kotlin.analysis.api.annotations.annotations
 import org.jetbrains.kotlin.analysis.api.resolution.KaSuccessCallInfo
 import org.jetbrains.kotlin.analysis.api.resolution.KaVariableAccessCall
 import org.jetbrains.kotlin.analysis.api.resolution.successfulFunctionCallOrNull
 import org.jetbrains.kotlin.analysis.api.resolution.symbol
 import org.jetbrains.kotlin.analysis.api.symbols.*
-import org.jetbrains.kotlin.analysis.api.types.KtFunctionalType
+import org.jetbrains.kotlin.analysis.api.types.KaFunctionType
 import org.jetbrains.kotlin.descriptors.Modality
 import org.jetbrains.kotlin.idea.codeinsight.utils.getCallExpressionSymbol
 import org.jetbrains.kotlin.idea.debugger.core.breakpoints.isInlineOnly
@@ -60,7 +59,7 @@ class SmartStepTargetVisitor(
     private fun recordCallableReference(expression: KtCallableReferenceExpression): Boolean {
         analyze(expression) {
             val symbol = expression.callableReference.mainReference.resolveToSymbol() ?: return false
-            if (symbol is KtPropertySymbol) {
+            if (symbol is KaPropertySymbol) {
                 return recordProperty(expression, symbol)
             }
             if (symbol is KaNamedFunctionSymbol) {
@@ -88,9 +87,9 @@ class SmartStepTargetVisitor(
 
     context(KaSession)
     @OptIn(KaExperimentalApi::class)
-    private fun recordProperty(expression: KtExpression, symbol: KtPropertySymbol): Boolean {
+    private fun recordProperty(expression: KtExpression, symbol: KaPropertySymbol): Boolean {
         val targetType = (expression as? KtNameReferenceExpression)?.computeTargetType()
-        if (symbol is KtSyntheticJavaPropertySymbol) {
+        if (symbol is KaSyntheticJavaPropertySymbol) {
             val propertyAccessSymbol = when (targetType) {
                 KtNameReferenceExpressionUsage.PROPERTY_GETTER, KtNameReferenceExpressionUsage.UNKNOWN, null -> symbol.javaGetterSymbol
                 KtNameReferenceExpressionUsage.PROPERTY_SETTER -> symbol.javaSetterSymbol
@@ -153,7 +152,7 @@ class SmartStepTargetVisitor(
     }
 
     context(KaSession)
-    private fun propertyAccessLabel(symbol: KtPropertySymbol, propertyAccessSymbol: KaDeclarationSymbol) =
+    private fun propertyAccessLabel(symbol: KaPropertySymbol, propertyAccessSymbol: KaDeclarationSymbol) =
         "${symbol.name}.${KotlinMethodSmartStepTarget.calcLabel(propertyAccessSymbol)}"
 
     private fun KtNameReferenceExpression.computeTargetType(): KtNameReferenceExpressionUsage {
@@ -235,12 +234,12 @@ class SmartStepTargetVisitor(
         argumentSymbol: KaValueParameterSymbol,
     ): KotlinLambdaInfo? {
         val callerMethodOrdinal = countExistingMethodCalls(declaration)
-        return if (argumentSymbol.returnType.isFunctionalInterfaceType) {
+        return if (argumentSymbol.returnType.isFunctionalInterface) {
             val samClassSymbol = argumentSymbol.returnType.expandedSymbol ?: return null
             val scope = samClassSymbol.memberScope
             val funMethodSymbol = scope.getCallableSymbols()
                 .filterIsInstance<KaNamedFunctionSymbol>()
-                .singleOrNull { it.modality == Modality.ABSTRACT }
+                .singleOrNull { it.modality == KaSymbolModality.ABSTRACT }
                 ?: return null
             KotlinLambdaInfo(
                 methodSymbol, argumentSymbol, callerMethodOrdinal,
@@ -248,7 +247,7 @@ class SmartStepTargetVisitor(
                 isSam = true, isSamSuspendMethod = funMethodSymbol.isSuspend, methodName = funMethodSymbol.name.asString()
             )
         } else {
-            val isNameMangledInBytecode = (argumentSymbol.returnType as? KtFunctionalType)?.parameterTypes
+            val isNameMangledInBytecode = (argumentSymbol.returnType as? KaFunctionType)?.parameterTypes
                 ?.any { it.expandedSymbol?.isInlineClass() == true } == true
             KotlinLambdaInfo(
                 methodSymbol, argumentSymbol, callerMethodOrdinal,
@@ -321,9 +320,9 @@ class SmartStepTargetVisitor(
     override fun visitSimpleNameExpression(expression: KtSimpleNameExpression) {
         if (checkLineRangeFits(expression.getLineRange())) {
             analyze(expression) {
-                val resolvedCall = expression.resolveCallOld() as? KaSuccessCallInfo ?: return
+                val resolvedCall = expression.resolveToCall() as? KaSuccessCallInfo ?: return
                 val variableAccessCall = resolvedCall.call as? KaVariableAccessCall ?: return
-                val symbol = variableAccessCall.partiallyAppliedSymbol.symbol as? KtPropertySymbol ?: return
+                val symbol = variableAccessCall.partiallyAppliedSymbol.symbol as? KaPropertySymbol ?: return
                 recordProperty(expression, symbol)
             }
         }
@@ -332,7 +331,7 @@ class SmartStepTargetVisitor(
 
     private fun recordFunctionCall(expression: KtExpression, highlightExpression: KtExpression) {
         analyze(expression) {
-            val resolvedCall = expression.resolveCallOld()?.successfulFunctionCallOrNull() ?: return
+            val resolvedCall = expression.resolveToCall()?.successfulFunctionCallOrNull() ?: return
             val symbol = resolvedCall.partiallyAppliedSymbol.symbol
             if (symbol.annotations.any { it.classId?.internalName == "kotlin/internal/IntrinsicConstEvaluation" }) {
                 return

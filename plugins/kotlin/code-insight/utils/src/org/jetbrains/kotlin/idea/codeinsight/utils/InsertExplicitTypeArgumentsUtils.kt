@@ -1,4 +1,4 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 
 @file:JvmName("InsertExplicitTypeArgumentsUtils")
 
@@ -9,10 +9,10 @@ import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
 import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.resolution.singleFunctionCallOrNull
 import org.jetbrains.kotlin.analysis.api.resolution.symbol
+import org.jetbrains.kotlin.analysis.api.symbols.typeParameters
 import org.jetbrains.kotlin.analysis.api.types.*
 import org.jetbrains.kotlin.idea.base.codeInsight.ShortenReferencesFacility
 import org.jetbrains.kotlin.psi.KtCallElement
-import org.jetbrains.kotlin.psi.KtCallExpression
 import org.jetbrains.kotlin.psi.KtPsiFactory
 import org.jetbrains.kotlin.psi.KtTypeArgumentList
 import org.jetbrains.kotlin.types.Variance
@@ -20,7 +20,7 @@ import org.jetbrains.kotlin.types.Variance
 context(KaSession)
 @OptIn(KaExperimentalApi::class)
 fun getRenderedTypeArguments(element: KtCallElement): String? {
-    val resolvedCall = element.resolveCallOld()?.singleFunctionCallOrNull() ?: return null
+    val resolvedCall = element.resolveToCall()?.singleFunctionCallOrNull() ?: return null
     val typeParameterSymbols = resolvedCall.partiallyAppliedSymbol.symbol.typeParameters
     if (typeParameterSymbols.isEmpty()) return null
     val renderedTypeParameters = buildList {
@@ -28,9 +28,9 @@ fun getRenderedTypeArguments(element: KtCallElement): String? {
             val type = resolvedCall.typeArgumentsMapping[symbol] ?: return null
 
             /** Can't use definitely-non-nullable type as reified type argument */
-            if (type is KtDefinitelyNotNullType && symbol.isReified) return null
+            if (type is KaDefinitelyNotNullType && symbol.isReified) return null
 
-            if (type.containsErrorType() || !(type.isDenotable || type is KtFlexibleType)) return null
+            if (type.containsErrorType() || !(type.isDenotable || type is KaFlexibleType)) return null
             add(type.render(position = Variance.IN_VARIANCE))
         }
     }
@@ -46,18 +46,18 @@ fun addTypeArguments(element: KtCallElement, context: String, project: Project) 
 }
 
 context(KaSession)
-private fun KtType.containsErrorType(): Boolean = when (this) {
-    is KtErrorType -> true
-    is KtFunctionalType -> {
+private fun KaType.containsErrorType(): Boolean = when (this) {
+    is KaErrorType -> true
+    is KaFunctionType -> {
         (receiverType?.containsErrorType() == true)
                 || returnType.containsErrorType()
                 || parameterTypes.any { it.containsErrorType() }
-                || ownTypeArguments.any { it.type?.containsErrorType() == true }
+                || typeArguments.any { it.type?.containsErrorType() == true }
     }
 
-    is KtNonErrorClassType -> ownTypeArguments.any { it.type?.containsErrorType() == true }
-    is KtDefinitelyNotNullType -> original.containsErrorType()
-    is KtFlexibleType -> lowerBound.containsErrorType() || upperBound.containsErrorType()
-    is KtIntersectionType -> conjuncts.any { it.containsErrorType() }
-    is KtTypeParameterType, is KtCapturedType, is KtDynamicType -> false
+    is KaClassType -> typeArguments.any { it.type?.containsErrorType() == true }
+    is KaDefinitelyNotNullType -> original.containsErrorType()
+    is KaFlexibleType -> lowerBound.containsErrorType() || upperBound.containsErrorType()
+    is KaIntersectionType -> conjuncts.any { it.containsErrorType() }
+    is KaTypeParameterType, is KaCapturedType, is KaDynamicType -> false
 }

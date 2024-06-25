@@ -116,8 +116,9 @@ sealed interface IjentFileSystemApi {
    */
   suspend fun fileWriter(
     path: IjentPath.Absolute,
-    append: Boolean = false,
-    creationMode: FileWriterCreationMode = FileWriterCreationMode.ALLOW_CREATE,
+    append: Boolean,
+    truncateExisting: Boolean,
+    creationMode: FileWriterCreationMode,
   ): IjentFsResult<
     IjentOpenedFile.Writer,
     FileWriterError>
@@ -132,6 +133,47 @@ sealed interface IjentFileSystemApi {
 
   enum class FileWriterCreationMode {
     ALLOW_CREATE, ONLY_CREATE, ONLY_OPEN_EXISTING,
+  }
+
+  @Throws(DeleteException::class)
+  suspend fun deleteDirectory(path: IjentPath.Absolute, removeContent: Boolean)
+
+  sealed class DeleteException(
+    where: IjentPath.Absolute,
+    additionalMessage: @NlsSafe String,
+  ) : IjentFsIOException(where, additionalMessage) {
+    class DirAlreadyDeleted(where: IjentPath.Absolute, additionalMessage: @NlsSafe String) : DeleteException(where, additionalMessage), IjentFsError.AlreadyDeleted
+    class DirNotEmpty(where: IjentPath.Absolute, additionalMessage: @NlsSafe String) : DeleteException(where, additionalMessage)
+    class PermissionDenied(where: IjentPath.Absolute, additionalMessage: @NlsSafe String) : DeleteException(where, additionalMessage), IjentFsError.PermissionDenied
+    class Other(where: IjentPath.Absolute, additionalMessage: @NlsSafe String)
+      : DeleteException(where, additionalMessage), IjentFsError.Other
+  }
+
+
+  @Throws(CopyException::class)
+  suspend fun copy(options: CopyOptions)
+
+  interface CopyOptions
+
+  fun copyOptionsBuilder(source: IjentPath.Absolute, target: IjentPath.Absolute): CopyOptionsBuilder
+
+  interface CopyOptionsBuilder {
+    fun replaceExisting(): CopyOptionsBuilder
+    fun copyAttributes(): CopyOptionsBuilder
+    fun atomicMove(): CopyOptionsBuilder
+    fun interruptible(): CopyOptionsBuilder
+    fun nofollowLinks(): CopyOptionsBuilder
+    fun build(): CopyOptions
+  }
+
+  sealed class CopyException(
+    where: IjentPath.Absolute,
+    additionalMessage: @NlsSafe String,
+  ) : IjentFsIOException(where, additionalMessage) {
+    class SourceDoesNotExist(where: IjentPath.Absolute, additionalMessage: @NlsSafe String) : CopyException(where, additionalMessage), IjentFsError.DoesNotExist
+    class PermissionDenied(where: IjentPath.Absolute, additionalMessage: @NlsSafe String) : CopyException(where, additionalMessage), IjentFsError.PermissionDenied
+    class Other(where: IjentPath.Absolute, additionalMessage: @NlsSafe String)
+      : CopyException(where, additionalMessage), IjentFsError.Other
   }
 }
 
@@ -149,7 +191,7 @@ sealed interface IjentOpenedFile {
       : CloseException(where, additionalMessage), IjentFsError.Other
   }
 
-  fun tell(): IjentFsResult<
+  suspend fun tell(): IjentFsResult<
     Long,
     TellError>
 
@@ -163,6 +205,7 @@ sealed interface IjentOpenedFile {
 
   sealed interface SeekError : IjentFsError {
     interface InvalidValue : SeekError, IjentFsError
+    interface FileNotOpened : SeekError, IjentFsError.FileNotOpened
     interface Other : SeekError, IjentFsError.Other
   }
 
@@ -170,12 +213,24 @@ sealed interface IjentOpenedFile {
     START, CURRENT, END,
   }
 
+
   interface Reader : IjentOpenedFile {
-    suspend fun read(buf: ByteBuffer): IjentFsResult<
-      Int,
-      ReadError>
+
+    /**
+     * If the remote file is read completely, then this function returns [ReadResult] with [ReadResult.EOF].
+     * Otherwise, if there are any data left to read, then it returns [ReadResult.Bytes]
+     */
+    suspend fun read(buf: ByteBuffer): IjentFsResult<ReadResult, ReadError>
+
+    sealed interface ReadResult {
+      interface EOF : ReadResult
+      interface Bytes : ReadResult {
+        val bytesRead: Int
+      }
+    }
 
     sealed interface ReadError : IjentFsError {
+      interface FileNotOpened : ReadError, IjentFsError.FileNotOpened
       interface InvalidValue : ReadError, IjentFsError
       interface Other : ReadError, IjentFsError.Other
     }
@@ -192,6 +247,7 @@ sealed interface IjentOpenedFile {
         interface FileSizeExceeded : ResourceExhausted, IjentFsError.Other
         interface NoSpaceLeft : ResourceExhausted, IjentFsError.Other
       }
+      interface FileNotOpened : WriteError, IjentFsError.FileNotOpened
       interface Other : WriteError, IjentFsError.Other
     }
 
@@ -220,6 +276,24 @@ sealed interface IjentOpenedFile {
 }
 
 interface IjentFileSystemPosixApi : IjentFileSystemApi {
+
+  enum class CreateDirAttributePosix {
+    // todo
+  }
+
+  @kotlin.jvm.Throws(CreateDirectoryException::class)
+  suspend fun createDirectory(path: IjentPath.Absolute, attributes: List<CreateDirAttributePosix>)
+
+  sealed class CreateDirectoryException(
+    where: IjentPath.Absolute,
+    additionalMessage: @NlsSafe String,
+  ) : IjentFsIOException(where, additionalMessage) {
+    class DirAlreadyExists(where: IjentPath.Absolute, additionalMessage: @NlsSafe String) : CreateDirectoryException(where, additionalMessage), IjentFsError.AlreadyExists
+    class FileAlreadyExists(where: IjentPath.Absolute, additionalMessage: @NlsSafe String) : CreateDirectoryException(where, additionalMessage), IjentFsError.AlreadyExists
+    class PermissionDenied(where: IjentPath.Absolute, additionalMessage: @NlsSafe String) : CreateDirectoryException(where, additionalMessage), IjentFsError.PermissionDenied
+    class Other(where: IjentPath.Absolute, additionalMessage: @NlsSafe String) : CreateDirectoryException(where, additionalMessage), IjentFsError.Other
+  }
+
   override suspend fun listDirectoryWithAttrs(
     path: IjentPath.Absolute,
     resolveSymlinks: Boolean,

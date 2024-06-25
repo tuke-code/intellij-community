@@ -68,8 +68,8 @@ internal object ChangeToLabeledReturnFixFactory {
     private fun getLambdaReturnExpression(element: PsiElement): KtReturnExpression? {
         val returnExpression = element.getStrictParentOfType<KtReturnExpression>() ?: return null
         val lambda = returnExpression.getStrictParentOfType<KtLambdaExpression>() ?: return null
-        val lambdaReturnType = lambda.functionLiteral.getReturnKtType()
-        val returnType = returnExpression.returnedExpression?.getKtType() ?: return null
+        val lambdaReturnType = lambda.functionLiteral.returnType
+        val returnType = returnExpression.returnedExpression?.expressionType ?: return null
         if (!returnType.isSubTypeOf(lambdaReturnType)) return null
         return returnExpression
     }

@@ -7,7 +7,7 @@ import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.resolution.successfulFunctionCallOrNull
 import org.jetbrains.kotlin.analysis.api.resolution.symbol
 import org.jetbrains.kotlin.analysis.api.symbols.*
-import org.jetbrains.kotlin.analysis.api.types.KtNonErrorClassType
+import org.jetbrains.kotlin.analysis.api.types.KaClassType
 import org.jetbrains.kotlin.builtins.StandardNames
 import org.jetbrains.kotlin.idea.base.psi.getContainingValueArgument
 import org.jetbrains.kotlin.name.StandardClassIds
@@ -61,7 +61,7 @@ context(KaSession)
 fun getCallExpressionSymbol(argument: KtExpression): Pair<KaFunctionSymbol, KaValueParameterSymbol>? {
     if (argument !is KtFunction && argument !is KtCallableReferenceExpression) return null
     val parentCallExpression = KtPsiUtil.getParentCallIfPresent(argument) as? KtCallExpression ?: return null
-    val parentCall = parentCallExpression.resolveCallOld()?.successfulFunctionCallOrNull() ?: return null
+    val parentCall = parentCallExpression.resolveToCall()?.successfulFunctionCallOrNull() ?: return null
     val symbol = parentCall.partiallyAppliedSymbol.symbol
     val valueArgument = parentCallExpression.getContainingValueArgument(argument) ?: return null
     val argumentSymbol = parentCall.argumentMapping[valueArgument.getArgumentExpression()]?.symbol ?: return null
@@ -85,7 +85,7 @@ private fun isArrayGeneratorConstructorCall(symbol: KaFunctionSymbol): Boolean {
         return isArrayClass && checkParameters(symbol)
     } else if (symbol is KaNamedFunctionSymbol && symbol.isExtension) {
         val receiverType = symbol.receiverType
-        return receiverType is KtNonErrorClassType
+        return receiverType is KaClassType
                 && receiverType.classId in StandardClassIds.elementTypeByUnsignedArrayType
                 && symbol.callableId?.packageName == StandardNames.BUILT_INS_PACKAGE_FQ_NAME
                 && checkParameters(symbol)

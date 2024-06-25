@@ -3,12 +3,12 @@ package org.jetbrains.kotlin.idea.k2.codeinsight.fixes
 
 import com.intellij.psi.PsiElement
 import org.jetbrains.kotlin.analysis.api.KaSession
-import org.jetbrains.kotlin.analysis.api.KtStarTypeProjection
 import org.jetbrains.kotlin.analysis.api.resolution.successfulFunctionCallOrNull
 import org.jetbrains.kotlin.analysis.api.resolution.symbol
 import org.jetbrains.kotlin.analysis.api.fir.diagnostics.KaFirDiagnostic
-import org.jetbrains.kotlin.analysis.api.types.KtNonErrorClassType
-import org.jetbrains.kotlin.analysis.api.types.KtTypeParameterType
+import org.jetbrains.kotlin.analysis.api.types.KaClassType
+import org.jetbrains.kotlin.analysis.api.types.KaStarTypeProjection
+import org.jetbrains.kotlin.analysis.api.types.KaTypeParameterType
 import org.jetbrains.kotlin.idea.base.psi.typeArguments
 import org.jetbrains.kotlin.idea.codeinsight.api.applicators.fixes.KotlinQuickFixFactory
 import org.jetbrains.kotlin.idea.quickfix.ChangeToStarProjectionFix
@@ -53,21 +53,21 @@ internal object ChangeToStarProjectionFixFactory {
             val type = when (parent) {
                 is KtValueArgument -> {
                     val callExpr = parent.getStrictParentOfType<KtCallExpression>()
-                    val functionCall = callExpr?.resolveCallOld()?.successfulFunctionCallOrNull()
+                    val functionCall = callExpr?.resolveToCall()?.successfulFunctionCallOrNull()
                     functionCall?.argumentMapping?.get(parent.getArgumentExpression())?.symbol?.returnType
                 }
 
                 is KtQualifiedExpression ->
                     if (KtPsiUtil.safeDeparenthesize(parent.receiverExpression) == binaryExpr)
-                        parent.resolveCallOld()?.successfulFunctionCallOrNull()?.partiallyAppliedSymbol?.symbol?.receiverParameter?.type
+                        parent.resolveToCall()?.successfulFunctionCallOrNull()?.partiallyAppliedSymbol?.symbol?.receiverParameter?.type
                     else
                         null
 
                 else ->
                     null
             }
-            val typeArguments = (type as? KtNonErrorClassType)?.ownTypeArguments
-            if (typeArguments?.any { it !is KtStarTypeProjection && it.type !is KtTypeParameterType } == true) return null
+            val typeArguments = (type as? KaClassType)?.typeArguments
+            if (typeArguments?.any { it !is KaStarTypeProjection && it.type !is KaTypeParameterType } == true) return null
         }
 
         return if (typeElement.typeArgumentsAsTypes.isEmpty()) null

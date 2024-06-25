@@ -1,4 +1,4 @@
-// Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.kotlin.idea.k2.refactoring.safeDelete
 
 import com.intellij.openapi.actionSystem.ex.ActionUtil
@@ -24,8 +24,9 @@ import com.intellij.util.containers.map2Array
 import org.jetbrains.annotations.TestOnly
 import org.jetbrains.kotlin.analysis.api.analyze
 import org.jetbrains.kotlin.analysis.api.symbols.KaCallableSymbol
-import org.jetbrains.kotlin.analysis.api.symbols.KaClassOrObjectSymbol
-import org.jetbrains.kotlin.analysis.api.symbols.KtSymbol
+import org.jetbrains.kotlin.analysis.api.symbols.KaClassSymbol
+import org.jetbrains.kotlin.analysis.api.symbols.KaSymbolModality
+import org.jetbrains.kotlin.analysis.api.symbols.KaSymbol
 import org.jetbrains.kotlin.analysis.api.symbols.markers.KaSymbolWithModality
 import org.jetbrains.kotlin.asJava.elements.KtLightMethod
 import org.jetbrains.kotlin.asJava.toLightMethods
@@ -128,12 +129,12 @@ class KotlinFirSafeDeleteProcessor : SafeDeleteProcessorDelegateBase() {
         val containingClass = element.containingClass()
         if (containingClass != null) {
             analyze(containingClass) {
-                val elementClassSymbol = containingClass.symbol as KaClassOrObjectSymbol
+                val elementClassSymbol = containingClass.symbol as KaClassSymbol
 
-                fun isMultipleInheritance(function: KtSymbol): Boolean {
+                fun isMultipleInheritance(function: KaSymbol): Boolean {
                     val superMethods = (function as? KaCallableSymbol)?.directlyOverriddenSymbols ?: return false
                     return superMethods.any {
-                        val superClassSymbol = it.containingSymbol as? KaClassOrObjectSymbol ?: return@any false
+                        val superClassSymbol = it.containingSymbol as? KaClassSymbol ?: return@any false
                         val superMethod = it.psi ?: return@any false
                         return@any !isInside(superMethod) && !superClassSymbol.isSubClassOf(elementClassSymbol)
                     }
@@ -305,7 +306,7 @@ class KotlinFirSafeDeleteProcessor : SafeDeleteProcessorDelegateBase() {
 
             return analyzeInModalWindow(element as KtDeclaration, RefactoringBundle.message("detecting.possible.conflicts")) {
                 (element.symbol as? KaCallableSymbol)?.allOverriddenSymbols
-                    ?.filter { (it as? KaSymbolWithModality)?.modality == Modality.ABSTRACT }
+                    ?.filter { (it as? KaSymbolWithModality)?.modality == KaSymbolModality.ABSTRACT }
                     ?.mapNotNull { it.psi }
                     ?.mapTo(ArrayList()) {
                         KotlinK2RefactoringsBundle.message(

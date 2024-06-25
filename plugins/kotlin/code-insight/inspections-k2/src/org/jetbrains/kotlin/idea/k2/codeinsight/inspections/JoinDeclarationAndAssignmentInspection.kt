@@ -14,12 +14,14 @@ import com.intellij.psi.PsiWhiteSpace
 import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.psi.util.parentOfType
 import com.intellij.psi.util.parents
+import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
 import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.resolution.singleVariableAccessCall
 import org.jetbrains.kotlin.analysis.api.resolution.symbol
 import org.jetbrains.kotlin.analysis.api.symbols.KaValueParameterSymbol
 import org.jetbrains.kotlin.analysis.api.symbols.markers.KaPossiblyNamedSymbol
-import org.jetbrains.kotlin.analysis.api.types.KtType
+import org.jetbrains.kotlin.analysis.api.symbols.typeParameters
+import org.jetbrains.kotlin.analysis.api.types.KaType
 import org.jetbrains.kotlin.idea.base.analysis.api.utils.isPossiblySubTypeOf
 import org.jetbrains.kotlin.idea.base.psi.replaced
 import org.jetbrains.kotlin.idea.base.resources.KotlinBundle
@@ -69,12 +71,13 @@ internal class JoinDeclarationAndAssignmentInspection :
     }
 
     context(KaSession)
+    @OptIn(KaExperimentalApi::class)
     override fun prepareContext(element: KtProperty): Context? {
         val assignment = findFirstAssignment(element) ?: return null
         val initializer = assignment.right ?: return null
 
-        val initializerType = initializer.getKtType()
-        val propertyType = element.typeReference?.getKtType()
+        val initializerType = initializer.expressionType
+        val propertyType = element.typeReference?.type
 
         if (initializer.hasReference(element)) return null
         if (initializer.dependsOnNextSiblingsOfProperty(element)) return null
@@ -276,7 +279,7 @@ internal class JoinDeclarationAndAssignmentInspection :
             return null
         }
 
-        val assignmentCall = firstAssignment.left?.resolveCallOld()?.singleVariableAccessCall()?.symbol ?: return null
+        val assignmentCall = firstAssignment.left?.resolveToCall()?.singleVariableAccessCall()?.symbol ?: return null
         if (assignmentCall != property.getVariableSymbol()) return null
 
         if (propertyContainer !is KtClassBody) return firstAssignment
@@ -356,7 +359,7 @@ internal class JoinDeclarationAndAssignmentInspection :
     }
 
     context(KaSession)
-    private fun isSubtype(type: KtType?, superType: KtType?): Boolean {
+    private fun isSubtype(type: KaType?, superType: KaType?): Boolean {
         if (type == null || superType == null) return false
         return type.isPossiblySubTypeOf(superType)
     }
@@ -366,7 +369,7 @@ internal class JoinDeclarationAndAssignmentInspection :
     private fun PsiElement.nextSiblings(): Sequence<PsiElement> = siblings(forward = true, withItself = false)
 
     context(KaSession)
-    private fun equalNullableTypes(type1: KtType?, type2: KtType?): Boolean {
+    private fun equalNullableTypes(type1: KaType?, type2: KaType?): Boolean {
         if (type1 == null) return type2 == null
         if (type2 == null) return false
         return type1.isEqualTo(type2)

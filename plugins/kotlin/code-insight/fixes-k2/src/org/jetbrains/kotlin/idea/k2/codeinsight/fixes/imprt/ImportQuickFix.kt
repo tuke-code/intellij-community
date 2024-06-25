@@ -20,12 +20,12 @@ import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.fir.diagnostics.KaFirDiagnostic
 import org.jetbrains.kotlin.analysis.api.renderer.base.annotations.KaRendererAnnotationsFilter
 import org.jetbrains.kotlin.analysis.api.renderer.declarations.KaCallableReturnTypeFilter
-import org.jetbrains.kotlin.analysis.api.renderer.declarations.KtDeclarationRenderer
-import org.jetbrains.kotlin.analysis.api.renderer.declarations.impl.KtDeclarationRendererForSource
+import org.jetbrains.kotlin.analysis.api.renderer.declarations.KaDeclarationRenderer
+import org.jetbrains.kotlin.analysis.api.renderer.declarations.impl.KaDeclarationRendererForSource
 import org.jetbrains.kotlin.analysis.api.renderer.declarations.modifiers.renderers.KaRendererVisibilityModifierProvider
 import org.jetbrains.kotlin.analysis.api.symbols.*
 import org.jetbrains.kotlin.analysis.api.symbols.markers.KaNamedSymbol
-import org.jetbrains.kotlin.analysis.api.types.KtErrorType
+import org.jetbrains.kotlin.analysis.api.types.KaErrorType
 import org.jetbrains.kotlin.analysis.utils.printer.prettyPrint
 import org.jetbrains.kotlin.idea.actions.KotlinAddImportActionInfo.executeListener
 import org.jetbrains.kotlin.idea.base.analysis.api.utils.KtSymbolFromIndexProvider
@@ -252,7 +252,7 @@ class ImportQuickFix(
         }
 
         @KaExperimentalApi
-        private val renderer: KtDeclarationRenderer = KtDeclarationRendererForSource.WITH_QUALIFIED_NAMES.with {
+        private val renderer: KaDeclarationRenderer = KaDeclarationRendererForSource.WITH_QUALIFIED_NAMES.with {
             modifiersRenderer = modifiersRenderer.with {
                 visibilityProvider = KaRendererVisibilityModifierProvider.WITH_IMPLICIT_VISIBILITY
             }
@@ -315,9 +315,9 @@ class ImportQuickFix(
                 suggestions = sortedImportCandidateSymbolsWithPriorities.map { (symbol, _) -> symbol.getFqName() }.distinct()
             )
 
-            val implicitReceiverTypes = containingKtFile.getScopeContextForPosition(position).implicitReceivers.map { it.type }
+            val implicitReceiverTypes = containingKtFile.scopeContext(position).implicitReceivers.map { it.type }
             // don't import callable on the fly as it might be unresolved because of an erroneous implicit receiver
-            val doNotImportCallablesOnFly = implicitReceiverTypes.any { it is KtErrorType }
+            val doNotImportCallablesOnFly = implicitReceiverTypes.any { it is KaErrorType }
 
             val sortedImportVariants = sortedImportCandidateSymbolsWithPriorities
                 .map { (symbol, priority) ->
@@ -347,9 +347,9 @@ class ImportQuickFix(
 
         context(KaSession)
         private fun KaDeclarationSymbol.getImportKind(): ImportFixHelper.ImportKind? = when {
-            this is KtPropertySymbol && isExtension -> ImportFixHelper.ImportKind.EXTENSION_PROPERTY
-            this is KtPropertySymbol -> ImportFixHelper.ImportKind.PROPERTY
-            this is KtJavaFieldSymbol -> ImportFixHelper.ImportKind.PROPERTY
+            this is KaPropertySymbol && isExtension -> ImportFixHelper.ImportKind.EXTENSION_PROPERTY
+            this is KaPropertySymbol -> ImportFixHelper.ImportKind.PROPERTY
+            this is KaJavaFieldSymbol -> ImportFixHelper.ImportKind.PROPERTY
 
             this is KaNamedFunctionSymbol && isOperator -> ImportFixHelper.ImportKind.OPERATOR
             this is KaNamedFunctionSymbol && isExtension -> ImportFixHelper.ImportKind.EXTENSION_FUNCTION

@@ -1,4 +1,4 @@
-// Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.kotlin.idea.k2.codeinsight.inspections
 
 import com.intellij.codeInsight.CodeInsightSettings
@@ -8,11 +8,8 @@ import com.intellij.psi.PsiElementVisitor
 import com.intellij.psi.createSmartPointer
 import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.analyze
-import org.jetbrains.kotlin.analysis.api.symbols.KaCallableSymbol
-import org.jetbrains.kotlin.analysis.api.symbols.KaClassOrObjectSymbol
-import org.jetbrains.kotlin.analysis.api.symbols.KaNamedFunctionSymbol
-import org.jetbrains.kotlin.analysis.api.symbols.KtPropertySymbol
-import org.jetbrains.kotlin.analysis.api.types.KtType
+import org.jetbrains.kotlin.analysis.api.symbols.*
+import org.jetbrains.kotlin.analysis.api.types.KaType
 import org.jetbrains.kotlin.builtins.StandardNames
 import org.jetbrains.kotlin.config.ApiVersion
 import org.jetbrains.kotlin.config.LanguageFeature
@@ -50,7 +47,7 @@ internal class EqualsOrHashCodeInspection : AbstractKotlinInspection() {
 
     context(KaSession)
     private fun matchesEqualsMethodSignature(function: KaNamedFunctionSymbol): Boolean {
-        if (function.modality == Modality.ABSTRACT) return false
+        if (function.modality == KaSymbolModality.ABSTRACT) return false
         if (function.name != EQUALS) return false
         if (function.typeParameters.isNotEmpty()) return false
         val param = function.valueParameters.singleOrNull() ?: return false
@@ -63,7 +60,7 @@ internal class EqualsOrHashCodeInspection : AbstractKotlinInspection() {
 
     context(KaSession)
     private fun matchesHashCodeMethodSignature(function: KaNamedFunctionSymbol): Boolean {
-        if (function.modality == Modality.ABSTRACT) return false
+        if (function.modality == KaSymbolModality.ABSTRACT) return false
         if (function.name != HASH_CODE) return false
         if (function.typeParameters.isNotEmpty()) return false
         if (function.valueParameters.isNotEmpty()) return false
@@ -77,17 +74,17 @@ internal class EqualsOrHashCodeInspection : AbstractKotlinInspection() {
      */
     context(KaSession)
     private fun findMethod(
-        classSymbol: KaClassOrObjectSymbol, methodName: Name, condition: (KaCallableSymbol) -> Boolean
+        classSymbol: KaClassSymbol, methodName: Name, condition: (KaCallableSymbol) -> Boolean
     ): KaCallableSymbol? = classSymbol.memberScope.getCallableSymbols(methodName).filter(condition).singleOrNull()
 
     context(KaSession)
-    private fun findEqualsMethodForClass(classSymbol: KaClassOrObjectSymbol): KaCallableSymbol? =
+    private fun findEqualsMethodForClass(classSymbol: KaClassSymbol): KaCallableSymbol? =
         findMethod(classSymbol, EQUALS) { callableSymbol ->
             (callableSymbol as? KaNamedFunctionSymbol)?.let { matchesEqualsMethodSignature(it) } == true
         }
 
     context(KaSession)
-    private fun findHashCodeMethodForClass(classSymbol: KaClassOrObjectSymbol): KaCallableSymbol? =
+    private fun findHashCodeMethodForClass(classSymbol: KaClassSymbol): KaCallableSymbol? =
         findMethod(classSymbol, HASH_CODE) { callableSymbol ->
             (callableSymbol as? KaNamedFunctionSymbol)?.let { matchesHashCodeMethodSignature(it) } == true
         }
@@ -123,7 +120,7 @@ internal class EqualsOrHashCodeInspection : AbstractKotlinInspection() {
         buildList<KtNamedDeclaration> {
             classOrObject.primaryConstructorParameters.filterTo(this) { it.hasValOrVar() }
             classOrObject.declarations.asSequence().filterIsInstance<KtProperty>().filterTo(this) {
-                it.getVariableSymbol() is KtPropertySymbol
+                it.getVariableSymbol() is KaPropertySymbol
             }
         }.filter {
             it.name?.quoteIfNeeded().isIdentifier()
@@ -133,7 +130,7 @@ internal class EqualsOrHashCodeInspection : AbstractKotlinInspection() {
 
     context(KaSession)
     private fun generateArraysEqualsCall(
-        type: KtType, canUseContentFunctions: Boolean, arg1: String, arg2: String
+        type: KaType, canUseContentFunctions: Boolean, arg1: String, arg2: String
     ): String {
         return if (canUseContentFunctions) {
             val methodName = if (type.isNestedArray) "contentDeepEquals" else "contentEquals"
@@ -146,7 +143,7 @@ internal class EqualsOrHashCodeInspection : AbstractKotlinInspection() {
 
     context(KaSession)
     private fun generateArrayHashCodeCall(
-        variableType: KtType?, canUseContentFunctions: Boolean, argument: String
+        variableType: KaType?, canUseContentFunctions: Boolean, argument: String
     ): String {
         return if (canUseContentFunctions) {
             val methodName = if (variableType?.isNestedArray == true) "contentDeepHashCode" else "contentHashCode"
@@ -180,7 +177,7 @@ internal class EqualsOrHashCodeInspection : AbstractKotlinInspection() {
              *  generates `equals(other: Any?)` by default and it generates `equals(other: kotlin.Any?)` if the project has a custom class
              *  named "Any". To preserve the same behavior for FIR, we tried
              *  [org.jetbrains.kotlin.analysis.api.components.KtSymbolDeclarationRendererMixIn.render] with
-             *  [org.jetbrains.kotlin.analysis.api.components.KtBuiltinTypes.ANY],
+             *  [org.jetbrains.kotlin.analysis.api.components.KaBuiltinTypes.any],
              *  `builtinTypes.ANY.expandedClassSymbol.classId?.asSingleFqName()?.asString()`, and
              *  `org.jetbrains.kotlin.builtins.StandardNames.FqNames.any.render()`, but they all have the same rendering result
              *  regardless of the user-defined "Any" class. We specify the parameter and the return type as `kotlin.Any?` and
@@ -228,7 +225,7 @@ internal class EqualsOrHashCodeInspection : AbstractKotlinInspection() {
                     append('\n')
 
                     variablesForEquals.forEach {
-                        val variableType = it.getKtType() ?: return@forEach
+                        val variableType = it.expressionType ?: return@forEach
                         val isNullableType = variableType.isMarkedNullable
                         val isArray = variableType.isArrayOrPrimitiveArray
                         val canUseArrayContentFunctions = targetClass.canUseArrayContentFunctions()
@@ -278,7 +275,7 @@ internal class EqualsOrHashCodeInspection : AbstractKotlinInspection() {
         analyze(targetClass) {
             fun KtNamedDeclaration.genVariableHashCode(parenthesesNeeded: Boolean): String {
                 val ref = name ?: return "0"
-                val type = getReturnKtType()
+                val type = returnType
                 val isNullable = type.isMarkedNullable
 
                 var text = when {
