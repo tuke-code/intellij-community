@@ -5,6 +5,7 @@ import com.intellij.ide.util.PropertiesComponent
 import com.intellij.openapi.diagnostic.Attachment
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.editor.Editor
+import com.intellij.openapi.extensions.ExtensionPointName
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.DimensionService
 import com.intellij.openapi.util.text.StringUtil
@@ -12,10 +13,12 @@ import com.intellij.openapi.wm.WindowManager
 import com.intellij.ui.AppUIUtil
 import com.intellij.ui.ScreenUtil
 import com.intellij.ui.components.JBTabbedPane
+import com.intellij.util.ui.JBUI
 import com.intellij.xdebugger.frame.XFullValueEvaluator
 import com.intellij.xdebugger.impl.ui.*
 import com.intellij.xdebugger.ui.TextValueVisualizer
 import com.intellij.xdebugger.ui.VisualizedContentTab
+import org.jetbrains.annotations.ApiStatus
 import java.awt.CardLayout
 import java.awt.Dimension
 import java.awt.Font
@@ -26,13 +29,18 @@ import javax.swing.JComponent
 import javax.swing.JPanel
 import kotlin.math.max
 
-private const val SELECTED_TAB_KEY_PREFIX = "DEBUGGER_VISUALIZED_TEXT_SELECTED_TAB#"
-private val logger = Logger.getInstance(VisualizedTextPopup.javaClass)
-
 /**
  * Provides tools to show a text-like value that might be formatted for better readability (JSON, XML, HTML, etc.).
  */
-internal object VisualizedTextPopup {
+@ApiStatus.Internal
+object VisualizedTextPopup {
+
+  private const val SELECTED_TAB_KEY_PREFIX = "DEBUGGER_VISUALIZED_TEXT_SELECTED_TAB#"
+
+  private val LOG = Logger.getInstance(VisualizedTextPopup.javaClass)
+
+  private val extensionPoint: ExtensionPointName<TextValueVisualizer> =
+    ExtensionPointName.create("com.intellij.xdebugger.textValueVisualizer")
 
   fun showValuePopup(event: MouseEvent, project: Project, editor: Editor?, component: JComponent, cancelCallback: Runnable?) {
     var size = DimensionService.getInstance().getSize(DebuggerUIUtil.FULL_VALUE_POPUP_DIMENSION_KEY, project)
@@ -63,13 +71,18 @@ internal object VisualizedTextPopup {
       return evaluator.show(event, project, editor)
     }
 
-    val panel = TextPanel(project)
+    val panel = PopupPanel(project)
     val callback = EvaluationCallback(project, panel)
-    showValuePopup(event, project, editor, panel, callback::setObsolete)
+    showValuePopup(event, project, editor, panel.component, callback::setObsolete)
     evaluator.startEvaluation(callback) // to make it really cancellable
   }
 
-  private class TextPanel(private val project: Project) : JPanel(CardLayout()) {
+  private class PopupPanel(private val project: Project)  {
+    private val base = JPanel(CardLayout())
+
+    val component: JComponent
+      get() = base
+
     init {
       showOnlyText(XDebuggerUIConstants.getEvaluatingExpressionMessage())
     }
@@ -77,16 +90,19 @@ internal object VisualizedTextPopup {
     fun showOnlyText(value: String, format: (TextViewer) -> Unit = {}) {
       val textArea = DebuggerUIUtil.createTextViewer(value, project)
       format(textArea)
+      showComponent(textArea)
+    }
 
-      removeAll()
-      add(textArea)
-      revalidate()
-      repaint()
+    fun showComponent(component: JComponent) {
+      base.removeAll()
+      base.add(component)
+      base.revalidate()
+      base.repaint()
     }
 
   }
 
-  private class EvaluationCallback(private val project: Project, private val panel: TextPanel) : XFullValueEvaluator.XFullValueEvaluationCallback {
+  private class EvaluationCallback(private val project: Project, private val panel: PopupPanel) : XFullValueEvaluator.XFullValueEvaluationCallback {
     private val obsolete = AtomicBoolean(false)
 
     private var lastFullValueHashCode: Int? = null
@@ -102,10 +118,7 @@ internal object VisualizedTextPopup {
 
       AppUIUtil.invokeOnEdt {
         try {
-          panel.removeAll()
-          panel.add(createComponent(fullValue))
-          panel.revalidate()
-          panel.repaint()
+          panel.showComponent(createComponent(fullValue))
         }
         catch (e: Exception) {
           errorOccurred(e.toString())
@@ -130,37 +143,28 @@ internal object VisualizedTextPopup {
     }
 
     private fun createComponent(fullValue: String): JComponent {
-      val tabs = collectVisualizedTabs(fullValue)
+      val tabs = collectVisualizedTabs(project, fullValue)
       assert(tabs.isNotEmpty()) { "at least one raw tab is expected to be provided by fallback visualizer" }
       if (tabs.size > 1) {
-        try {
-          return createTabbedPane(tabs, fullValue)
-        }
-        catch (e: Exception) {
-          logger.error("failed to visualize value", e, Attachment("value.txt", fullValue))
-          // Fallback to the default visualizer, which provided the last tab.
-        }
+        return createTabbedPane(tabs)
       }
 
-      return tabs.last()
-        .also { it.onShown(project, firstTime = true) }
-        .createComponent(project)
+      val (tab, component) = tabs.first()
+      tab.onShown(project, firstTime = true)
+      return component
     }
 
-    private fun createTabbedPane(tabs: List<VisualizedContentTab>, fullValue: String): JComponent {
-      assert(tabs.isNotEmpty())
+    private fun createTabbedPane(tabsAndComponents: List<Pair<VisualizedContentTab, JComponent>>): JComponent {
+      assert(tabsAndComponents.isNotEmpty())
 
       val panel = JBTabbedPane()
-      for (tab in tabs) {
-        val component = try {
-          tab.createComponent(project)
-        }
-        catch (e: Throwable) {
-          // It's not easy to recover after missing a tab, so we throw and catch above.
-          throw Exception("failed to create visualized component (${tab.id})", e)
-        }
+      panel.tabComponentInsets = JBUI.emptyInsets()
+
+      for ((tab, component) in tabsAndComponents) {
         panel.addTab(tab.name, component)
       }
+
+      val tabs = tabsAndComponents.map { it.first }
 
       // We try to make it content-specific by remembering separate value for every set of tabs.
       // E.g., it allows remembering that in the group HTML+XML+RAW user prefers HTML, and in the group HTML+MARKDOWN+RAW -- MARKDOWN.
@@ -189,32 +193,44 @@ internal object VisualizedTextPopup {
     }
   }
 
-  private fun collectVisualizedTabs(fullValue: String): List<VisualizedContentTab> {
-    return TextValueVisualizer.EP.extensionList.flatMap { viz ->
+  fun collectVisualizedTabs(project: Project, fullValue: String): List<Pair<VisualizedContentTab, JComponent>> {
+    val tabs = extensionPoint.extensionList
+                 .flatMap { viz ->
+                   try {
+                     viz.visualize(fullValue)
+                   }
+                   catch (e: Throwable) {
+                     LOG.error("failed to visualize value ($viz)", e, Attachment("value.txt", fullValue))
+                     emptyList()
+                   }
+                 } +
+               // Explicitly add the fallback raw visualizer to make it the last one.
+               FallbackTextVisualizer.visualize(fullValue)
+
+    return tabs.map { tab ->
       try {
-        viz.visualize(fullValue)
+        tab to tab.createComponent(project)
       }
-      catch (t: Throwable) {
-        logger.error("failed to visualize value ($viz)", t, Attachment("value.txt", fullValue))
-        emptyList()
+      catch (e: Throwable) {
+        LOG.error("failed to create visualized compnent (${tab.id})", e, Attachment("value.txt", fullValue))
+        null
       }
-    } +
-      // Explicitly add the fallback raw visualizer to make it the last one.
-      FallbackTextVisualizer.visualize(fullValue)
+    }.filterNotNull()
   }
 
   fun isVisualizable(fullValue: String): Boolean {
     // text with line breaks would be nicely rendered by the raw visualizer
     return StringUtil.containsLineBreak(fullValue) ||
-      TextValueVisualizer.EP.extensionList.any { viz ->
-        try {
-          viz.canVisualize(fullValue)
-        }
-        catch (t: Throwable) {
-          logger.error("failed to check visualization of value ($viz)", t, Attachment("value.txt", fullValue))
-          false
-        }
-      }
+           extensionPoint.extensionList
+             .any { viz ->
+               try {
+                 viz.canVisualize(fullValue)
+               }
+               catch (t: Throwable) {
+                 LOG.error("failed to check visualization of value ($viz)", t, Attachment("value.txt", fullValue))
+                 false
+               }
+             }
   }
 
 }

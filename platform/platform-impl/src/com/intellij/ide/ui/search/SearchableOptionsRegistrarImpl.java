@@ -19,7 +19,6 @@ import com.intellij.openapi.util.Comparing;
 import com.intellij.openapi.util.NlsSafe;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.openapi.util.text.Strings;
-import com.intellij.util.CollectConsumer;
 import com.intellij.util.ResourceUtil;
 import com.intellij.util.containers.ContainerUtil;
 import kotlin.Pair;
@@ -36,10 +35,11 @@ import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.function.Consumer;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 
 @SuppressWarnings("Duplicates")
+@ApiStatus.Internal
 public final class SearchableOptionsRegistrarImpl extends SearchableOptionsRegistrar {
   private static final ExtensionPointName<SearchableOptionContributor> EP_NAME =
     new ExtensionPointName<>("com.intellij.search.optionContributor");
@@ -212,9 +212,8 @@ public final class SearchableOptionsRegistrarImpl extends SearchableOptionsRegis
 
     Set<Configurable> effectiveConfigurables = new LinkedHashSet<>();
     if (previouslyFiltered == null) {
-      Consumer<Configurable> consumer = new CollectConsumer<>(effectiveConfigurables);
       for (ConfigurableGroup group : groups) {
-        SearchUtil.processExpandedGroups(group, consumer);
+        SearchUtilKt.processExpandedGroups(group, effectiveConfigurables);
       }
     }
     else {
@@ -442,33 +441,41 @@ public final class SearchableOptionsRegistrarImpl extends SearchableOptionsRegis
   }
 
   @Override
-  public @NotNull Set<String> getInnerPaths(SearchableConfigurable configurable, String option) {
+  public @NotNull Set<@NotNull String> getInnerPaths(SearchableConfigurable configurable, String option) {
     initialize();
-    final Set<String> words = getProcessedWordsWithoutStemming(option);
-    final Set<OptionDescription> path = getOptionDescriptionsByWords(configurable, words);
+    Set<String> words = getProcessedWordsWithoutStemming(option);
+    Set<OptionDescription> path = getOptionDescriptionsByWords(configurable, words);
+
+    if (path == null || path.isEmpty()) {
+      return Collections.emptySet();
+    }
 
     Set<String> resultSet = new HashSet<>();
-    if (path != null && !path.isEmpty()) {
-      OptionDescription theOnlyResult = null;
-      for (OptionDescription description : path) {
-        final String hit = description.getHit();
-        if (hit != null) {
-          boolean theBest = true;
-          for (String word : words) {
-            if (!StringUtil.containsIgnoreCase(hit, word)) {
-              theBest = false;
-              break;
-            }
-          }
-          if (theBest) {
-            resultSet.add(description.getPath());
+    OptionDescription theOnlyResult = null;
+    for (OptionDescription description : path) {
+      String hit = description.getHit();
+      if (hit != null) {
+        boolean theBest = true;
+        for (String word : words) {
+          if (!StringUtil.containsIgnoreCase(hit, word)) {
+            theBest = false;
+            break;
           }
         }
-        theOnlyResult = description;
+        if (theBest) {
+          String p = description.getPath();
+          if (p != null) {
+            resultSet.add(p);
+          }
+        }
       }
+      theOnlyResult = description;
+    }
 
-      if (resultSet.isEmpty()) {
-        resultSet.add(theOnlyResult.getPath());
+    if (resultSet.isEmpty()) {
+      String p = theOnlyResult.getPath();
+      if (p != null) {
+        resultSet.add(p);
       }
     }
 
@@ -492,17 +499,20 @@ public final class SearchableOptionsRegistrarImpl extends SearchableOptionsRegis
                                                           @NotNull Set<? super String> result,
                                                           @NotNull Set<String> stopWords) {
     for (String opt : WORD_SEPARATOR_CHARS.split(text.toLowerCase(Locale.ENGLISH))) {
-      if (stopWords.contains(opt)) {
-        continue;
+      if (!stopWords.contains(opt) && !stopWords.contains(PorterStemmerUtil.stem(opt))) {
+        result.add(opt);
       }
-
-      String processed = PorterStemmerUtil.stem(opt);
-      if (stopWords.contains(processed)) {
-        continue;
-      }
-
-      result.add(opt);
     }
+  }
+
+  @ApiStatus.Internal
+  public static void collectProcessedWordsWithoutStemmingAndStopWords(@NotNull String text, @NotNull Set<? super String> result) {
+    Collections.addAll(result, WORD_SEPARATOR_CHARS.split(text.toLowerCase(Locale.ENGLISH)));
+  }
+
+  @ApiStatus.Internal
+  public static Stream<String> splitToWordsWithoutStemmingAndStopWords(@NotNull String text) {
+    return WORD_SEPARATOR_CHARS.splitAsStream(text);
   }
 
   @Override

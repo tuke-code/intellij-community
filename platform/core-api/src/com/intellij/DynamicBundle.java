@@ -100,7 +100,7 @@ public class DynamicBundle extends AbstractBundle {
     List<ResourceBundle> resourceBundles = new ArrayList<>();
     for (Path path : paths) {
       try {
-        ResourceBundle resourceBundle = Companion.resolveBundle(loader, locale, FileUtil.toSystemIndependentName(path.toString()));
+        ResourceBundle resourceBundle = AbstractBundleKt._doResolveBundle(loader, locale, FileUtil.toSystemIndependentName(path.toString()));
         resourceBundles.add(resourceBundle);
       }
       catch (MissingResourceException ignored) { }
@@ -273,14 +273,24 @@ public class DynamicBundle extends AbstractBundle {
     return classLoader != null && baseName != null ? getResourceBundle(classLoader, baseName) : null;
   }
 
-  private static @NotNull ResourceBundle resolveResourceBundle(@NotNull ClassLoader loader, @NonNls @NotNull String pathToBundle, @NotNull Locale locale) {
-    return Companion.resolveResourceBundleWithFallback(loader, pathToBundle, () -> resolveResourceBundle(DynamicBundle.class.getClassLoader(),
-                                                                                               loader, pathToBundle, locale,
-                                                                                               bundleResolver(pathToBundle)));
+  private static @NotNull ResourceBundle resolveResourceBundle(
+    @NotNull ClassLoader loader,
+    @NonNls @NotNull String pathToBundle,
+    @NotNull Locale locale
+  ) {
+    return Companion.resolveResourceBundleWithFallback(loader, pathToBundle, () -> {
+      return resolveResourceBundle(
+        DynamicBundle.class.getClassLoader(),
+        loader,
+        pathToBundle,
+        locale,
+        bundleResolver(pathToBundle)
+      );
+    });
   }
 
   private static @NotNull BiFunction<@NotNull ClassLoader, @NotNull Locale, @NotNull ResourceBundle> bundleResolver(@NonNls @NotNull String pathToBundle) {
-    return (loader, locale) -> Companion.resolveBundle(loader, locale, pathToBundle);
+    return (loader, locale) -> AbstractBundleKt._doResolveBundle(loader, locale, pathToBundle);
   }
 
   /**
@@ -327,9 +337,7 @@ public class DynamicBundle extends AbstractBundle {
   private static @NotNull Locale getResolveLocale() {
     Locale resolveLocale = getLocale();
     // we must use Locale.ROOT to get English messages from default bundles
-    if (resolveLocale.equals(Locale.ENGLISH)) return Locale.ROOT;
-
-    return resolveLocale;
+    return resolveLocale.equals(Locale.ENGLISH) ? Locale.ROOT : resolveLocale;
   }
 
   @ApiStatus.Internal

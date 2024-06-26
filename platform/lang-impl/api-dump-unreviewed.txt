@@ -189,12 +189,12 @@ f:com.intellij.analysis.problemsView.toolWindow.HighlightingPanel
 - fileClosed(com.intellij.openapi.fileEditor.FileEditorManager,com.intellij.openapi.vfs.VirtualFile):V
 - fileOpened(com.intellij.openapi.fileEditor.FileEditorManager,com.intellij.openapi.vfs.VirtualFile):V
 - f:getCurrentFile():com.intellij.openapi.vfs.VirtualFile
-- getData(java.lang.String):java.lang.Object
 - powerSaveStateChanged():V
 - f:selectHighlighter(com.intellij.openapi.editor.ex.RangeHighlighterEx):V
 - selectionChanged(com.intellij.openapi.fileEditor.FileEditorManagerEvent):V
 - selectionChangedTo(Z):V
 - f:setCurrentFile(kotlin.Pair):V
+- uiDataSnapshot(com.intellij.openapi.actionSystem.DataSink):V
 - f:updateSelectedFile():org.jetbrains.concurrency.CancellablePromise
 f:com.intellij.analysis.problemsView.toolWindow.HighlightingPanel$Companion
 a:com.intellij.analysis.problemsView.toolWindow.Node
@@ -279,7 +279,7 @@ c:com.intellij.analysis.problemsView.toolWindow.ProblemsViewPanel
 - com.intellij.ui.OnePixelSplitter
 - com.intellij.analysis.problemsView.toolWindow.ProblemsViewTab
 - com.intellij.openapi.Disposable
-- com.intellij.openapi.actionSystem.DataProvider
+- com.intellij.openapi.actionSystem.UiCompatibleDataProvider
 - pf:myPreview:com.intellij.ui.preview.DescriptorPreview
 - pf:mySortBySeverity:com.intellij.openapi.actionSystem.ToggleOptionAction$Option
 - pf:myToolbar:com.intellij.openapi.actionSystem.ActionToolbar
@@ -288,7 +288,6 @@ c:com.intellij.analysis.problemsView.toolWindow.ProblemsViewPanel
 - p:createComparator():java.util.Comparator
 - p:createToolbar():com.intellij.openapi.actionSystem.ActionToolbar
 - dispose():V
-- getData(java.lang.String):java.lang.Object
 - getName(I):java.lang.String
 - p:getPopupHandlerGroupId():java.lang.String
 - f:getProject():com.intellij.openapi.project.Project
@@ -306,6 +305,7 @@ c:com.intellij.analysis.problemsView.toolWindow.ProblemsViewPanel
 - orientationChangedTo(Z):V
 - p:saveProportion():V
 - selectionChangedTo(Z):V
+- uiDataSnapshot(com.intellij.openapi.actionSystem.DataSink):V
 - p:updatePreview():V
 - p:updateToolWindowContent():V
 - visibilityChangedTo(Z):V
@@ -10904,7 +10904,6 @@ c:com.intellij.execution.console.LanguageConsoleImpl
 - f:getConsoleEditor():com.intellij.openapi.editor.ex.EditorEx
 - getConsolePromptDecorator():com.intellij.execution.console.ConsolePromptDecorator
 - getCurrentEditor():com.intellij.openapi.editor.ex.EditorEx
-- getData(java.lang.String):java.lang.Object
 - f:getEditorDocument():com.intellij.openapi.editor.Document
 - f:getFile():com.intellij.psi.PsiFile
 - f:getHistoryViewer():com.intellij.openapi.editor.ex.EditorEx
@@ -11043,7 +11042,7 @@ c:com.intellij.execution.impl.ConsoleViewImpl
 - com.intellij.execution.ui.ConsoleView
 - com.intellij.execution.ui.ObservableConsoleView
 - com.intellij.ide.OccurenceNavigator
-- com.intellij.openapi.actionSystem.DataProvider
+- com.intellij.openapi.actionSystem.UiCompatibleDataProvider
 - sf:CONSOLE_VIEW_IN_EDITOR_VIEW:com.intellij.openapi.util.Key
 - sf:IS_CONSOLE_DOCUMENT:com.intellij.openapi.util.Key
 - p:myCancelStickToEnd:Z
@@ -11073,7 +11072,6 @@ c:com.intellij.execution.impl.ConsoleViewImpl
 - foldImmediately():V
 - getComponent():javax.swing.JComponent
 - getContentSize():I
-- getData(java.lang.String):java.lang.Object
 - getEditor():com.intellij.openapi.editor.Editor
 - getHyperlinks():com.intellij.execution.impl.EditorHyperlinkSupport
 - getNextOccurenceActionName():java.lang.String
@@ -11105,6 +11103,7 @@ c:com.intellij.execution.impl.ConsoleViewImpl
 - setOutputPaused(Z):V
 - setUpdateFoldingsEnabled(Z):V
 - p:type(com.intellij.openapi.editor.Editor,java.lang.String):V
+- uiDataSnapshot(com.intellij.openapi.actionSystem.DataSink):V
 - p:updateFoldings(I,I):V
 - waitAllRequests():V
 c:com.intellij.execution.impl.ConsoleViewImpl$ClearAllAction
@@ -14775,14 +14774,13 @@ f:com.intellij.ide.bookmark.ui.BookmarksView
 - com.intellij.ui.OnePixelSplitter
 - com.intellij.ide.OccurenceNavigator
 - com.intellij.openapi.Disposable
-- com.intellij.openapi.actionSystem.DataProvider
+- com.intellij.openapi.actionSystem.UiDataProvider
 - sf:Companion:com.intellij.ide.bookmark.ui.BookmarksView$Companion
 - <init>(com.intellij.openapi.project.Project,java.lang.Boolean):V
 - f:addEditSourceListener(com.intellij.ide.bookmark.ui.BookmarksView$EditSourceListener):V
 - dispose():V
 - f:getAutoScrollFromSource():com.intellij.openapi.actionSystem.ToggleOptionAction$Option
 - f:getAutoScrollToSource():com.intellij.openapi.actionSystem.ToggleOptionAction$Option
-- getData(java.lang.String):java.lang.Object
 - f:getGroupLineBookmarks():com.intellij.openapi.actionSystem.ToggleOptionAction$Option
 - f:getModel():com.intellij.ui.tree.StructureTreeModel
 - getNextOccurenceActionName():java.lang.String
@@ -14802,6 +14800,7 @@ f:com.intellij.ide.bookmark.ui.BookmarksView
 - f:select(com.intellij.ide.bookmark.BookmarkGroup,com.intellij.ide.bookmark.Bookmark):org.jetbrains.concurrency.Promise
 - f:select(com.intellij.openapi.vfs.VirtualFile):V
 - setOrientation(Z):V
+- uiDataSnapshot(com.intellij.openapi.actionSystem.DataSink):V
 f:com.intellij.ide.bookmark.ui.BookmarksView$Companion
 - f:getBOOKMARKS_VIEW():com.intellij.openapi.actionSystem.DataKey
 com.intellij.ide.bookmark.ui.BookmarksView$EditSourceListener
@@ -15961,26 +15960,26 @@ a:com.intellij.ide.navigationToolbar.StructureAwareNavBarModelExtension
 - processChildren(java.lang.Object,java.lang.Object,com.intellij.util.Processor):Z
 f:com.intellij.ide.navigationToolbar.StructureAwareNavBarModelExtension$Companion
 - f:getMODEL():com.intellij.openapi.util.Key
-com.intellij.ide.navigationToolbar.experimental.ExperimentalToolbarStateListener
-- sf:Companion:com.intellij.ide.navigationToolbar.experimental.ExperimentalToolbarStateListener$Companion
-- a:refreshVisibility():V
-f:com.intellij.ide.navigationToolbar.experimental.ExperimentalToolbarStateListener$Companion
-- f:getTOPIC():com.intellij.util.messages.Topic
-c:com.intellij.ide.navigationToolbar.experimental.NewToolbarRootPaneManager
+c:com.intellij.ide.navigationToolbar.rider.RiderMainToolbarRootPaneManager
 - com.intellij.openapi.util.SimpleModificationTracker
-- sf:Companion:com.intellij.ide.navigationToolbar.experimental.NewToolbarRootPaneManager$Companion
+- sf:Companion:com.intellij.ide.navigationToolbar.rider.RiderMainToolbarRootPaneManager$Companion
 - <init>(com.intellij.openapi.project.Project):V
 - isLeftSideAction(com.intellij.openapi.actionSystem.AnAction):Z
 - isRightSideAction(com.intellij.openapi.actionSystem.AnAction):Z
 - mainGroupName():java.lang.String
 - f:startUpdateActionGroups(javax.swing.JPanel):V
-f:com.intellij.ide.navigationToolbar.experimental.NewToolbarRootPaneManager$Companion
-- f:getInstance(com.intellij.openapi.project.Project):com.intellij.ide.navigationToolbar.experimental.NewToolbarRootPaneManager
-f:com.intellij.ide.navigationToolbar.experimental.SearchEverywhereNewToolbarAction
+f:com.intellij.ide.navigationToolbar.rider.RiderMainToolbarRootPaneManager$Companion
+- f:getInstance(com.intellij.openapi.project.Project):com.intellij.ide.navigationToolbar.rider.RiderMainToolbarRootPaneManager
+com.intellij.ide.navigationToolbar.rider.RiderMainToolbarStateListener
+- sf:Companion:com.intellij.ide.navigationToolbar.rider.RiderMainToolbarStateListener$Companion
+- a:refreshVisibility():V
+f:com.intellij.ide.navigationToolbar.rider.RiderMainToolbarStateListener$Companion
+- f:getTOPIC():com.intellij.util.messages.Topic
+f:com.intellij.ide.navigationToolbar.rider.SearchEverywhereRiderMainToolbarAction
 - com.intellij.ide.actions.SearchEverywhereAction
 - com.intellij.openapi.actionSystem.ex.AnActionListener
 - com.intellij.openapi.project.DumbAware
-- sf:Companion:com.intellij.ide.navigationToolbar.experimental.SearchEverywhereNewToolbarAction$Companion
+- sf:Companion:com.intellij.ide.navigationToolbar.rider.SearchEverywhereRiderMainToolbarAction$Companion
 - sf:SHOW_HOT_KEY_TIP:java.lang.String
 - <init>():V
 - afterActionPerformed(com.intellij.openapi.actionSystem.AnAction,com.intellij.openapi.actionSystem.AnActionEvent,com.intellij.openapi.actionSystem.AnActionResult):V
@@ -15989,7 +15988,7 @@ f:com.intellij.ide.navigationToolbar.experimental.SearchEverywhereNewToolbarActi
 - f:getSeManager():com.intellij.ide.actions.searcheverywhere.SearchEverywhereManager
 - f:setSeManager(com.intellij.ide.actions.searcheverywhere.SearchEverywhereManager):V
 - update(com.intellij.openapi.actionSystem.AnActionEvent):V
-f:com.intellij.ide.navigationToolbar.experimental.SearchEverywhereNewToolbarAction$Companion
+f:com.intellij.ide.navigationToolbar.rider.SearchEverywhereRiderMainToolbarAction$Companion
 com.intellij.ide.projectView.HelpID
 - sf:PROJECT_VIEWS:java.lang.String
 a:com.intellij.ide.projectView.ProjectView
@@ -17848,11 +17847,6 @@ c:com.intellij.ide.todo.nodes.TodoTreeHelper
 - getProject():com.intellij.openapi.project.Project
 - getSelectedElement(java.lang.Object):com.intellij.psi.PsiElement
 - skipDirectory(com.intellij.psi.PsiDirectory):Z
-f:com.intellij.ide.ui.search.TraverseUIStarterKt
-- sf:buildSearchableOptions(java.nio.file.Path,Z,kotlin.coroutines.Continuation):java.lang.Object
-- bs:buildSearchableOptions$default(java.nio.file.Path,Z,kotlin.coroutines.Continuation,I,java.lang.Object):java.lang.Object
-- sf:doBuildSearchableOptions(java.util.Map,java.nio.file.Path,Z,kotlin.coroutines.Continuation):java.lang.Object
-- bs:doBuildSearchableOptions$default(java.util.Map,java.nio.file.Path,Z,kotlin.coroutines.Continuation,I,java.lang.Object):java.lang.Object
 a:com.intellij.ide.util.AbstractTreeClassChooserDialog
 - com.intellij.openapi.ui.DialogWrapper
 - com.intellij.ide.util.TreeChooser
@@ -18243,11 +18237,6 @@ c:com.intellij.ide.util.gotoByName.AbstractPrimeSymbolNavigationContributor
 - f:getIndexKey():com.intellij.psi.stubs.StubIndexKey
 - processElementsWithName(java.lang.String,com.intellij.util.Processor,com.intellij.util.indexing.FindSymbolParameters):V
 - processNames(com.intellij.util.Processor,com.intellij.psi.search.GlobalSearchScope,com.intellij.util.indexing.IdFilter):V
-f:com.intellij.ide.util.gotoByName.ActionAsyncProvider
-- <init>(com.intellij.ide.util.gotoByName.GotoActionModel):V
-- f:clearIntentions():V
-- f:filterElements(kotlinx.coroutines.CoroutineScope,kotlin.jvm.functions.Function2,java.lang.String,kotlin.jvm.functions.Function2):V
-- f:processActions(kotlinx.coroutines.CoroutineScope,kotlin.jvm.functions.Function2,java.lang.String,java.util.Set,kotlin.jvm.functions.Function2):V
 f:com.intellij.ide.util.gotoByName.ActionSearchUtilKt
 - sf:buildMatcher(java.lang.String):com.intellij.util.text.Matcher
 - sf:calcElementWeight(java.lang.Object,java.lang.String,com.intellij.psi.codeStyle.MinusculeMatcher):java.lang.Integer

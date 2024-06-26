@@ -3,18 +3,23 @@ package com.intellij.xdebugger.impl.ui.visualizedtext
 
 import com.intellij.openapi.fileTypes.FileType
 import com.intellij.openapi.project.Project
+import com.intellij.util.ui.JBUI
 import com.intellij.xdebugger.impl.ui.DebuggerUIUtil
 import com.intellij.xdebugger.ui.VisualizedContentTab
+import org.jetbrains.annotations.ApiStatus
+import javax.swing.JComponent
 
 /**
  * Simple tab that displays the optionally [formatted][formatText] text
  * using [fileType]-based highlighting.
  */
+@ApiStatus.Experimental // until we consider collection visualizers
 abstract class TextBasedContentTab : VisualizedContentTab {
   protected abstract fun formatText(): String
 
   protected abstract val fileType: FileType
 
-  override fun createComponent(project: Project) =
-    DebuggerUIUtil.createTextViewer(formatText(), project, fileType).component
+  override fun createComponent(project: Project): JComponent =
+    DebuggerUIUtil.createTextViewer(formatText(), project, fileType)
+      .also { it.border = JBUI.Borders.customLine(it.background, 10) }
 }

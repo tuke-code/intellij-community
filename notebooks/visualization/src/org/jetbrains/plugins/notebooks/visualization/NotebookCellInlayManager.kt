@@ -47,6 +47,8 @@ class NotebookCellInlayManager private constructor(
 
   private val cellEventListeners = EventDispatcher.create(EditorCellEventListener::class.java)
 
+  private val invalidationListeners = mutableListOf<Runnable>()
+
   private var valid = false
 
   override fun dispose() {}
@@ -214,12 +216,7 @@ class NotebookCellInlayManager private constructor(
       it.view?.postInitInlays()
     }
 
-    val foldingModel = editor.foldingModel
-    foldingModel.runBatchFoldingOperation({
-                                            _cells.forEach { cell ->
-                                              cell.view?.configureFoldings()
-                                            }
-                                          }, true, false)
+    updateCellsFolding(_cells)
 
     cellEventListeners.multicaster.onEditorCellEvents(_cells.map { CellCreated(it) })
     inlaysChanged()
@@ -248,12 +245,26 @@ class NotebookCellInlayManager private constructor(
     keepScrollingPositionWhile(editor) {
       val matchingIntervals = notebookCellLines.getMatchingCells(interestingRange)
 
-      for (interval in matchingIntervals) {
-        _cells[interval.ordinal].update(force)
+      val matchingCells = matchingIntervals.map {
+        _cells[it.ordinal]
       }
+      matchingCells.forEach {
+        it.update(force)
+      }
+
+      updateCellsFolding(matchingCells)
 
       inlaysChanged()
     }
+  }
+
+  private fun updateCellsFolding(editorCells: List<EditorCell>) {
+    val foldingModel = editor.foldingModel
+    foldingModel.runBatchFoldingOperation({
+                                            editorCells.forEach { cell ->
+                                              cell.view?.configureFoldings()
+                                            }
+                                          }, true, false)
   }
 
   private fun NotebookCellLines.getMatchingCells(logicalLines: IntRange): List<NotebookCellLines.Interval> =
@@ -309,9 +320,13 @@ class NotebookCellInlayManager private constructor(
           }
         }
         is NotebookIntervalPointersEvent.OnSwapped -> {
-          val first = _cells[change.firstOrdinal].intervalPointer
-          _cells[change.firstOrdinal].intervalPointer = _cells[change.secondOrdinal].intervalPointer
-          _cells[change.secondOrdinal].intervalPointer = first
+          val firstCell = _cells[change.firstOrdinal]
+          val first = firstCell.intervalPointer
+          val secondCell = _cells[change.secondOrdinal]
+          firstCell.intervalPointer = secondCell.intervalPointer
+          secondCell.intervalPointer = first
+          firstCell.update(force = false)
+          secondCell.update(force = false)
         }
       }
     }
@@ -320,6 +335,22 @@ class NotebookCellInlayManager private constructor(
     }
     cellEventListeners.multicaster.onEditorCellEvents(events)
     inlaysChanged()
+
+    checkInlayOffsets()
+  }
+
+  private fun checkInlayOffsets() {
+    val inlaysOffsets = buildSet {
+      for (cell in _cells) {
+        add(editor.document.getLineStartOffset(cell.interval.lines.first))
+        add(editor.document.getLineEndOffset(cell.interval.lines.last))
+      }
+    }
+    val wronglyPlacedInlays = editor.inlayModel.getBlockElementsInRange(0, editor.document.textLength)
+      .filter { it.offset !in inlaysOffsets }
+    if (wronglyPlacedInlays.isNotEmpty()) {
+      error("Expected offsets: $inlaysOffsets. Wrongly placed inlays: $wronglyPlacedInlays")
+    }
   }
 
   private fun fixInlaysOffsetsAfterNewCellInsert(change: NotebookIntervalPointersEvent.OnInserted) {
@@ -352,7 +383,10 @@ class NotebookCellInlayManager private constructor(
   }
 
   fun invalidateCells() {
-    valid = false
+    if (valid) {
+      valid = false
+      invalidationListeners.forEach { it.run() }
+    }
   }
 
   fun validateCells() {
@@ -365,5 +399,9 @@ class NotebookCellInlayManager private constructor(
       }
       valid = true
     }
+  }
+
+  fun onInvalidate(function: () -> Unit) {
+    invalidationListeners.add(function)
   }
 }

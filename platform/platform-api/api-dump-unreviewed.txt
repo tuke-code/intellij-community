@@ -1147,10 +1147,6 @@ c:com.intellij.ide.errorTreeView.SimpleErrorData
 - getKind():com.intellij.ide.errorTreeView.ErrorTreeElementKind
 - getMessages():java.lang.String[]
 - getVf():com.intellij.openapi.vfs.VirtualFile
-c:com.intellij.ide.passwordSafe.PasswordSafeException
-- java.lang.RuntimeException
-- <init>(java.lang.String):V
-- <init>(java.lang.String,java.lang.Throwable):V
 a:com.intellij.ide.plugins.PluginReplacement
 - com.intellij.openapi.extensions.PluginAware
 - sf:EP_NAME:com.intellij.openapi.extensions.ExtensionPointName
@@ -1277,8 +1273,9 @@ c:com.intellij.ide.ui.search.OptionDescription
 - <init>(java.lang.String,java.lang.String,java.lang.String):V
 - <init>(java.lang.String,java.lang.String,java.lang.String,java.lang.String):V
 - <init>(java.lang.String,java.lang.String,java.lang.String,java.lang.String,java.lang.String):V
-- f:compareTo(com.intellij.ide.ui.search.OptionDescription):I
-- f:equals(java.lang.Object):Z
+- b:<init>(java.lang.String,java.lang.String,java.lang.String,java.lang.String,java.lang.String,I,kotlin.jvm.internal.DefaultConstructorMarker):V
+- compareTo(com.intellij.ide.ui.search.OptionDescription):I
+- equals(java.lang.Object):Z
 - f:getConfigurableId():java.lang.String
 - f:getGroupName():java.lang.String
 - f:getHit():java.lang.String
@@ -1286,7 +1283,7 @@ c:com.intellij.ide.ui.search.OptionDescription
 - f:getPath():java.lang.String
 - getValue():java.lang.String
 - hasExternalEditor():Z
-- f:hashCode():I
+- hashCode():I
 - invokeInternalEditor():V
 a:com.intellij.ide.ui.search.SearchableOptionContributor
 - <init>():V
@@ -7923,14 +7920,14 @@ c:com.intellij.ui.components.ActionLink
 - f:withFont(java.awt.Font):com.intellij.ui.components.ActionLink
 c:com.intellij.ui.components.AnActionLink
 - com.intellij.ui.components.ActionLink
-- com.intellij.openapi.actionSystem.DataProvider
+- com.intellij.openapi.actionSystem.UiCompatibleDataProvider
 - <init>(com.intellij.openapi.actionSystem.AnAction,java.lang.String):V
 - <init>(java.lang.String,com.intellij.openapi.actionSystem.AnAction):V
 - <init>(java.lang.String,com.intellij.openapi.actionSystem.AnAction,java.lang.String):V
 - <init>(java.lang.String,java.lang.String):V
-- getData(java.lang.String):java.lang.Object
 - f:getDataProvider():com.intellij.openapi.actionSystem.DataProvider
 - f:setDataProvider(com.intellij.openapi.actionSystem.DataProvider):V
+- uiDataSnapshot(com.intellij.openapi.actionSystem.DataSink):V
 f:com.intellij.ui.components.BrowserLink
 - com.intellij.ui.components.ActionLink
 - <init>(java.lang.String):V
@@ -8039,6 +8036,7 @@ c:com.intellij.ui.components.JBComboBoxLabel
 - f:getIconResolver():kotlin.jvm.functions.Function1
 - f:getImageResolverFactory():kotlin.jvm.functions.Function1
 - f:getKeyboardActions():java.util.Map
+- f:getUnderlinedHoveredHyperlink():Z
 - f:iconResolver(kotlin.jvm.functions.Function1):com.intellij.ui.components.JBHtmlPaneConfiguration$Builder
 - f:imageResolverFactory(kotlin.jvm.functions.Function1):com.intellij.ui.components.JBHtmlPaneConfiguration$Builder
 - f:keyboardActions(java.util.Map):com.intellij.ui.components.JBHtmlPaneConfiguration$Builder
@@ -8046,6 +8044,7 @@ c:com.intellij.ui.components.JBComboBoxLabel
 - f:setFontResolver(com.intellij.util.ui.CSSFontResolver):V
 - f:setIconResolver(kotlin.jvm.functions.Function1):V
 - f:setImageResolverFactory(kotlin.jvm.functions.Function1):V
+- f:setUnderlinedHoveredHyperlink(Z):V
 *f:com.intellij.ui.components.JBHtmlPaneConfiguration$Companion
 - f:builder():com.intellij.ui.components.JBHtmlPaneConfiguration$Builder
 *f:com.intellij.ui.components.JBHtmlPaneStyleConfiguration
@@ -11007,7 +11006,7 @@ c:com.intellij.ui.tabs.impl.SingleHeightTabs
 f:com.intellij.ui.tabs.impl.SingleHeightTabs$Companion
 c:com.intellij.ui.tabs.impl.TabLabel
 - javax.swing.JPanel
-- com.intellij.openapi.actionSystem.DataProvider
+- com.intellij.openapi.actionSystem.UiCompatibleDataProvider
 - javax.accessibility.Accessible
 - pf:label:com.intellij.ui.SimpleColoredComponent
 - f:apply(com.intellij.ui.tabs.UiDecorator$UiDecoration):V
@@ -11015,7 +11014,6 @@ c:com.intellij.ui.tabs.impl.TabLabel
 - editLabelForeground(java.awt.Color):java.awt.Color
 - f:getAccessibleContext():javax.accessibility.AccessibleContext
 - f:getActionsPosition():com.intellij.ui.tabs.impl.TabLabel$ActionsPosition
-- f:getData(java.lang.String):java.lang.Object
 - pf:getEffectiveBackground():java.awt.Color
 - getIconAlpha():F
 - f:getInfo():com.intellij.ui.tabs.TabInfo
@@ -11050,6 +11048,7 @@ c:com.intellij.ui.tabs.impl.TabLabel
 - f:setText(com.intellij.ui.SimpleColoredText):V
 - p:shouldPaintFadeout():Z
 - f:toggleShowActions(Z):V
+- f:uiDataSnapshot(com.intellij.openapi.actionSystem.DataSink):V
 - f:updateTabActions():Z
 pf:com.intellij.ui.tabs.impl.TabLabel$AccessibleTabLabel
 - javax.swing.JPanel$AccessibleJPanel

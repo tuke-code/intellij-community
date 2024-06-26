@@ -1,10 +1,7 @@
 // Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.codeInsight.daemon.impl.analysis;
 
-import com.intellij.codeInsight.CodeInsightUtilCore;
-import com.intellij.codeInsight.ContainerProvider;
-import com.intellij.codeInsight.ExceptionUtil;
-import com.intellij.codeInsight.JavaModuleSystemEx;
+import com.intellij.codeInsight.*;
 import com.intellij.codeInsight.JavaModuleSystemEx.ErrorWithFixes;
 import com.intellij.codeInsight.daemon.HighlightDisplayKey;
 import com.intellij.codeInsight.daemon.JavaErrorBundle;
@@ -38,6 +35,7 @@ import com.intellij.pom.java.JavaFeature;
 import com.intellij.pom.java.LanguageLevel;
 import com.intellij.psi.*;
 import com.intellij.psi.codeStyle.VariableKind;
+import com.intellij.psi.impl.IncompleteModelUtil;
 import com.intellij.psi.impl.PsiImplUtil;
 import com.intellij.psi.impl.PsiSuperMethodImplUtil;
 import com.intellij.psi.impl.java.stubs.index.JavaImplicitClassIndex;
@@ -53,6 +51,7 @@ import com.intellij.psi.search.GlobalSearchScope;
 import com.intellij.psi.templateLanguages.OuterLanguageElement;
 import com.intellij.psi.tree.IElementType;
 import com.intellij.psi.tree.TokenSet;
+import com.intellij.psi.util.InheritanceUtil;
 import com.intellij.psi.util.*;
 import com.intellij.refactoring.util.RefactoringChangeUtil;
 import com.intellij.ui.ColorUtil;
@@ -65,10 +64,7 @@ import com.intellij.util.containers.ContainerUtil;
 import com.intellij.util.ui.JBUI;
 import com.intellij.util.ui.NamedColorUtil;
 import com.intellij.util.ui.UIUtil;
-import com.siyeh.ig.psiutils.ControlFlowUtils;
-import com.siyeh.ig.psiutils.InstanceOfUtils;
-import com.siyeh.ig.psiutils.VariableAccessUtils;
-import com.siyeh.ig.psiutils.VariableNameGenerator;
+import com.siyeh.ig.psiutils.*;
 import one.util.streamex.StreamEx;
 import org.jetbrains.annotations.*;
 
@@ -354,7 +350,7 @@ public final class HighlightUtil {
       lValue = null;
     }
     if (lValue != null && !TypeConversionUtil.isLValue(lValue) && !PsiTreeUtil.hasErrorElements(expression) &&
-        !(IncompleteModelUtil.isIncompleteModel(expression) && 
+        !(IncompleteModelUtil.isIncompleteModel(expression) &&
           PsiUtil.skipParenthesizedExprDown(lValue) instanceof PsiReferenceExpression ref &&
           IncompleteModelUtil.canBePendingReference(ref))) {
       String description = JavaErrorBundle.message("variable.expected");
@@ -549,9 +545,8 @@ public final class HighlightUtil {
       }
 
       PsiType lType = variable.getType();
-      if (PsiTypes.nullType().equals(lType) && SyntaxTraverser.psiTraverser(initializer)
-                                          .filter(PsiLiteralExpression.class)
-                                          .find(l -> PsiTypes.nullType().equals(l.getType())) != null) {
+      if (PsiTypes.nullType().equals(lType) && 
+          ExpressionUtils.nonStructuralChildren(initializer).allMatch(ExpressionUtils::isNullLiteral)) {
         HighlightInfo.Builder info =
           HighlightInfo.newHighlightInfo(HighlightInfoType.ERROR).descriptionAndTooltip(JavaErrorBundle.message("lvti.null"))
             .range(typeElement);
@@ -932,14 +927,11 @@ public final class HighlightUtil {
   static HighlightInfo.Builder checkUnhandledExceptions(@NotNull PsiElement element) {
     List<PsiClassType> unhandled = ExceptionUtil.getOwnUnhandledExceptions(element);
     if (unhandled.isEmpty()) return null;
+    unhandled = ContainerUtil.filter(unhandled, type -> type.resolve() != null);
+    if (unhandled.isEmpty()) return null;
 
     HighlightInfoType highlightType = getUnhandledExceptionHighlightType(element);
     if (highlightType == null) return null;
-
-    if (IncompleteModelUtil.isIncompleteModel(element)) {
-      unhandled = ContainerUtil.filter(unhandled, type -> !IncompleteModelUtil.isUnresolvedClassType(type));
-      if (unhandled.isEmpty()) return null;
-    }
 
     TextRange textRange = computeRange(element);
     String description = getUnhandledExceptionsDescriptor(unhandled);
@@ -1700,18 +1692,17 @@ public final class HighlightUtil {
   }
 
 
-  @NotNull
-  static Set<PsiClassType> collectUnhandledExceptions(@NotNull PsiTryStatement statement) {
-    Set<PsiClassType> thrownTypes = new HashSet<>();
+  static @NotNull UnhandledExceptions collectUnhandledExceptions(@NotNull PsiTryStatement statement) {
+    UnhandledExceptions thrownTypes = UnhandledExceptions.EMPTY;
 
     PsiCodeBlock tryBlock = statement.getTryBlock();
     if (tryBlock != null) {
-      thrownTypes.addAll(ExceptionUtil.collectUnhandledExceptions(tryBlock, tryBlock));
+      thrownTypes = thrownTypes.merge(UnhandledExceptions.collect(tryBlock));
     }
 
     PsiResourceList resources = statement.getResourceList();
     if (resources != null) {
-      thrownTypes.addAll(ExceptionUtil.collectUnhandledExceptions(resources, resources));
+      thrownTypes = thrownTypes.merge(UnhandledExceptions.collect(resources));
     }
 
     return thrownTypes;
@@ -3294,6 +3285,15 @@ public final class HighlightUtil {
     return null;
   }
 
+  /**
+   * @param elementToHighlight element to attach the highlighting
+   * @return HighlightInfo builder that adds a pending reference highlight
+   */
+  static HighlightInfo.@NotNull Builder getPendingReferenceHighlightInfo(@NotNull PsiElement elementToHighlight) {
+    return HighlightInfo.newHighlightInfo(HighlightInfoType.PENDING_REFERENCE).range(elementToHighlight)
+      .descriptionAndTooltip(JavaErrorBundle.message("incomplete.project.state.pending.reference"));
+  }
+
   @FunctionalInterface
   interface IncompatibleTypesTooltipComposer {
     @NotNull @NlsContexts.Tooltip
@@ -3530,7 +3530,7 @@ public final class HighlightUtil {
           definitelyIncorrect = true;
         }
         if (!definitelyIncorrect && IncompleteModelUtil.isIncompleteModel(containingFile) && IncompleteModelUtil.canBePendingReference(ref)) {
-          return IncompleteModelUtil.getPendingReferenceHighlightInfo(refName);
+          return getPendingReferenceHighlightInfo(refName);
         }
       }
 

@@ -54,6 +54,7 @@ class EditorCellInput(
       toggleTextFolding()
       inputComponentFactory(this, _component)
     }
+    invalidate()
   }
 
   private fun toggleTextFolding() {
@@ -98,6 +99,10 @@ class EditorCellInput(
   }
 
   override fun doLayout() {
+    updateFoldingPosition(bounds)
+  }
+
+  private fun updateFoldingPosition(bounds: Rectangle) {
     folding.updatePosition(bounds.y + delimiterPanelSize, bounds.height - delimiterPanelSize)
   }
 
@@ -158,6 +163,7 @@ class EditorCellInput(
     _component = componentFactory(this, oldComponent)
     if (bounds != calculateBounds()) {
       invalidate()
+      updateFoldingPosition(bounds)
     }
   }
 }

@@ -63,6 +63,7 @@ import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.TimedDeadzone
 import com.intellij.util.ui.UIUtil
 import kotlinx.coroutines.*
+import org.jetbrains.annotations.ApiStatus
 import java.awt.*
 import java.awt.datatransfer.DataFlavor
 import java.awt.datatransfer.Transferable
@@ -76,7 +77,7 @@ import javax.swing.*
 class EditorTabbedContainer internal constructor(
   private val window: EditorWindow,
   private val coroutineScope: CoroutineScope,
-) : CloseTarget {
+) {
   @JvmField
   internal val editorTabs: JBEditorTabs
   private val dragOutDelegate: DragOutDelegate
@@ -108,17 +109,7 @@ class EditorTabbedContainer internal constructor(
     })
     editorTabs.component.isFocusable = false
     editorTabs.component.transferHandler = EditorTabbedContainerTransferHandler(window)
-    @Suppress("UsagesOfObsoleteApi")
-    editorTabs.setDataProvider(object : UiCompatibleDataProvider {
-      override fun uiDataSnapshot(sink: DataSink) {
-        sink[CommonDataKeys.PROJECT] = window.manager.project
-        sink[CommonDataKeys.VIRTUAL_FILE] = window.selectedComposite?.file
-        sink[EditorWindow.DATA_KEY] = window
-        sink[PlatformCoreDataKeys.FILE_EDITOR] = window.selectedComposite?.selectedEditor
-        sink[PlatformCoreDataKeys.HELP_ID] = "ideaInterface.editor"
-        sink[CloseTarget.KEY] = if (editorTabs.selectedInfo == null) null else this@EditorTabbedContainer
-      }
-    })
+    editorTabs
       .setPopupGroup(
         /* popupGroup = */ { CustomActionsSchema.getInstance().getCorrectedAction(IdeActions.GROUP_EDITOR_TAB_POPUP) as ActionGroup },
         /* place = */ ActionPlaces.EDITOR_TAB_POPUP,
@@ -275,14 +266,10 @@ class EditorTabbedContainer internal constructor(
 
   val tabs: JBTabs
     get() = editorTabs
-
-  override fun close() {
-    val selected = editorTabs.targetInfo ?: return
-    window.manager.closeFile((selected.`object` as VirtualFile), window)
-  }
 }
 
-internal class DockableEditor @JvmOverloads constructor(
+@ApiStatus.Internal
+class DockableEditor @JvmOverloads constructor(
   @JvmField val img: Image?,
   @JvmField val file: VirtualFile,
   private val presentation: Presentation,
@@ -319,6 +306,7 @@ private fun doProcessDoubleClick(e: MouseEvent, editorTabs: JBTabsImpl, window: 
   }
 
   val actionManager = ActionManager.getInstance()
+
   @Suppress("DEPRECATION")
   val context = DataManager.getInstance().dataContext
   var isEditorMaximized: Boolean? = null
@@ -534,7 +522,7 @@ private class EditorTabs(
     requestFocusOnLastFocusedComponent = true,
     isTabDraggingEnabled = true,
   ),
-), ComponentWithMnemonics, EditorWindowHolder, DataProvider {
+), ComponentWithMnemonics, EditorWindowHolder, CloseTarget {
   private val _entryPointActionGroup: DefaultActionGroup
   private var isActive = false
 
@@ -565,13 +553,22 @@ private class EditorTabs(
     _entryPointActionGroup = DefaultActionGroup(java.util.List.of(source))
   }
 
-  override fun getData(dataId: String): Any? {
-    return when {
-      CommonDataKeys.PROJECT.`is`(dataId) -> window.owner.manager.project
-      EditorWindow.DATA_KEY.`is`(dataId) -> window
-      PlatformDataKeys.LAST_ACTIVE_FILE_EDITOR.`is`(dataId) -> window.owner.currentCompositeFlow.value?.selectedEditor
-      else -> null
-    }
+  override fun uiDataSnapshot(sink: DataSink) {
+    super.uiDataSnapshot(sink)
+    sink[CommonDataKeys.PROJECT] = window.owner.manager.project
+    sink[EditorWindow.DATA_KEY] = window
+    sink[CloseTarget.KEY] = if (selectedInfo == null) null else this
+
+    sink[PlatformCoreDataKeys.FILE_EDITOR] = window.selectedComposite?.selectedEditor
+    sink[PlatformDataKeys.LAST_ACTIVE_FILE_EDITOR] = window.owner.currentCompositeFlow.value?.selectedEditor
+
+    sink[CommonDataKeys.VIRTUAL_FILE] = window.selectedComposite?.file
+    sink[PlatformCoreDataKeys.HELP_ID] = "ideaInterface.editor"
+  }
+
+  override fun close() {
+    val selected = targetInfo ?: return
+    window.manager.closeFile((selected.`object` as VirtualFile), window)
   }
 
   override fun getEditorWindow(): EditorWindow = window
@@ -642,6 +639,7 @@ private class EditorTabs(
     val newActive = UIUtil.isFocusAncestor(this)
     if (newActive != isActive) {
       isActive = newActive
+      resetScrollBarActivity()
       revalidateAndRepaint()
     }
   }

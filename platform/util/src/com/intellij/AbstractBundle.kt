@@ -71,7 +71,7 @@ open class AbstractBundle {
     }
 
     @ApiStatus.Internal
-    inline fun resolveResourceBundleWithFallback(
+    fun resolveResourceBundleWithFallback(
       loader: ClassLoader,
       pathToBundle: String,
       firstTry: () -> ResourceBundle,
@@ -84,11 +84,6 @@ open class AbstractBundle {
         ResourceBundle.clearCache(loader)
         return ResourceBundle.getBundle(pathToBundle, Locale.getDefault(), loader)
       }
-    }
-
-    @ApiStatus.Internal
-    fun resolveBundle(loader: ClassLoader, locale: @NonNls Locale, pathToBundle: @NonNls String): ResourceBundle {
-      return ResourceBundle.getBundle(pathToBundle, locale, loader, IntelliJResourceControl)
     }
   }
 
@@ -144,7 +139,9 @@ open class AbstractBundle {
     val isDefault = DefaultBundleService.isDefaultBundle()
     var bundle = getBundle(isDefault)
     if (bundle == null) {
-      bundle = resolveResourceBundle(pathToBundle, classLoader)
+      bundle = resolveResourceBundleWithFallback(loader = classLoader, pathToBundle = pathToBundle) {
+        findBundle(pathToBundle = pathToBundle, loader = classLoader, control = IntelliJResourceControl)
+      }
       val ref = SoftReference(bundle)
       if (isDefault) {
         defaultBundle = ref
@@ -158,12 +155,6 @@ open class AbstractBundle {
 
   @ApiStatus.Internal
   protected open fun getBundle(isDefault: Boolean): ResourceBundle? = (if (isDefault) defaultBundle else bundle)?.get()
-
-  private fun resolveResourceBundle(pathToBundle: String, loader: ClassLoader): ResourceBundle {
-    return resolveResourceBundleWithFallback(loader = loader, pathToBundle = pathToBundle) {
-      findBundle(pathToBundle = pathToBundle, loader = loader, control = IntelliJResourceControl)
-    }
-  }
 
   protected open fun findBundle(pathToBundle: @NonNls String, loader: ClassLoader, control: ResourceBundle.Control): ResourceBundle {
     return ResourceBundle.getBundle(pathToBundle, Locale.getDefault(), loader, control)
@@ -187,6 +178,12 @@ open class AbstractBundle {
   }
 }
 
+@Suppress("FunctionName")
+@ApiStatus.Internal
+fun _doResolveBundle(loader: ClassLoader, locale: @NonNls Locale, pathToBundle: @NonNls String): ResourceBundle {
+  return ResourceBundle.getBundle(pathToBundle, locale, loader, IntelliJResourceControl)
+}
+
 // UTF-8 control for Java <= 1.8.
 // Before java9 ISO-8859-1 was used, in java 9 and above UTF-8.
 // See https://docs.oracle.com/javase/9/docs/api/java/util/PropertyResourceBundle.html and
@@ -201,7 +198,7 @@ private object IntelliJResourceControl : ResourceBundle.Control() {
     val resourceName = (if (bundleName.contains("://")) null else toResourceName(bundleName, "properties")) ?: return null
     val stream = loader.getResourceAsStream(resourceName) ?: return null
     return stream.use {
-      IntelliJResourceBundle(InputStreamReader(it, StandardCharsets.UTF_8))
+      IntelliJResourceBundle(reader = InputStreamReader(it, StandardCharsets.UTF_8))
     }
   }
 }

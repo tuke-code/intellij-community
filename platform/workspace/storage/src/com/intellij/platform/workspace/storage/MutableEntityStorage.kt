@@ -79,11 +79,13 @@ import org.jetbrains.annotations.ApiStatus
  * ```
  * If you do that for a child with nullable reference to the parent, the child will be detached from the parent but won't be removed from
  * the storage.
+ *
+ * See the documentation for [modifyEntity] for more examples on when the children are automatically removed.
  * 
  * ## Batch operations
  * Besides operation with individual entities, [MutableEntityStorage] supports two batch operations: [applyChangesFrom] and [replaceBySource].
  * 
- * ### Add Diff
+ * ### Apply Changes From
  * Each instance of [MutableEntityStorage] records changes made in it: addition, modification and removal of entities. Such changes made
  * in one instance may be applied to a different instance by calling [applyChangesFrom] function.
  *
@@ -142,8 +144,96 @@ public interface MutableEntityStorage : EntityStorage {
 
   /**
    * Modifies the given entity [e] by passing a builder interface for it to [change]. 
-   * This function isn't supposed to be used directly, it's more convenient to use a specialized `modifyEntity` extension function which
-   * is generated for each entity type.
+   * This function isn't supposed to be used directly, it's more convenient to use a specialized `modifySomethingEntity` extension function
+   *   which is generated for each entity type.
+   *
+   * # Side effects on other entities
+   *
+   * The modification of the entity can have side effects on other related entities. For example, some children entities
+   *  may be removed by modification the parent. The entity storage tries to preserve the child entities unless this breaks the consistency.
+   *
+   *
+   * ## One To Many
+   * In One-To-Many connection, if the parent is modified and some existing child is not presented in the new list of children,
+   *   the child will be removed in case the parent field is not nullable. If the parent field in child is nullable, the child remains
+   *   in the storage and returns `null` when accessing the parent.
+   * ```
+   * interface ChildEntity : WorkspaceEntity {
+   *   val parent: ParentEntity
+   * }
+   *
+   * ...
+   *
+   * val child = ChildEntity(..)
+   * val parent = ParentEntity(...) {
+   *   this.children = listOf(child)
+   * }
+   *
+   * builder.modifyParentEntity(parent) {
+   *   this.children = emptyList()
+   * }
+   *
+   * // child entity is removed because parent field is not nullable
+   * ```
+   * ```
+   * interface ChildEntity : WorkspaceEntity {
+   *   val parent: ParentEntity?
+   * }
+   *
+   * ...
+   *
+   * val child = ChildEntity(..)
+   * val parent = ParentEntity(...) {
+   *   this.children = listOf(child)
+   * }
+   *
+   * builder.modifyParentEntity(parent) {
+   *   this.children = emptyList()
+   * }
+   *
+   * // child entity is NOT removed because parent field is nullable
+   * ```
+   *
+   * ## One To One
+   * In One-To-One connection, if the child of a parent is set to null or another child, the previous child is removed in case
+   *   the parent field is not nullable. If the child has a nullable parent, the child remains in the storage and returns `null` when
+   *   accessing the parent.
+   * ```
+   * interface ChildEntity : WorkspaceEntity {
+   *   val parent: ParentEntity
+   * }
+   *
+   * ...
+   *
+   * val child = ChildEntity(..)
+   * val parent = ParentEntity(...) {
+   *   this.child = child
+   * }
+   *
+   * builder.modifyParentEntity(parent) {
+   *   this.child = null
+   * }
+   *
+   * // child entity is removed because parent field is not nullable
+   * ```
+   * ```
+   * interface ChildEntity : WorkspaceEntity {
+   *   val parent: ParentEntity?
+   * }
+   *
+   * ...
+   *
+   * val child = ChildEntity(..)
+   * val parent = ParentEntity(...) {
+   *   this.child = child
+   * }
+   *
+   * builder.modifyParentEntity(parent) {
+   *   this.child = null
+   * }
+   *
+   * // child entity is NOT removed because parent field is nullable
+   * ```
    *
    * @return updated entity [e]. There is no guarantee if the modifications are visible or not in the instance of [e],
    *   so [e] should not be used after the modification
@@ -151,8 +241,12 @@ public interface MutableEntityStorage : EntityStorage {
   public fun <M : WorkspaceEntity.Builder<out T>, T : WorkspaceEntity> modifyEntity(clazz: Class<M>, e: T, change: M.() -> Unit): T
 
   /**
-   * Remove the entity from the storage if it's present. All child entities of the entity with non-null reference to the parent entity are
-   * also removed.
+   * Remove the entity from the storage if it's present.
+   *
+   * All children of the entity will be cascade removed.
+   * If the child entities are not supposed to be removed, they should be modified by setting `null` to the parent of the
+   *   child entities. This can be done only for children with a nullable parent.
+   *
    * @return `true` if the entity was removed, `false` if the entity was not in the storage
    */
   public fun removeEntity(e: WorkspaceEntity): Boolean

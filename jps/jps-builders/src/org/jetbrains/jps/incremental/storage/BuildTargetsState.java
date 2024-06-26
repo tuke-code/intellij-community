@@ -1,10 +1,12 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.jps.incremental.storage;
 
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.util.Pair;
 import com.intellij.openapi.util.io.FileUtil;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.jps.builders.BuildRootIndex;
 import org.jetbrains.jps.builders.BuildTarget;
 import org.jetbrains.jps.builders.BuildTargetType;
 import org.jetbrains.jps.builders.impl.BuildRootIndexImpl;
@@ -25,9 +27,18 @@ public final class BuildTargetsState {
   private long myLastSuccessfulRebuildDuration = -1;
   private final ConcurrentMap<BuildTargetType<?>, BuildTargetTypeState> myTypeStates = new ConcurrentHashMap<>(16, 0.75f, 1);
   private final JpsModel myModel;
-  private final BuildRootIndexImpl myBuildRootIndex;
+  private final BuildRootIndex myBuildRootIndex;
 
+  /**
+   * @deprecated temporary available to enable kotlin tests running. Should be removed eventually
+   */
+  @Deprecated
+  @ApiStatus.Internal
   public BuildTargetsState(BuildDataPaths dataPaths, JpsModel model, BuildRootIndexImpl buildRootIndex) {
+    this(dataPaths, model, (BuildRootIndex)buildRootIndex);
+  }
+
+  public BuildTargetsState(BuildDataPaths dataPaths, JpsModel model, BuildRootIndex buildRootIndex) {
     myDataPaths = dataPaths;
     myModel = model;
     myBuildRootIndex = buildRootIndex;
@@ -135,7 +146,7 @@ public final class BuildTargetsState {
     return myModel;
   }
 
-  public BuildRootIndexImpl getBuildRootIndex() {
+  public BuildRootIndex getBuildRootIndex() {
     return myBuildRootIndex;
   }
 
