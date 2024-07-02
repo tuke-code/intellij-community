@@ -1,7 +1,6 @@
 // Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.platform.ide.navigation.impl
 
-import com.intellij.ide.DataManager
 import com.intellij.ide.ui.UISettings
 import com.intellij.ide.util.PsiNavigationSupport
 import com.intellij.injected.editor.VirtualFileWindow
@@ -83,13 +82,17 @@ private class IdeNavigationService(private val project: Project) : NavigationSer
     return semaphore.withPermit {
       val request = readAction {
         navigatable.navigationRequest()
-      }
-      if (request == null) {
-        false
-      }
-      else {
-        navigateToSource(project = project, request = request, options = options as NavigationOptions.Impl, dataContext = null)
-      }
+      } ?: return@withPermit false
+      navigate(project = project, requests = listOf(request), options = options, dataContext = null)
+    }
+  }
+
+  override suspend fun navigate(request: NavigationRequest, options: NavigationOptions) {
+    if (request is SourceNavigationRequest) {
+      navigateToSource(project = project, request = request, options = options as NavigationOptions.Impl, dataContext = null)
+    }
+    else {
+      navigate(project = project, requests = listOf(request), options = options, dataContext = null)
     }
   }
 }
@@ -100,7 +103,7 @@ private val LOG: Logger = Logger.getInstance("#com.intellij.platform.ide.navigat
  * Navigates to all sources from [requests], or navigates to first non-source request.
  */
 private suspend fun navigate(project: Project, requests: List<NavigationRequest>, options: NavigationOptions, dataContext: DataContext?): Boolean {
-  val maxSourceRequests = Registry.intValue("ide.source.file.navigation.limit", 100)
+  val maxSourceRequests = if (requests.size == 1) Int.MAX_VALUE else Registry.intValue("ide.source.file.navigation.limit", 100)
   var nonSourceRequest: NavigationRequest? = null
 
   options as NavigationOptions.Impl
@@ -191,8 +194,6 @@ private suspend fun navigateToSource(
   dataContext: DataContext?,
 ) {
   val file = request.file
-  val offset = request.offsetMarker?.takeIf { it.isValid }?.startOffset ?: -1
-
   val type = if (file.isDirectory) null else FileTypeManager.getInstance().getKnownFileTypeOrAssociate(file, project)
   if (type != null && file.isValid) {
     if (type is INativeFileType) {
@@ -201,28 +202,20 @@ private suspend fun navigateToSource(
       }
     }
     else {
-      val descriptor = OpenFileDescriptor(project, request.file, offset)
-      descriptor.isUseCurrentWindow = true
-      if (UISettings.getInstance().openInPreviewTabIfPossible && Registry.`is`("editor.preview.tab.navigation")) {
-        descriptor.isUsePreviewTab = true
+      if (dataContext != null) {
+        val descriptor = OpenFileDescriptor(project, request.file, request.offsetMarker?.takeIf { it.isValid }?.startOffset ?: -1)
+        descriptor.isUseCurrentWindow = true
+        if (UISettings.getInstance().openInPreviewTabIfPossible && Registry.`is`("editor.preview.tab.navigation")) {
+          descriptor.isUsePreviewTab = true
+        }
+
+        val fileNavigator = serviceAsync<FileNavigator>()
+        if (fileNavigator is FileNavigatorImpl && fileNavigator.navigateInRequestedEditorAsync(descriptor, dataContext)) {
+          return
+        }
       }
 
-      val fileNavigator = serviceAsync<FileNavigator>()
-      if (fileNavigator is FileNavigatorImpl &&
-          withContext(Dispatchers.EDT) {
-            blockingContext {
-              fileNavigator.navigateInRequestedEditor(
-                descriptor = descriptor,
-                dataContextSupplier = {
-                  dataContext ?: @Suppress("DEPRECATION") DataManager.getInstance().dataContext
-                },
-              )
-            }
-          }) {
-        return
-      }
-
-      if (openFile(request = request, descriptor = descriptor, options = options, openMode = openMode)) {
+      if (openFile(request = request, project = project, options = options, openMode = openMode)) {
         return
       }
     }
@@ -232,60 +225,60 @@ private suspend fun navigateToSource(
 }
 
 private suspend fun openFile(
-  descriptor: OpenFileDescriptor,
   options: NavigationOptions.Impl,
   openMode: FileEditorManagerImpl.OpenMode,
+  project: Project,
   request: SourceNavigationRequest,
 ): Boolean {
-  val originalFile = descriptor.file
-  val fileEditorManager = descriptor.project.serviceAsync<FileEditorManager>() as FileEditorManagerEx
-  val effectiveDescriptor: FileEditorNavigatable
+  var offset = request.offsetMarker?.takeIf { it.isValid }?.startOffset ?: -1
+  val originalFile = request.file
+  var file = originalFile
+
+  val fileEditorManager = project.serviceAsync<FileEditorManager>() as FileEditorManagerEx
   if (originalFile is VirtualFileWindow) {
-    effectiveDescriptor = readAction {
-      val hostOffset = originalFile.documentWindow.injectedToHost(descriptor.offset)
-      val fixedDescriptor = OpenFileDescriptor(descriptor.project, originalFile.delegate, hostOffset)
-      fixedDescriptor.isUseCurrentWindow = descriptor.isUseCurrentWindow
-      fixedDescriptor.isUsePreviewTab = descriptor.isUsePreviewTab
-      fixedDescriptor
+    readAction {
+      offset = originalFile.documentWindow.injectedToHost(offset)
+      file = originalFile.delegate
     }
   }
-  else {
-    effectiveDescriptor = descriptor
-  }
 
-  val file = effectiveDescriptor.file
-  val openOptions = FileEditorOpenOptions(
-    reuseOpen = !effectiveDescriptor.isUseCurrentWindow,
-    usePreviewTab = effectiveDescriptor.isUsePreviewTab,
-    requestFocus = options.requestFocus,
-    openMode = openMode,
-  )
-
-  val fileEditors = fileEditorManager.openFile(file = file, options = openOptions).allEditors
+  val fileEditors = fileEditorManager.openFile(
+    file = file,
+    options = FileEditorOpenOptions(
+      reuseOpen = true,
+      requestFocus = options.requestFocus,
+      openMode = openMode,
+    ),
+  ).allEditors
   if (fileEditors.isEmpty()) {
     return false
   }
 
-  val currentCompositeForFile = fileEditorManager.getComposite(file) as? EditorComposite
   val elementRange = if (options.preserveCaret) request.elementRangeMarker?.takeIf { it.isValid }?.textRange else null
+  val currentCompositeForFile = fileEditorManager.getComposite(file) as? EditorComposite
   if (elementRange != null) {
     for (editor in fileEditors) {
       if (editor is TextEditor) {
         val text = editor.editor
-        val offset = readAction { text.caretModel.offset }
-        if (elementRange.containsOffset(offset)) {
+        if (elementRange.containsOffset(readAction { text.caretModel.offset })) {
           return true
         }
       }
     }
   }
 
+
+  if (offset == -1) {
+    return true
+  }
+
+  val descriptor = OpenFileDescriptor(project, file, offset)
   suspend fun tryNavigate(filter: (NavigatableFileEditor) -> Boolean): Boolean {
     for (editor in fileEditors) {
       // try to navigate opened editor
       if (editor is NavigatableFileEditor &&
           filter(editor) &&
-          withContext(Dispatchers.EDT) { navigateAndSelectEditor(editor, effectiveDescriptor, currentCompositeForFile) }) {
+          withContext(Dispatchers.EDT) { navigateAndSelectEditor(editor, descriptor, currentCompositeForFile) }) {
         return true
       }
     }

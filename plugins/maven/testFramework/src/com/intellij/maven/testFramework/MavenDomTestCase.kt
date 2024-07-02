@@ -15,6 +15,7 @@ import com.intellij.find.findUsages.PsiElement2UsageTargetAdapter
 import com.intellij.lang.annotation.HighlightSeverity
 import com.intellij.openapi.actionSystem.CommonDataKeys
 import com.intellij.openapi.application.EDT
+import com.intellij.openapi.application.readAction
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.util.Comparing
@@ -194,11 +195,13 @@ abstract class MavenDomTestCase : MavenMultiVersionImportingTestCase() {
     assertNull(ref!!.resolve())
   }
 
-  protected fun assertUnresolved(file: VirtualFile, expectedText: String?) {
-    val ref = getReferenceAtCaret(file)
-    assertNotNull(ref)
-    assertNull(ref!!.resolve())
-    assertEquals(expectedText, ref.canonicalText)
+  protected suspend fun assertUnresolved(file: VirtualFile, expectedText: String?) {
+    withContext(Dispatchers.EDT) {
+      val ref = getReferenceAtCaret(file)
+      assertNotNull(ref)
+      assertNull(ref!!.resolve())
+      assertEquals(expectedText, ref.canonicalText)
+    }
   }
 
   @Throws(IOException::class)
@@ -247,10 +250,11 @@ abstract class MavenDomTestCase : MavenMultiVersionImportingTestCase() {
     return resolved
   }
 
-  @Throws(IOException::class)
-  protected fun assertResolved(file: VirtualFile, expected: PsiElement, expectedText: String?) {
-    val ref = doAssertResolved(file, expected)
-    assertEquals(expectedText, ref!!.canonicalText)
+  protected suspend fun assertResolved(file: VirtualFile, expected: PsiElement, expectedText: String?) {
+    withContext(Dispatchers.EDT) {
+      val ref = doAssertResolved(file, expected)
+      assertEquals(expectedText, ref!!.canonicalText)
+    }
   }
 
   private fun doAssertResolved(file: VirtualFile, expected: PsiElement): PsiReference? {
@@ -452,18 +456,18 @@ abstract class MavenDomTestCase : MavenMultiVersionImportingTestCase() {
     }
   }
 
-  @Throws(Exception::class)
-  protected fun assertRenameResult(value: String?, expectedXml: String?) {
+  protected suspend fun assertRenameResult(value: String?, expectedXml: String?) {
     doRename(projectPom, value)
     assertEquals(createPomXml(expectedXml), getTestPsiFile(projectPom).text)
   }
 
-  protected fun doRename(f: VirtualFile, value: String?) {
-    val context = createRenameDataContext(f, value)
-    val renameHandler = RenameHandlerRegistry.getInstance().getRenameHandler(context)
-    assertNotNull(renameHandler)
-
-    invokeRename(context, renameHandler)
+  protected suspend fun doRename(f: VirtualFile, value: String?) {
+    withContext(Dispatchers.EDT) {
+      val context = createRenameDataContext(f, value)
+      val renameHandler = RenameHandlerRegistry.getInstance().getRenameHandler(context)
+      assertNotNull(renameHandler)
+      invokeRename(context, renameHandler)
+    }
   }
 
   protected fun doInlineRename(f: VirtualFile, value: String) {
@@ -474,16 +478,18 @@ abstract class MavenDomTestCase : MavenMultiVersionImportingTestCase() {
     CodeInsightTestUtil.doInlineRename(renameHandler as VariableInplaceRenameHandler?, value, fixture)
   }
 
-  protected fun assertCannotRename() {
-    val context = createRenameDataContext(projectPom, "new name")
-    val handler = RenameHandlerRegistry.getInstance().getRenameHandler(context)
-    if (handler == null) return
-    try {
-      invokeRename(context, handler)
-    }
-    catch (e: RefactoringErrorHintException) {
-      if (!e.message!!.startsWith("Cannot perform refactoring.")) {
-        throw e
+  protected suspend fun assertCannotRename() {
+    withContext(Dispatchers.EDT) {
+      val context = createRenameDataContext(projectPom, "new name")
+      val handler = RenameHandlerRegistry.getInstance().getRenameHandler(context)
+      if (handler == null) return@withContext
+      try {
+        invokeRename(context, handler)
+      }
+      catch (e: RefactoringErrorHintException) {
+        if (!e.message!!.startsWith("Cannot perform refactoring.")) {
+          throw e
+        }
       }
     }
   }

@@ -1,7 +1,7 @@
 // Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.platform.ide.diagnostic.startUpPerformanceReporter
 
-// import com.intellij.concurrency.currentThreadContext
+import com.intellij.concurrency.currentThreadContext
 import com.intellij.diagnostic.StartUpMeasurer
 import com.intellij.ide.impl.ProjectUtilCore
 import com.intellij.idea.IdeStarter
@@ -9,12 +9,21 @@ import com.intellij.internal.statistic.eventLog.EventLogGroup
 import com.intellij.internal.statistic.eventLog.events.*
 import com.intellij.internal.statistic.eventLog.events.EventFields.createDurationField
 import com.intellij.internal.statistic.service.fus.collectors.CounterUsagesCollector
-// import com.intellij.openapi.application.readAction
+import com.intellij.openapi.application.ex.ApplicationManagerEx
+import com.intellij.openapi.application.readAction
 import com.intellij.openapi.components.Service
+import com.intellij.openapi.components.serviceAsync
+import com.intellij.openapi.diagnostic.thisLogger
+import com.intellij.openapi.editor.impl.DocumentMarkupModel
+import com.intellij.openapi.fileEditor.FileDocumentManager
+import com.intellij.openapi.fileEditor.FileEditorManager
+import com.intellij.openapi.fileEditor.TextEditor
+import com.intellij.openapi.project.Project
+import com.intellij.openapi.project.ProjectManager
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.VirtualFileWithId
 import com.intellij.util.containers.ComparatorUtil
-// import com.intellij.util.containers.ContainerUtil
+import com.intellij.util.containers.ContainerUtil
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
@@ -89,14 +98,13 @@ object FUSProjectHotStartUpMeasurer {
     }
 
     class MarkupRestoredEvent(val fileId: Int) : Event
-   /*
     class FirstEditorEvent(
       val sourceOfSelectedEditor: SourceOfSelectedEditor,
       val file: VirtualFile,
-      val time: Long
+      val time: Long,
     ) : Event
 
-    class NoMoreEditorsEvent(val time: Long) : Event*/
+    class NoMoreEditorsEvent(val time: Long) : Event
 
     data object ResetProjectPathEvent : Event
     data object IdeStarterStartedEvent : Event
@@ -199,32 +207,71 @@ object FUSProjectHotStartUpMeasurer {
     channel.trySend(Event.MarkupRestoredEvent(file.id))
   }
 
-  @Suppress("unused")
   fun firstOpenedEditor(file: VirtualFile) {
-    /*if (!currentThreadContext().isProperContext()) {
+    if (!currentThreadContext().isProperContext()) {
       return
     }
-    channel.trySend(Event.FirstEditorEvent(SourceOfSelectedEditor.TextEditor, file, System.nanoTime()))*/
+    channel.trySend(Event.FirstEditorEvent(SourceOfSelectedEditor.TextEditor, file, System.nanoTime()))
+    if (ApplicationManagerEx.isInIntegrationTest()) {
+      val project = ProjectManager.getInstance().openProjects[0]
+      val fileEditorManager = FileEditorManager.getInstance(project)
+      checkEditorHasBasicHighlight(file, project, fileEditorManager)
+    }
   }
 
-  @Suppress("unused", "RedundantSuspendModifier")
+  /**
+   * Unfortunately, current architecture doesn't allow to check that there is basic highlighting (syntax + maybe folding) in editor.
+   * Here are some heuristics that may save us from bugs, but do not guarantee that.
+   */
+  private fun checkEditorHasBasicHighlight(file: VirtualFile, project: Project, fileEditorManager: FileEditorManager) {
+    val textEditor: TextEditor = fileEditorManager.getEditors(file)[0] as TextEditor
+    // It's marked @NotNull, but before initialization is actually null.
+    // So this is a valid check that highlighter is initialized. It is used for syntax highlighting
+    // via HighlighterIterator from LexerEditorHighlighter.createIterator & IterationState.
+    // See also: EditorHighlighterUpdater.updateHighlighters() and setupHighlighter(),
+    // LexerEditorHighlighter.createIterator, TextEditorImplKt.setHighlighterToEditor
+    textEditor.editor.highlighter
+    // See usages of TextEditorImpl.asyncLoader in PsiAwareTextEditorImpl, especially in span "HighlighterTextEditorInitializer".
+    // It's reasonable to expect loaded editor to provide minimal highlighting the statistic is interested in.
+    if (!textEditor.isEditorLoaded) {
+      thisLogger().error("The editor is not loaded yet")
+    }
+
+    val cachedDocument = FileDocumentManager.getInstance().getCachedDocument(file)
+    if (cachedDocument == null) {
+      thisLogger().error("No cached document for ${file.path}")
+    }
+    else {
+      val markupModel = DocumentMarkupModel.forDocument(cachedDocument, project, false)
+      if (markupModel == null) {
+        thisLogger().error("No markup model for ${file.path} when the editor is opened")
+      }
+    }
+  }
+
   suspend fun firstOpenedUnknownEditor(file: VirtualFile, nanoTime: Long) {
-   /* if (!isProperContext()) return
-    channel.trySend(Event.FirstEditorEvent(SourceOfSelectedEditor.UnknownEditor, file, nanoTime))*/
+    if (!isProperContext()) return
+    channel.trySend(Event.FirstEditorEvent(SourceOfSelectedEditor.UnknownEditor, file, nanoTime))
+    if (ApplicationManagerEx.isInIntegrationTest()) {
+      val project = serviceAsync<ProjectManager>().openProjects[0]
+      val fileEditorManager = project.serviceAsync<FileEditorManager>()
+      checkEditorHasBasicHighlight(file, project, fileEditorManager)
+    }
   }
 
-  @Suppress("unused", "RedundantSuspendModifier")
   suspend fun openedReadme(readmeFile: VirtualFile, nanoTime: Long) {
-   /* if (!isProperContext()) return
-    channel.trySend(Event.FirstEditorEvent(SourceOfSelectedEditor.FoundReadmeFile, readmeFile, nanoTime))*/
+    if (!isProperContext()) return
+    channel.trySend(Event.FirstEditorEvent(SourceOfSelectedEditor.FoundReadmeFile, readmeFile, nanoTime))
+    // Do not check highlights here, because the readme file is opened in preview-only mode with
+    // `readme.putUserData(TextEditorWithPreview.DEFAULT_LAYOUT_FOR_FILE, TextEditorWithPreview.Layout.SHOW_PREVIEW)`,
+    // see the caller
   }
 
-  @Suppress("unused")
   fun reportNoMoreEditorsOnStartup(nanoTime: Long) {
-    /*if (!currentThreadContext().isProperContext()) {
+    if (!currentThreadContext().isProperContext()) {
       return
     }
-    channel.trySend(Event.NoMoreEditorsEvent(nanoTime))*/
+    channel.trySend(Event.NoMoreEditorsEvent(nanoTime))
   }
 
   private data class LastHandledEvent(val event: Event.FUSReportableEvent, val durationReportedToFUS: Duration)
@@ -283,7 +330,7 @@ object FUSProjectHotStartUpMeasurer {
 
   private fun applyFrameInteractiveEventIfPossible(
     frameBecameInteractiveEvent: Event.FrameBecameInteractiveEvent?,
-    lastHandledEvent: LastHandledEvent
+    lastHandledEvent: LastHandledEvent,
   ): LastHandledEvent? {
     if (frameBecameInteractiveEvent != null) {
       val durationFromStart = getDurationFromStart(frameBecameInteractiveEvent.time, lastHandledEvent)
@@ -292,7 +339,7 @@ object FUSProjectHotStartUpMeasurer {
     }
     return null
   }
-/*
+
   private suspend fun applyEditorEventIfPossible(
     firstEditorEvent: Event.FirstEditorEvent?,
     noEditorEvent: Event.NoMoreEditorsEvent?,
@@ -331,7 +378,7 @@ object FUSProjectHotStartUpMeasurer {
 
     CODE_LOADED_AND_VISIBLE_IN_EDITOR_EVENT.log(data)
     throw CancellationException()
-  }*/
+  }
 
   suspend fun startWritingStatistics() {
     try {
@@ -357,8 +404,8 @@ object FUSProjectHotStartUpMeasurer {
     var frameBecameInteractiveEvent: Event.FrameBecameInteractiveEvent? = null
     var projectPathReportEvent: Event.ProjectPathReportEvent? = null
     var projectTypeReportEvent: Event.ProjectTypeReportEvent? = null
-    // var firstEditorEvent: Event.FirstEditorEvent? = null
-    // var noEditorEvent: Event.NoMoreEditorsEvent? = null
+    var firstEditorEvent: Event.FirstEditorEvent? = null
+    var noEditorEvent: Event.NoMoreEditorsEvent? = null
 
     for (event in channel) {
       yield()
@@ -388,8 +435,8 @@ object FUSProjectHotStartUpMeasurer {
         Event.ResetProjectPathEvent -> projectPathReportEvent = null
         is Event.ProjectTypeReportEvent -> if (projectTypeReportEvent == null) projectTypeReportEvent = event
         is Event.ViolationEvent -> reportViolation(event.violation, event.time, ideStarterStartedEvent, lastHandledEvent)
-        // is Event.FirstEditorEvent -> if (firstEditorEvent == null) firstEditorEvent = event
-        // is Event.NoMoreEditorsEvent -> if (noEditorEvent == null) noEditorEvent = event
+        is Event.FirstEditorEvent -> if (firstEditorEvent == null) firstEditorEvent = event
+        is Event.NoMoreEditorsEvent -> if (noEditorEvent == null) noEditorEvent = event
       }
 
       while (true) {
@@ -402,8 +449,7 @@ object FUSProjectHotStartUpMeasurer {
                                              projectPathReportEvent, ideStarterStartedEvent, lastHandledEvent)
           is Event.FrameBecameVisibleEvent -> applyFrameInteractiveEventIfPossible(frameBecameInteractiveEvent, lastHandledEvent)
           is Event.FrameBecameInteractiveEvent -> {
-            //applyEditorEventIfPossible(firstEditorEvent, noEditorEvent, markupResurrectedFileIds, projectPathReportEvent, lastHandledEvent)
-            throw CancellationException()
+            applyEditorEventIfPossible(firstEditorEvent, noEditorEvent, markupResurrectedFileIds, projectPathReportEvent, lastHandledEvent)
             break
           }
         }
@@ -422,8 +468,10 @@ object FUSProjectHotStartUpMeasurer {
       get() = this
   }
 
-  private fun getDurationFromStart(finishTimestampNano: Long = System.nanoTime(),
-                                   lastReportedEvent: LastHandledEvent?): Duration {
+  private fun getDurationFromStart(
+    finishTimestampNano: Long = System.nanoTime(),
+    lastReportedEvent: LastHandledEvent?,
+  ): Duration {
     val duration = (finishTimestampNano - StartUpMeasurer.getStartTime()).toDuration(DurationUnit.NANOSECONDS)
     return if (lastReportedEvent == null) duration else ComparatorUtil.max(duration, lastReportedEvent.durationReportedToFUS)
   }
@@ -462,7 +510,6 @@ private val FRAME_BECAME_VISIBLE_EVENT = GROUP.registerVarargEvent("frame.became
 
 private val FRAME_BECAME_INTERACTIVE_EVENT = GROUP.registerEvent("frame.became.interactive", DURATION)
 
-@Suppress("unused")
 private enum class SourceOfSelectedEditor {
   TextEditor,
   UnknownEditor,
@@ -473,7 +520,6 @@ private val LOADED_CACHED_MARKUP_FIELD = EventFields.Boolean("loaded_cached_mark
 private val SOURCE_OF_SELECTED_EDITOR_FIELD: EnumEventField<SourceOfSelectedEditor> =
   EventFields.Enum("source_of_selected_editor", SourceOfSelectedEditor::class.java)
 private val NO_EDITORS_TO_OPEN_FIELD = EventFields.Boolean("no_editors_to_open")
-@Suppress("unused")
 private val CODE_LOADED_AND_VISIBLE_IN_EDITOR_EVENT = GROUP.registerVarargEvent("code.loaded.and.visible.in.editor",
                                                                                 DURATION,
                                                                                 EventFields.FileType,

@@ -1,7 +1,6 @@
 // Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.ui;
 
-import com.intellij.ide.ui.UISettings;
 import com.intellij.openapi.util.Condition;
 import com.intellij.openapi.util.TextRange;
 import com.intellij.openapi.util.text.StringUtil;
@@ -90,7 +89,7 @@ public abstract class FilteringTree<T extends DefaultMutableTreeNode, U> {
     return new FilteringSpeedSearch(searchTextField);
   }
 
-  protected class FilteringSpeedSearch extends MySpeedSearch<T> {
+  protected class FilteringSpeedSearch extends MySpeedSearch<T> implements FilteringTreeUserObjectMatcher<U> {
 
     protected FilteringSpeedSearch(@NotNull SearchTextField field) {
       super(myTree, field.getTextEditor());
@@ -112,21 +111,31 @@ public abstract class FilteringTree<T extends DefaultMutableTreeNode, U> {
 
     @Override
     public @NotNull Matching checkMatching(@NotNull T node) {
-      String text = getText(getUserObject(node));
+      U userObject = getUserObject(node);
+      if (userObject == null) return Matching.NONE;
+
+      String text = getText(userObject);
       if (text == null) return Matching.NONE;
 
       Iterable<TextRange> matchingFragments = matchingFragments(text);
-      if (matchingFragments == null) {
-        return Matching.NONE;
-      }
+      return checkMatching(userObject, matchingFragments);
+    }
 
-      TextRange onlyFragment = getOnlyElement(matchingFragments);
-      if (onlyFragment != null && onlyFragment.getStartOffset() == 0) {
-        return Matching.FULL;
+    @Override
+    public final @NotNull Matching checkMatching(@NotNull U userObject, @Nullable Iterable<TextRange> matchingFragments) {
+      Matching result;
+      if (matchingFragments == null) {
+        result = Matching.NONE;
+      } else {
+        TextRange onlyFragment = getOnlyElement(matchingFragments);
+        result = onlyFragment != null && onlyFragment.getStartOffset() == 0 ? Matching.FULL : Matching.PARTIAL;
       }
-      else {
-        return Matching.PARTIAL;
-      }
+      onMatchingChecked(userObject, matchingFragments, result);
+
+      return result;
+    }
+
+    protected void onMatchingChecked(@NotNull U userObject, @Nullable Iterable<TextRange> matchingFragments, @NotNull Matching result) {
     }
 
     private static <T> @Nullable T getOnlyElement(@NotNull Iterable<T> iterable) {
@@ -353,8 +362,7 @@ public abstract class FilteringTree<T extends DefaultMutableTreeNode, U> {
       for (U child : children) {
         isAccepted |= computeAcceptCache(child, cache);
       }
-      String name = myNamer.fun(object);
-      isAccepted |= object == myRootObject || name != null && accept(name);
+      isAccepted = isAccepted || object == myRootObject || accept(object);
       if (isAccepted) {
         for (U child : children) {
           if (myNamer.fun(child) == null) cache.add(child);
@@ -362,6 +370,19 @@ public abstract class FilteringTree<T extends DefaultMutableTreeNode, U> {
         cache.add(object);
       }
       return isAccepted;
+    }
+
+    private boolean accept(@NotNull U object) {
+      String name = myNamer.fun(object);
+      if (name == null) return false;
+
+      Iterable<TextRange> matchingFragments = mySpeedSearch.matchingFragments(name);
+      if (mySpeedSearch instanceof FilteringTreeUserObjectMatcher filteringTreeSpeedSearch) {
+        //noinspection unchecked
+        return filteringTreeSpeedSearch.checkMatching(object, matchingFragments) != Matching.NONE;
+      } else {
+        return matchingFragments != null;
+      }
     }
 
     public @NotNull Iterable<? extends U> getChildren(@Nullable U object) {
@@ -467,11 +488,6 @@ public abstract class FilteringTree<T extends DefaultMutableTreeNode, U> {
         }
         nodesWereRemoved(node, ints, removedNodes.toArray());
       }
-    }
-
-    private boolean accept(@Nullable String name) {
-      if (name == null) return true;
-      return mySpeedSearch.matchingFragments(name) != null;
     }
 
     @Override
@@ -613,10 +629,10 @@ public abstract class FilteringTree<T extends DefaultMutableTreeNode, U> {
       if (!isPopupActive()) return false;
       Iterator<Item> it;
       if (keyCode == KeyEvent.VK_UP) {
-        it = iterate(getSelection(), false, UISettings.getInstance().getCycleScrolling());
+        it = iterate(getSelection(), false, TreeUtil.isCyclicScrollingAllowed());
       }
       else if (keyCode == KeyEvent.VK_DOWN) {
-        it = iterate(getSelection(), true, UISettings.getInstance().getCycleScrolling());
+        it = iterate(getSelection(), true, TreeUtil.isCyclicScrollingAllowed());
       }
       else if (keyCode == KeyEvent.VK_HOME) {
         it = iterate(null, true);
@@ -641,4 +657,8 @@ public abstract class FilteringTree<T extends DefaultMutableTreeNode, U> {
   }
 
   public enum Matching {NONE, PARTIAL, FULL}
+
+  protected interface FilteringTreeUserObjectMatcher<U> {
+    @NotNull Matching checkMatching(@NotNull U userObject, @Nullable Iterable<TextRange> matchingFragments);
+  }
 }

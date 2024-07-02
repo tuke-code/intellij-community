@@ -248,11 +248,19 @@ public open class VersionedEntityStorageImpl(initialStorage: ImmutableEntityStor
   }
 }
 
+@ApiStatus.Internal
+public interface VersionedStorageChangeInternal : VersionedStorageChange {
+  /** Use [getChanges] to process changes of the specific entities. */
+  @ApiStatus.Internal
+  @ApiStatus.Obsolete
+  public fun getAllChanges(): Sequence<EntityChange<*>>
+}
+
 private class VersionedStorageChangeImpl(
   override val storageBefore: ImmutableEntityStorage,
   override val storageAfter: ImmutableEntityStorage,
   private val changes: Map<Class<*>, List<EntityChange<*>>>
-) : VersionedStorageChange {
+) : VersionedStorageChangeInternal {
   @Suppress("UNCHECKED_CAST")
   override fun <T : WorkspaceEntity> getChanges(entityClass: Class<T>): List<EntityChange<T>> {
     return (changes[entityClass] as? List<EntityChange<T>>) ?: emptyList()

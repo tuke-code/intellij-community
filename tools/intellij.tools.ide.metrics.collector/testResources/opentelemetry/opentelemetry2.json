@@ -31,7 +31,7 @@
           "operationName": "execute projectOpened handlers",
           "processID": "p1",
           "startTime": 1655663744106750,
-          "duration": 59582,
+          "duration": 59582000,
           "references": [
             {
               "refType": "CHILD_OF",
@@ -46,7 +46,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663744166955,
-          "duration": 15,
+          "duration": 15000,
           "tags": [
             {
               "key": "plugin",
@@ -73,7 +73,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663744169716,
-          "duration": 321,
+          "duration": 321000,
           "tags": [
             {
               "key": "plugin",
@@ -100,7 +100,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663744171043,
-          "duration": 1221,
+          "duration": 1221000,
           "tags": [
             {
               "key": "plugin",
@@ -127,7 +127,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663744176050,
-          "duration": 4294,
+          "duration": 4294000,
           "tags": [
             {
               "key": "plugin",
@@ -154,7 +154,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663744181792,
-          "duration": 2226,
+          "duration": 2226000,
           "tags": [
             {
               "key": "plugin",
@@ -181,7 +181,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663744184511,
-          "duration": 452,
+          "duration": 452000,
           "tags": [
             {
               "key": "plugin",
@@ -208,7 +208,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663744185585,
-          "duration": 228,
+          "duration": 228000,
           "tags": [
             {
               "key": "plugin",
@@ -235,7 +235,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663744186295,
-          "duration": 2791,
+          "duration": 2791000,
           "tags": [
             {
               "key": "plugin",
@@ -262,7 +262,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663744192502,
-          "duration": 2792,
+          "duration": 2792000,
           "tags": [
             {
               "key": "plugin",
@@ -289,7 +289,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663744198732,
-          "duration": 14184,
+          "duration": 14184000,
           "tags": [
             {
               "key": "plugin",
@@ -316,7 +316,7 @@
           "operationName": "run startup activities",
           "processID": "p1",
           "startTime": 1655663744166841,
-          "duration": 46122,
+          "duration": 46122000,
           "references": [
             {
               "refType": "CHILD_OF",
@@ -331,7 +331,7 @@
           "operationName": "StartupManager.projectOpened",
           "processID": "p1",
           "startTime": 1655663744166725,
-          "duration": 48744,
+          "duration": 48744000,
           "references": [
             {
               "refType": "CHILD_OF",
@@ -346,7 +346,7 @@
           "operationName": "open project",
           "processID": "p1",
           "startTime": 1655663743992000,
-          "duration": 224576,
+          "duration": 224576000,
           "tags": [
             {
               "key": "project",
@@ -361,7 +361,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663744224724,
-          "duration": 385,
+          "duration": 385000,
           "tags": [
             {
               "key": "plugin",
@@ -388,7 +388,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663744226575,
-          "duration": 795,
+          "duration": 795000,
           "tags": [
             {
               "key": "plugin",
@@ -415,7 +415,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663744239922,
-          "duration": 1678,
+          "duration": 1678000,
           "tags": [
             {
               "key": "plugin",
@@ -442,7 +442,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663744244605,
-          "duration": 29,
+          "duration": 29000,
           "tags": [
             {
               "key": "plugin",
@@ -469,7 +469,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663744247422,
-          "duration": 1547,
+          "duration": 1547000,
           "tags": [
             {
               "key": "plugin",
@@ -496,7 +496,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663744250234,
-          "duration": 8392,
+          "duration": 8392000,
           "tags": [
             {
               "key": "plugin",
@@ -523,7 +523,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663744261964,
-          "duration": 5985,
+          "duration": 5985000,
           "tags": [
             {
               "key": "plugin",
@@ -550,7 +550,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663744269577,
-          "duration": 94,
+          "duration": 94000,
           "tags": [
             {
               "key": "plugin",
@@ -577,7 +577,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663744272513,
-          "duration": 157,
+          "duration": 157000,
           "tags": [
             {
               "key": "plugin",
@@ -604,7 +604,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663744280094,
-          "duration": 524,
+          "duration": 524000,
           "tags": [
             {
               "key": "plugin",
@@ -631,7 +631,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663744283379,
-          "duration": 15939,
+          "duration": 15939000,
           "tags": [
             {
               "key": "plugin",
@@ -658,7 +658,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663744301346,
-          "duration": 4498,
+          "duration": 4498000,
           "tags": [
             {
               "key": "plugin",
@@ -685,7 +685,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663744306246,
-          "duration": 14244,
+          "duration": 14244000,
           "tags": [
             {
               "key": "plugin",
@@ -712,7 +712,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663744326358,
-          "duration": 7323,
+          "duration": 7323000,
           "tags": [
             {
               "key": "plugin",
@@ -739,7 +739,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663744334965,
-          "duration": 10952,
+          "duration": 10952000,
           "tags": [
             {
               "key": "plugin",
@@ -766,7 +766,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663744347297,
-          "duration": 2718,
+          "duration": 2718000,
           "tags": [
             {
               "key": "plugin",
@@ -793,7 +793,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663744351503,
-          "duration": 10004,
+          "duration": 10004000,
           "tags": [
             {
               "key": "plugin",
@@ -820,7 +820,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663744362781,
-          "duration": 6382,
+          "duration": 6382000,
           "tags": [
             {
               "key": "plugin",
@@ -847,7 +847,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663744370506,
-          "duration": 152,
+          "duration": 152000,
           "tags": [
             {
               "key": "plugin",
@@ -874,7 +874,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663744371999,
-          "duration": 1467,
+          "duration": 1467000,
           "tags": [
             {
               "key": "plugin",
@@ -901,7 +901,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663744374776,
-          "duration": 9594,
+          "duration": 9594000,
           "tags": [
             {
               "key": "plugin",
@@ -928,7 +928,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663744385835,
-          "duration": 23643,
+          "duration": 23643000,
           "tags": [
             {
               "key": "plugin",
@@ -955,7 +955,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663744410833,
-          "duration": 5771,
+          "duration": 5771000,
           "tags": [
             {
               "key": "plugin",
@@ -982,7 +982,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663744417848,
-          "duration": 21559,
+          "duration": 21559000,
           "tags": [
             {
               "key": "plugin",
@@ -1009,7 +1009,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663744441900,
-          "duration": 3612,
+          "duration": 3612000,
           "tags": [
             {
               "key": "plugin",
@@ -1036,7 +1036,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663744447318,
-          "duration": 5352,
+          "duration": 5352000,
           "tags": [
             {
               "key": "plugin",
@@ -1063,7 +1063,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663744454051,
-          "duration": 6604,
+          "duration": 6604000,
           "tags": [
             {
               "key": "plugin",
@@ -1090,7 +1090,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663744462044,
-          "duration": 606,
+          "duration": 606000,
           "tags": [
             {
               "key": "plugin",
@@ -1117,7 +1117,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663744463906,
-          "duration": 6358,
+          "duration": 6358000,
           "tags": [
             {
               "key": "plugin",
@@ -1144,7 +1144,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663744471709,
-          "duration": 907530,
+          "duration": 907530000,
           "tags": [
             {
               "key": "plugin",
@@ -1171,7 +1171,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663745380580,
-          "duration": 2347,
+          "duration": 2347000,
           "tags": [
             {
               "key": "plugin",
@@ -1198,7 +1198,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663745384154,
-          "duration": 136,
+          "duration": 136000,
           "tags": [
             {
               "key": "plugin",
@@ -1225,7 +1225,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663745385580,
-          "duration": 234,
+          "duration": 234000,
           "tags": [
             {
               "key": "plugin",
@@ -1252,7 +1252,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663745387004,
-          "duration": 1812,
+          "duration": 1812000,
           "tags": [
             {
               "key": "plugin",
@@ -1279,7 +1279,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663745390029,
-          "duration": 8637,
+          "duration": 8637000,
           "tags": [
             {
               "key": "plugin",
@@ -1306,7 +1306,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663745399358,
-          "duration": 8815,
+          "duration": 8815000,
           "tags": [
             {
               "key": "plugin",
@@ -1333,7 +1333,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663745408535,
-          "duration": 594,
+          "duration": 594000,
           "tags": [
             {
               "key": "plugin",
@@ -1360,7 +1360,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663745409237,
-          "duration": 2601,
+          "duration": 2601000,
           "tags": [
             {
               "key": "plugin",
@@ -1387,7 +1387,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663745412086,
-          "duration": 1730,
+          "duration": 1730000,
           "tags": [
             {
               "key": "plugin",
@@ -1414,7 +1414,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663745415957,
-          "duration": 30,
+          "duration": 30000,
           "tags": [
             {
               "key": "plugin",
@@ -1441,7 +1441,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663745416165,
-          "duration": 29165,
+          "duration": 29165000,
           "tags": [
             {
               "key": "plugin",
@@ -1468,7 +1468,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663745445573,
-          "duration": 181602,
+          "duration": 181602000,
           "tags": [
             {
               "key": "plugin",
@@ -1495,7 +1495,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663745629215,
-          "duration": 9388,
+          "duration": 9388000,
           "tags": [
             {
               "key": "plugin",
@@ -1522,7 +1522,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663745640149,
-          "duration": 226,
+          "duration": 226000,
           "tags": [
             {
               "key": "plugin",
@@ -1549,7 +1549,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663745641591,
-          "duration": 2061,
+          "duration": 2061000,
           "tags": [
             {
               "key": "plugin",
@@ -1576,7 +1576,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663745644663,
-          "duration": 969,
+          "duration": 969000,
           "tags": [
             {
               "key": "plugin",
@@ -1603,7 +1603,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663745645895,
-          "duration": 1320,
+          "duration": 1320000,
           "tags": [
             {
               "key": "plugin",
@@ -1630,7 +1630,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663745648623,
-          "duration": 148,
+          "duration": 148000,
           "tags": [
             {
               "key": "plugin",
@@ -1657,7 +1657,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663745650209,
-          "duration": 934,
+          "duration": 934000,
           "tags": [
             {
               "key": "plugin",
@@ -1684,7 +1684,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663745652266,
-          "duration": 26328,
+          "duration": 26328000,
           "tags": [
             {
               "key": "plugin",
@@ -1711,7 +1711,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663745678989,
-          "duration": 147,
+          "duration": 147000,
           "tags": [
             {
               "key": "plugin",
@@ -1738,7 +1738,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663745679504,
-          "duration": 131,
+          "duration": 131000,
           "tags": [
             {
               "key": "plugin",
@@ -1765,7 +1765,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663745679835,
-          "duration": 801,
+          "duration": 801000,
           "tags": [
             {
               "key": "plugin",
@@ -1792,7 +1792,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663745681065,
-          "duration": 490,
+          "duration": 490000,
           "tags": [
             {
               "key": "plugin",
@@ -1819,7 +1819,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663745681725,
-          "duration": 1259,
+          "duration": 1259000,
           "tags": [
             {
               "key": "plugin",
@@ -1846,7 +1846,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663745683046,
-          "duration": 105,
+          "duration": 105000,
           "tags": [
             {
               "key": "plugin",
@@ -1873,7 +1873,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663745683171,
-          "duration": 614,
+          "duration": 614000,
           "tags": [
             {
               "key": "plugin",
@@ -1900,7 +1900,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663745683809,
-          "duration": 17,
+          "duration": 17000,
           "tags": [
             {
               "key": "plugin",
@@ -1927,7 +1927,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663745683847,
-          "duration": 938,
+          "duration": 938000,
           "tags": [
             {
               "key": "plugin",
@@ -1954,7 +1954,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663745684811,
-          "duration": 17,
+          "duration": 17000,
           "tags": [
             {
               "key": "plugin",
@@ -1981,7 +1981,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663745684845,
-          "duration": 5,
+          "duration": 5000,
           "tags": [
             {
               "key": "plugin",
@@ -2008,7 +2008,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663745684866,
-          "duration": 125,
+          "duration": 125000,
           "tags": [
             {
               "key": "plugin",
@@ -2035,7 +2035,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663745685012,
-          "duration": 2638,
+          "duration": 2638000,
           "tags": [
             {
               "key": "plugin",
@@ -2062,7 +2062,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663745687706,
-          "duration": 24,
+          "duration": 24000,
           "tags": [
             {
               "key": "plugin",
@@ -2089,7 +2089,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663745687748,
-          "duration": 1224,
+          "duration": 1224000,
           "tags": [
             {
               "key": "plugin",
@@ -2116,7 +2116,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663745690083,
-          "duration": 16,
+          "duration": 16000,
           "tags": [
             {
               "key": "plugin",
@@ -2143,7 +2143,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663745691192,
-          "duration": 21,
+          "duration": 21000,
           "tags": [
             {
               "key": "plugin",
@@ -2170,7 +2170,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663745692297,
-          "duration": 8,
+          "duration": 8000,
           "tags": [
             {
               "key": "plugin",
@@ -2197,7 +2197,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663745693394,
-          "duration": 11,
+          "duration": 11000,
           "tags": [
             {
               "key": "plugin",
@@ -2224,7 +2224,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663745693428,
-          "duration": 7,
+          "duration": 7000,
           "tags": [
             {
               "key": "plugin",
@@ -2251,7 +2251,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663745693454,
-          "duration": 7,
+          "duration": 7000,
           "tags": [
             {
               "key": "plugin",
@@ -2278,7 +2278,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663745693480,
-          "duration": 7,
+          "duration": 7000,
           "tags": [
             {
               "key": "plugin",
@@ -2305,7 +2305,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663745693506,
-          "duration": 7,
+          "duration": 7000,
           "tags": [
             {
               "key": "plugin",
@@ -2332,7 +2332,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663745693533,
-          "duration": 20,
+          "duration": 20000,
           "tags": [
             {
               "key": "plugin",
@@ -2359,7 +2359,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663745693574,
-          "duration": 7,
+          "duration": 7000,
           "tags": [
             {
               "key": "plugin",
@@ -2386,7 +2386,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663745693600,
-          "duration": 6,
+          "duration": 6000,
           "tags": [
             {
               "key": "plugin",
@@ -2413,7 +2413,7 @@
           "operationName": "run post-startup dynamically registered activities",
           "processID": "p1",
           "startTime": 1655663745683015,
-          "duration": 10601,
+          "duration": 10601000,
           "references": [
             {
               "refType": "CHILD_OF",
@@ -2428,7 +2428,7 @@
           "operationName": "run post-startup activities",
           "processID": "p1",
           "startTime": 1655663744217216,
-          "duration": 1573617,
+          "duration": 1573617000,
           "tags": [
             {
               "key": "thread.name",
@@ -2455,7 +2455,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663749073876,
-          "duration": 2005,
+          "duration": 2005000,
           "tags": [
             {
               "key": "plugin",
@@ -2482,7 +2482,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663749076160,
-          "duration": 2224,
+          "duration": 2224000,
           "tags": [
             {
               "key": "plugin",
@@ -2509,7 +2509,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663749078446,
-          "duration": 23,
+          "duration": 23000,
           "tags": [
             {
               "key": "plugin",
@@ -2536,7 +2536,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663749078507,
-          "duration": 1350,
+          "duration": 1350000,
           "tags": [
             {
               "key": "plugin",
@@ -2563,7 +2563,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663749079908,
-          "duration": 251,
+          "duration": 251000,
           "tags": [
             {
               "key": "plugin",
@@ -2590,7 +2590,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663749080206,
-          "duration": 35,
+          "duration": 35000,
           "tags": [
             {
               "key": "plugin",
@@ -2617,7 +2617,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663749080280,
-          "duration": 1396,
+          "duration": 1396000,
           "tags": [
             {
               "key": "plugin",
@@ -2644,7 +2644,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663749081700,
-          "duration": 1021,
+          "duration": 1021000,
           "tags": [
             {
               "key": "plugin",
@@ -2671,7 +2671,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663749082749,
-          "duration": 4828,
+          "duration": 4828000,
           "tags": [
             {
               "key": "plugin",
@@ -2698,7 +2698,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663749087631,
-          "duration": 18,
+          "duration": 18000,
           "tags": [
             {
               "key": "plugin",
@@ -2725,7 +2725,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663749087668,
-          "duration": 229,
+          "duration": 229000,
           "tags": [
             {
               "key": "plugin",
@@ -2752,7 +2752,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663749087919,
-          "duration": 124,
+          "duration": 124000,
           "tags": [
             {
               "key": "plugin",
@@ -2779,7 +2779,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663749088067,
-          "duration": 453,
+          "duration": 453000,
           "tags": [
             {
               "key": "plugin",
@@ -2806,7 +2806,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663749088543,
-          "duration": 14,
+          "duration": 14000,
           "tags": [
             {
               "key": "plugin",
@@ -2833,7 +2833,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663749088575,
-          "duration": 1408,
+          "duration": 1408000,
           "tags": [
             {
               "key": "plugin",
@@ -2860,7 +2860,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663749090008,
-          "duration": 676,
+          "duration": 676000,
           "tags": [
             {
               "key": "plugin",
@@ -2887,7 +2887,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663749090716,
-          "duration": 266,
+          "duration": 266000,
           "tags": [
             {
               "key": "plugin",
@@ -2914,7 +2914,7 @@
           "operationName": "run activity",
           "processID": "p1",
           "startTime": 1655663749091006,
-          "duration": 8504,
+          "duration": 8504000,
           "tags": [
             {
               "key": "plugin",
@@ -2941,7 +2941,7 @@
           "operationName": "run post-startup dynamically registered dumb-unaware activities",
           "processID": "p1",
           "startTime": 1655663749103648,
-          "duration": 44,
+          "duration": 44000,
           "tags": [
             {
               "key": "count",
@@ -2963,7 +2963,7 @@
           "operationName": "findUsages",
           "processID": "p1",
           "startTime": 1655663822330024,
-          "duration": 1183940,
+          "duration": 1183940000,
           "tags": [
             {
               "key": "number_of_found_usages",
@@ -2985,7 +2985,7 @@
           "operationName": "timer",
           "processID": "p1",
           "startTime": 1655663822329993,
-          "duration": 1184011,
+          "duration": 1184011000,
           "tags": [
             {
               "key": "average_awt_delay",
@@ -3012,7 +3012,7 @@
           "operationName": "findUsages",
           "processID": "p1",
           "startTime": 1655663822309500,
-          "duration": 1204619,
+          "duration": 1204619000,
           "logs": [
             {
               "timestamp": 1655663822323783,
@@ -3049,7 +3049,7 @@
           "operationName": "timer",
           "processID": "p1",
           "startTime": 1655663822150165,
-          "duration": 1519377,
+          "duration": 1519377000,
           "tags": [
             {
               "key": "average_awt_delay",
@@ -3076,7 +3076,7 @@
           "operationName": "performance_test",
           "processID": "p1",
           "startTime": 1655663744193000,
-          "duration": 81444430
+          "duration": 81444430000
         }
       ]
     }

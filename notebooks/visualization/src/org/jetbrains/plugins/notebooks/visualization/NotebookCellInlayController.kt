@@ -89,9 +89,12 @@ interface NotebookCellInlayController {
   /**
    * This method will be called in folding batch operation
    */
-  fun configureFolding() {}
+  fun updateCellFolding() = Unit
+
+  val shouldUpdateInlay: Boolean
+    get() = false
 
   companion object {
-    val gutterActionKey = Key<AnAction>("jupyter.editor.cell.gutter.action")
+    val GUTTER_ACTION_KEY = Key<AnAction>("jupyter.editor.cell.gutter.action")
   }
 }

@@ -3,6 +3,7 @@
 
 package com.intellij.openapi.fileEditor.impl
 
+import com.intellij.codeWithMe.ClientId
 import com.intellij.featureStatistics.fusCollectors.FileEditorCollector
 import com.intellij.featureStatistics.fusCollectors.FileEditorCollector.EmptyStateCause
 import com.intellij.icons.AllIcons
@@ -165,8 +166,15 @@ class EditorWindow internal constructor(
    */
   @Suppress("MemberVisibilityCanBePrivate", "unused")
   fun getSelectedComposite(ignorePopup: Boolean): EditorComposite? {
-    return if (ignorePopup) tabbedPane.tabs.selectedInfo?.composite else selectedComposite
+    return (if (ignorePopup) tabbedPane.editorTabs.selectedInfo else tabbedPane.editorTabs.targetInfo)?.composite
   }
+
+  /**
+   * A file in a context.
+   * For example, if a context menu is shown currently for some tab, the composite for which a menu is invoked will be returned
+   */
+  @Internal
+  fun getContextFile(): VirtualFile? = tabbedPane.tabs.targetInfo?.composite?.file
 
   val allComposites: List<EditorComposite>
     get() = composites().toList()
@@ -389,7 +397,7 @@ class EditorWindow internal constructor(
         owner.setCurrentWindow(window = this@EditorWindow)
       }
 
-      composite.coroutineScope.launch(Dispatchers.EDT) {
+      composite.coroutineScope.launch(Dispatchers.EDT + ClientId.coroutineContext() + ModalityState.any().asContextElement()) {
         if (!isHeadless) {
           owner.setCurrentWindow(window = this@EditorWindow)
         }
@@ -597,7 +605,7 @@ class EditorWindow internal constructor(
   }
 
   internal fun updateTabsVisibility(uiSettings: UISettings = UISettings.getInstance()) {
-    tabbedPane.editorTabs.isHideTabs = (owner.isFloating && tabCount == 1 && shouldHideTabs(selectedComposite)) ||
+    tabbedPane.editorTabs.isHideTabs = (owner.isFloating && tabCount == 1 && (owner.isSingletonEditorInWindow || shouldHideTabs(selectedComposite))) ||
                                        uiSettings.editorTabPlacement == UISettings.TABS_NONE ||
                                        (uiSettings.presentationMode && !Registry.`is`("ide.editor.tabs.visible.in.presentation.mode"))
   }
@@ -617,17 +625,17 @@ class EditorWindow internal constructor(
     owner.removeWindow(this)
   }
 
-  fun hasClosedTabs(): Boolean = !removedTabs.isEmpty()
+  internal fun hasClosedTabs(): Boolean = !removedTabs.isEmpty()
 
-  fun restoreClosedTab() {
-    assert(hasClosedTabs()) { "Nothing to restore" }
-    val info = removedTabs.last()
+  @RequiresEdt
+  internal fun restoreClosedTab() {
+    val info = removedTabs.removeLastOrNull() ?: return
     val file = VirtualFileManager.getInstance().findFileByUrl(info.first) ?: return
     manager.openFileImpl(
       window = this,
       _file = file,
       entry = null,
-      options = info.second.copy(selectAsCurrent = true, requestFocus = true),
+      options = info.second.copy(selectAsCurrent = true, requestFocus = true, waitForCompositeOpen = false),
     )
   }
 

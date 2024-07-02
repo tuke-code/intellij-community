@@ -149,6 +149,8 @@
 
     <backgroundPostStartupActivity implementation="com.intellij.diagnostic.IdeHeartbeatEventReporter"/>
 
+    <backgroundPostStartupActivity implementation="com.intellij.featureStatistics.InternalFlagDetection"/>
+
     <applicationService serviceInterface="com.intellij.ide.plugins.PluginManagerConfigurableService"
                         serviceImplementation="com.intellij.ide.plugins.PluginManagerConfigurableServiceImpl"/>
 
@@ -191,7 +193,7 @@
     <applicationService serviceInterface="com.intellij.execution.wsl.WslIjentAvailabilityService"
                         serviceImplementation="com.intellij.execution.wsl.DummyWslIjentAvailabilityService"/>
 
-    <executionTargetType implementation="com.intellij.execution.wsl.target.WslTargetType"/>
+    <executionTargetType implementation="com.intellij.execution.wsl.target.WslTargetType" os="windows"/>
     <registryKey key="wsl.obtain.windows.host.ip.alternatively" os="windows" defaultValue="true" restartRequired="true"
                  description="Obtain Windows host machine IP alternatively (not using the recommended 'cat /etc/resolv.conf | grep nameserver')."/>
 
@@ -1049,7 +1051,7 @@
                 icon="AllIcons.Toolwindows.Notifications"
                 factoryClass="com.intellij.notification.impl.NotificationsToolWindowFactory"/>
 
-    <toolWindow id="Meet New UI" anchor="right" secondary="false" icon="com.intellij.icons.ExpUiIcons.Toolwindow.MeetNewUi"
+    <toolWindow id="Meet New UI" anchor="right" secondary="false" icon="com.intellij.icons.AllIcons.Toolwindow.MeetNewUi"
                 factoryClass="com.intellij.ide.ui.experimental.meetNewUi.MeetNewUiToolWindowFactory"/>
 
     <applicationService serviceInterface="com.intellij.ide.TypePresentationService"
@@ -1637,8 +1639,6 @@
     <advancedSetting id="search.everywhere.show.results.notification" default="true" groupKey="group.advanced.settings.se"/>
     <advancedSetting id="search.everywhere.contributors.wait.timeout" default="2000" groupKey="group.advanced.settings.se"/>
     <advancedSetting id="search.everywhere.recent.at.top" default="true" groupKey="group.advanced.settings.se"/>
-    <advancedSetting id="federated.learning" default="true" groupKey="group.advanced.settings.federated.learning"/>
-    <advancedSetting id="federated.learning.search.everywhere" default="true" groupKey="group.advanced.settings.federated.learning"/>
 
     <applicationInitializedListener implementation="com.intellij.lang.documentation.ide.impl.QuickDocAutoPopupInEAPInitializer"/>
 
@@ -1843,6 +1843,8 @@
               topic="com.intellij.ide.plugins.DynamicPluginListener"/>
     <listener class="com.intellij.codeInsight.hints.InlayUnloadingListener" activeInHeadlessMode="false" activeInTestMode="false"
               topic="com.intellij.ide.plugins.DynamicPluginListener"/>
+    <listener class="com.intellij.ide.plugins.LocalizationPluginListener" activeInHeadlessMode="false" activeInTestMode="false"
+              topic="com.intellij.ide.plugins.DynamicPluginListener"/>
     <listener class="com.intellij.openapi.fileTypes.StdFileTypes$StdFileTypesUpdater" activeInHeadlessMode="true" activeInTestMode="false"
               topic="com.intellij.openapi.fileTypes.FileTypeListener"/>
     <listener class="com.intellij.internal.statistic.collectors.fus.TypingEventsLogger$TypingEventsListener" activeInHeadlessMode="true"
@@ -1887,7 +1889,7 @@
     <listener class="com.intellij.diff.tools.combined.CombinedDiffAdvancedSettingsChangeListener"
               topic="com.intellij.openapi.options.advanced.AdvancedSettingsChangeListener"/>
 
-    <listener class="com.intellij.execution.wsl.ijent.nio.toggle.IjentWslNioFsVmOptionsSetter"
+    <listener class="com.intellij.execution.wsl.ijent.nio.toggle.IjentWslNioFsVmOptionsSetter$ApplicationListener"
               topic="com.intellij.openapi.application.ApplicationActivationListener"
               os="windows"/>
     <listener class="com.intellij.execution.wsl.ijent.nio.toggle.IjentWslNioFsRegistryListener"

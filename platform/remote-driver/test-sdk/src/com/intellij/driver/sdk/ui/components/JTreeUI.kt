@@ -25,6 +25,11 @@ open class JTreeUiComponent(data: ComponentData) : UiComponent(data) {
     get() = driver.new(JTreeFixtureRef::class, robot, component)
 
   fun clickRow(row: Int) = fixture.clickRow(row)
+  fun clickRow(predicate: (String) -> Boolean) {
+    collectExpandedPaths().singleOrNull { predicate(it.path.last()) }?.let {
+      clickRow(it.row)
+    } ?: PathNotFoundException("row not found")
+  }
   fun rightClickRow(row: Int) = fixture.rightClickRow(row)
   fun doubleClickRow(row: Int) = fixture.doubleClickRow(row)
   fun clickPath(vararg path: String, fullMatch: Boolean = true) {
@@ -60,7 +65,7 @@ open class JTreeUiComponent(data: ComponentData) : UiComponent(data) {
     fixture.expandAll(timeout.inWholeMilliseconds.toInt())
   }
 
-  fun expandPath(vararg path: String, fullMatch: Boolean = true) = waitFor(10.seconds, errorMessage = "Failed find ${path.toList()}") {
+  fun expandPath(vararg path: String, fullMatch: Boolean = true) = waitFor("Expand path '${path.toList()}'", 10.seconds) {
     try {
       val expandedPath = mutableListOf<String>()
       path.forEach {
@@ -81,7 +86,7 @@ open class JTreeUiComponent(data: ComponentData) : UiComponent(data) {
     }
   }
 
-  fun expandPathWithEnter(vararg path: String, fullMatch: Boolean = true) = waitFor(10.seconds, errorMessage = "Failed find ${path.toList()}") {
+  fun expandPathWithEnter(vararg path: String, fullMatch: Boolean = true) = waitFor("Expand path by enter '${path.toList()}'") {
     try {
       val expandedPath = mutableListOf<String>()
       path.forEach {

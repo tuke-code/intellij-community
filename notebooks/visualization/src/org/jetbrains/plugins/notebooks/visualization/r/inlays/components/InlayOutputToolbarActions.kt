@@ -4,10 +4,61 @@
 
 package org.jetbrains.plugins.notebooks.visualization.r.inlays.components
 
-import org.jetbrains.plugins.notebooks.visualization.r.ui.DumbAwareActionAdapter
+import com.intellij.openapi.actionSystem.ActionUpdateThread
+import com.intellij.openapi.actionSystem.AnActionEvent
+import com.intellij.openapi.project.DumbAwareAction
+import org.jetbrains.plugins.notebooks.visualization.r.inlays.components.InlayOutput.Companion.getInlayOutput
+import org.jetbrains.plugins.notebooks.visualization.r.inlays.components.InlayOutput.Companion.getToolbarPaneOrNull
 
-class ClearOutputAction : DumbAwareActionAdapter()
+class ClearOutputAction private constructor() : DumbAwareAction() {
+  override fun update(e: AnActionEvent) {
+    e.presentation.isEnabledAndVisible = getToolbarPaneOrNull(e) != null
+  }
 
-class SaveOutputAction : DumbAwareActionAdapter()
+  override fun actionPerformed(e: AnActionEvent) {
+    getToolbarPaneOrNull(e)?.inlayOutput?.doClearAction()
+  }
 
-class CopyImageToClipboardAction : DumbAwareActionAdapter()
+  override fun getActionUpdateThread(): ActionUpdateThread =
+    ActionUpdateThread.EDT
+
+  companion object {
+    const val ID = "org.jetbrains.plugins.notebooks.visualization.r.inlays.components.ClearOutputAction"
+  }
+}
+
+
+internal class SaveOutputAction private constructor() : DumbAwareAction() {
+  override fun update(e: AnActionEvent) {
+    e.presentation.isEnabledAndVisible = getInlayOutput<InlayOutput.WithSaveAs>(e) != null
+  }
+
+  override fun actionPerformed(e: AnActionEvent) {
+    getInlayOutput<InlayOutput.WithSaveAs>(e)?.saveAs()
+  }
+
+  override fun getActionUpdateThread(): ActionUpdateThread =
+    ActionUpdateThread.EDT
+
+  companion object {
+    const val ID = "org.jetbrains.plugins.notebooks.visualization.r.inlays.components.SaveOutputAction"
+  }
+}
+
+
+class CopyImageToClipboardAction private constructor() : DumbAwareAction() {
+  override fun update(e: AnActionEvent) {
+    e.presentation.isEnabledAndVisible = getInlayOutput<InlayOutput.WithCopyImageToClipboard>(e) != null
+  }
+
+  override fun actionPerformed(e: AnActionEvent) {
+    getInlayOutput<InlayOutput.WithCopyImageToClipboard>(e)?.copyImageToClipboard()
+  }
+
+  override fun getActionUpdateThread(): ActionUpdateThread =
+    ActionUpdateThread.EDT
+
+  companion object {
+    const val ID = "org.jetbrains.plugins.notebooks.visualization.r.inlays.components.CopyImageToClipboardAction"
+  }
+}

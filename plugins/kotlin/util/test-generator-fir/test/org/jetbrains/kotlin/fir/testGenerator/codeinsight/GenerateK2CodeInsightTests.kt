@@ -18,6 +18,7 @@ import org.jetbrains.kotlin.idea.k2.quickDoc.AbstractFirRenderingKDocTest
 import org.jetbrains.kotlin.idea.k2.structureView.AbstractKotlinGoToSuperDeclarationsHandlerTest
 import org.jetbrains.kotlin.idea.k2.surroundWith.AbstractKotlinFirSurroundWithTest
 import org.jetbrains.kotlin.idea.k2.unwrap.AbstractKotlinFirUnwrapRemoveTest
+import org.jetbrains.kotlin.idea.navigation.AbstractKotlinGotoImplementationMultiModuleTest
 import org.jetbrains.kotlin.idea.navigation.AbstractKotlinGotoImplementationMultifileTest
 import org.jetbrains.kotlin.idea.navigation.AbstractKotlinGotoImplementationTest
 import org.jetbrains.kotlin.testGenerator.model.*
@@ -42,12 +43,15 @@ internal fun MutableTWorkspace.generateK2CodeInsightTests() {
         testClass<AbstractKotlinGoToSuperDeclarationsHandlerTest> {
             model("gotoSuperDeclarationsHandler", pattern = Patterns.KT_WITHOUT_DOTS, passTestDataPath = false)
         }
-        testClass<AbstractKotlinGotoImplementationTest>(generatedClassName = "org.jetbrains.kotlin.idea.k2.navigation.KotlinGotoImplementationMultifileTestGenerated") {
+        testClass<AbstractKotlinGotoImplementationTest>(generatedClassName = "org.jetbrains.kotlin.idea.k2.navigation.KotlinGotoImplementationTestGenerated") {
             model("../../../idea/tests/testData/navigation/implementations", isRecursive = false)
         }
-        testClass<AbstractKotlinGotoImplementationMultifileTest>(generatedClassName = "org.jetbrains.kotlin.idea.k2.navigation.KotlinGotoImplementationTestGenerated") {
+        testClass<AbstractKotlinGotoImplementationMultifileTest>(generatedClassName = "org.jetbrains.kotlin.idea.k2.navigation.KotlinGotoImplementationMultifileTestGenerated") {
             model("../../../idea/tests/testData/navigation/implementations/multifile/javaKotlin", testMethodName = "doJavaKotlinTest")
             model("../../../idea/tests/testData/navigation/implementations/multifile/kotlinJava", testMethodName = "doKotlinJavaTest")
+        }
+        testClass<AbstractKotlinGotoImplementationMultiModuleTest>(generatedClassName = "org.jetbrains.kotlin.idea.k2.navigation.KotlinGotoImplementationMultiModuleTestGenerated") {
+            model("../../../idea/tests/testData/navigation/implementations/multiModule", isRecursive = false, pattern = DIRECTORY)
         }
         testClass<AbstractKotlinFirSurroundWithTest> {
             model("../../../idea/tests/testData/codeInsight/surroundWith/if", testMethodName = "doTestWithIfSurrounder")

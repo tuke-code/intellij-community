@@ -174,8 +174,44 @@ open class JBTabsImpl internal constructor(
   internal var tabListOptions: TabListOptions = tabListOptions
     private set
 
-  private val RELAYOUT_DELAY = 2000
-  private val relayoutAlarm = Alarm(parentDisposable)
+  private val scrollBarActivityTracker = ScrollBarActivityTracker()
+
+  private inner class ScrollBarActivityTracker {
+    var isRecentlyActive: Boolean = false
+      private set
+    private val RELAYOUT_DELAY = 2000
+    private val relayoutAlarm = Alarm(parentDisposable)
+    private var suspended = false
+
+    fun suspend() {
+      suspended = true
+    }
+
+    fun resume() {
+      suspended = false
+    }
+
+    fun reset() {
+      relayoutAlarm.cancelAllRequests()
+      isRecentlyActive = false
+    }
+
+    fun setRecentlyActive() {
+      if (suspended) return
+      relayoutAlarm.cancelAllRequests()
+      isRecentlyActive = true
+      if (!relayoutAlarm.isDisposed) {
+        relayoutAlarm.addRequest(ContextAwareRunnable {
+          isRecentlyActive = false
+          relayout(forced = false, layoutNow = false)
+        }, RELAYOUT_DELAY)
+      }
+    }
+
+    fun cancelActivityTimer() {
+      relayoutAlarm.cancelAllRequests()
+    }
+  }
 
   private val visibleInfos = ArrayList<TabInfo>()
   private val infoToPage = HashMap<TabInfo, AccessibleTabPage>()
@@ -240,8 +276,8 @@ open class JBTabsImpl internal constructor(
 
   private var listener: Job? = null
 
-  var isRecentlyActive: Boolean = false
-    private set
+  val isRecentlyActive: Boolean
+    get() = scrollBarActivityTracker.isRecentlyActive
 
   @JvmField
   internal val attractions: MutableSet<TabInfo> = HashSet()
@@ -475,19 +511,7 @@ open class JBTabsImpl internal constructor(
 
   @Internal
   protected fun resetScrollBarActivity() {
-    relayoutAlarm.cancelAllRequests()
-    isRecentlyActive = false
-  }
-
-  private fun setRecentlyActive() {
-    relayoutAlarm.cancelAllRequests()
-    isRecentlyActive = true
-    if (!relayoutAlarm.isDisposed) {
-      relayoutAlarm.addRequest(ContextAwareRunnable {
-        isRecentlyActive = false
-        relayout(forced = false, layoutNow = false)
-      }, RELAYOUT_DELAY)
-    }
+    scrollBarActivityTracker.reset()
   }
 
   internal fun isScrollBarAdjusting(): Boolean = scrollBar.valueIsAdjusting
@@ -509,9 +533,9 @@ open class JBTabsImpl internal constructor(
       }
 
       isMouseInsideTabsArea = inside
-      relayoutAlarm.cancelAllRequests()
+      scrollBarActivityTracker.cancelActivityTimer()
       if (!inside) {
-        setRecentlyActive()
+        scrollBarActivityTracker.setRecentlyActive()
       }
     }
 
@@ -1988,7 +2012,7 @@ open class JBTabsImpl internal constructor(
 
   private fun updateTabsOffsetFromScrollBar() {
     if (!isScrollBarAdjusting()) {
-      setRecentlyActive()
+      scrollBarActivityTracker.setRecentlyActive()
       toggleScrollBar(isMouseInsideTabsArea)
     }
     val currentUnitsOffset = effectiveLayout.scrollOffset
@@ -1998,6 +2022,7 @@ open class JBTabsImpl internal constructor(
   }
 
   override fun doLayout() {
+    scrollBarActivityTracker.suspend() // Model changes caused by layout changes shouldn't be interpreted as activity.
     try {
       for (tab in tabs) {
         tab.tabLabel?.setTabActionsAutoHide(tabLabelActionsAutoHide)
@@ -2067,6 +2092,7 @@ open class JBTabsImpl internal constructor(
     }
     finally {
       forcedRelayout = false
+      scrollBarActivityTracker.resume()
     }
   }
 

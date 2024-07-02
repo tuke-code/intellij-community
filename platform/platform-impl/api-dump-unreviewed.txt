@@ -4771,20 +4771,6 @@ c:com.intellij.ide.actions.OpenInAssociatedApplicationAction
 - actionPerformed(com.intellij.openapi.actionSystem.AnActionEvent):V
 - getActionUpdateThread():com.intellij.openapi.actionSystem.ActionUpdateThread
 - update(com.intellij.openapi.actionSystem.AnActionEvent):V
-f:com.intellij.ide.actions.OpenInRightSplitAction
-- com.intellij.openapi.actionSystem.AnAction
-- com.intellij.openapi.project.DumbAware
-- sf:Companion:com.intellij.ide.actions.OpenInRightSplitAction$Companion
-- <init>():V
-- actionPerformed(com.intellij.openapi.actionSystem.AnActionEvent):V
-- getActionUpdateThread():com.intellij.openapi.actionSystem.ActionUpdateThread
-- update(com.intellij.openapi.actionSystem.AnActionEvent):V
-f:com.intellij.ide.actions.OpenInRightSplitAction$Companion
-- f:openInRightSplit(com.intellij.openapi.project.Project,com.intellij.openapi.vfs.VirtualFile):com.intellij.openapi.fileEditor.impl.EditorWindow
-- f:openInRightSplit(com.intellij.openapi.project.Project,com.intellij.openapi.vfs.VirtualFile,com.intellij.pom.Navigatable):com.intellij.openapi.fileEditor.impl.EditorWindow
-- f:openInRightSplit(com.intellij.openapi.project.Project,com.intellij.openapi.vfs.VirtualFile,com.intellij.pom.Navigatable,Z):com.intellij.openapi.fileEditor.impl.EditorWindow
-- bs:openInRightSplit$default(com.intellij.ide.actions.OpenInRightSplitAction$Companion,com.intellij.openapi.project.Project,com.intellij.openapi.vfs.VirtualFile,com.intellij.pom.Navigatable,Z,I,java.lang.Object):com.intellij.openapi.fileEditor.impl.EditorWindow
-- f:overrideDoubleClickWithOneClick(javax.swing.JComponent):V
 f:com.intellij.ide.actions.OpenModuleSettingsAction
 - com.intellij.ide.actions.EditSourceAction
 - <init>():V
@@ -4815,9 +4801,6 @@ c:com.intellij.ide.actions.PinActiveTabAction
 - p:getFileFromEvent(com.intellij.openapi.actionSystem.AnActionEvent,com.intellij.openapi.fileEditor.impl.EditorWindow):com.intellij.openapi.vfs.VirtualFile
 - p:getHandler(com.intellij.openapi.actionSystem.AnActionEvent):com.intellij.ide.actions.PinActiveTabAction$Handler
 - update(com.intellij.openapi.actionSystem.AnActionEvent):V
-f:com.intellij.ide.actions.PinActiveTabAction$EW
-- com.intellij.ide.actions.PinActiveTabAction
-- <init>():V
 a:com.intellij.ide.actions.PinActiveTabAction$Handler
 - f:isActiveTab:Z
 - f:isPinned:Z
@@ -5015,6 +4998,7 @@ c:com.intellij.ide.actions.RevealFileAction
 - getActionUpdateThread():com.intellij.openapi.actionSystem.ActionUpdateThread
 - s:getFileManagerName():java.lang.String
 - s:getFileManagerName(Z):java.lang.String
+- s:isDirectoryOpenSupported():Z
 - s:isSupported():Z
 - s:openDirectory(java.io.File):V
 - s:openDirectory(java.nio.file.Path):V
@@ -7186,9 +7170,6 @@ f:com.intellij.ide.plugins.CountIcon
 f:com.intellij.ide.plugins.CreateAllServicesAndExtensionsActionKt
 - sf:ACTION_ID:java.lang.String
 - sf:performAction():V
-com.intellij.ide.plugins.CustomPluginRepoContributor
-- sf:EP_NAME:com.intellij.openapi.extensions.ExtensionPointName
-- a:getRepoUrls():java.util.List
 f:com.intellij.ide.plugins.CustomPluginRepositoryService
 - com.intellij.ide.plugins.auth.PluginRepositoryAuthListener
 - <init>():V
@@ -14987,13 +14968,14 @@ a:com.intellij.openapi.fileEditor.ex.FileEditorManagerEx
 - a:openFile(com.intellij.openapi.vfs.VirtualFile,com.intellij.openapi.fileEditor.impl.EditorWindow,com.intellij.openapi.fileEditor.impl.FileEditorOpenOptions):com.intellij.openapi.fileEditor.FileEditorComposite
 - *a:openFile(com.intellij.openapi.vfs.VirtualFile,com.intellij.openapi.fileEditor.impl.FileEditorOpenOptions,kotlin.coroutines.Continuation):java.lang.Object
 - openFile(com.intellij.openapi.vfs.VirtualFile,Z):com.intellij.openapi.fileEditor.FileEditor[]
-- openFile(com.intellij.openapi.vfs.VirtualFile,Z,Z):com.intellij.openapi.fileEditor.FileEditor[]
+- f:openFile(com.intellij.openapi.vfs.VirtualFile,Z,Z):com.intellij.openapi.fileEditor.FileEditor[]
 - bs:openFile$default(com.intellij.openapi.fileEditor.ex.FileEditorManagerEx,com.intellij.openapi.vfs.VirtualFile,com.intellij.openapi.fileEditor.impl.EditorWindow,com.intellij.openapi.fileEditor.impl.FileEditorOpenOptions,I,java.lang.Object):com.intellij.openapi.fileEditor.FileEditorComposite
 - *bs:openFile$default(com.intellij.openapi.fileEditor.ex.FileEditorManagerEx,com.intellij.openapi.vfs.VirtualFile,com.intellij.openapi.fileEditor.impl.FileEditorOpenOptions,kotlin.coroutines.Continuation,I,java.lang.Object):java.lang.Object
 - f:openFileWithProviders(com.intellij.openapi.vfs.VirtualFile,Z,com.intellij.openapi.fileEditor.impl.EditorWindow):com.intellij.openapi.util.Pair
 - f:openFileWithProviders(com.intellij.openapi.vfs.VirtualFile,Z,Z):com.intellij.openapi.util.Pair
 - refreshIcons():V
 - registerExtraEditorDataProvider(com.intellij.openapi.fileEditor.EditorDataProvider,com.intellij.openapi.Disposable):V
+- f:requestOpenFile(com.intellij.openapi.vfs.VirtualFile):V
 - runWhenLoaded(com.intellij.openapi.editor.Editor,java.lang.Runnable):V
 - a:setCurrentWindow(com.intellij.openapi.fileEditor.impl.EditorWindow):V
 - a:unsplitAllWindow():V
@@ -15171,7 +15153,6 @@ f:com.intellij.openapi.fileEditor.impl.EditorWindow
 - f:getTabCount():I
 - sf:getTabLimit():I
 - f:getTabbedPane():com.intellij.openapi.fileEditor.impl.EditorTabbedContainer
-- f:hasClosedTabs():Z
 - f:inSplitter():Z
 - f:isDisposed():Z
 - f:isEmptyVisible():Z
@@ -15180,7 +15161,6 @@ f:com.intellij.openapi.fileEditor.impl.EditorWindow
 - f:isShowing():Z
 - f:removeFromSplitter():V
 - f:requestFocus(Z):V
-- f:restoreClosedTab():V
 - f:setAsCurrentWindow(Z):V
 - f:setEditor(com.intellij.openapi.fileEditor.impl.EditorWithProviderComposite,Z):V
 - f:setFilePinned(com.intellij.openapi.vfs.VirtualFile,Z):V
@@ -16373,6 +16353,12 @@ f:com.intellij.openapi.options.advanced.AdvancedSettingsConfigurable$AdvancedSet
 - f:getReset():kotlin.jvm.functions.Function0
 - hashCode():I
 - f:isDefault():com.intellij.ui.layout.ComponentPredicate
+f:com.intellij.openapi.options.advanced.AdvancedSettingsConfigurable$Config
+- sf:Companion:com.intellij.openapi.options.advanced.AdvancedSettingsConfigurable$Config$Companion
+- <init>():V
+f:com.intellij.openapi.options.advanced.AdvancedSettingsConfigurable$Config$Companion
+- f:getShowFederatedLearningSwitches():Z
+- f:setShowFederatedLearningSwitches(Z):V
 f:com.intellij.openapi.options.advanced.AdvancedSettingsConfigurableKt
 - sf:updateMatchText(javax.swing.JComponent,java.lang.String,java.lang.String):V
 f:com.intellij.openapi.options.advanced.AdvancedSettingsImpl
@@ -20269,10 +20255,14 @@ f:com.intellij.openapi.wm.impl.FocusRequestInfo
 - f:trace:java.lang.Throwable
 - <init>(java.awt.Component,java.lang.Throwable,Z):V
 a:com.intellij.openapi.wm.impl.FrameTitleBuilder
+- sf:Companion:com.intellij.openapi.wm.impl.FrameTitleBuilder$Companion
 - <init>():V
 - a:getFileTitle(com.intellij.openapi.project.Project,com.intellij.openapi.vfs.VirtualFile):java.lang.String
-- s:getInstance():com.intellij.openapi.wm.impl.FrameTitleBuilder
+- *:getFileTitleAsync(com.intellij.openapi.project.Project,com.intellij.openapi.vfs.VirtualFile,kotlin.coroutines.Continuation):java.lang.Object
+- sf:getInstance():com.intellij.openapi.wm.impl.FrameTitleBuilder
 - a:getProjectTitle(com.intellij.openapi.project.Project):java.lang.String
+f:com.intellij.openapi.wm.impl.FrameTitleBuilder$Companion
+- f:getInstance():com.intellij.openapi.wm.impl.FrameTitleBuilder
 f:com.intellij.openapi.wm.impl.IdeBackgroundUtil
 - sf:EDITOR_PROP:java.lang.String
 - sf:FRAME_PROP:java.lang.String
@@ -20415,6 +20405,7 @@ c:com.intellij.openapi.wm.impl.PlatformFrameTitleBuilder
 - com.intellij.openapi.wm.impl.FrameTitleBuilder
 - <init>():V
 - getFileTitle(com.intellij.openapi.project.Project,com.intellij.openapi.vfs.VirtualFile):java.lang.String
+- getFileTitleAsync(com.intellij.openapi.project.Project,com.intellij.openapi.vfs.VirtualFile,kotlin.coroutines.Continuation):java.lang.Object
 - getProjectTitle(com.intellij.openapi.project.Project):java.lang.String
 c:com.intellij.openapi.wm.impl.ProjectFrameHelper
 - com.intellij.openapi.actionSystem.UiDataProvider
@@ -23890,9 +23881,11 @@ a:com.intellij.ui.FilteringTree
 - p:onSpeedSearchUpdateComplete(java.lang.String):V
 - p:useIdentityHashing():Z
 pc:com.intellij.ui.FilteringTree$FilteringSpeedSearch
+- com.intellij.ui.FilteringTree$FilteringTreeUserObjectMatcher
 - com.intellij.ui.speedSearch.SpeedSearch
 - p:<init>(com.intellij.ui.FilteringTree,com.intellij.ui.SearchTextField):V
 - a:checkMatching(java.lang.Object):com.intellij.ui.FilteringTree$Matching
+- f:checkMatching(java.lang.Object,java.lang.Iterable):com.intellij.ui.FilteringTree$Matching
 - checkMatching(javax.swing.tree.DefaultMutableTreeNode):com.intellij.ui.FilteringTree$Matching
 - a:getSelection():java.lang.Object
 - getSelection():javax.swing.tree.DefaultMutableTreeNode
@@ -23900,12 +23893,15 @@ pc:com.intellij.ui.FilteringTree$FilteringSpeedSearch
 - iterate(java.lang.Object,Z,Z):java.util.Iterator
 - iterate(javax.swing.tree.DefaultMutableTreeNode,Z):java.util.Iterator
 - noHits():V
+- p:onMatchingChecked(java.lang.Object,java.lang.Iterable,com.intellij.ui.FilteringTree$Matching):V
 - p:onSearchFieldUpdated(java.lang.String):V
 - p:onUpdatePattern(java.lang.String):V
 - a:select(java.lang.Object):V
 - select(javax.swing.tree.DefaultMutableTreeNode):V
 - update():V
 - updateSelection():V
+p:com.intellij.ui.FilteringTree$FilteringTreeUserObjectMatcher
+- a:checkMatching(java.lang.Object,java.lang.Iterable):com.intellij.ui.FilteringTree$Matching
 e:com.intellij.ui.FilteringTree$Matching
 - java.lang.Enum
 - sf:FULL:com.intellij.ui.FilteringTree$Matching
@@ -29566,7 +29562,6 @@ a:com.intellij.workspaceModel.ide.impl.jps.serialization.BaseIdeSerializationCon
 - getCustomModuleComponentSerializers():java.util.List
 - getCustomModuleRootsSerializers():java.util.List
 - isJavaPluginPresent():Z
-- isOrphanageEnabled():Z
 f:com.intellij.workspaceModel.ide.impl.jps.serialization.BaseIdeSerializationContext$Companion
 - f:getCUSTOM_FACET_RELATED_ENTITY_SERIALIZER_EP():com.intellij.openapi.extensions.ExtensionPointName
 - f:getCUSTOM_MODULE_ROOTS_SERIALIZER_EP():com.intellij.openapi.extensions.ExtensionPointName

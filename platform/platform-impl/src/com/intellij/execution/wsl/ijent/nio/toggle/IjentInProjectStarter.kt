@@ -3,26 +3,36 @@ package com.intellij.execution.wsl.ijent.nio.toggle
 
 import com.intellij.execution.wsl.WSLDistribution
 import com.intellij.execution.wsl.WslDistributionManager
+import com.intellij.execution.wsl.WslIjentAvailabilityService
 import com.intellij.execution.wsl.WslIjentManager
 import com.intellij.openapi.components.serviceAsync
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.modules
 import com.intellij.openapi.project.rootManager
 import com.intellij.openapi.startup.ProjectActivity
-import kotlinx.coroutines.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 
 /** Starts the IJent if a project on WSL is opened. */
 internal class IjentInProjectStarter : ProjectActivity {
-  override suspend fun execute(project: Project) {
-    val service = serviceAsync<IjentWslNioFsToggler>()
-    if (!service.isInitialized) {
-      return
+  override suspend fun execute(project: Project): Unit = coroutineScope {
+    if (!WslIjentAvailabilityService.getInstance().useIjentForWslNioFileSystem()) {
+      return@coroutineScope
     }
 
-    val allWslDistributions = service.coroutineScope.async {
-      withContext(Dispatchers.IO) {
-        serviceAsync<WslDistributionManager>().installedDistributions
-      }
+    val ijentWslNioFsToggler = IjentWslNioFsToggler.instanceAsync()
+    if (!ijentWslNioFsToggler.isAvailable) {
+      return@coroutineScope
+    }
+
+    launch {
+      ijentWslNioFsToggler.enableForAllWslDistributions()
+    }
+
+    val allWslDistributions = async(Dispatchers.IO) {
+      serviceAsync<WslDistributionManager>().installedDistributions
     }
 
     val relatedWslDistributions = hashSetOf<WSLDistribution>()
@@ -53,7 +63,7 @@ internal class IjentInProjectStarter : ProjectActivity {
     }
 
     for (distro in relatedWslDistributions) {
-      service.coroutineScope.launch {
+      launch {
         serviceAsync<WslIjentManager>().getIjentApi(distro, project, false)
       }
     }

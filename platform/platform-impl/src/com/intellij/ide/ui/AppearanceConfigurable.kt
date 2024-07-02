@@ -6,7 +6,6 @@ import com.intellij.application.options.colors.SchemesPanel
 import com.intellij.application.options.colors.SchemesPanelFactory
 import com.intellij.application.options.editor.CheckboxDescriptor
 import com.intellij.application.options.editor.checkBox
-import com.intellij.icons.AllIcons
 import com.intellij.ide.DataManager
 import com.intellij.ide.GeneralSettings
 import com.intellij.ide.IdeBundle.message
@@ -138,6 +137,8 @@ private val cdFullPathsInTitleBar
   get() = CheckboxDescriptor(message("checkbox.full.paths.in.window.header"), settings::fullPathsInWindowHeader)
 private val cdShowMenuIcons
   get() = CheckboxDescriptor(message("checkbox.show.icons.in.menu.items"), settings::showIconsInMenus, groupName = windowOptionGroupName)
+private val cdKeepPopupsForToggles
+  get() = CheckboxDescriptor(message("checkbox.keep.popups.for.toggles"), settings::keepPopupsForToggles, groupName = uiOptionGroupName)
 private val cdDifferentiateProjects
   get() = CheckboxDescriptor(message("checkbox.use.solution.colors.in.main.toolbar"), settings::differentiateProjects,
                              message("text.use.solution.colors.in.main.toolbar"), groupName = uiOptionGroupName)
@@ -157,7 +158,8 @@ internal fun getAppearanceOptionDescriptors(): Sequence<OptionDescription> {
     cdDnDWithAlt,
     cdFullPathsInTitleBar,
     cdSeparateMainMenu.takeUnless { SystemInfo.isMac },
-    cdDifferentiateProjects
+    cdDifferentiateProjects,
+    cdShowMenuIcons
   ).filterNotNull().map(CheckboxDescriptor::asUiOptionDescriptor)
 }
 
@@ -434,6 +436,7 @@ internal class AppearanceConfigurable : BoundSearchableConfigurable(message("tit
           yield { checkBox(cdEnableControlsMnemonics) }
           yield { checkBox(cdEnableMenuMnemonics) }
           yield { checkBox(cdShowMenuIcons) }
+          yield { checkBox(cdKeepPopupsForToggles) }
           if (SystemInfoRt.isWindows && IdeFrameDecorator.isCustomDecorationAvailable || IdeRootPane.hideNativeLinuxTitleAvailable) {
             yield {
               val checkBox = checkBox(cdMergeMainMenuWithWindowTitle)
@@ -520,7 +523,6 @@ internal class AppearanceConfigurable : BoundSearchableConfigurable(message("tit
                 checkBox(cdShowToolWindowNames).gap(RightGap.SMALL).onApply {
                   ResizeStripeManager.applyShowNames()
                 }
-                icon(AllIcons.General.Beta)
               },
               { checkBox(cdRightToolWindowLayout) },
             )

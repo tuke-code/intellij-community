@@ -150,6 +150,10 @@ public final class JavaCompletionProcessor implements PsiScopeProcessor, Element
       return true;
     }
 
+    if (element instanceof PsiImplicitClass) {
+      return true;
+    }
+
     if (element instanceof PsiMember && !PsiNameHelper.getInstance(element.getProject()).isIdentifier(((PsiMember)element).getName())) {
       // The member could be defined in another JVM language where its name is not a legal name in Java.
       // In this case, just skip such the member. We cannot legally reference it from Java source.
@@ -363,6 +367,7 @@ public final class JavaCompletionProcessor implements PsiScopeProcessor, Element
       case PACKAGE -> myFilter.isClassAcceptable(PsiPackage.class);
       case VARIABLE -> myFilter.isClassAcceptable(PsiVariable.class);
       case ENUM_CONST -> myFilter.isClassAcceptable(PsiEnumConstant.class);
+      case MODULE -> myFilter.isClassAcceptable(PsiJavaModule.class);
     };
   }
 

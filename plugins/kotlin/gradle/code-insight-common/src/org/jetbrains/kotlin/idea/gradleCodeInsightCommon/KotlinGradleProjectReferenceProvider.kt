@@ -25,6 +25,7 @@ private const val GRADLE_PROJECT_DEPENDENCY_SUFFIX = "ProjectDependency"
 private val GRADLE_DSL_PROJECT: Name = Name.identifier("project")
 private val GRADLE_DSL_PROJECTS: Name = Name.identifier("projects")
 private val GRADLE_PROJECT_PACKAGE = FqName("org.gradle.accessors.dm")
+private val KOTLIN_DEPENDENCY_HANDLER_CLASS = FqName("KotlinDependencyHandler")
 
 class KotlinGradleProjectReferenceProvider: AbstractKotlinGradleReferenceProvider() {
     override fun getImplicitReference(
@@ -41,7 +42,12 @@ class KotlinGradleProjectReferenceProvider: AbstractKotlinGradleReferenceProvide
             ?.takeIf { it.startsWith(GRADLE_SEPARATOR) } ?: return null
         val callableId = analyzeSurroundingCallExpression(element.parent) ?: return null
 
-        if (callableId.packageName != GRADLE_DSL_PACKAGE || callableId.callableName != GRADLE_DSL_PROJECT) return null
+        if (callableId.callableName != GRADLE_DSL_PROJECT ||
+            (!(callableId.packageName == GRADLE_DSL_PACKAGE ||
+                    (callableId.packageName == KGP_PACKAGE && callableId.className == KOTLIN_DEPENDENCY_HANDLER_CLASS))
+                    )) {
+            return null
+        }
 
         val length = element.textRange.length
         return if (text == GRADLE_SEPARATOR) {
@@ -76,8 +82,16 @@ class KotlinGradleProjectReferenceProvider: AbstractKotlinGradleReferenceProvide
         if (className == GRADLE_ROOT_PROJECT_ACCESSOR) return listOf(identifier)
 
         val modules = className.dropSuffix(GRADLE_PROJECT_DEPENDENCY_SUFFIX) ?: return null
-        return modules.split(GRADLE_CLASS_ACCESSOR_SEPARATOR).map { it.first().lowercaseChar() + it.drop(1) } + identifier
+        return modules.split(GRADLE_CLASS_ACCESSOR_SEPARATOR)
+            .map { it.first().lowercaseChar() + it.drop(1).camelToKebabCase() } + identifier.camelToKebabCase()
     }
+
+    fun String.camelToKebabCase(): String =
+        this.fold(StringBuilder()) { acc, c ->
+            val lc = c.lowercase()
+            if (c.isUpperCase()) acc.append('-')
+            acc.append(lc)
+        }.toString()
 
     private fun String.dropPrefix(prefix: String): String? =
         takeIf { it.startsWith(prefix) }?.replaceFirst(prefix, "")

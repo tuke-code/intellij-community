@@ -60,6 +60,4 @@ public interface VersionedStorageChange {
    * The events are ordered: Removed -> Replaced -> Added
    */
   public fun <T : WorkspaceEntity> getChanges(entityClass: Class<T>): List<EntityChange<T>>
-
-  public fun getAllChanges(): Sequence<EntityChange<*>>
 }

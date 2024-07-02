@@ -1874,7 +1874,6 @@ c:com.intellij.build.BuildView
 - com.intellij.execution.ui.ConsoleView
 - com.intellij.execution.ui.ObservableConsoleView
 - com.intellij.ide.OccurenceNavigator
-- com.intellij.openapi.actionSystem.DataProvider
 - sf:CONSOLE_VIEW_NAME:java.lang.String
 - *sf:RESTART_ACTIONS:com.intellij.openapi.actionSystem.DataKey
 - <init>(com.intellij.openapi.project.Project,com.intellij.build.BuildDescriptor,java.lang.String,com.intellij.build.ViewManager):V
@@ -1891,7 +1890,6 @@ c:com.intellij.build.BuildView
 - getActions():com.intellij.openapi.actionSystem.AnAction[]
 - getAdditionalActions():com.intellij.openapi.actionSystem.AnAction[]
 - getContentSize():I
-- getData(java.lang.String):java.lang.Object
 - getFilter():java.util.function.Predicate
 - getNextOccurenceActionName():java.lang.String
 - getPreviousOccurenceActionName():java.lang.String
@@ -1911,6 +1909,7 @@ c:com.intellij.build.BuildView
 - scrollTo(I):V
 - setHelpId(java.lang.String):V
 - setOutputPaused(Z):V
+- uiDataSnapshot(com.intellij.openapi.actionSystem.DataSink):V
 c:com.intellij.build.BuildViewManager
 - com.intellij.build.AbstractViewManager
 - <init>(com.intellij.openapi.project.Project):V
@@ -1949,7 +1948,7 @@ f:com.intellij.build.BuildViewSettingsProviderAdapter
 - isExecutionViewHidden():Z
 *c:com.intellij.build.CompositeView
 - javax.swing.JPanel
-- com.intellij.openapi.actionSystem.DataProvider
+- com.intellij.openapi.actionSystem.UiDataProvider
 - com.intellij.openapi.ui.ComponentContainer
 - <init>(java.lang.String):V
 - addView(com.intellij.openapi.ui.ComponentContainer,java.lang.String):V
@@ -1957,13 +1956,13 @@ f:com.intellij.build.BuildViewSettingsProviderAdapter
 - createConsoleActions():com.intellij.openapi.actionSystem.AnAction[]
 - dispose():V
 - getComponent():javax.swing.JComponent
-- getData(java.lang.String):java.lang.Object
 - getPreferredFocusableComponent():javax.swing.JComponent
 - getSwitchActions():com.intellij.openapi.actionSystem.AnAction[]
 - getView(java.lang.String):com.intellij.openapi.ui.ComponentContainer
 - getView(java.lang.String,java.lang.Class):java.lang.Object
 - isViewVisible(java.lang.String):Z
 - showView(java.lang.String,Z):V
+- uiDataSnapshot(com.intellij.openapi.actionSystem.DataSink):V
 c:com.intellij.build.DefaultBuildDescriptor
 - com.intellij.build.BuildDescriptor
 - <init>(com.intellij.build.BuildDescriptor):V
@@ -6922,7 +6921,7 @@ f:com.intellij.codeInsight.hints.presentation.IconPresentation
 - f:setIcon(javax.swing.Icon):V
 f:com.intellij.codeInsight.hints.presentation.InlayTextMetrics
 - sf:Companion:com.intellij.codeInsight.hints.presentation.InlayTextMetrics$Companion
-- <init>(com.intellij.openapi.editor.Editor,I,I,java.awt.FontMetrics,I):V
+- <init>(com.intellij.openapi.editor.Editor,I,I,java.awt.FontMetrics,I,F):V
 - f:getAscent():I
 - f:getDescent():I
 - f:getFont():java.awt.Font
@@ -11061,6 +11060,7 @@ c:com.intellij.execution.impl.ConsoleViewImpl
 - p:calcNextOccurrence(I):com.intellij.ide.OccurenceNavigator$OccurenceInfo
 - canPause():Z
 - clear():V
+- pf:clearThisConsoleAction():com.intellij.openapi.actionSystem.AnAction
 - p:createCenterComponent():javax.swing.JComponent
 - p:createCompositeFilter():com.intellij.execution.filters.CompositeFilter
 - createConsoleActions():com.intellij.openapi.actionSystem.AnAction[]
@@ -11695,6 +11695,7 @@ f:com.intellij.find.editorHeaderActions.SelectAllAction
 c:com.intellij.find.editorHeaderActions.ShowFilterPopupGroup
 - com.intellij.openapi.actionSystem.DefaultActionGroup
 - com.intellij.openapi.actionSystem.ShortcutProvider
+- com.intellij.openapi.project.DumbAware
 - <init>():V
 - getActionUpdateThread():com.intellij.openapi.actionSystem.ActionUpdateThread
 - getShortcut():com.intellij.openapi.actionSystem.ShortcutSet
@@ -13895,38 +13896,40 @@ a:com.intellij.ide.actions.searcheverywhere.AbstractGotoSEContributor
 - com.intellij.ide.actions.searcheverywhere.ScopeSupporting
 - com.intellij.ide.actions.searcheverywhere.SearchEverywhereExtendedInfoProvider
 - com.intellij.ide.actions.searcheverywhere.WeightedSearchEverywhereContributor
+- sf:Companion:com.intellij.ide.actions.searcheverywhere.AbstractGotoSEContributor$Companion
 - p:isScopeDefaultAndAutoSet:Z
 - pf:myProject:com.intellij.openapi.project.Project
 - pf:myPsiContext:com.intellij.psi.SmartPsiElementPointer
 - p:myScopeDescriptor:com.intellij.ide.util.scopeChooser.ScopeDescriptor
-- psf:ourPatternToDetectAnonymousClasses:java.util.regex.Pattern
 - p:<init>(com.intellij.openapi.actionSystem.AnActionEvent):V
-- ps:applyPatternFilter(java.lang.String,java.util.regex.Pattern):java.lang.String
-- s:createContext(com.intellij.openapi.project.Project,com.intellij.psi.SmartPsiElementPointer):com.intellij.openapi.actionSystem.DataContext
+- psf:applyPatternFilter(java.lang.String,java.util.regex.Pattern):java.lang.String
 - p:createExtendedNavigatable(com.intellij.psi.PsiElement,java.lang.String,I):com.intellij.pom.Navigatable
 - pa:createModel(com.intellij.openapi.project.Project):com.intellij.ide.util.gotoByName.FilteringGotoByModel
 - p:createScopes():java.util.List
-- p:doGetActions(com.intellij.ide.actions.searcheverywhere.PersistentSearchEverywhereContributorFilter,com.intellij.ide.util.ElementsChooser$StatisticsCollector,java.lang.Runnable):java.util.List
+- pf:doGetActions(com.intellij.ide.actions.searcheverywhere.PersistentSearchEverywhereContributorFilter,com.intellij.ide.util.ElementsChooser$StatisticsCollector,java.lang.Runnable):java.util.List
 - fetchWeightedElements(java.lang.String,com.intellij.openapi.progress.ProgressIndicator,com.intellij.util.Processor):V
 - filterControlSymbols(java.lang.String):java.lang.String
 - getDataForItem(java.lang.Object,java.lang.String):java.lang.Object
-- s:getElement(com.intellij.psi.PsiElement,java.lang.String):com.intellij.psi.PsiElement
 - getElementPriority(java.lang.Object,java.lang.String):I
 - getElementsRenderer():javax.swing.ListCellRenderer
 - getItemDescription(java.lang.Object):java.lang.String
-- ps:getLineAndColumn(java.lang.String):com.intellij.openapi.util.Pair
+- psf:getLineAndColumn(java.lang.String):com.intellij.util.IntPair
+- pf:getProject():com.intellij.openapi.project.Project
 - getScope():com.intellij.ide.util.scopeChooser.ScopeDescriptor
 - getSearchProviderId():java.lang.String
 - getSupportedScopes():java.util.List
 - isDumbAware():Z
-- p:isEverywhere():Z
+- pf:isEverywhere():Z
 - isMultiSelectionSupported():Z
 - isShownInSeparateTab():Z
-- p:preparePsi(com.intellij.psi.PsiElement,I,java.lang.String):com.intellij.psi.PsiElement
 - p:processElement(com.intellij.openapi.progress.ProgressIndicator,com.intellij.util.Processor,com.intellij.ide.util.gotoByName.FilteringGotoByModel,java.lang.Object,I):Z
 - processSelectedItem(java.lang.Object,I,java.lang.String):Z
 - setScope(com.intellij.ide.util.scopeChooser.ScopeDescriptor):V
 - showInFindResults():Z
+- p:triggerLineOrColumnFeatureUsed(com.intellij.pom.Navigatable,kotlin.coroutines.Continuation):java.lang.Object
+f:com.intellij.ide.actions.searcheverywhere.AbstractGotoSEContributor$Companion
+- f:createContext(com.intellij.openapi.project.Project,com.intellij.psi.SmartPsiElementPointer):com.intellij.openapi.actionSystem.DataContext
+- f:getElement(com.intellij.psi.PsiElement,java.lang.String):com.intellij.psi.PsiElement
 c:com.intellij.ide.actions.searcheverywhere.ActionSearchEverywhereContributor
 - com.intellij.ide.actions.searcheverywhere.SearchEverywhereExtendedInfoProvider
 - com.intellij.ide.actions.searcheverywhere.WeightedSearchEverywhereContributor
@@ -14024,24 +14027,23 @@ c:com.intellij.ide.actions.searcheverywhere.FileSearchEverywhereContributor
 - com.intellij.ide.actions.searcheverywhere.AbstractGotoSEContributor
 - com.intellij.ide.actions.searcheverywhere.EssentialContributor
 - com.intellij.ide.actions.searcheverywhere.SearchEverywherePreviewProvider
+- sf:Companion:com.intellij.ide.actions.searcheverywhere.FileSearchEverywhereContributor$Companion
 - <init>(com.intellij.openapi.actionSystem.AnActionEvent):V
 - createExtendedInfo():com.intellij.ide.actions.searcheverywhere.ExtendedInfo
-- s:createFileTypeFilter(com.intellij.openapi.project.Project):com.intellij.ide.actions.searcheverywhere.PersistentSearchEverywhereContributorFilter
+- sf:createFileTypeFilter(com.intellij.openapi.project.Project):com.intellij.ide.actions.searcheverywhere.PersistentSearchEverywhereContributorFilter
 - p:createModel(com.intellij.openapi.project.Project):com.intellij.ide.util.gotoByName.FilteringGotoByModel
 - getActions(java.lang.Runnable):java.util.List
 - getDataForItem(java.lang.Object,java.lang.String):java.lang.Object
 - getElementPriority(java.lang.Object,java.lang.String):I
-- getElementsRenderer():javax.swing.ListCellRenderer
+- f:getElementsRenderer():javax.swing.ListCellRenderer
 - getGroupName():java.lang.String
 - getItemDescription(java.lang.Object):java.lang.String
 - getSortWeight():I
 - isEmptyPatternSupported():Z
-- p:processElement(com.intellij.openapi.progress.ProgressIndicator,com.intellij.util.Processor,com.intellij.ide.util.gotoByName.FilteringGotoByModel,java.lang.Object,I):Z
-- processSelectedItem(java.lang.Object,I,java.lang.String):Z
-f:com.intellij.ide.actions.searcheverywhere.FileSearchEverywhereContributor$Factory
-- com.intellij.ide.actions.searcheverywhere.SearchEverywhereContributorFactory
-- <init>():V
-- createContributor(com.intellij.openapi.actionSystem.AnActionEvent):com.intellij.ide.actions.searcheverywhere.SearchEverywhereContributor
+- pf:processElement(com.intellij.openapi.progress.ProgressIndicator,com.intellij.util.Processor,com.intellij.ide.util.gotoByName.FilteringGotoByModel,java.lang.Object,I):Z
+- pf:triggerLineOrColumnFeatureUsed(com.intellij.pom.Navigatable,kotlin.coroutines.Continuation):java.lang.Object
+f:com.intellij.ide.actions.searcheverywhere.FileSearchEverywhereContributor$Companion
+- f:createFileTypeFilter(com.intellij.openapi.project.Project):com.intellij.ide.actions.searcheverywhere.PersistentSearchEverywhereContributorFilter
 a:com.intellij.ide.actions.searcheverywhere.FixedTabsListCustomizationStrategy
 - <init>(java.util.List):V
 - getSeparateTabContributors(java.util.List):java.util.List
@@ -14503,28 +14505,9 @@ f:com.intellij.ide.actions.searcheverywhere.footer.ActionHistoryManager
 - sf:getInstance():com.intellij.ide.actions.searcheverywhere.footer.ActionHistoryManager
 f:com.intellij.ide.actions.searcheverywhere.footer.ActionHistoryManager$Companion
 - f:getInstance():com.intellij.ide.actions.searcheverywhere.footer.ActionHistoryManager
-f:com.intellij.ide.actions.searcheverywhere.footer.ExtendedInfoComponent
-- sf:Companion:com.intellij.ide.actions.searcheverywhere.footer.ExtendedInfoComponent$Companion
-- f:component:javax.swing.JPanel
-- <init>(com.intellij.openapi.project.Project,com.intellij.ide.actions.searcheverywhere.ExtendedInfo):V
-- f:getAdvertisement():com.intellij.ide.actions.searcheverywhere.ExtendedInfo
-- f:getProject():com.intellij.openapi.project.Project
-- f:updateElement(java.lang.Object,com.intellij.openapi.Disposable):V
-f:com.intellij.ide.actions.searcheverywhere.footer.ExtendedInfoComponent$Companion
-f:com.intellij.ide.actions.searcheverywhere.footer.ExtendedInfoImpl
-- com.intellij.ide.actions.searcheverywhere.ExtendedInfo
-- <init>(java.util.List):V
-- f:getContributors():java.util.List
 f:com.intellij.ide.actions.searcheverywhere.footer.ExtendedInfoImplKt
-- sf:createPsiExtendedInfo():com.intellij.ide.actions.searcheverywhere.ExtendedInfo
 - sf:createPsiExtendedInfo(kotlin.jvm.functions.Function1,kotlin.jvm.functions.Function1,kotlin.jvm.functions.Function1):com.intellij.ide.actions.searcheverywhere.ExtendedInfo
 - bs:createPsiExtendedInfo$default(kotlin.jvm.functions.Function1,kotlin.jvm.functions.Function1,kotlin.jvm.functions.Function1,I,java.lang.Object):com.intellij.ide.actions.searcheverywhere.ExtendedInfo
-- sf:createTextExtendedInfo():com.intellij.ide.actions.searcheverywhere.ExtendedInfo
-f:com.intellij.ide.actions.searcheverywhere.footer.ExtendedInfoOpenInRightSplitAction
-- com.intellij.openapi.actionSystem.AnAction
-- <init>(com.intellij.openapi.actionSystem.DataContext):V
-- actionPerformed(com.intellij.openapi.actionSystem.AnActionEvent):V
-- f:getSplit():com.intellij.ide.actions.OpenInRightSplitAction
 c:com.intellij.ide.actions.searcheverywhere.footer.RecentSet
 - java.util.LinkedHashSet
 - <init>():V
@@ -14576,6 +14559,7 @@ f:com.intellij.ide.actions.searcheverywhere.statistics.SearchEverywhereUsageTrig
 - sf:GROUP_NAVIGATE:com.intellij.internal.statistic.eventLog.events.EventId1
 - sf:HAS_ONLY_SIMILAR_ELEMENT:com.intellij.internal.statistic.eventLog.events.BooleanEventField
 - sf:HAS_ONLY_SIMILAR_ITEM_SHOWN:com.intellij.internal.statistic.eventLog.events.EventId
+- sf:IS_ELEMENT_SEMANTIC:com.intellij.internal.statistic.eventLog.events.BooleanEventField
 - sf:IS_ONLY_MORE:com.intellij.internal.statistic.eventLog.events.BooleanEventField
 - sf:ITEM_NUMBER_BEFORE_MORE:com.intellij.internal.statistic.eventLog.events.IntEventField
 - sf:LAST_TAB_ID:com.intellij.internal.statistic.eventLog.events.StringEventField

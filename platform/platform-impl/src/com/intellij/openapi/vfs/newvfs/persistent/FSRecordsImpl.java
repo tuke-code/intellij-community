@@ -1337,9 +1337,14 @@ public final class FSRecordsImpl implements Closeable {
     }
   }
 
-  int storeUnlinkedContent(byte[] bytes) {
+  /**
+   * Stores content and return contentRecordId, by which content could be later retrieved.
+   * If the same content (bytes) was already stored -- method could return id of already existing record, without allocating
+   * & storing new record.
+   */
+  int writeContentRecord(@NotNull ByteArraySequence content) {
     try {
-      return contentAccessor.allocateContentRecordAndStore(bytes);
+      return contentAccessor.writeContentRecord(content);
     }
     catch (IOException e) {
       throw handleError(e);

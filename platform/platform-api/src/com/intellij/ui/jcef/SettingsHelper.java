@@ -206,7 +206,7 @@ final class SettingsHelper {
       args = ArrayUtil.mergeArrays(args, "--remote-debugging-port=0", "--remote-allow-origins=*");
     }
 
-    args = ArrayUtil.mergeArrays(args, "--autoplay-policy=no-user-gesture-required");
+    args = ArrayUtil.mergeArrays(args, "--autoplay-policy=no-user-gesture-required", "--disable-component-update");
 
     if (isOffScreenRenderingModeEnabled()) {
       args = ArrayUtil.mergeArrays(args, "--disable-gpu-compositing");
@@ -238,48 +238,6 @@ final class SettingsHelper {
       });
     }
     notification.notify(null);
-  }
-
-  static void showNotificationMissingLibraries() {
-    if (!SystemInfoRt.isLinux)
-      return;
-
-    try {
-      Process proc = Runtime.getRuntime().exec("ldd " + System.getProperty("java.home") + "/lib/libjcef.so");
-      StringBuilder missingLibs = new StringBuilder();
-      try (BufferedReader reader = new BufferedReader(new InputStreamReader(proc.getInputStream(), StandardCharsets.UTF_8))) {
-        String line;
-        String delim = " => ";
-        String prevLib = null;
-        while ((line = reader.readLine()) != null) {
-          if (line.contains("not found") && !line.contains("libjvm")) {
-            String[] split = line.split(delim);
-            if (split.length != 2) continue;
-            String lib = split[0];
-            if (lib.equals(prevLib)) continue;
-            if (!missingLibs.isEmpty()) missingLibs.append(", ");
-            missingLibs.append(lib);
-            prevLib = lib;
-          }
-        }
-      }
-      if (proc.waitFor() == 0 && !missingLibs.isEmpty()) {
-        String msg = IdeBundle.message("notification.content.jcef.missingLibs", missingLibs);
-        Notification notification = NOTIFICATION_GROUP.getValue().
-          createNotification(IdeBundle.message("notification.title.jcef.startFailure"), msg, NotificationType.ERROR);
-        //noinspection DialogTitleCapitalization
-        notification.addAction(new AnAction(IdeBundle.message("action.jcef.followInstructions")) {
-          @Override
-          public void actionPerformed(@NotNull AnActionEvent e) {
-            BrowserUtil.open(MISSING_LIBS_SUPPORT_URL);
-          }
-        });
-        notification.notify(null);
-      }
-    }
-    catch (Throwable t) {
-      LOG.error("failed to identify JCEF missing libs", t);
-    }
   }
 
   private static CefSettings.LogSeverity getLogLevel() {

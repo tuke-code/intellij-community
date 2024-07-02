@@ -678,8 +678,10 @@ f:com.intellij.codeInsight.intention.preview.IntentionPreviewInfo$CustomDiff
 - <init>(com.intellij.openapi.fileTypes.FileType,java.lang.String,java.lang.String):V
 - <init>(com.intellij.openapi.fileTypes.FileType,java.lang.String,java.lang.String,java.lang.String):V
 - <init>(com.intellij.openapi.fileTypes.FileType,java.lang.String,java.lang.String,java.lang.String,Z):V
+- equals(java.lang.Object):Z
 - fileName():java.lang.String
 - fileType():com.intellij.openapi.fileTypes.FileType
+- hashCode():I
 - modifiedText():java.lang.String
 - originalText():java.lang.String
 - showLineNumbers():Z
@@ -2589,6 +2591,7 @@ com.intellij.modcommand.ModCommand
 - *s:moveCaretAfter(com.intellij.modcommand.ModCommand,com.intellij.psi.PsiFile,I,Z):com.intellij.modcommand.ModCommand
 - s:moveTo(com.intellij.psi.PsiElement):com.intellij.modcommand.ModCommand
 - s:nop():com.intellij.modcommand.ModCommand
+- s:openUrl(java.lang.String):com.intellij.modcommand.ModCommand
 - s:psiBasedStep(com.intellij.psi.PsiElement,java.lang.String,java.util.function.Function,java.util.function.Function):com.intellij.modcommand.ModCommandAction
 - s:psiUpdate(com.intellij.modcommand.ActionContext,java.util.function.Consumer):com.intellij.modcommand.ModCommand
 - s:psiUpdate(com.intellij.psi.PsiElement,java.util.function.BiConsumer):com.intellij.modcommand.ModCommand
@@ -2683,9 +2686,24 @@ f:com.intellij.modcommand.ModCopyToClipboard
 f:com.intellij.modcommand.ModCreateFile
 - java.lang.Record
 - com.intellij.modcommand.ModCommand
-- <init>(com.intellij.modcommand.FutureVirtualFile,java.lang.String):V
+- <init>(com.intellij.modcommand.FutureVirtualFile,com.intellij.modcommand.ModCreateFile$Content):V
+- content():com.intellij.modcommand.ModCreateFile$Content
 - f:equals(java.lang.Object):Z
 - file():com.intellij.modcommand.FutureVirtualFile
+- f:hashCode():I
+f:com.intellij.modcommand.ModCreateFile$Binary
+- java.lang.Record
+- com.intellij.modcommand.ModCreateFile$Content
+- <init>(B[]):V
+- bytes():B[]
+- f:equals(java.lang.Object):Z
+- f:hashCode():I
+com.intellij.modcommand.ModCreateFile$Content
+f:com.intellij.modcommand.ModCreateFile$Text
+- java.lang.Record
+- com.intellij.modcommand.ModCreateFile$Content
+- <init>(java.lang.String):V
+- f:equals(java.lang.Object):Z
 - f:hashCode():I
 - text():java.lang.String
 f:com.intellij.modcommand.ModDeleteFile
@@ -2747,6 +2765,13 @@ f:com.intellij.modcommand.ModNothing
 - f:hashCode():I
 - isEmpty():Z
 - unpack():java.util.List
+f:com.intellij.modcommand.ModOpenUrl
+- java.lang.Record
+- com.intellij.modcommand.ModCommand
+- <init>(java.lang.String):V
+- f:equals(java.lang.Object):Z
+- f:hashCode():I
+- url():java.lang.String
 *:com.intellij.modcommand.ModPsiNavigator
 - a:getCaretOffset():I
 - a:moveCaretTo(I):V
@@ -3134,6 +3159,7 @@ a:com.intellij.openapi.fileEditor.FileEditorManager
 - a:removeBottomComponent(com.intellij.openapi.fileEditor.FileEditor,javax.swing.JComponent):V
 - removeFileEditorManagerListener(com.intellij.openapi.fileEditor.FileEditorManagerListener):V
 - a:removeTopComponent(com.intellij.openapi.fileEditor.FileEditor,javax.swing.JComponent):V
+- *:requestOpenFile(com.intellij.openapi.vfs.VirtualFile):V
 - a:runWhenLoaded(com.intellij.openapi.editor.Editor,java.lang.Runnable):V
 - a:setSelectedEditor(com.intellij.openapi.vfs.VirtualFile,java.lang.String):V
 - updateFileColor(com.intellij.openapi.vfs.VirtualFile):V

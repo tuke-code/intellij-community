@@ -37,6 +37,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static com.intellij.ide.actions.searcheverywhere.footer.ExtendedInfoImplKt.createPsiExtendedInfo;
+import static com.intellij.ide.util.gotoByName.ChooseByNamePopup.patternToDetectAnonymousClasses;
 
 /**
  * @author Konstantin Bulenkov
@@ -61,8 +62,7 @@ public class ClassSearchEverywhereContributor extends AbstractGotoSEContributor 
   @Override
   public @NotNull String getFullGroupName() {
     //noinspection HardCodedStringLiteral
-    @Nls String res = String.join("/", GotoClassPresentationUpdater.getActionTitlePluralized());
-    return res;
+    return String.join("/", GotoClassPresentationUpdater.getActionTitlePluralized());
   }
 
   @Override
@@ -91,7 +91,7 @@ public class ClassSearchEverywhereContributor extends AbstractGotoSEContributor 
     }
 
     if (pattern.indexOf('$') != -1) {
-      pattern = applyPatternFilter(pattern, ourPatternToDetectAnonymousClasses);
+      pattern = applyPatternFilter(pattern, patternToDetectAnonymousClasses);
     }
 
     return super.filterControlSymbols(pattern);
@@ -113,10 +113,10 @@ public class ClassSearchEverywhereContributor extends AbstractGotoSEContributor 
   }
 
   @Override
-  protected @Nullable Navigatable createExtendedNavigatable(PsiElement psi, String searchText, int modifiers) {
-    Navigatable res = super.createExtendedNavigatable(psi, searchText, modifiers);
-    if (res != null) {
-      return res;
+  protected @Nullable Navigatable createExtendedNavigatable(@NotNull PsiElement psi, @NotNull String searchText, int modifiers) {
+    Navigatable result = super.createExtendedNavigatable(psi, searchText, modifiers);
+    if (result != null) {
+      return result;
     }
 
     VirtualFile file = PsiUtilCore.getVirtualFile(psi);
@@ -129,7 +129,6 @@ public class ClassSearchEverywhereContributor extends AbstractGotoSEContributor 
           public void navigate(boolean requestFocus) {
             NavigationUtil.activateFileWithPsiElement(psi, false);
             delegate.navigate(true);
-
           }
 
           @Override

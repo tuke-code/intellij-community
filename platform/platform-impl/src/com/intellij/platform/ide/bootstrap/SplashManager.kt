@@ -5,7 +5,7 @@ package com.intellij.platform.ide.bootstrap
 import com.dynatrace.hash4j.hashing.Hashing
 import com.intellij.diagnostic.LoadingState
 import com.intellij.diagnostic.StartUpMeasurer
-import com.intellij.ide.impl.ProjectUtil
+import com.intellij.ide.impl.ProjectUtil.getRootFrameForWindow
 import com.intellij.idea.AppMode
 import com.intellij.openapi.application.ApplicationInfo
 import com.intellij.openapi.application.ApplicationNamesInfo
@@ -31,10 +31,7 @@ import com.intellij.util.ui.StartupUiUtil
 import kotlinx.coroutines.*
 import sun.awt.image.SunWritableRaster
 import java.awt.*
-import java.awt.event.ComponentAdapter
-import java.awt.event.ComponentEvent
-import java.awt.event.WindowAdapter
-import java.awt.event.WindowEvent
+import java.awt.event.*
 import java.awt.geom.RoundRectangle2D
 import java.awt.image.*
 import java.nio.ByteBuffer
@@ -56,7 +53,7 @@ private var SPLASH_WINDOW: Splash? = null
 // if hideSplash requested before we show splash, we should not try to show splash
 private val splashJob = AtomicReference<Job>(CompletableDeferred<Unit>())
 
-private val SHOW_SPLASH_LONGER = System.getProperty("idea.show.splash.longer", "false").toBoolean()
+private val SHOW_SPLASH_LONGER = System.getProperty("idea.show.splash.longer", "true").toBoolean()
 
 private fun isTooLateToShowSplash(): Boolean = !SHOW_SPLASH_LONGER && LoadingState.COMPONENTS_LOADED.isOccurred
 
@@ -135,14 +132,20 @@ private fun CoroutineScope.showSplashIfNeeded(initUiScale: Job, appInfoDeferred:
         return@span
       }
 
-      // Hide if splash was deactivated because of focusing some other window in the OS (not IDE Frame).
-      splash.addWindowListener(object : WindowAdapter() {
-        override fun windowDeactivated(e: WindowEvent?) {
-          if (ProjectUtil.getRootFrameForWindow(e?.oppositeWindow) == null) {
-            hideSplash()
+      val deactivationListener = if (SHOW_SPLASH_LONGER) {
+        // Hide if splash or IDE frame was deactivated because of focusing some other window in the OS (not IDE Frame).
+        val listener = AWTEventListener { e ->
+          if (e.id == WindowEvent.WINDOW_DEACTIVATED) {
+            val windowEvent = e as WindowEvent
+            if (getRootFrameForWindow(windowEvent.oppositeWindow) == null) {
+              hideSplash()
+            }
           }
         }
-      })
+        Toolkit.getDefaultToolkit().addAWTEventListener(listener, AWTEvent.WINDOW_EVENT_MASK)
+        listener
+      }
+      else null
 
       StartUpMeasurer.addInstantEvent("splash shown")
       try {
@@ -170,6 +173,7 @@ private fun CoroutineScope.showSplashIfNeeded(initUiScale: Job, appInfoDeferred:
       }
       catch (ignore: CancellationException) {
         SPLASH_WINDOW = null
+        Toolkit.getDefaultToolkit().removeAWTEventListener(deactivationListener)
         splash.isVisible = false
         splash.dispose()
         StartUpMeasurer.addInstantEvent("splash hidden")

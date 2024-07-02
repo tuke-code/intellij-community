@@ -8,7 +8,6 @@ import com.intellij.find.impl.SearchEverywhereItem;
 import com.intellij.find.impl.TextSearchRightActionAction;
 import com.intellij.find.impl.UsageAdaptersKt;
 import com.intellij.icons.AllIcons;
-import com.intellij.icons.ExpUiIcons;
 import com.intellij.ide.DataManager;
 import com.intellij.ide.IdeBundle;
 import com.intellij.ide.SearchTopHitProvider;
@@ -138,7 +137,7 @@ public final class SearchEverywhereUI extends BigPopupUI implements DataProvider
   public static final int MULTIPLE_CONTRIBUTORS_ELEMENTS_LIMIT = 15;
 
   private static Icon getShowInFindToolWindowIcon() {
-    return ExperimentalUI.isNewUI() ? ExpUiIcons.General.OpenInToolWindow : AllIcons.General.Pin_tab;
+    return ExperimentalUI.isNewUI() ? AllIcons.General.OpenInToolWindow : AllIcons.General.Pin_tab;
   }
 
   private final SEResultsListFactory myListFactory;
@@ -1298,8 +1297,9 @@ public final class SearchEverywhereUI extends BigPopupUI implements DataProvider
     boolean multiSelectMode = e.isShiftDown() || UIUtil.isControlKeyDown(e);
     boolean isPreviewDoubleClick = !isPreviewActive() || !hasPreviewProvider(myHeader.getSelectedTab()) || e.getClickCount() == 2;
     int selectedIndex = myResultsList.locationToIndex(e.getPoint());
-    if (myListModel.getElementAt(selectedIndex) instanceof SearchListModel.ResultsNotificationElement) {
-      int listSize = myListModel.getSize();
+    int listSize = myListModel.getSize();
+    if (selectedIndex > 0 && selectedIndex < listSize
+        && myListModel.getElementAt(selectedIndex) instanceof SearchListModel.ResultsNotificationElement) {
       if (prevSelectedIndex == (selectedIndex - 1 + listSize) % listSize) {
         myResultsList.setSelectedIndex(selectedIndex + 1);
         ScrollingUtil.ensureIndexIsVisible(myResultsList, selectedIndex + 1, 0);
@@ -1368,6 +1368,9 @@ public final class SearchEverywhereUI extends BigPopupUI implements DataProvider
       Object value = myListModel.getElementAt(i);
       selectedItems.add(value);
 
+      SearchEverywhereContributor<?> effectiveContributor =
+        contributor instanceof SearchEverywhereContributorWrapper wrapper ? wrapper.getEffectiveContributor() : contributor;
+
       String selectedTabContributorID = myHeader.getSelectedTab().getReportableID();
       //noinspection ConstantConditions
       String reportableContributorID = getReportableContributorID(contributor);
@@ -1378,6 +1381,9 @@ public final class SearchEverywhereUI extends BigPopupUI implements DataProvider
       }
       data.add(SearchEverywhereUsageTriggerCollector.SELECTED_ITEM_NUMBER.with(hasNotificationElement ? (i - 1) : i));
       data.add(SearchEverywhereUsageTriggerCollector.HAS_ONLY_SIMILAR_ELEMENT.with(hasNotificationElement));
+      data.add(SearchEverywhereUsageTriggerCollector.IS_ELEMENT_SEMANTIC.with(
+        effectiveContributor instanceof SemanticSearchEverywhereContributor semanticContributor &&
+        semanticContributor.isElementSemantic(value)));
       PsiElement psi = toPsi(value);
       if (psi != null) {
         data.add(EventFields.Language.with(psi.getLanguage()));

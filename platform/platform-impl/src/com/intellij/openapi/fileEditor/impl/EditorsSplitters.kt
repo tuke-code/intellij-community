@@ -220,9 +220,14 @@ open class EditorsSplitters internal constructor(
       .stateIn(coroutineScope, SharingStarted.Lazily, null)
 
     coroutineScope.launch(CoroutineName("EditorSplitters frame title update")) {
-      currentCompositeFlow.collectLatest { _ ->
-        updateFrameTitle()
-      }
+      @Suppress("OPT_IN_USAGE")
+      currentCompositeFlow
+        .debounce(100.milliseconds)
+        .collectLatest { composite ->
+          // some providers depend on editor list (DiffEditorTabTitleProvider)
+          composite?.waitForAvailableWithoutTriggeringInit()
+          updateFrameTitle()
+        }
     }
   }
 
@@ -444,17 +449,14 @@ open class EditorsSplitters internal constructor(
   internal suspend fun updateFrameTitle() {
     val project = manager.project
     val frame = getFrame() ?: return
-    val file = currentFile
+    val file = currentCompositeFlow.value?.file
     if (file == null) {
       withContext(Dispatchers.EDT) {
         frame.setFileTitle(null, null)
       }
     }
     else {
-      val title = readAction {
-        FrameTitleBuilder.getInstance().getFileTitle(project, file)
-      }
-
+      val title = serviceAsync<FrameTitleBuilder>().getFileTitleAsync(project, file)
       val ioFile = try {
         if (file is LightVirtualFileBase) null else Path.of(file.presentableUrl)
       }
@@ -495,6 +497,9 @@ open class EditorsSplitters internal constructor(
 
   internal val splitCount: Int
     get() = if (componentCount > 0) getSplitCount(getComponent(0) as JComponent) else 0
+
+  internal open val isSingletonEditorInWindow: Boolean
+    get() = false
 
   internal open fun afterFileClosed(file: VirtualFile) {}
 
@@ -614,10 +619,8 @@ open class EditorsSplitters internal constructor(
         }
       }
     }
-    else if (!windowsPerFile.isEmpty()) {
-      if (!windowsPerFile.contains(currentWindow)) {
-        setCurrentWindow(window = windowsPerFile[0])
-      }
+    else if (!windowsPerFile.isEmpty() && !windowsPerFile.contains(currentWindow)) {
+      setCurrentWindow(window = windowsPerFile[0])
     }
     return currentWindow!!
   }
@@ -733,7 +736,11 @@ open class EditorsSplitters internal constructor(
       if (component !== window.component) {
         // reuse
         windows.find { SwingUtilities.isDescendingFrom(component, it.component) }?.let { rightSplitWindow ->
-          manager.openFile(file = file, window = rightSplitWindow, options = FileEditorOpenOptions(requestFocus = requestFocus))
+          manager.openFile(
+            file = file,
+            window = rightSplitWindow,
+            options = FileEditorOpenOptions(requestFocus = requestFocus, waitForCompositeOpen = false),
+          )
           return rightSplitWindow
         }
       }
@@ -958,9 +965,7 @@ private class UiBuilder(private val splitters: EditorsSplitters, private val isL
           )
 
           val tabTitleTask = compositeCoroutineScope.async(start = CoroutineStart.LAZY) {
-            readAction {
-              EditorTabPresentationUtil.getEditorTabTitle(fileEditorManager.project, file)
-            }
+            EditorTabPresentationUtil.getEditorTabTitleAsync(fileEditorManager.project, file)
           }
           val tabIconTask = if (UISettings.getInstance().showFileIconInTabs) {
             compositeCoroutineScope.async(start = CoroutineStart.LAZY) {

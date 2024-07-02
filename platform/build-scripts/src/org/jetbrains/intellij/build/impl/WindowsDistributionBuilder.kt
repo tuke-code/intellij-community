@@ -5,6 +5,8 @@ import com.intellij.openapi.util.SystemInfoRt
 import com.intellij.openapi.util.io.NioFiles
 import com.intellij.openapi.util.text.StringUtilRt
 import com.intellij.platform.diagnostic.telemetry.helpers.useWithScope
+import com.intellij.platform.ijent.community.buildConstants.ENABLE_IJENT_WSL_FILE_SYSTEM_VMOPTIONS
+import com.intellij.platform.ijent.community.buildConstants.isIjentWslFsEnabledByDefaultForProduct
 import com.jetbrains.plugin.structure.base.utils.exists
 import io.opentelemetry.api.common.AttributeKey
 import io.opentelemetry.api.trace.Span
@@ -306,17 +308,13 @@ internal class WindowsDistributionBuilder(
       val launcherPropertiesPath = context.paths.tempDir.resolve("launcher-${arch.dirName}.properties")
       val icoFile = computeIcoPath(context)
 
-      val productVersion = when {
-        context.buildNumber.endsWith(".SNAPSHOT") -> context.buildNumber.substring(0, context.buildNumber.length - 9) + ".9999.0"
-        context.buildNumber.count { it == '.' } == 1 -> "${context.buildNumber}.0"
-        else -> context.buildNumber
-      }
+      val productVersion = context.buildNumber.replace(".SNAPSHOT", ".0") + ".0".repeat(3 - context.buildNumber.count { it == '.' })
       val launcherProperties = mutableListOf(
         "CompanyName" to appInfo.companyName,
         "LegalCopyright" to "Copyright 2000-${LocalDate.now().year} ${appInfo.companyName}",
         "FileDescription" to appInfo.productNameWithEdition,
         "ProductName" to appInfo.productNameWithEdition,
-        "ProductVersion" to "${productVersion}.0-${appInfo.productCode}", // "242.1234.56.0-IU"
+        "ProductVersion" to "$productVersion-${appInfo.productCode}", // "242.1234.56.0-IU"
       )
       if (!customizer.useXPlatLauncher) {
         val vmOptions = context.getAdditionalJvmArguments(OsFamily.WINDOWS, arch) + additionalNonCustomizableJvmArgs + listOf("-Dide.native.launcher=true")
@@ -417,7 +415,10 @@ internal class WindowsDistributionBuilder(
 
   private fun writeWindowsVmOptions(distBinDir: Path, context: BuildContext): Path {
     val vmOptionsFile = distBinDir.resolve("${context.productProperties.baseFileName}64.exe.vmoptions")
-    val vmOptions = VmOptionsGenerator.computeVmOptions(context, OsFamily.WINDOWS)
+    var vmOptions = VmOptionsGenerator.computeVmOptions(context)
+    if (isIjentWslFsEnabledByDefaultForProduct(context.productProperties.platformPrefix)) {
+      vmOptions = vmOptions + ENABLE_IJENT_WSL_FILE_SYSTEM_VMOPTIONS
+    }
     writeVmOptions(vmOptionsFile, vmOptions, separator = "\r\n")
     return vmOptionsFile
   }

@@ -1,4 +1,4 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.openapi.vfs.newvfs.persistent;
 
 import com.intellij.openapi.util.io.BufferExposingByteArrayOutputStream;
@@ -43,14 +43,19 @@ public final class PersistentFSContentAccessor {
     PersistentFSConnection.ensureIdIsValid(fileId);
     PersistentFSRecordsStorage records = connection.getRecords();
 
-    int contentRecordId = connection.getContents().storeRecord(content);
+    int contentRecordId = writeContentRecord(content);
 
     records.setContentRecordId(fileId, contentRecordId);
   }
 
 
-  int allocateContentRecordAndStore(byte @NotNull [] content) throws IOException {
-    return connection.getContents().storeRecord(new ByteArraySequence(content));
+  /**
+   * Stores content and return contentRecordId, by which content could be later retrieved.
+   * If the same content (bytes) was already stored -- method could return id of already existing record, without allocating
+   * & storing new record.
+   */
+  int writeContentRecord(@NotNull ByteArraySequence content) throws IOException {
+    return connection.getContents().storeRecord(content);
   }
 
   @ApiStatus.Obsolete

@@ -12,9 +12,7 @@ from _pydev_bundle.pydev_imports import quote
 from _pydevd_bundle import pydevd_extension_utils
 from _pydevd_bundle import pydevd_resolver
 from _pydevd_bundle.pydevd_constants import dict_keys, IS_PY3K, \
-    LOAD_VALUES_POLICY, \
-    DEFAULT_VALUES_DICT, \
-    SELF_VALUES_LOAD_POLICY
+    LOAD_VALUES_POLICY, DEFAULT_VALUES_DICT
 from _pydevd_bundle.pydevd_extension_api import TypeResolveProvider, \
     StrPresentationProvider
 from _pydevd_bundle.pydevd_frame_type_handler import get_vars_handler, \
@@ -23,7 +21,7 @@ from _pydevd_bundle.pydevd_repr_utils import get_value_repr
 from _pydevd_bundle.pydevd_user_type_renderers_utils import \
     try_get_type_renderer_for_var
 from _pydevd_bundle.pydevd_utils import is_string, should_evaluate_full_value, \
-    should_evaluate_shape
+    should_evaluate_shape, is_safe_to_access
 
 try:
     import types
@@ -296,8 +294,6 @@ def var_to_xml(val, name, do_trim=True, additional_in_xml='', evaluate_full_valu
         xml = '<var name="%s" ' % (make_valid_xml_value(name))
         return ''.join((xml, ' />\n'))
 
-    is_self = name == 'self'
-
     try:
         # This should be faster than isinstance (but we have to protect against not having a '__class__' attribute).
         is_exception_on_eval = val.__class__ == ExceptionOnEvaluate
@@ -336,9 +332,7 @@ def var_to_xml(val, name, do_trim=True, additional_in_xml='', evaluate_full_valu
 
     # value to xml
     value = None
-    if is_self:
-        value = DEFAULT_VALUES_DICT[SELF_VALUES_LOAD_POLICY]
-    elif not evaluate_full_value:
+    if not evaluate_full_value:
         value = DEFAULT_VALUES_DICT[LOAD_VALUES_POLICY]
     elif type_renderer is not None:
         value = type_renderer.evaluate_var_string_repr(v)
@@ -349,15 +343,14 @@ def var_to_xml(val, name, do_trim=True, additional_in_xml='', evaluate_full_valu
 
     # shape to xml
     xml_shape = ''
-    if not is_self:
-        try:
-            if should_evaluate_shape():
-                if hasattr(v, 'shape') and not callable(v.shape):
-                    xml_shape = ' shape="%s"' % make_valid_xml_value(str(tuple(v.shape)))
-                elif hasattr(v, '__len__') and not is_string(v):
-                    xml_shape = ' shape="%s"' % make_valid_xml_value("%s" % str(len(v)))
-        except:
-            pass
+    try:
+        if should_evaluate_shape() and is_safe_to_access(v, 'shape'):
+            if hasattr(v, 'shape') and not callable(v.shape):
+                xml_shape = ' shape="%s"' % make_valid_xml_value(str(tuple(v.shape)))
+            elif hasattr(v, '__len__') and not is_string(v):
+                xml_shape = ' shape="%s"' % make_valid_xml_value("%s" % str(len(v)))
+    except:
+        pass
 
     # additional info to xml
     if is_exception_on_eval:

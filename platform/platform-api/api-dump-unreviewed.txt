@@ -1944,10 +1944,15 @@ com.intellij.openapi.actionSystem.ex.ActionPopupMenuListener
 - actionPopupMenuReleased(com.intellij.openapi.actionSystem.ActionPopupMenu):V
 f:com.intellij.openapi.actionSystem.ex.ActionUtil
 - sf:ALLOW_PlAIN_LETTER_SHORTCUTS:com.intellij.openapi.util.Key
+- sf:ALWAYS_VISIBLE_GROUP:com.intellij.openapi.util.Key
+- sf:HIDE_DROPDOWN_ICON:com.intellij.openapi.util.Key
 - sf:INLINE_ACTIONS:com.intellij.openapi.util.Key
 - sf:INSTANCE:com.intellij.openapi.actionSystem.ex.ActionUtil
+- sf:KEYBOARD_SHORTCUT_SUFFIX:com.intellij.openapi.util.Key
 - sf:SEARCH_TAG:com.intellij.openapi.util.Key
+- sf:SECONDARY_ICON:com.intellij.openapi.util.Key
 - sf:SECONDARY_TEXT:com.intellij.openapi.util.Key
+- sf:SUPPRESS_SUBMENU:com.intellij.openapi.util.Key
 - sf:clearActions(javax.swing.JComponent):V
 - sf:copyFrom(com.intellij.openapi.actionSystem.AnAction,java.lang.String):com.intellij.openapi.actionSystem.AnAction
 - sf:copyRegisteredShortcuts(javax.swing.JComponent,javax.swing.JComponent):V
@@ -2602,6 +2607,7 @@ f:com.intellij.openapi.keymap.KeymapUtil
 - s:getFirstKeyboardShortcutText(java.lang.String):java.lang.String
 - s:getFirstMouseShortcutText(java.lang.String):java.lang.String
 - s:getKeyStroke(com.intellij.openapi.actionSystem.ShortcutSet):javax.swing.KeyStroke
+- s:getKeyStroke(java.lang.String):javax.swing.KeyStroke
 - s:getKeyStrokes(com.intellij.openapi.actionSystem.ShortcutSet):java.util.Collection
 - s:getKeyText(I):java.lang.String
 - s:getKeystrokeText(javax.swing.KeyStroke):java.lang.String

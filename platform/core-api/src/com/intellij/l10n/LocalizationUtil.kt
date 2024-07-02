@@ -3,7 +3,6 @@ package com.intellij.l10n
 
 import com.intellij.DynamicBundle
 import com.intellij.diagnostic.LoadingState
-import com.intellij.ide.plugins.IdeaPluginDescriptor
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.progress.ProcessCanceledException
@@ -23,8 +22,6 @@ object LocalizationUtil {
   private const val LOCALIZATION_FOLDER_NAME: String = "localization"
   @Internal
   const val LOCALIZATION_KEY: String = "i18n.locale"
-  @Internal
-  val l10nPluginIdToLanguageTag: Map<String, String> = mapOf("com.intellij.ja" to "ja", "com.intellij.ko" to "ko", "com.intellij.zh" to "zh-CN")
 
   @Internal
   fun getForcedLocale(): String? {
@@ -43,7 +40,6 @@ object LocalizationUtil {
     if (forcedLocale == null) {
       val englishTag = Locale.ENGLISH.toLanguageTag()
       if (languageTag != englishTag && findLanguageBundle(locale) == null) {
-        LocalizationStateService.getInstance()?.setSelectedLocale(englishTag)
         return Locale.ENGLISH
       }
     }
@@ -213,8 +209,6 @@ object LocalizationUtil {
     val list = ArrayList<Locale>()
     val map = HashMap<Locale, String>()
 
-    list.add(Locale.ENGLISH)
-
     for (bundleEP in getAllLanguageBundleExtensions()) {
       val locale = Locale.forLanguageTag(bundleEP.locale)
       list.add(locale)
@@ -225,9 +219,9 @@ object LocalizationUtil {
       }
     }
 
-    return list to map
+    return buildList<Locale> {
+      add(Locale.ENGLISH)
+      addAll(list.sortedBy { map[it] ?: it.getDisplayLanguage(Locale.ENGLISH) })
+    } to map
   }
-
-  @Internal
-  fun isInactiveLocalizationPlugin(descriptor: IdeaPluginDescriptor): Boolean = LocalizationPluginHelper.getInstance()?.isInactiveLocalizationPlugin(descriptor) ?: false
 }

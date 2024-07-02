@@ -9,6 +9,9 @@ import com.intellij.concurrency.captureThreadContext
 import com.intellij.concurrency.resetThreadContext
 import com.intellij.openapi.application.*
 import com.intellij.openapi.components.serviceAsync
+import com.intellij.openapi.diagnostic.Logger
+import com.intellij.openapi.diagnostic.logger
+import com.intellij.openapi.diagnostic.trace
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.editor.ex.EditorEx
 import com.intellij.openapi.fileEditor.FileEditorStateLevel
@@ -22,6 +25,7 @@ import com.intellij.util.ArrayUtil
 import com.intellij.util.awaitCancellationAndInvoke
 import com.intellij.util.concurrency.annotations.RequiresEdt
 import com.intellij.util.concurrency.annotations.RequiresReadLock
+import com.intellij.util.ui.AnimatedIcon
 import com.intellij.util.ui.AsyncProcessIcon
 import kotlinx.coroutines.*
 import org.jetbrains.annotations.ApiStatus.Internal
@@ -29,8 +33,11 @@ import java.util.concurrent.atomic.AtomicReference
 import javax.swing.JComponent
 import javax.swing.event.ChangeEvent
 import kotlin.coroutines.resume
+import kotlin.math.max
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
+
+private val LOG: Logger = logger<AsyncEditorLoader>()
 
 @Internal
 class AsyncEditorLoader internal constructor(
@@ -114,16 +121,21 @@ class AsyncEditorLoader internal constructor(
     }
 
     coroutineScope.launch(CoroutineName("AsyncEditorLoader.wait")) {
+      val editorFileName = textEditor.file.name
       val indicatorJob = showLoadingIndicator(
         startDelay = 300.milliseconds,
-        addUi = textEditor.component::addLoadingDecoratorUi
+        addUi = textEditor.component::addLoadingDecoratorUi,
+        editorFileName = editorFileName,
       )
       // await instead of join to get errors here
       try {
+        LOG.trace { "async editor task awaiting for $editorFileName" }
         task.await()
+        LOG.trace { "async editor task finished for $editorFileName" }
       }
       finally {
         indicatorJob.cancel()
+        LOG.trace { "spinner icon canceled for $editorFileName" }
       }
 
       // mark as loaded before daemonCodeAnalyzer restart
@@ -243,24 +255,40 @@ private fun restoreCaretPosition(editor: EditorEx, delayedScrollState: DelayedSc
   }
 }
 
-private fun CoroutineScope.showLoadingIndicator(startDelay: Duration, addUi: (component: JComponent) -> Unit): Job {
+private fun CoroutineScope.showLoadingIndicator(
+  startDelay: Duration,
+  addUi: (component: JComponent) -> Unit,
+  editorFileName: String,
+): Job {
   require(startDelay >= Duration.ZERO)
 
-  val scheduleTime = System.currentTimeMillis()
-  return launch {
-    delay((startDelay.inWholeMilliseconds - (System.currentTimeMillis() - scheduleTime)).coerceAtLeast(0))
+  val scheduleTimeMs = System.currentTimeMillis()
+  LOG.trace { "spinner icon scheduled for $editorFileName at $scheduleTimeMs ms" }
 
-    val processIcon = withContext(Dispatchers.EDT) {
-      val processIcon = AsyncProcessIcon.createBig(/* coroutineScope = */ this@launch)
-      addUi(processIcon)
-      processIcon
-    }
+  return launch {
+    val delayBeforeIcon = max(0, startDelay.inWholeMilliseconds - (System.currentTimeMillis() - scheduleTimeMs))
+    LOG.trace { "spinner icon delaying $delayBeforeIcon ms for $editorFileName" }
+
+    delay(delayBeforeIcon)
+
+    val processIconRef = AtomicReference<AnimatedIcon>()
 
     awaitCancellationAndInvoke {
       withContext(Dispatchers.EDT) {
-        processIcon.suspend()
-        processIcon.parent.remove(processIcon)
+        val processIcon = processIconRef.getAndSet(null)
+        if (processIcon != null) {
+          processIcon.suspend()
+          processIcon.parent.remove(processIcon)
+          LOG.trace { "spinner icon removed for $editorFileName" }
+        }
       }
+    }
+
+    withContext(Dispatchers.EDT) {
+      val processIcon = AsyncProcessIcon.createBig(/* coroutineScope = */ this@launch)
+      processIconRef.set(processIcon)
+      addUi(processIcon)
+      LOG.trace { "spinner icon created for $editorFileName" }
     }
   }
 }

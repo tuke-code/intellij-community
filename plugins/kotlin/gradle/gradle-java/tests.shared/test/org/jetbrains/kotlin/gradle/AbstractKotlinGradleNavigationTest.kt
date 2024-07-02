@@ -10,12 +10,15 @@ import org.jetbrains.kotlin.idea.base.test.IgnoreTests
 import org.jetbrains.kotlin.idea.base.test.TestRoot
 import org.jetbrains.kotlin.test.InTextDirectivesUtils
 import org.jetbrains.kotlin.test.TestMetadata
+import org.jetbrains.plugins.gradle.settings.GradleSystemSettings
 import org.jetbrains.plugins.gradle.testFramework.GradleTestFixtureBuilder
 import org.jetbrains.plugins.gradle.testFramework.annotations.BaseGradleVersionSource
 import org.jetbrains.plugins.gradle.testFramework.util.withBuildFile
 import org.jetbrains.plugins.gradle.testFramework.util.withSettingsFile
 import org.junit.jupiter.params.ParameterizedTest
 import kotlin.test.assertTrue
+
+private const val EXPECTED_NAVIGATION_DIRECTIVE = "EXPECTED-NAVIGATION-SUBSTRING"
 
 @TestRoot("idea/tests/testData/")
 @TestDataPath("\$CONTENT_ROOT")
@@ -28,6 +31,13 @@ abstract class AbstractKotlinGradleNavigationTest : AbstractGradleCodeInsightTes
     @BaseGradleVersionSource
     @TestMetadata("projectDependency.test")
     fun testProjectDependency(gradleVersion: GradleVersion) {
+        verifyNavigationFromCaretToExpected(gradleVersion)
+    }
+
+    @ParameterizedTest
+    @BaseGradleVersionSource
+    @TestMetadata("projectKmpDependency.test")
+    fun testProjectKmpDependency(gradleVersion: GradleVersion) {
         verifyNavigationFromCaretToExpected(gradleVersion)
     }
 
@@ -95,11 +105,14 @@ abstract class AbstractKotlinGradleNavigationTest : AbstractGradleCodeInsightTes
     }
 
     private fun verifyNavigationFromCaretToExpected(gradleVersion: GradleVersion) {
-        test(gradleVersion, GRADLE_KOTLIN_FIXTURE) {
+        val systemSettings = GradleSystemSettings.getInstance()
+        systemSettings.isDownloadSources = true
+
+        test(gradleVersion, GRADLE_KMP_KOTLIN_FIXTURE) {
             val mainFileContent = mainTestDataFile
             val mainFile = mainTestDataPsiFile
             val expectedNavigationText =
-                InTextDirectivesUtils.findStringWithPrefixes(mainFileContent.content, "// \"EXPECTED-NAVIGATION-SUBSTRING\": ") ?: error("EXPECTED-NAVIGATION-SUBSTRING is not specified")
+                InTextDirectivesUtils.findStringWithPrefixes(mainFileContent.content, "// \"$EXPECTED_NAVIGATION_DIRECTIVE\": ") ?: error("$EXPECTED_NAVIGATION_DIRECTIVE is not specified")
 
             codeInsightFixture.configureFromExistingVirtualFile(mainFile.virtualFile)
             assertTrue("<caret> is not present") {
@@ -113,32 +126,38 @@ abstract class AbstractKotlinGradleNavigationTest : AbstractGradleCodeInsightTes
                 mainFile.virtualFile.toNioPath(),
                 if (useK2Plugin == true) IgnoreTests.DIRECTIVES.IGNORE_K2 else IgnoreTests.DIRECTIVES.IGNORE_K1
             ) {
-                assertTrue("Actual text:\n\n$text") { text.contains(expectedNavigationText) }
+                assertTrue("Actual text:\n\n$text") {
+                    !text.contains(EXPECTED_NAVIGATION_DIRECTIVE) && text.contains(expectedNavigationText)
+                }
             }
         }
     }
 
     companion object {
-        val GRADLE_KOTLIN_FIXTURE: GradleTestFixtureBuilder = GradleTestFixtureBuilder.create("GradleKotlinFixture") { gradleVersion ->
+        val GRADLE_KMP_KOTLIN_FIXTURE: GradleTestFixtureBuilder = GradleTestFixtureBuilder.create("GradleKotlinFixture") { gradleVersion ->
             withSettingsFile(useKotlinDsl = true) {
                 setProjectName("GradleKotlinFixture")
-                include("module1", ":module1:module11", ":module1:module11:module111")
+                include("module1", ":module1:a-module11", ":module1:a-module11:module111")
                 enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
             }
             withBuildFile(gradleVersion, useKotlinDsl = true) {
+                withKotlinMultiplatformPlugin()
+                withMavenCentral()
+            }
+            withBuildFile(gradleVersion, relativeModulePath = "buildSrc", useKotlinDsl = true) {
                 withKotlinJvmPlugin()
                 withMavenCentral()
             }
             withBuildFile(gradleVersion, relativeModulePath = "module1", useKotlinDsl = true) {
-                withKotlinJvmPlugin()
+                withKotlinMultiplatformPlugin()
                 withMavenCentral()
             }
-            withBuildFile(gradleVersion, relativeModulePath = "module1/module11", useKotlinDsl = true) {
-                withKotlinJvmPlugin()
+            withBuildFile(gradleVersion, relativeModulePath = "module1/a-module11", useKotlinDsl = true) {
+                withKotlinMultiplatformPlugin()
                 withMavenCentral()
             }
-            withBuildFile(gradleVersion, relativeModulePath = "module1/module11/module111", useKotlinDsl = true) {
-                withKotlinJvmPlugin()
+            withBuildFile(gradleVersion, relativeModulePath = "module1/a-module11/module111", useKotlinDsl = true) {
+                withKotlinMultiplatformPlugin()
                 withMavenCentral()
             }
             withFile(

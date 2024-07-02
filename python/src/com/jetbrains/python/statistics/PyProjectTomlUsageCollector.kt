@@ -10,7 +10,7 @@ import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.findPsiFile
 import com.intellij.psi.PsiFile
 import com.intellij.psi.search.FileTypeIndex
-import com.intellij.psi.search.GlobalSearchScope
+import com.intellij.psi.search.ProjectScope
 import com.jetbrains.python.packaging.PyRequirementParser
 import org.jetbrains.annotations.ApiStatus.Internal
 import org.jetbrains.annotations.VisibleForTesting
@@ -98,7 +98,7 @@ class PyProjectTomlUsageCollector : ProjectUsagesCollector() {
 
         return@processFiles true
       },
-      GlobalSearchScope.allScope(project))
+      ProjectScope.getContentScope(project))
 
     val metrics = mutableSetOf<MetricEvent>()
     tools.forEach { name ->
@@ -126,7 +126,7 @@ class PyProjectTomlUsageCollector : ProjectUsagesCollector() {
           key.substringAfter(TOOL_PREFIX, "").substringBefore(".")
         else ""
 
-        normalize(name)
+        normalizePackageName(name)
       }.filter {
         it.isNotEmpty()
       }
@@ -150,20 +150,11 @@ class PyProjectTomlUsageCollector : ProjectUsagesCollector() {
             }
           }
         }.mapNotNull {
-          val requirement = PyRequirementParser.fromLine(normalize(it))
+          val requirement = PyRequirementParser.fromLine(normalizePackageName(it))
           requirement?.name
         }
 
       systems.addAll(collected)
-    }
-
-    @JvmStatic
-    fun normalize(name: String): String {
-      return name
-        .replace("_", "-")
-        .replace(".", "-")
-        .replace("\"", "")
-        .lowercase()
     }
   }
 }

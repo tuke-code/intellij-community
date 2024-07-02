@@ -10,6 +10,7 @@ import com.intellij.internal.statistic.service.fus.collectors.ProjectUsagesColle
 import com.intellij.openapi.module.ModuleManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.registry.Registry
+import org.jetbrains.annotations.ApiStatus
 
 /**
  * @author Konstantin Bulenkov
@@ -27,12 +28,13 @@ class IntelliJProjectUsageCollector : ProjectUsagesCollector() {
       }
     }
   }
+}
 
-  private fun isIdeaProject(project: Project): Boolean {
-    if (Registry.`is`(RegistryApplicationUsagesCollector.DISABLE_INTELLIJ_PROJECT_ANALYTICS)) return false
+@ApiStatus.Internal
+fun isIdeaProject(project: Project): Boolean {
+  if (Registry.`is`(RegistryApplicationUsagesCollector.DISABLE_INTELLIJ_PROJECT_ANALYTICS)) return false
 
-    val moduleManager = ModuleManager.getInstance(project)
-    return moduleManager.findModuleByName("intellij.platform.commercial") != null
-           && moduleManager.findModuleByName("intellij.platform.commercial.verifier") != null
-  }
+  val moduleManager = ModuleManager.getInstance(project)
+  return moduleManager.findModuleByName("intellij.platform.commercial") != null
+         && moduleManager.findModuleByName("intellij.platform.commercial.verifier") != null
 }

@@ -3,23 +3,25 @@ package org.jetbrains.plugins.terminal.block.prompt
 
 import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnActionEvent
-import com.intellij.openapi.project.DumbAwareAction
-import org.jetbrains.plugins.terminal.TerminalBundle
-import org.jetbrains.plugins.terminal.TerminalOptionsProvider
+import com.intellij.openapi.project.DumbAwareToggleAction
+import org.jetbrains.plugins.terminal.block.BlockTerminalOptions
 
-internal class TerminalSwitchPromptStyleAction : DumbAwareAction() {
-  override fun actionPerformed(e: AnActionEvent) {
-    val options = TerminalOptionsProvider.instance
-    options.useShellPrompt = !options.useShellPrompt
+internal sealed class TerminalSwitchPromptStyleAction(private val style: TerminalPromptStyle) : DumbAwareToggleAction() {
+  override fun isSelected(e: AnActionEvent): Boolean {
+    return BlockTerminalOptions.getInstance().promptStyle == style
   }
 
-  override fun update(e: AnActionEvent) {
-    e.presentation.text = if (TerminalOptionsProvider.instance.useShellPrompt) {
-      @Suppress("DialogTitleCapitalization")  // It triggers on 'Pre-set'
-      TerminalBundle.message("action.Terminal.SwitchPromptStyle.use.preset.prompt")
+  override fun setSelected(e: AnActionEvent, state: Boolean) {
+    if (state) {
+      BlockTerminalOptions.getInstance().promptStyle = style
     }
-    else TerminalBundle.message("action.Terminal.SwitchPromptStyle.use.shell.prompt")
   }
 
   override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.BGT
 }
+
+internal class TerminalUseSingleLinePromptAction : TerminalSwitchPromptStyleAction(TerminalPromptStyle.SINGLE_LINE)
+
+internal class TerminalUseDoubleLinePromptAction : TerminalSwitchPromptStyleAction(TerminalPromptStyle.DOUBLE_LINE)
+
+internal class TerminalUseShellPromptAction : TerminalSwitchPromptStyleAction(TerminalPromptStyle.SHELL)

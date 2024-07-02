@@ -54,6 +54,7 @@ public class PsiJavaCodeReferenceElementImpl extends CompositePsiElement impleme
     CLASS_OR_PACKAGE_NAME_KIND,
     CLASS_FQ_NAME_KIND,
     CLASS_FQ_OR_PACKAGE_NAME_KIND,
+    MODULE_NAME_KIND,
     CLASS_IN_QUALIFIED_NEW_KIND,
   }
 
@@ -334,6 +335,7 @@ public class PsiJavaCodeReferenceElementImpl extends CompositePsiElement impleme
       case PACKAGE_NAME_KIND:
       case CLASS_FQ_NAME_KIND:
       case CLASS_FQ_OR_PACKAGE_NAME_KIND:
+      case MODULE_NAME_KIND:
         return getNormalizedText();
 
       default:
@@ -528,6 +530,9 @@ public class PsiJavaCodeReferenceElementImpl extends CompositePsiElement impleme
         }
 
         return result;
+
+      case MODULE_NAME_KIND:
+        return JavaResolveResult.EMPTY_ARRAY;
     }
 
     throw new IllegalArgumentException("Unexpected kind: " + kind);
@@ -593,7 +598,13 @@ public class PsiJavaCodeReferenceElementImpl extends CompositePsiElement impleme
         else {
           throw cannotBindError(element, kind, element+ " is not a PsiClass but "+element.getClass());
         }
-
+      case MODULE_NAME_KIND:
+        if (element instanceof PsiJavaModule) {
+          return bindToModule((PsiJavaModule)element, containingFile);
+        }
+        else {
+          throw cannotBindError(element, kind, element+ " is not a PsiJavaModule but "+element.getClass());
+        }
       default:
         throw new IllegalArgumentException("Unexpected kind: " + kind);
     }
@@ -707,6 +718,7 @@ public class PsiJavaCodeReferenceElementImpl extends CompositePsiElement impleme
       case PACKAGE_NAME_KIND:
       case CLASS_FQ_NAME_KIND:
       case CLASS_FQ_OR_PACKAGE_NAME_KIND:
+      case MODULE_NAME_KIND:
         return true;
 
       default:
@@ -731,6 +743,13 @@ public class PsiJavaCodeReferenceElementImpl extends CompositePsiElement impleme
     }
     PsiJavaParserFacade parserFacade = JavaPsiFacade.getInstance(getProject()).getParserFacade();
     PsiJavaCodeReferenceElement ref = parserFacade.createReferenceFromText(qName, getParent());
+    getTreeParent().replaceChildInternal(this, (TreeElement)ref.getNode());
+    return ref;
+  }
+
+  private @NotNull PsiElement bindToModule(@NotNull PsiJavaModule aModule, @NotNull PsiFile containingFile) throws IncorrectOperationException {
+    PsiJavaParserFacade parserFacade = JavaPsiFacade.getInstance(containingFile.getProject()).getParserFacade();
+    PsiJavaCodeReferenceElement ref = parserFacade.createReferenceFromText(aModule.getName(), getParent());
     getTreeParent().replaceChildInternal(this, (TreeElement)ref.getNode());
     return ref;
   }
@@ -787,6 +806,8 @@ public class PsiJavaCodeReferenceElementImpl extends CompositePsiElement impleme
           String qName = ((PsiPackage)element).getQualifiedName();
           return qName.equals(getCanonicalText(false, null, containingFile));
         }
+        return false;
+      case MODULE_NAME_KIND:
         return false;
       default:
         throw new IllegalArgumentException("Unexpected kind: " + kind);
@@ -860,6 +881,9 @@ public class PsiJavaCodeReferenceElementImpl extends CompositePsiElement impleme
       case CLASS_FQ_OR_PACKAGE_NAME_KIND:
         filter = isQualified() ? new OrFilter(ElementClassFilter.CLASS, ElementClassFilter.PACKAGE) : ElementClassFilter.PACKAGE;
         break;
+      case MODULE_NAME_KIND:
+        filter = ElementClassFilter.MODULE;
+        break;
       default:
         throw new RuntimeException("Unknown reference type");
     }
@@ -914,6 +938,8 @@ public class PsiJavaCodeReferenceElementImpl extends CompositePsiElement impleme
             aClass.processDeclarations(new FilterScopeProcessor<>(filter, processor), ResolveState.initial(), null, this);
           }
         }
+        return;
+      case MODULE_NAME_KIND:
         return;
       default:
         throw new RuntimeException("Unknown reference type");
@@ -1009,6 +1035,7 @@ public class PsiJavaCodeReferenceElementImpl extends CompositePsiElement impleme
       case PACKAGE_NAME_KIND:
       case CLASS_FQ_NAME_KIND:
       case CLASS_FQ_OR_PACKAGE_NAME_KIND:
+      case MODULE_NAME_KIND:
         return getNormalizedText(); // there cannot be any <...>
 
       default:

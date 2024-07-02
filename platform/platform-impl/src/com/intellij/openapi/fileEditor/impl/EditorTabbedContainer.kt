@@ -12,7 +12,7 @@ import com.intellij.ide.ui.UISettings
 import com.intellij.ide.ui.customization.CustomActionsSchema
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.actionSystem.*
-import com.intellij.openapi.actionSystem.impl.ActionButton
+import com.intellij.openapi.actionSystem.ex.ActionUtil
 import com.intellij.openapi.application.EDT
 import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.application.asContextElement
@@ -46,7 +46,6 @@ import com.intellij.ui.docking.DragSession
 import com.intellij.ui.docking.impl.DockManagerImpl
 import com.intellij.ui.docking.impl.DockManagerImpl.Companion.isNorthPanelAvailable
 import com.intellij.ui.docking.impl.DockManagerImpl.Companion.isNorthPanelVisible
-import com.intellij.ui.docking.impl.DockManagerImpl.Companion.isSingletonEditorInWindow
 import com.intellij.ui.tabs.*
 import com.intellij.ui.tabs.TabInfo.DragOutDelegate
 import com.intellij.ui.tabs.UiDecorator.UiDecoration
@@ -238,7 +237,7 @@ class EditorTabbedContainer internal constructor(
     }
 
     coroutineScope.launch {
-      val title = EditorTabPresentationUtil.getEditorTabTitle(window.manager.project, file)
+      val title = EditorTabPresentationUtil.getCustomEditorTabTitleAsync(window.manager.project, file) ?: return@launch
       withContext(Dispatchers.EDT) {
         tab.setText(title)
       }
@@ -269,13 +268,14 @@ class EditorTabbedContainer internal constructor(
 }
 
 @ApiStatus.Internal
-class DockableEditor @JvmOverloads constructor(
-  @JvmField val img: Image?,
-  @JvmField val file: VirtualFile,
+class DockableEditor(
+  @JvmField internal val img: Image?,
+  @JvmField internal val file: VirtualFile,
   private val presentation: Presentation,
   private val preferredSize: Dimension,
-  @JvmField val isPinned: Boolean,
-  @JvmField val isNorthPanelAvailable: Boolean = isNorthPanelVisible(UISettings.getInstance()),
+  @JvmField internal val isPinned: Boolean,
+  @JvmField internal val isSingletonEditorInWindow: Boolean,
+  @JvmField internal val isNorthPanelAvailable: Boolean = isNorthPanelVisible(UISettings.getInstance()),
 ) : DockableContent<VirtualFile?> {
   override fun getKey(): VirtualFile = file
 
@@ -433,15 +433,18 @@ internal class EditorTabbedContainerDragOutDelegate(private val window: EditorWi
       presentation.putClientProperty(DockManagerImpl.REOPEN_WINDOW, DockManagerImpl.REOPEN_WINDOW.get(file, true))
     }
     presentation.icon = info.icon
-    val editors = window.getComposite(file)?.allEditors ?: emptyList()
-    presentation.putClientProperty(DockManagerImpl.ALLOW_DOCK_TOOL_WINDOWS, !isSingletonEditorInWindow(editors))
+    val editors = info.composite.allEditors
+    val isSingletonEditorInWindow = isSingletonEditorInWindow(editors)
+    presentation.putClientProperty(DockManagerImpl.ALLOW_DOCK_TOOL_WINDOWS, !isSingletonEditorInWindow)
     session = DockManager.getInstance(window.manager.project).createDragSession(
       mouseEvent,
-      createDockableEditor(
-        image = img,
+      DockableEditor(
+        img = img,
         file = file,
         presentation = presentation,
-        window = window,
+        preferredSize = window.size,
+        isPinned = window.isFilePinned(file = file),
+        isSingletonEditorInWindow = isSingletonEditorInWindow,
         isNorthPanelAvailable = isNorthPanelAvailable(editors),
       ),
     )
@@ -549,7 +552,7 @@ private class EditorTabs(
     })
 
     val source = ActionManager.getInstance().getAction("EditorTabsEntryPoint")
-    source.templatePresentation.putClientProperty(ActionButton.HIDE_DROPDOWN_ICON, true)
+    source.templatePresentation.putClientProperty(ActionUtil.HIDE_DROPDOWN_ICON, true)
     _entryPointActionGroup = DefaultActionGroup(java.util.List.of(source))
   }
 
@@ -724,19 +727,6 @@ private class EditorTabLabel(info: TabInfo, tabs: JBTabsImpl) : TabLabel(tabs, i
   private fun paintDimmed() = ExperimentalUI.isNewUI() && tabs.selectedInfo != info && !tabs.isHoveredTab(this)
 }
 
-internal fun createDockableEditor(
-  image: Image?,
-  file: VirtualFile,
-  presentation: Presentation,
-  window: EditorWindow,
-  isNorthPanelAvailable: Boolean,
-): DockableEditor {
-  return DockableEditor(
-    img = image,
-    file = file,
-    presentation = presentation,
-    preferredSize = window.size,
-    isPinned = window.isFilePinned(file),
-    isNorthPanelAvailable = isNorthPanelAvailable,
-  )
+internal fun isSingletonEditorInWindow(editors: List<FileEditor>): Boolean {
+  return editors.any { FileEditorManagerImpl.SINGLETON_EDITOR_IN_WINDOW.get(it, false) || EditorWindow.HIDE_TABS.get(it, false) }
 }

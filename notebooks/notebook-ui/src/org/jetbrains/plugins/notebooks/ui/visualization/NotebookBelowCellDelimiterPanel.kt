@@ -1,6 +1,6 @@
 package org.jetbrains.plugins.notebooks.ui.visualization
 
-import com.intellij.icons.ExpUiIcons
+import com.intellij.icons.AllIcons
 import com.intellij.openapi.actionSystem.*
 import com.intellij.openapi.editor.ex.util.EditorUtil
 import com.intellij.openapi.editor.impl.EditorImpl
@@ -8,12 +8,15 @@ import com.intellij.openapi.util.registry.Registry
 import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.UIUtil
 import org.jetbrains.annotations.Nls
-import java.awt.*
+import java.awt.BorderLayout
+import java.awt.Cursor
+import java.awt.Dimension
 import javax.swing.*
 
 class NotebookBelowCellDelimiterPanel(
   val editor: EditorImpl,
   @Nls private val tooltipText: String?,
+  @Nls private val durationText: String?,
   private val executionCount: Int?,
   private val statusIcon: Icon?,
   private val isExecutable: Boolean,
@@ -42,7 +45,10 @@ class NotebookBelowCellDelimiterPanel(
 
   private fun createExecutionLabel(): JLabel {
     val executionCountText = executionCount?.let { if (it > 0) "[$it]" else "" } ?: ""
-    return JLabel(executionCountText).apply {
+    val durationLabelText = durationText ?: ""
+    val labelText = "$executionCountText $durationLabelText"
+
+    return JLabel(labelText).apply {
       icon = statusIcon
       font = EditorUtil.getEditorFont()
       foreground = UIUtil.getLabelInfoForeground()
@@ -72,7 +78,7 @@ class NotebookBelowCellDelimiterPanel(
     val action = ActionManager.getInstance().getAction("JupyterCellAddTagInlayAction") ?: return null
 
     return JButton().apply {
-      icon = ExpUiIcons.General.Add
+      icon = AllIcons.Expui.General.Add
       preferredSize = Dimension(plusTagButtonSize, plusTagButtonSize)
       isContentAreaFilled = false
       isFocusPainted = false
@@ -103,7 +109,7 @@ class NotebookBelowCellDelimiterPanel(
 
   private fun getCollapsed(): Boolean {
     if (cellTags.isNotEmpty()) return false
-    return !isExecutionCountDefined() && (tooltipText == null || statusIcon == ExpUiIcons.General.GreenCheckmark)
+    return !isExecutionCountDefined() && (tooltipText == null || statusIcon == AllIcons.Expui.General.GreenCheckmark)
   }
 
   private fun isExecutionCountDefined(): Boolean = executionCount?.let { it > 0 } ?: false

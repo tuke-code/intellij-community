@@ -47,7 +47,6 @@ import com.intellij.util.containers.MostlySingularMultiMap;
 import com.intellij.util.ui.StartupUiUtil;
 import com.intellij.util.ui.UIUtil;
 import com.intellij.xml.util.XmlStringUtil;
-import com.siyeh.ig.psiutils.ClassUtils;
 import com.siyeh.ig.psiutils.ExpressionUtils;
 import org.intellij.lang.annotations.Language;
 import org.jetbrains.annotations.Contract;
@@ -528,7 +527,7 @@ public final class HighlightMethodUtil {
     if (!resolvedMethod.isConstructor() || !resolvedMethod.getParameterList().isEmpty()) return;
     PsiClass psiClass = resolvedMethod.getContainingClass();
     if (psiClass == null || !CommonClassNames.JAVA_LANG_OBJECT.equals(psiClass.getQualifiedName())) return;
-    PsiClass containingClass = ClassUtils.getContainingClass(methodCall);
+    PsiClass containingClass = PsiUtil.getContainingClass(methodCall);
     if (containingClass == null) return;
     PsiReferenceList extendsList = containingClass.getExtendsList();
     if (extendsList != null && extendsList.getReferenceElements().length > 0) return;
@@ -581,6 +580,7 @@ public final class HighlightMethodUtil {
         if ((parameters.length == 0 || !parameters[parameters.length - 1].isVarArgs()) &&
             parameters.length != expressions.length) {
           toolTip = createMismatchedArgumentCountTooltip(parameters.length, expressions.length);
+          description = JavaAnalysisBundle.message("arguments.count.mismatch", parameters.length, expressions.length);
         }
         else if (mismatchedExpressions.isEmpty()) {
           if (IncompleteModelUtil.isIncompleteModel(list)) return null;
@@ -630,6 +630,7 @@ public final class HighlightMethodUtil {
     PsiType argType = wrongArg != null ? wrongArg.getType() : null;
     if (argType != null) {
       int idx = ArrayUtil.find(expressions, wrongArg);
+      if (idx > parameters.length - 1 && !parameters[parameters.length - 1].isVarArgs()) return null;
       PsiType paramType = candidateInfo.getSubstitutor().substitute(PsiTypesUtil.getParameterType(parameters, idx, candidateInfo.isVarargs()));
       String errorMessage = candidateInfo.getInferenceErrorMessage();
       HtmlChunk reason = getTypeMismatchErrorHtml(errorMessage);
@@ -839,8 +840,7 @@ public final class HighlightMethodUtil {
                                                     boolean varargs) {
     List<PsiExpression> result = new ArrayList<>();
     for (int i = 0; i < Math.max(parameters.length, expressions.length); i++) {
-      if (parameters.length == 0 ||
-          !assignmentCompatible(i, parameters, expressions, substitutor, varargs)) {
+      if (parameters.length == 0 || !assignmentCompatible(i, parameters, expressions, substitutor, varargs)) {
         result.add(i < expressions.length ? expressions[i] : null);
       }
     }
@@ -1201,8 +1201,7 @@ public final class HighlightMethodUtil {
 
   @NotNull
   private static @NlsContexts.Tooltip String createMismatchedArgumentCountTooltip(int expected, int actual) {
-    return HtmlChunk.text(JavaAnalysisBundle.message("arguments.count.mismatch", expected, actual))
-      .wrapWith("html").toString();
+    return HtmlChunk.text(JavaAnalysisBundle.message("arguments.count.mismatch", expected, actual)).wrapWith("html").toString();
   }
 
   @NotNull
@@ -1838,8 +1837,7 @@ public final class HighlightMethodUtil {
     }
 
     PsiJavaCodeReferenceElement classReference = expression.getClassOrAnonymousClassReference();
-    checkConstructorCall(project, typeResult, expression, type, classReference, javaSdkVersion, expression.getArgumentList(),
-                         errorSink);
+    checkConstructorCall(project, typeResult, expression, type, classReference, javaSdkVersion, expression.getArgumentList(), errorSink);
   }
 
   static void checkAmbiguousConstructorCall(@NotNull Project project, PsiJavaCodeReferenceElement ref,

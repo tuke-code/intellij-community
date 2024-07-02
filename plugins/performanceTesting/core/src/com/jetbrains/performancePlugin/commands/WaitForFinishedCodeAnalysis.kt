@@ -5,6 +5,7 @@ import com.intellij.codeInsight.daemon.impl.DaemonCodeAnalyzerImpl
 import com.intellij.codeInsight.daemon.impl.TrafficLightRenderer
 import com.intellij.diagnostic.StartUpMeasurer
 import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.application.EDT
 import com.intellij.openapi.application.ReadAction
 import com.intellij.openapi.application.ex.ApplicationEx
 import com.intellij.openapi.application.ex.ApplicationManagerEx
@@ -27,9 +28,11 @@ import com.intellij.platform.ide.diagnostic.startUpPerformanceReporter.FUSProjec
 import com.intellij.util.concurrency.annotations.RequiresReadLock
 import com.intellij.util.ui.UIUtil
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Semaphore
@@ -61,15 +64,17 @@ internal class WaitForFinishedCodeAnalysis(text: String, line: Int) : Performanc
             delay(500)
           }
           else {
-            // added delay to ensure time till opening editors is covered because `isHandlingFinished`
-            // now happens on the frame becoming interactive or all events written: IJPL-156308
-            delay(500)
             return@launch
           }
         }
       }
     }
     checkingJob.join()
+    // WaitForFinishedCodeAnalysisFileEditorListener.fileOpenedSync works on EDT,
+    // so this is to ensure the reopened editor from startup would be caught by the listener before we ask ListenerState to wait
+    withContext(Dispatchers.EDT) {
+      // do nothing
+    }
     context.project.service<ListenerState>().waitAnalysisToFinish()
   }
 
@@ -92,6 +97,7 @@ class ListenerState(val project: Project, val cs: CoroutineScope) {
 
   private fun ensureLockedIfNeeded() {
     synchronized(stateLock) {
+      @Suppress("UsePropertyAccessSyntax") // inhibit weak warning, for property access is a warning
       if (!sessions.isEmpty() && !locked) {
         LOG.info("Highlighting began with ${sessions.keys.joinToString(separator = ",\n") { it.description }}")
         highlightingFinishedEverywhere.acquire()
@@ -106,6 +112,7 @@ class ListenerState(val project: Project, val cs: CoroutineScope) {
         return
       }
 
+      @Suppress("UsePropertyAccessSyntax")  // inhibit weak warning, for property access is a warning
       if (sessions.isEmpty()) {
         LOG.info("Highlighting done")
         LOG.info("Total opening time is : ${Duration.ofNanos(System.nanoTime() - StartUpMeasurer.getStartTime()).toMillis()}")
@@ -113,9 +120,9 @@ class ListenerState(val project: Project, val cs: CoroutineScope) {
         locked = false
       }
       else {
-        //Printing additional information to get information why huglighting was stucked
+        //Printing additional information to get information why highlighting was stuck
         sessions.forEach {
-          printCodeAnalyzerStatistis(it.key.editor)
+          printCodeAnalyzerStatistic(it.key.editor)
           printFileStatus(it.key.editor)
         }
         LOG.info("Highlighting still in progress: ${sessions.keys.joinToString(separator = ",\n") { it.description }}")
@@ -248,7 +255,7 @@ class ListenerState(val project: Project, val cs: CoroutineScope) {
     }
   }
 
-  private fun printCodeAnalyzerStatistis(editor: Editor) {
+  private fun printCodeAnalyzerStatistic(editor: Editor) {
     try {
       ReadAction.run<Throwable> {
         LOG.info("Analyzer status for ${editor.virtualFile.path}\n ${TrafficLightRenderer(project, editor.document).daemonCodeAnalyzerStatus}")
@@ -266,7 +273,7 @@ class ListenerState(val project: Project, val cs: CoroutineScope) {
         .toString(editor.document)
       LOG.info("File status map $fileStatus")
     }
-    catch (throwable: Throwable) {
+    catch (_: Throwable) {
       LOG.warn("Print Analyzer status map failed")
     }
   }
@@ -306,7 +313,8 @@ internal class WaitForFinishedCodeAnalysisListener(private val project: Project)
   }
 
   private fun daemonStopped(fileEditors: Collection<FileEditor>, isCancelled: Boolean) {
-    ListenerState.LOG.info("daemon stopped with ${fileEditors.size} unfiltered editors")
+    val status = if(isCancelled) "cancelled" else "stopped"
+    ListenerState.LOG.info("daemon $status with ${fileEditors.size} unfiltered editors")
     val worthy = fileEditors.getWorthy()
     if (worthy.isEmpty()) return
 

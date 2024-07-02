@@ -8052,7 +8052,129 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
 
 
 
+    @RunWith(JUnit3RunnerWithInners.class)
+    @TestMetadata("../../../idea/tests/testData/intentions/convertParameterToReceiver")
+    public static class ConvertParameterToReceiver extends AbstractK2IntentionTest {
+        @java.lang.Override
+        @org.jetbrains.annotations.NotNull
+        public final KotlinPluginMode getPluginMode() {
+            return KotlinPluginMode.K2;
+        }
 
+        private void runTest(String testDataFilePath) throws Exception {
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+        }
+
+        @TestMetadata("classParameter.kt")
+        public void testClassParameter() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/convertParameterToReceiver/classParameter.kt");
+        }
+
+        @TestMetadata("companionAsReceiver.kt")
+        public void testCompanionAsReceiver() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/convertParameterToReceiver/companionAsReceiver.kt");
+        }
+
+        @TestMetadata("definitelyNotNullType.kt")
+        public void testDefinitelyNotNullType() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/convertParameterToReceiver/definitelyNotNullType.kt");
+        }
+
+        @TestMetadata("explicitThis.kt")
+        public void testExplicitThis() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/convertParameterToReceiver/explicitThis.kt");
+        }
+
+        @TestMetadata("explicitThisForAnonymousObject.kt")
+        public void testExplicitThisForAnonymousObject() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/convertParameterToReceiver/explicitThisForAnonymousObject.kt");
+        }
+
+        @TestMetadata("explicitThisForExtension.kt")
+        public void testExplicitThisForExtension() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/convertParameterToReceiver/explicitThisForExtension.kt");
+        }
+
+        @TestMetadata("explicitThisForExtension2.kt")
+        public void testExplicitThisForExtension2() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/convertParameterToReceiver/explicitThisForExtension2.kt");
+        }
+
+        @TestMetadata("functionExpression.kt")
+        public void testFunctionExpression() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/convertParameterToReceiver/functionExpression.kt");
+        }
+
+        @TestMetadata("functionExpressionWithThisConflict.kt")
+        public void testFunctionExpressionWithThisConflict() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/convertParameterToReceiver/functionExpressionWithThisConflict.kt");
+        }
+
+        @TestMetadata("hasVararg.kt")
+        public void testHasVararg() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/convertParameterToReceiver/hasVararg.kt");
+        }
+
+        @TestMetadata("javaBaseMethod.kt")
+        public void testJavaBaseMethod() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/convertParameterToReceiver/javaBaseMethod.kt");
+        }
+
+        @TestMetadata("kotlinBaseMethod.kt")
+        public void testKotlinBaseMethod() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/convertParameterToReceiver/kotlinBaseMethod.kt");
+        }
+
+        @TestMetadata("lambdaParameter.kt")
+        public void testLambdaParameter() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/convertParameterToReceiver/lambdaParameter.kt");
+        }
+
+        @TestMetadata("localFun.kt")
+        public void testLocalFun() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/convertParameterToReceiver/localFun.kt");
+        }
+
+        @TestMetadata("localObject.kt")
+        public void testLocalObject() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/convertParameterToReceiver/localObject.kt");
+        }
+
+        @TestMetadata("localObjectWithFunctionNameConflict.kt")
+        public void testLocalObjectWithFunctionNameConflict() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/convertParameterToReceiver/localObjectWithFunctionNameConflict.kt");
+        }
+
+        @TestMetadata("memberFun.kt")
+        public void testMemberFun() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/convertParameterToReceiver/memberFun.kt");
+        }
+
+        @TestMetadata("noParameterUnderCaret.kt")
+        public void testNoParameterUnderCaret() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/convertParameterToReceiver/noParameterUnderCaret.kt");
+        }
+
+        @TestMetadata("parameterOfObjectFunction.kt")
+        public void testParameterOfObjectFunction() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/convertParameterToReceiver/parameterOfObjectFunction.kt");
+        }
+
+        @TestMetadata("topLevelFun.kt")
+        public void testTopLevelFun() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/convertParameterToReceiver/topLevelFun.kt");
+        }
+
+        @TestMetadata("vararg.kt")
+        public void testVararg() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/convertParameterToReceiver/vararg.kt");
+        }
+
+        @TestMetadata("withExtensionReceiver.kt")
+        public void testWithExtensionReceiver() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/convertParameterToReceiver/withExtensionReceiver.kt");
+        }
+    }
 
 
 
@@ -8113,7 +8235,109 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
 
 
 
+    @RunWith(JUnit3RunnerWithInners.class)
+    @TestMetadata("../../../idea/tests/testData/intentions/convertReceiverToParameter")
+    public static class ConvertReceiverToParameter extends AbstractK2IntentionTest {
+        @java.lang.Override
+        @org.jetbrains.annotations.NotNull
+        public final KotlinPluginMode getPluginMode() {
+            return KotlinPluginMode.K2;
+        }
 
+        private void runTest(String testDataFilePath) throws Exception {
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+        }
+
+        @TestMetadata("autoSuggestedName.kt")
+        public void testAutoSuggestedName() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/convertReceiverToParameter/autoSuggestedName.kt");
+        }
+
+        @TestMetadata("autoSuggestedName1.kt")
+        public void testAutoSuggestedName1() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/convertReceiverToParameter/autoSuggestedName1.kt");
+        }
+
+        @TestMetadata("callVariableAsFunction.kt")
+        public void testCallVariableAsFunction() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/convertReceiverToParameter/callVariableAsFunction.kt");
+        }
+
+        @TestMetadata("definitelyNotNullType.kt")
+        public void testDefinitelyNotNullType() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/convertReceiverToParameter/definitelyNotNullType.kt");
+        }
+
+        @TestMetadata("explicitThisForExtension.kt")
+        public void testExplicitThisForExtension() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/convertReceiverToParameter/explicitThisForExtension.kt");
+        }
+
+        @TestMetadata("functionExpression.kt")
+        public void testFunctionExpression() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/convertReceiverToParameter/functionExpression.kt");
+        }
+
+        @TestMetadata("genericReceiver.kt")
+        public void testGenericReceiver() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/convertReceiverToParameter/genericReceiver.kt");
+        }
+
+        @TestMetadata("localFun.kt")
+        public void testLocalFun() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/convertReceiverToParameter/localFun.kt");
+        }
+
+        @TestMetadata("memberFun.kt")
+        public void testMemberFun() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/convertReceiverToParameter/memberFun.kt");
+        }
+
+        @TestMetadata("noReceiverUnderCaret.kt")
+        public void testNoReceiverUnderCaret() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/convertReceiverToParameter/noReceiverUnderCaret.kt");
+        }
+
+        @TestMetadata("notExtension.kt")
+        public void testNotExtension() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/convertReceiverToParameter/notExtension.kt");
+        }
+
+        @TestMetadata("replaceThis.kt")
+        public void testReplaceThis() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/convertReceiverToParameter/replaceThis.kt");
+        }
+
+        @TestMetadata("thisCall.kt")
+        public void testThisCall() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/convertReceiverToParameter/thisCall.kt");
+        }
+
+        @TestMetadata("topLevelFun.kt")
+        public void testTopLevelFun() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/convertReceiverToParameter/topLevelFun.kt");
+        }
+
+        @TestMetadata("usedInAnonymousObject.kt")
+        public void testUsedInAnonymousObject() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/convertReceiverToParameter/usedInAnonymousObject.kt");
+        }
+
+        @TestMetadata("usedWithTypeArgumentAndLambdaArgument.kt")
+        public void testUsedWithTypeArgumentAndLambdaArgument() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/convertReceiverToParameter/usedWithTypeArgumentAndLambdaArgument.kt");
+        }
+
+        @TestMetadata("validOverload.kt")
+        public void testValidOverload() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/convertReceiverToParameter/validOverload.kt");
+        }
+
+        @TestMetadata("varargs.kt")
+        public void testVarargs() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/convertReceiverToParameter/varargs.kt");
+        }
+    }
 
 
 
