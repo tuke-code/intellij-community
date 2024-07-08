@@ -39,8 +39,7 @@ use serde::Deserialize;
 
 #[cfg(target_os = "windows")]
 use {
-    std::os::windows::ffi::OsStrExt,
-    windows::core::{GUID, PCWSTR, PWSTR},
+    windows::core::{HSTRING, GUID, PCWSTR, PWSTR},
     windows::Win32::Foundation,
     windows::Win32::UI::Shell,
     windows::Win32::System::Console::{AllocConsole, ATTACH_PARENT_PROCESS, AttachConsole},
@@ -197,14 +196,12 @@ fn set_dll_search_path(jre_home: &Path) -> Result<()> {
 
     let jre_bin_dir = jre_home.join("bin");
     debug!("[JVM] Adding {:?} to the DLL search path", jre_bin_dir);
-    let jre_bin_dir_chars = jre_bin_dir.as_os_str().encode_wide().chain([0u16]).collect::<Vec<u16>>();
-    let jre_bin_dir_str = PCWSTR::from_raw(jre_bin_dir_chars.as_ptr());
-    let jre_bin_dir_cookie = unsafe { LibraryLoader::AddDllDirectory(jre_bin_dir_str) };
+    let jre_bin_dir_cookie = unsafe { LibraryLoader::AddDllDirectory(&HSTRING::from(jre_bin_dir.as_path())) };
     if jre_bin_dir_cookie.is_null() {
         return Err(anyhow::Error::from(std::io::Error::last_os_error()))
             .context(format!("Failed to add '{}' to 'jvm.dll' dependencies search path", jre_bin_dir.display()));
     }
-    
+
     Ok(())
 }
 
@@ -297,7 +294,7 @@ fn init_cef_sandbox(jre_home: &Path, sandbox_subprocess: bool) -> Result<Option<
             let proc: libloading::Symbol<'_, unsafe extern "system" fn(*mut std::os::raw::c_void, *mut std::os::raw::c_void) -> i32> = lib.get(b"execute_subprocess\0")
                 .context("Cannot find 'execute_subprocess' in 'jcef_helper.dll'")?;
 
-            let mut h_instance = LibraryLoader::GetModuleHandleW(PCWSTR(std::ptr::null_mut()))?;
+            let mut h_instance = LibraryLoader::GetModuleHandleW(PCWSTR::null())?;
             proc(&mut h_instance as *mut _ as *mut std::os::raw::c_void, cef_sandbox.ptr)
         };
         debug!("  finished: {}", exit_code);
@@ -347,7 +344,7 @@ pub fn get_config_home() -> Result<PathBuf> {
 #[cfg(target_os = "windows")]
 fn get_known_folder_path(rfid: &GUID, rfid_debug_name: &str) -> Result<PathBuf> {
     debug!("Calling SHGetKnownFolderPath({})", rfid_debug_name);
-    let result: PWSTR = unsafe { Shell::SHGetKnownFolderPath(rfid, Shell::KF_FLAG_CREATE, Foundation::HANDLE(0)) }?;
+    let result: PWSTR = unsafe { Shell::SHGetKnownFolderPath(rfid, Shell::KF_FLAG_CREATE, Foundation::HANDLE::default()) }?;
     let result_str = unsafe { result.to_string() }?;
     debug!("  result: {}", result_str);
     Ok(PathBuf::from(result_str))
@@ -386,8 +383,8 @@ fn get_user_home() -> Result<PathBuf> {
 
 #[cfg(target_family = "windows")]
 fn win_user_profile_dir() -> Result<String> {
-    let token = Foundation::HANDLE(-4);  // as defined in `GetCurrentProcessToken()`; Windows 8+/Server 2012+
-    let mut buf: [u16; Foundation::MAX_PATH as usize] = unsafe { std::mem::zeroed() };
+    let token = Foundation::HANDLE(-4isize as *mut std::ffi::c_void);  // as defined in `GetCurrentProcessToken()`
+    let mut buf = [0u16; Foundation::MAX_PATH as usize];
     let mut size = buf.len() as u32;
     debug!("Calling GetUserProfileDirectoryW({:?})", token);
     let result = unsafe {
@@ -397,7 +394,7 @@ fn win_user_profile_dir() -> Result<String> {
     if result.is_ok() {
         Ok(String::from_utf16(&buf[0..(size - 1) as usize])?)
     } else {
-        bail!("GetUserProfileDirectoryW(): {:?}", unsafe { Foundation::GetLastError() })
+        bail!("GetUserProfileDirectoryW(): {:?}", std::io::Error::last_os_error())
     }
 }
 

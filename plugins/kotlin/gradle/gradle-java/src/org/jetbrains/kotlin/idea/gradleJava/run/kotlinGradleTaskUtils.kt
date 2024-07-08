@@ -2,15 +2,14 @@
 package org.jetbrains.kotlin.idea.gradleJava.run
 
 import com.intellij.psi.PsiElement
+import com.intellij.psi.impl.source.tree.LeafPsiElement
 import org.jetbrains.kotlin.analysis.api.analyze
-import org.jetbrains.kotlin.analysis.api.resolution.KaFunctionCall
-import org.jetbrains.kotlin.analysis.api.resolution.singleFunctionCallOrNull
-import org.jetbrains.kotlin.analysis.api.resolution.symbol
+import org.jetbrains.kotlin.analysis.api.resolution.*
 import org.jetbrains.kotlin.analysis.api.types.symbol
+import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.psi.psiUtil.getParentOfType
-import org.jetbrains.kotlin.psi.psiUtil.getPossiblyQualifiedCallExpression
 import org.jetbrains.kotlin.utils.addToStdlib.safeAs
 import org.jetbrains.plugins.gradle.service.execution.GradleRunConfiguration
 import org.jetbrains.plugins.gradle.service.resolve.GradleCommonClassNames.GRADLE_API_PROJECT
@@ -29,16 +28,31 @@ internal fun isInGradleKotlinScript(psiElement: PsiElement): Boolean {
     return file.name.endsWith(".$KOTLIN_DSL_SCRIPT_EXTENSION")
 }
 
-internal fun isTaskNameCandidate(element: PsiElement): Boolean =
-    element.safeAs<KtStringTemplateExpression>()
-        ?.parent.safeAs<KtValueArgument>()
-        ?.parent.safeAs<KtValueArgumentList>()
-        ?.parent is KtCallExpression
+internal fun isTaskNameLineMarkerCandidate(element: PsiElement): Boolean {
+    if (element !is LeafPsiElement) return false
+    return isOpenQuoteOfStringArgumentInCall(element)
+            || isIdentifierInPropertyWithDelegate(element)
+}
 
 internal fun findTaskNameAround(element: PsiElement): String? {
     return findTaskNameInSurroundingCallExpression(element)
         ?: findTaskNameInSurroundingProperty(element)
 }
+
+/** Returns `true` for the first quote `"` before`taskName` in example: `tasks.register("taskName")` */
+private fun isOpenQuoteOfStringArgumentInCall(leafElement: LeafPsiElement) =
+    leafElement.takeIf { it.elementType == KtTokens.OPEN_QUOTE }
+        ?.parent.safeAs<KtStringTemplateExpression>()
+        ?.parent.safeAs<KtValueArgument>()
+        ?.parent.safeAs<KtValueArgumentList>()
+        ?.parent is KtCallExpression
+
+/** Returns `true` for `taskName` element in example: `val taskName by tasks.registering() { }` */
+private fun isIdentifierInPropertyWithDelegate(leafElement: LeafPsiElement): Boolean =
+    leafElement.safeAs<LeafPsiElement>()
+        ?.takeIf { it.elementType == KtTokens.IDENTIFIER }
+        ?.parent.safeAs<KtProperty>()?.hasDelegateExpression()
+        ?: false
 
 private fun findTaskNameInSurroundingCallExpression(element: PsiElement): String? {
     val callExpression = element.getParentOfType<KtCallExpression>(false, KtScriptInitializer::class.java) ?: return null
@@ -57,21 +71,21 @@ private fun findTaskNameInSurroundingCallExpression(element: PsiElement): String
 }
 
 private fun findTaskNameInSurroundingProperty(element: PsiElement): String? {
+    val stopAt = arrayOf(KtScriptInitializer::class.java, KtLambdaExpression::class.java)
     // A property element could contain e.g., `val taskName by tasks.registering{}` or `val taskName by tasks.creating{}`
-    val property = element.getParentOfType<KtProperty>(false, KtScriptInitializer::class.java) ?: return null
+    val property = element.getParentOfType<KtProperty>(false, *stopAt) ?: return null
     // `tasks.registering{}` would be a delegateExpression for the example above
     val delegateExpression = property.delegateExpression ?: return null
-    val callExpression = delegateExpression.getPossiblyQualifiedCallExpression() ?: return null
-    return analyze(callExpression) {
-        val resolvedCall = callExpression.resolveToCall() ?: return null
-        val functionCall = resolvedCall.singleFunctionCallOrNull() ?: return null
-        if (!doesCustomizeTask(functionCall)) return null
+    return analyze(delegateExpression) {
+        val resolvedCall = delegateExpression.resolveToCall() ?: return null
+        val singleCall = resolvedCall.singleCallOrNull<KaCallableMemberCall<*, *>>() ?: return null
+        if (!doesCustomizeTask(singleCall)) return null
         val taskName = property.symbol.name.identifier
         taskName
     }
 }
 
-private fun doesCustomizeTask(functionCall: KaFunctionCall<*>): Boolean {
+private fun doesCustomizeTask(functionCall: KaCallableMemberCall<*, *>): Boolean {
     val callableId = functionCall.partiallyAppliedSymbol.symbol.callableId ?: return false
     val methodName = callableId.callableName.identifier
     val classFqName = getReceiverClassFqName(functionCall)
@@ -81,7 +95,7 @@ private fun doesCustomizeTask(functionCall: KaFunctionCall<*>): Boolean {
             || isMethodOfProject(methodName, classFqName)
 }
 
-private fun getReceiverClassFqName(functionCall: KaFunctionCall<*>): FqName? {
+private fun getReceiverClassFqName(functionCall: KaCallableMemberCall<*, *>): FqName? {
     val type = functionCall.partiallyAppliedSymbol.extensionReceiver?.type
         ?: functionCall.partiallyAppliedSymbol.dispatchReceiver?.type
     return type?.symbol?.classId?.asSingleFqName()

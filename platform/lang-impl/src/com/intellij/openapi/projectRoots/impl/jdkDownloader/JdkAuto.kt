@@ -28,6 +28,7 @@ import com.intellij.util.lang.JavaVersion
 import com.intellij.util.system.CpuArch
 import com.intellij.util.text.nullize
 import com.intellij.util.xmlb.annotations.XCollection
+import org.jetbrains.annotations.Nls
 import org.jetbrains.annotations.NotNull
 import org.jetbrains.jps.model.java.JdkVersionDetector
 import java.io.File
@@ -189,13 +190,19 @@ class JdkAuto : UnknownSdkResolver, JdkDownloaderBase {
         }
       }
 
-      override fun proposeDownload(sdk: UnknownSdk, indicator: ProgressIndicator): UnknownSdkDownloadableSdkFix? {
+      private fun (Sequence<Pair<JdkItem, JavaVersion>>).selectJdk(): JdkItem? {
+        val version = maxByOrNull { it.second } ?: return null
+        return filter { it.second == version.second }.minByOrNull { it.first.archiveSize }?.first
+      }
+
+      override fun proposeDownload(sdk: UnknownSdk, indicator: ProgressIndicator): UnknownSdkDownloadableSdkFix? = proposeDownload(sdk, indicator, null)
+
+      override fun proposeDownload(sdk: UnknownSdk, indicator: ProgressIndicator, lookupReason: @Nls String?): UnknownSdkDownloadableSdkFix? {
         if (sdk.sdkType != sdkType) return null
 
         val req = parseSdkRequirement(sdk) ?: return null
         LOG.info("Looking for a possible download for ${sdk.sdkType.presentableName} with name ${sdk.sdkName} ; $req")
 
-        //we select the newest matching version for a possible fix
         val jdks = lazyDownloadModel
                      .asSequence()
                      .filter { CpuArch.fromString(it.arch) == CpuArch.CURRENT }
@@ -208,9 +215,9 @@ class JdkAuto : UnknownSdkResolver, JdkDownloaderBase {
                      }
 
         val jdkToDownload =
-          jdks.filter { req.matches(it.first) }.maxByOrNull { it.second }?.first
-          ?: jdks.filter { it.first.suggestedSdkName == sdk.sdkName }.maxByOrNull { it.second }?.first
-          ?: jdks.filter { it.first.product.vendor == "Oracle" }.maxByOrNull { it.second }?.first
+          jdks.filter { req.matches(it.first) }.selectJdk()
+          ?: jdks.filter { it.first.suggestedSdkName == sdk.sdkName }.selectJdk()
+          ?: jdks.filter { it.first.product.vendor == "Oracle" }.selectJdk()
           ?: return null
 
         val jarConfigurator = JarSdkConfigurator(resolveHint(sdk)?.includeJars ?: listOf())
@@ -219,7 +226,8 @@ class JdkAuto : UnknownSdkResolver, JdkDownloaderBase {
           override fun getVersionString() = jdkToDownload.versionString
           override fun getPresentableVersionString() = jdkToDownload.presentableVersionString
 
-          override fun getDownloadDescription() = jdkToDownload.fullPresentationText
+          override fun getSdkLookupReason(): String? = lookupReason
+          override fun getDownloadDescription() = jdkToDownload.fullPresentationText + " (${(jdkToDownload.archiveSize / 1024 / 1024).toInt()} MB)"
 
           override fun createTask(indicator: ProgressIndicator): SdkDownloadTask {
             val jdkInstaller = JdkInstaller.getInstance()

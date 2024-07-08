@@ -462,7 +462,10 @@ public class MergeThreesideViewer extends ThreesideTextDiffViewerEx {
     if (myProject == null) return;
     ArrayList<PsiFile> files = new ArrayList<>();
     for (ThreeSide value : ThreeSide.values()) {
-      files.add(getPsiFile(value, myProject, myMergeRequest));
+      PsiFile psiFile = getPsiFile(value, myProject, myMergeRequest);
+      if (psiFile != null) {
+        files.add(psiFile);
+      }
     }
     myPsiFiles = files;
   }
@@ -743,7 +746,6 @@ public class MergeThreesideViewer extends ThreesideTextDiffViewerEx {
         DiffBalloons.showSuccessPopup(title, message, point, this, () -> {
           if (isDisposed() || myLoadingPanel.isLoading()) return;
           doFinishMerge(MergeResult.RESOLVED, MergeResultSource.NOTIFICATION);
-
         });
       });
     }
@@ -837,7 +839,23 @@ public class MergeThreesideViewer extends ThreesideTextDiffViewerEx {
 
   @ApiStatus.Internal
   @RequiresEdt
-  public void markChangeResolvedWithAI(@NotNull TextMergeChange change) {
+  public void resolveChangeWithAiAnswer(@NotNull TextMergeChange change, @NotNull List<String> newContentLines) {
+    processChangesAndTransferData(Collections.singletonList(change), ThreeSide.BASE, (c) -> {
+      return replaceChangeWithAi(change, newContentLines);
+    });
+  }
+
+  private LineRange replaceChangeWithAi(@NotNull TextMergeChange change, @NotNull List<String> newContentLines) {
+    if (change.isResolved()) return null;
+
+    myModel.replaceChange(change.getIndex(), newContentLines);
+    markChangeResolvedWithAI(change);
+    return new LineRange(myModel.getLineStart(change.getIndex()), myModel.getLineEnd(change.getIndex()));
+  }
+
+  @ApiStatus.Internal
+  @RequiresEdt
+  private void markChangeResolvedWithAI(@NotNull TextMergeChange change) {
     myAggregator.wasResolvedByAi(change.getIndex());
     change.markChangeResolvedWithAI();
     markChangeResolved(change);
@@ -1020,7 +1038,8 @@ public class MergeThreesideViewer extends ThreesideTextDiffViewerEx {
       TextMergeChange change = myAllMergeChanges.get(index);
       if (change.isResolvedWithAI()) {
         myAggregator.wasEditedAfterAi(index);
-      } else {
+      }
+      else {
         myAggregator.wasEdited(index);
       }
     }
@@ -1129,7 +1148,7 @@ public class MergeThreesideViewer extends ThreesideTextDiffViewerEx {
   }
 
   private void transferReferenceData(@NotNull List<? extends TextMergeChange> changes, @NotNull ThreeSide side, List<LineRange> newRanges) {
-    if (myResolveImportConflicts) {
+    if (myResolveImportConflicts && myPsiFiles.size() == 3) {
       Document document = getContent(ThreeSide.BASE).getDocument();
       List<RangeMarker> markers = ContainerUtil.map(newRanges, range ->
         document.createRangeMarker(document.getLineStartOffset(range.start), document.getLineEndOffset(range.end)));

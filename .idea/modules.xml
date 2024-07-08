@@ -40,11 +40,11 @@
       <module fileurl="file://$PROJECT_DIR$/android/app-inspection/integration/intellij.android.app-inspection.integration.iml" filepath="$PROJECT_DIR$/android/app-inspection/integration/intellij.android.app-inspection.integration.iml" />
       <module fileurl="file://$PROJECT_DIR$/android/artwork/intellij.android.artwork.iml" filepath="$PROJECT_DIR$/android/artwork/intellij.android.artwork.iml" />
       <module fileurl="file://$PROJECT_DIR$/android/artwork-compose/intellij.android.artwork-compose.iml" filepath="$PROJECT_DIR$/android/artwork-compose/intellij.android.artwork-compose.iml" />
-      <module fileurl="file://$PROJECT_DIR$/android/as-driver/agent/intellij.android.as-driver.agent.iml" filepath="$PROJECT_DIR$/android/as-driver/agent/intellij.android.as-driver.agent.iml" />
       <module fileurl="file://$PROJECT_DIR$/android/as-driver/integration/intellij.android.as-driver.integration.iml" filepath="$PROJECT_DIR$/android/as-driver/integration/intellij.android.as-driver.integration.iml" />
       <module fileurl="file://$PROJECT_DIR$/android/as-driver/utils/intellij.android.as-driver.utils.iml" filepath="$PROJECT_DIR$/android/as-driver/utils/intellij.android.as-driver.utils.iml" />
       <module fileurl="file://$PROJECT_DIR$/android/assistant/intellij.android.assistant.iml" filepath="$PROJECT_DIR$/android/assistant/intellij.android.assistant.iml" />
       <module fileurl="file://$PROJECT_DIR$/android/assistant/intellij.android.assistant-test.iml" filepath="$PROJECT_DIR$/android/assistant/intellij.android.assistant-test.iml" />
+      <module fileurl="file://$PROJECT_DIR$/android/avd/intellij.android.avd.iml" filepath="$PROJECT_DIR$/android/avd/intellij.android.avd.iml" />
       <module fileurl="file://$PROJECT_DIR$/android/intellij.android.avdmanager.tests/intellij.android.avdmanager.tests.iml" filepath="$PROJECT_DIR$/android/intellij.android.avdmanager.tests/intellij.android.avdmanager.tests.iml" />
       <module fileurl="file://$PROJECT_DIR$/android/bleak/intellij.android.bleak.iml" filepath="$PROJECT_DIR$/android/bleak/intellij.android.bleak.iml" />
       <module fileurl="file://$PROJECT_DIR$/android/bleak-config/intellij.android.bleak-config.iml" filepath="$PROJECT_DIR$/android/bleak-config/intellij.android.bleak-config.iml" />
@@ -174,6 +174,7 @@
       <module fileurl="file://$PROJECT_DIR$/android/ml-api/intellij.android.ml-api.iml" filepath="$PROJECT_DIR$/android/ml-api/intellij.android.ml-api.iml" />
       <module fileurl="file://$PROJECT_DIR$/android/mlkit/intellij.android.mlkit.iml" filepath="$PROJECT_DIR$/android/mlkit/intellij.android.mlkit.iml" />
       <module fileurl="file://$PROJECT_DIR$/android/mlkit/intellij.android.mlkit.tests.iml" filepath="$PROJECT_DIR$/android/mlkit/intellij.android.mlkit.tests.iml" />
+      <module fileurl="file://$PROJECT_DIR$/android/motion-editor/intellij.android.motion-editor.iml" filepath="$PROJECT_DIR$/android/motion-editor/intellij.android.motion-editor.iml" />
       <module fileurl="file://$PROJECT_DIR$/android/native-symbolizer/intellij.android.native-symbolizer.iml" filepath="$PROJECT_DIR$/android/native-symbolizer/intellij.android.native-symbolizer.iml" />
       <module fileurl="file://$PROJECT_DIR$/android/native-symbolizer/gradle/intellij.android.native-symbolizer.gradle.iml" filepath="$PROJECT_DIR$/android/native-symbolizer/gradle/intellij.android.native-symbolizer.gradle.iml" />
       <module fileurl="file://$PROJECT_DIR$/android/native-symbolizer/intellij.android.native-symbolizer.tests.iml" filepath="$PROJECT_DIR$/android/native-symbolizer/intellij.android.native-symbolizer.tests.iml" />
@@ -662,7 +663,6 @@
       <module fileurl="file://$PROJECT_DIR$/platform/lang-impl/intellij.platform.lang.tests.iml" filepath="$PROJECT_DIR$/platform/lang-impl/intellij.platform.lang.tests.iml" />
       <module fileurl="file://$PROJECT_DIR$/plugins/IntelliLang/intellij.platform.langInjection.iml" filepath="$PROJECT_DIR$/plugins/IntelliLang/intellij.platform.langInjection.iml" />
       <module fileurl="file://$PROJECT_DIR$/plugins/IntelliLang/IntelliLang-tests/intellij.platform.langInjection.tests.iml" filepath="$PROJECT_DIR$/plugins/IntelliLang/IntelliLang-tests/intellij.platform.langInjection.tests.iml" />
-      <module fileurl="file://$PROJECT_DIR$/platform/localIde/intellij.platform.localIde.iml" filepath="$PROJECT_DIR$/platform/localIde/intellij.platform.localIde.iml" />
       <module fileurl="file://$PROJECT_DIR$/platform/lvcs-api/intellij.platform.lvcs.iml" filepath="$PROJECT_DIR$/platform/lvcs-api/intellij.platform.lvcs.iml" />
       <module fileurl="file://$PROJECT_DIR$/platform/lvcs-impl/intellij.platform.lvcs.impl.iml" filepath="$PROJECT_DIR$/platform/lvcs-impl/intellij.platform.lvcs.impl.iml" />
       <module fileurl="file://$PROJECT_DIR$/platform/macro/intellij.platform.macro.iml" filepath="$PROJECT_DIR$/platform/macro/intellij.platform.macro.iml" />
@@ -672,6 +672,7 @@
       <module fileurl="file://$PROJECT_DIR$/platform/ml-embeddings/intellij.platform.ml.embeddings.iml" filepath="$PROJECT_DIR$/platform/ml-embeddings/intellij.platform.ml.embeddings.iml" />
       <module fileurl="file://$PROJECT_DIR$/platform/ml-embeddings/tests/intellij.platform.ml.embeddings.tests.iml" filepath="$PROJECT_DIR$/platform/ml-embeddings/tests/intellij.platform.ml.embeddings.tests.iml" />
       <module fileurl="file://$PROJECT_DIR$/platform/ml-impl/intellij.platform.ml.impl.iml" filepath="$PROJECT_DIR$/platform/ml-impl/intellij.platform.ml.impl.iml" />
+      <module fileurl="file://$PROJECT_DIR$/platform/monolith/intellij.platform.monolith.iml" filepath="$PROJECT_DIR$/platform/monolith/intellij.platform.monolith.iml" />
       <module fileurl="file://$PROJECT_DIR$/platform/main/intellij.platform.monolith.main/intellij.platform.monolith.main.iml" filepath="$PROJECT_DIR$/platform/main/intellij.platform.monolith.main/intellij.platform.monolith.main.iml" />
       <module fileurl="file://$PROJECT_DIR$/platform/navbar/shared/intellij.platform.navbar.iml" filepath="$PROJECT_DIR$/platform/navbar/shared/intellij.platform.navbar.iml" />
       <module fileurl="file://$PROJECT_DIR$/platform/navbar/backend/intellij.platform.navbar.backend.iml" filepath="$PROJECT_DIR$/platform/navbar/backend/intellij.platform.navbar.backend.iml" />

@@ -39,7 +39,7 @@ class LocalEventsFlow : EventsFlow {
       // To avoid double subscriptions
       if (subscribers[eventClassName]?.any { it.subscriberName == subscriberObject } == true) return false
       val newSubscriber = Subscriber(subscriberObject, timeout, callback)
-      LOG.debug("New subscriber $newSubscriber for $eventClassName")
+      LOG.info("New subscriber $newSubscriber for $eventClassName")
       subscribers.computeIfAbsent(eventClassName) { CopyOnWriteArrayList() }.add(newSubscriber)
       return true
     }
@@ -50,9 +50,10 @@ class LocalEventsFlow : EventsFlow {
     val subscribersForEvent = subscribersLock.readLock().withLock {
       subscribers[eventClassName]
     }
+    val exceptions = mutableListOf<Throwable>()
     (subscribersForEvent as? CopyOnWriteArrayList<Subscriber<T>>)
       ?.map { subscriber ->
-        LOG.debug("Post event $eventClassName for $subscriber.")
+        LOG.info("Post event $eventClassName for $subscriber.")
         CompletableFuture.runAsync({
                                      LOG.debug("Start execution $eventClassName for $subscriber")
                                      runBlocking { subscriber.callback(event) }
@@ -70,9 +71,14 @@ class LocalEventsFlow : EventsFlow {
           it.join()
         }
         catch (e: CompletionException) {
-          throw e.cause ?: e
+          exceptions.add(e)
         }
       }
+
+    if (exceptions.isNotEmpty()) {
+      val exceptionsString = exceptions.joinToString(separator = "\n") { e -> "${exceptions.indexOf(e) + 1}) ${e.message}" }
+      throw IllegalArgumentException("Exceptions occurred while processing subscribers. $exceptionsString")
+    }
   }
 
   override fun unsubscribeAll() {

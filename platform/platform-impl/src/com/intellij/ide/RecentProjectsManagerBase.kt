@@ -10,6 +10,7 @@ import com.intellij.ide.impl.ProjectUtil.isSameProject
 import com.intellij.ide.impl.ProjectUtilCore
 import com.intellij.ide.impl.ProjectUtilService
 import com.intellij.ide.lightEdit.LightEdit
+import com.intellij.ide.vcs.RecentProjectsBranchesProvider
 import com.intellij.idea.AppMode
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.application.*
@@ -27,6 +28,7 @@ import com.intellij.openapi.project.ex.ProjectManagerEx
 import com.intellij.openapi.project.impl.OpenProjectImplOptions
 import com.intellij.openapi.project.impl.createNewProjectFrameProducer
 import com.intellij.openapi.project.impl.frame
+import com.intellij.openapi.util.Key
 import com.intellij.openapi.util.ModificationTracker
 import com.intellij.openapi.util.io.FileUtilRt
 import com.intellij.openapi.util.registry.Registry
@@ -77,11 +79,23 @@ open class RecentProjectsManagerBase(coroutineScope: CoroutineScope) :
   RecentProjectsManager, PersistentStateComponent<RecentProjectManagerState>, ModificationTracker {
   companion object {
     const val MAX_PROJECTS_IN_MAIN_MENU: Int = 6
+    private val TEMPORARY_PROJECT_KEY = Key.create<Boolean>("RecentProjectManager.TemporaryProject")
 
     @JvmStatic
     fun getInstanceEx(): RecentProjectsManagerBase = RecentProjectsManager.getInstance() as RecentProjectsManagerBase
 
     internal fun isFileSystemPath(path: String): Boolean = path.indexOf('/') != -1 || path.indexOf('\\') != -1
+
+    /**
+     * Indicates that the project shouldn't be added to the recent projects list. 
+     * This function must be called before the project is opened, e.g., in [com.intellij.ide.impl.OpenProjectTaskBuilder.beforeInit].
+     */
+    @Internal
+    fun markProjectAsTemporary(project: Project) {
+      project.putUserData(TEMPORARY_PROJECT_KEY, true)
+    }
+
+    private fun isTemporaryProject(project: Project) = project.getUserData(TEMPORARY_PROJECT_KEY) == true
   }
 
   private val modCounter = LongAdder()
@@ -229,6 +243,10 @@ open class RecentProjectsManagerBase(coroutineScope: CoroutineScope) :
   }
 
   fun markPathRecent(path: String, project: Project): RecentProjectMetaInfo {
+    if (isTemporaryProject(project)) {
+      return RecentProjectMetaInfo()
+    }
+    
     synchronized(stateLock) {
       for (group in state.groups) {
         if (group.markProjectFirst(path)) {
@@ -326,7 +344,7 @@ open class RecentProjectsManagerBase(coroutineScope: CoroutineScope) :
   }
 
   override fun setActivationTimestamp(project: Project, timestamp: Long) {
-    if (disableUpdatingRecentInfo.get()) {
+    if (disableUpdatingRecentInfo.get() || isTemporaryProject(project)) {
       return
     }
 
@@ -355,7 +373,7 @@ open class RecentProjectsManagerBase(coroutineScope: CoroutineScope) :
   }
 
   internal suspend fun projectOpened(project: Project, openTimestamp: Long) {
-    if (disableUpdatingRecentInfo.get() || LightEdit.owns(project)) {
+    if (disableUpdatingRecentInfo.get() || LightEdit.owns(project) || isTemporaryProject(project)) {
       return
     }
 
@@ -425,9 +443,7 @@ open class RecentProjectsManagerBase(coroutineScope: CoroutineScope) :
   }
 
   fun getCurrentBranchName(path: String): String? {
-    synchronized(stateLock) {
-      return state.additionalInfo.get(path)?.currentBranch
-    }
+    return RecentProjectsBranchesProvider.getCurrentBranch(path)
   }
 
   fun getProjectName(path: String): String {

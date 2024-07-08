@@ -13,9 +13,9 @@ import com.intellij.driver.sdk.ui.remote.Component
 import com.intellij.driver.sdk.ui.remote.Robot
 import com.intellij.driver.sdk.ui.remote.RobotProvider
 import com.intellij.driver.sdk.ui.remote.SearchService
+import com.intellij.driver.sdk.waitAny
 import com.intellij.driver.sdk.waitFor
 import com.intellij.driver.sdk.waitForOne
-import com.intellij.driver.sdk.waitAny
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.util.SystemInfo
 import java.awt.Color
@@ -328,9 +328,21 @@ open class UiComponent(private val data: ComponentData) : Finder, WithKeyboard {
     waitOneMatchInVerticallyOrderedText("Find '${text}'(fullMatch = $fullMatch) in vertically ordered text", text, fullMatch, timeout = timeout)
 
   fun present(): Boolean {
-    return data.parentSearchContext.findAll(data.xpath).isNotEmpty().also {
-      LOG.info("$this is present in hierarchy: $it")
+    val found = data.parentSearchContext.findAll(data.xpath)
+
+    val present = if (found.size == 1) {
+      true
     }
+    else if (found.isEmpty()) {
+      false
+    }
+    else {
+      error("There are more than one $this in the hierarchy: $found.\n\t" +
+            "Please use `xx()` if you need to check for more than one $this or clarify your search request.")
+    }
+
+    LOG.info("$this is present in hierarchy: $present")
+    return present
   }
 
   fun notPresent(): Boolean {
@@ -368,45 +380,45 @@ open class UiComponent(private val data: ComponentData) : Finder, WithKeyboard {
   }
 
   // Mouse
-  fun click(point: Point? = null, silient: Boolean = false) {
+  fun click(point: Point? = null, silent: Boolean = false) {
     if (point != null) {
-      if (!silient) {
+      if (!silent) {
         LOG.info("Click at $this: $point")
       }
       robot.click(component, point)
     }
     else {
-      if (!silient) {
+      if (!silent) {
         LOG.info("Click at '$this'")
       }
       robot.click(component)
     }
   }
 
-  fun doubleClick(point: Point? = null, silient: Boolean = false) {
+  fun doubleClick(point: Point? = null, silent: Boolean = false) {
     if (point != null) {
-      if (!silient) {
+      if (!silent) {
         LOG.info("Double click at $this: $point")
       }
       robot.click(component, point, RemoteMouseButton.LEFT, 2)
     }
     else {
-      if (!silient) {
+      if (!silent) {
         LOG.info("Double click at '$this'")
       }
       robot.doubleClick(component)
     }
   }
 
-  fun rightClick(point: Point? = null, silient: Boolean = false) {
+  fun rightClick(point: Point? = null, silent: Boolean = false) {
     if (point != null) {
-      if (!silient) {
+      if (!silent) {
         LOG.info("Right click at $this: $point")
       }
       robot.click(component, point, RemoteMouseButton.RIGHT, 1)
     }
     else {
-      if (!silient) {
+      if (!silent) {
         LOG.info("Right click at $this")
       }
       robot.rightClick(component)
@@ -418,14 +430,14 @@ open class UiComponent(private val data: ComponentData) : Finder, WithKeyboard {
     robot.click(component, button, count)
   }
 
-  fun moveMouse(point: Point? = null, silient: Boolean = false) {
+  fun moveMouse(point: Point? = null, silent: Boolean = false) {
     if (point != null) {
-      if (!silient) {
+      if (!silent) {
         LOG.info("Move mouse to $this: $point")
       }
       robot.moveMouse(component, point)
     } else {
-      if (!silient) {
+      if (!silent) {
         LOG.info("Move mouse to $this")
       }
       robot.moveMouse(component)
@@ -450,8 +462,8 @@ open class UiComponent(private val data: ComponentData) : Finder, WithKeyboard {
 
   fun getForegroundColor() = Color(component.getForeground().getRGB())
 
-  fun waitIsFocusOwner() {
-    waitFor {
+  fun waitIsFocusOwner(timeout: Duration = DEFAULT_FIND_TIMEOUT) {
+    waitFor("Component '$this' is focus owner", timeout = timeout) {
       component.isFocusOwner()
     }
   }

@@ -17,7 +17,6 @@ import com.intellij.openapi.actionSystem.IdeActions.GROUP_MAIN_TOOLBAR_NEW_UI
 import com.intellij.openapi.actionSystem.ex.ActionUtil
 import com.intellij.openapi.actionSystem.ex.CustomComponentAction
 import com.intellij.openapi.actionSystem.impl.ActionButton
-import com.intellij.openapi.actionSystem.impl.ActionMenu
 import com.intellij.openapi.actionSystem.impl.ActionToolbarImpl
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.ModalityState
@@ -231,7 +230,12 @@ class StripeActionGroup: ActionGroup(), DumbAware {
 
 }
 
-private open class TogglePinActionBase(val toolWindowId: String): DumbAwareAction(ActionsBundle.messagePointer("action.TopStripePinButton.text")) {
+private open class TogglePinActionBase(val toolWindowId: String)
+  : DumbAwareAction(ActionsBundle.messagePointer("action.TopStripePinButton.text")) {
+  init {
+    templatePresentation.keepPopupOnPerform = KeepPopupOnPerform.IfPreferred
+  }
+
   override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.BGT
   override fun update(e: AnActionEvent) {
     val pinned = buttonState.isPinned(toolWindowId)
@@ -247,14 +251,14 @@ private open class TogglePinActionBase(val toolWindowId: String): DumbAwareActio
     ActionToolbarImpl.updateAllToolbarsImmediately()
   }
 }
+
 private class TogglePinAction(toolWindowId: String): TogglePinActionBase(toolWindowId) {
   override fun update(e: AnActionEvent) {
     super.update(e)
     val pinned = Toggleable.isSelected(e.presentation)
-    e.presentation.isMultiChoice = true
     e.presentation.icon = if (!pinned) AllIcons.General.Pin else AllIcons.General.PinSelected
     e.presentation.selectedIcon = if (!pinned) AllIcons.General.PinHovered else AllIcons.General.PinSelectedHovered
-    e.presentation.putClientProperty(ActionMenu.ALWAYS_VISIBLE, pinned)
+    e.presentation.putClientProperty(ActionUtil.ALWAYS_VISIBLE_INLINE_ACTION, pinned)
   }
 }
 

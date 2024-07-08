@@ -8,6 +8,7 @@ import com.intellij.driver.sdk.ui.QueryBuilder
 
 class ToolWindowLeftToolbarUi(data: ComponentData) : UiComponent(data) {
   val projectButton = stripeButton { byAccessibleName("Project") }
+  val runButton = stripeButton { byAccessibleName("Run") }
   val buildButton = stripeButton { byAccessibleName("Build") }
   val gitButton = stripeButton { byAccessibleName("Git") }
   val commitButton = stripeButton { byAccessibleName("Commit") }
@@ -23,6 +24,7 @@ class ToolWindowRightToolbarUi(data: ComponentData) : UiComponent(data) {
   val gradleButton = stripeButton { byAccessibleName("Gradle") }
   val mavenButton = stripeButton { byAccessibleName("Maven") }
   val databaseButton = stripeButton { byAccessibleName("Database") }
+  val aiAssistantButton = stripeButton { byAccessibleName("AI Assistant") }
 }
 
 class StripeButtonUi(data: ComponentData) : UiComponent(data) {
@@ -31,6 +33,10 @@ class StripeButtonUi(data: ComponentData) : UiComponent(data) {
 
   fun isSelected() = driver.withContext(OnDispatcher.EDT) {
     button.isSelected()
+  }
+
+  fun isToolWindowVisible(): Boolean {
+    return button.getToolWindow().isVisible()
   }
 
   fun open() {
@@ -52,6 +58,7 @@ class StripeButtonUi(data: ComponentData) : UiComponent(data) {
   interface ToolWindowRef {
     fun getId(): String
     fun isActive(): Boolean
+    fun isVisible(): Boolean
   }
 
   @Remote("com.intellij.ide.actions.ActivateToolWindowAction\$Manager")

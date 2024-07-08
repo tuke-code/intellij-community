@@ -165,6 +165,7 @@ f:com.intellij.icons.AllIcons$Actions
 - sf:Restart:javax.swing.Icon
 - sf:RestartDebugger:javax.swing.Icon
 - sf:RestartFrame:javax.swing.Icon
+- sf:RestartStop:javax.swing.Icon
 - sf:Resume:javax.swing.Icon
 - sf:Rollback:javax.swing.Icon
 - sf:RunAll:javax.swing.Icon
@@ -192,6 +193,7 @@ f:com.intellij.icons.AllIcons$Actions
 - sf:StartMemoryProfile:javax.swing.Icon
 - sf:StepOut:javax.swing.Icon
 - sf:StepOutCodeBlock:javax.swing.Icon
+- sf:StopAndRestart:javax.swing.Icon
 - sf:StopRefresh:javax.swing.Icon
 - sf:Stub:javax.swing.Icon
 - sf:SuggestedRefactoringBulb:javax.swing.Icon
@@ -1254,26 +1256,22 @@ f:com.intellij.icons.AllIcons$ToolbarDecorator
 - sf:ExportSmall:javax.swing.Icon
 - sf:Import:javax.swing.Icon
 - <init>():V
-f:com.intellij.icons.AllIcons$Toolwindow
+f:com.intellij.icons.AllIcons$Toolwindows
 - sf:Changes:javax.swing.Icon
 - sf:Dependencies:javax.swing.Icon
-- sf:MeetNewUi:javax.swing.Icon
-- sf:Repositories:javax.swing.Icon
-- sf:Task:javax.swing.Icon
-- sf:ToolWindowDuplicates:javax.swing.Icon
-- sf:ToolWindowInternal:javax.swing.Icon
-- <init>():V
-f:com.intellij.icons.AllIcons$Toolwindows
 - sf:Documentation:javax.swing.Icon
 - sf:ErrorEvents:javax.swing.Icon
 - sf:InfoEvents:javax.swing.Icon
+- sf:MeetNewUi:javax.swing.Icon
 - sf:NoEvents:javax.swing.Icon
 - sf:Notifications:javax.swing.Icon
 - sf:NotificationsNew:javax.swing.Icon
 - sf:NotificationsNewImportant:javax.swing.Icon
 - sf:Problems:javax.swing.Icon
 - sf:ProblemsEmpty:javax.swing.Icon
+- sf:Repositories:javax.swing.Icon
 - sf:SettingSync:javax.swing.Icon
+- sf:Task:javax.swing.Icon
 - sf:ToolWindowAnalyzeDataflow:javax.swing.Icon
 - sf:ToolWindowAnt:javax.swing.Icon
 - sf:ToolWindowBookmarks:javax.swing.Icon
@@ -1284,6 +1282,7 @@ f:com.intellij.icons.AllIcons$Toolwindows
 - sf:ToolWindowCoverage:javax.swing.Icon
 - sf:ToolWindowDataView:javax.swing.Icon
 - sf:ToolWindowDebugger:javax.swing.Icon
+- sf:ToolWindowDuplicates:javax.swing.Icon
 - sf:ToolWindowFavorites:javax.swing.Icon
 - sf:ToolWindowFind:javax.swing.Icon
 - sf:ToolWindowHierarchy:javax.swing.Icon
@@ -1600,6 +1599,7 @@ c:com.intellij.openapi.util.IconLoader$CachedImageIcon
 - com.intellij.openapi.util.ScalableIcon
 - com.intellij.ui.icons.CopyableIcon
 - com.intellij.ui.icons.DarkIconProvider
+- com.intellij.ui.icons.IconPathProvider
 - com.intellij.ui.icons.IconWithToolTip
 f:com.intellij.openapi.util.text.TextWithMnemonic
 - sf:EMPTY:com.intellij.openapi.util.text.TextWithMnemonic
@@ -4155,10 +4155,14 @@ f:com.intellij.util.ui.JBUI$CurrentTheme$Button
 - <init>():V
 - s:buttonColorEnd():java.awt.Color
 - s:buttonColorStart():java.awt.Color
+- s:buttonForeground():java.awt.Color
+- s:buttonLoadingForeground():java.awt.Color
 - s:buttonOutlineColorEnd(Z):java.awt.Color
 - s:buttonOutlineColorStart(Z):java.awt.Color
 - s:defaultButtonColorEnd():java.awt.Color
 - s:defaultButtonColorStart():java.awt.Color
+- s:defaultButtonForeground():java.awt.Color
+- s:defaultButtonLoadingForeground():java.awt.Color
 - s:disabledOutlineColor():java.awt.Color
 - s:focusBorderColor(Z):java.awt.Color
 - s:minimumSize():java.awt.Dimension

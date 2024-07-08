@@ -1751,6 +1751,7 @@ f:com.intellij.codeInspection.GlobalInspectionUtil
 - <init>():V
 - s:createInspectionMessage(java.lang.String):java.lang.String
 - s:createProblem(com.intellij.psi.PsiElement,com.intellij.codeInsight.daemon.impl.HighlightInfo,com.intellij.openapi.util.TextRange,com.intellij.lang.annotation.ProblemGroup,com.intellij.codeInspection.InspectionManager,com.intellij.codeInspection.ProblemDescriptionsProcessor,com.intellij.codeInspection.GlobalInspectionContext):V
+- s:createProblemDescriptor(com.intellij.psi.PsiElement,com.intellij.codeInsight.daemon.impl.HighlightInfo,com.intellij.openapi.util.TextRange,com.intellij.lang.annotation.ProblemGroup,com.intellij.codeInspection.InspectionManager):com.intellij.codeInspection.ProblemDescriptor
 f:com.intellij.codeInspection.InspectionEngine
 - <init>():V
 - s:calcElementDialectIds(java.util.List,java.util.List):java.util.Set
@@ -3514,6 +3515,7 @@ c:com.intellij.lang.impl.modcommand.ModCommandBatchExecutorImpl
 c:com.intellij.lang.impl.modcommand.ModCommandServiceImpl
 - com.intellij.modcommand.ModCommandService
 - <init>():V
+- chooseFileAndPerform(com.intellij.psi.PsiFile,com.intellij.openapi.editor.Editor,com.intellij.modcommand.ModCommandAction,I):com.intellij.modcommand.ModCommandWithContext
 - psiUpdate(com.intellij.modcommand.ActionContext,java.util.function.Consumer):com.intellij.modcommand.ModCommand
 - unwrap(com.intellij.codeInspection.LocalQuickFix):com.intellij.modcommand.ModCommandAction
 - updateOption(com.intellij.psi.PsiElement,com.intellij.codeInspection.InspectionProfileEntry,java.util.function.Consumer):com.intellij.modcommand.ModCommand
@@ -3984,6 +3986,7 @@ f:com.intellij.profile.codeInspection.ProjectInspectionProfileManagerKt
 - sf:PROFILE_DIR:java.lang.String
 - sf:PROJECT_DEFAULT_PROFILE_NAME:java.lang.String
 a:com.intellij.psi.FilePropertyKeyImpl
+- com.intellij.psi.FilePropertyKey
 - sf:Companion:com.intellij.psi.FilePropertyKeyImpl$Companion
 - p:<init>(java.lang.String,com.intellij.openapi.vfs.newvfs.FileAttribute):V
 - sf:createPersistentEnumKey(java.lang.String,java.lang.String,I,java.lang.Class):com.intellij.psi.FilePropertyKey

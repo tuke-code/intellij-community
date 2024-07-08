@@ -10,9 +10,8 @@ import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.diagnostic.debug
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.waitForSmartMode
-import com.intellij.openapi.roots.ProjectRootManager
+import com.intellij.openapi.roots.ProjectFileIndex
 import com.intellij.openapi.util.registry.Registry
-import com.intellij.openapi.vfs.VfsUtilCore
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.VirtualFileManager
 import com.intellij.openapi.vfs.isFile
@@ -20,14 +19,16 @@ import com.intellij.platform.diagnostic.telemetry.helpers.useWithScope
 import com.intellij.platform.ide.progress.withBackgroundProgress
 import com.intellij.platform.ml.embeddings.EmbeddingsBundle
 import com.intellij.platform.ml.embeddings.logging.EmbeddingSearchLogger
+import com.intellij.platform.ml.embeddings.search.indices.EntitySourceType
+import com.intellij.platform.ml.embeddings.search.indices.EntitySourceType.DEFAULT
 import com.intellij.platform.ml.embeddings.search.indices.FileIndexableEntitiesProvider
 import com.intellij.platform.ml.embeddings.search.indices.IndexableEntity
 import com.intellij.platform.ml.embeddings.search.utils.SEMANTIC_SEARCH_TRACER
 import com.intellij.platform.ml.embeddings.services.LocalArtifactsManager
 import com.intellij.platform.ml.embeddings.services.LocalEmbeddingServiceProvider
 import com.intellij.platform.ml.embeddings.utils.normalized
-import com.intellij.psi.PsiManager
 import com.intellij.platform.util.coroutines.childScope
+import com.intellij.psi.PsiManager
 import com.intellij.util.TimeoutUtil
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
@@ -65,8 +66,8 @@ class FileBasedEmbeddingStoragesManager(private val project: Project, private va
     indexingScope.coroutineContext.cancelChildren()
     withContext(indexingScope.coroutineContext) {
       if (!ApplicationManager.getApplication().isUnitTestMode) {
-        project.waitForSmartMode() // project may become dumb again, but we don't interfere initial indexing
         loadRequirements()
+        project.waitForSmartMode() // project may become dumb again, but we don't interfere initial indexing
       }
       indexProject()
     }
@@ -146,11 +147,8 @@ class FileBasedEmbeddingStoragesManager(private val project: Project, private va
         indexFiles(scanFiles().toList().sortedByDescending { it.name.length })
         EmbeddingSearchLogger.indexingFinished(project, forActions = false, TimeoutUtil.getDurationMillis(projectIndexingStartTime))
       }
-      catch (e: CancellationException) {
-        logger.debug { "Full project embedding indexing was cancelled" }
-        throw e
-      }
       finally {
+        ensureActive()
         if (isFirstIndexing) {
           onFirstIndexingFinish()
           isFirstIndexing = false
@@ -161,7 +159,7 @@ class FileBasedEmbeddingStoragesManager(private val project: Project, private va
     logger.debug { "Finished full project embedding indexing" }
   }
 
-  private suspend fun startIndexingSession() {
+  suspend fun startIndexingSession() {
     val settings = EmbeddingIndexSettingsImpl.getInstance()
     // Ensure all embedding indices are loaded into memory:
     withContext(Dispatchers.IO) {
@@ -177,7 +175,7 @@ class FileBasedEmbeddingStoragesManager(private val project: Project, private va
     }
   }
 
-  private fun finishIndexingSession() {
+  fun finishIndexingSession() {
     val settings = EmbeddingIndexSettingsImpl.getInstance()
     if (settings.shouldIndexFiles) {
       FileEmbeddingsStorage.getInstance(project).finishIndexingSession()
@@ -190,7 +188,7 @@ class FileBasedEmbeddingStoragesManager(private val project: Project, private va
     }
   }
 
-  suspend fun indexFiles(files: List<VirtualFile>) {
+  suspend fun indexFiles(files: List<VirtualFile>, sourceType: EntitySourceType = DEFAULT) {
     val settings = EmbeddingIndexSettingsImpl.getInstance()
     if (!settings.shouldIndexAnythingFileBased) return
     startIndexingSession()
@@ -294,7 +292,7 @@ class FileBasedEmbeddingStoragesManager(private val project: Project, private va
   }
 
 
-  private fun getIndex(entity: IndexableEntity) = when (entity) {
+  fun getIndex(entity: IndexableEntity) = when (entity) {
     is IndexableFile -> FileEmbeddingsStorage.getInstance(project).index
     is IndexableClass -> ClassEmbeddingsStorage.getInstance(project).index
     is IndexableSymbol -> SymbolEmbeddingStorage.getInstance(project).index
@@ -307,15 +305,12 @@ class FileBasedEmbeddingStoragesManager(private val project: Project, private va
     return channelFlow {
       SEMANTIC_SEARCH_TRACER.spanBuilder(SCANNING_SPAN_NAME).useWithScope {
         withBackgroundProgress(project, EmbeddingsBundle.getMessage("ml.embeddings.indices.scanning.label")) {
-          // ProjectFileIndex.getInstance(project).iterateContent { file ->
-          ProjectRootManager.getInstance(project).contentSourceRoots.forEach { root ->
-            VfsUtilCore.iterateChildrenRecursively(root, null) { file ->
-              if (file.isFile && file.isValid && file.isInLocalFileSystem) {
-                launch { send(file) }
-                filteredFiles += 1
-              }
-              scanLimit == null || filteredFiles < scanLimit
+          ProjectFileIndex.getInstance(project).iterateContent { file ->
+            if (file.isFile && file.isValid && file.isInLocalFileSystem) {
+              launch { send(file) }
+              filteredFiles += 1
             }
+            scanLimit == null || filteredFiles < scanLimit
           }
         }
       }

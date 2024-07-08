@@ -5,7 +5,6 @@ package com.intellij.ide.actions.searcheverywhere
 
 import com.intellij.codeWithMe.ClientId
 import com.intellij.ide.actions.GotoActionBase
-import com.intellij.ide.actions.OpenInRightSplitAction.Companion.openInRightSplit
 import com.intellij.ide.actions.QualifiedNameProviderUtil
 import com.intellij.ide.actions.SearchEverywherePsiRenderer
 import com.intellij.ide.plugins.DynamicPluginListener
@@ -21,7 +20,8 @@ import com.intellij.navigation.NavigationItem
 import com.intellij.navigation.PsiElementNavigationItem
 import com.intellij.openapi.actionSystem.*
 import com.intellij.openapi.actionSystem.impl.SimpleDataContext
-import com.intellij.openapi.application.*
+import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.application.readAction
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.intellij.openapi.components.serviceAsync
@@ -34,7 +34,9 @@ import com.intellij.openapi.project.DumbService.Companion.isDumbAware
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Key
 import com.intellij.openapi.util.text.StringUtil
+import com.intellij.platform.backend.navigation.NavigationRequest
 import com.intellij.platform.backend.navigation.NavigationRequests
+import com.intellij.platform.ide.navigation.NavigationOptions
 import com.intellij.platform.ide.navigation.NavigationService
 import com.intellij.platform.util.coroutines.childScope
 import com.intellij.pom.Navigatable
@@ -49,12 +51,11 @@ import com.intellij.util.Processor
 import com.intellij.util.indexing.FindSymbolParameters
 import it.unimi.dsi.fastutil.ints.IntArrayList
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import org.jetbrains.annotations.ApiStatus
 import java.awt.event.InputEvent
 import java.util.*
+import java.util.regex.Matcher
 import java.util.regex.Pattern
 import javax.swing.ListCellRenderer
 
@@ -384,32 +385,39 @@ abstract class AbstractGotoSEContributor protected constructor(event: AnActionEv
     project.service<SearchEverywhereContributorCoroutineScopeHolder>().coroutineScope.launch(ClientId.coroutineContext()) {
       val command = readAction {
         val psiElement = preparePsi(selected, searchText)
-        val extendedNavigatable = createExtendedNavigatable(psi = psiElement, searchText = searchText, modifiers = modifiers)
         val file = PsiUtilCore.getVirtualFile(psiElement)
+        val extendedNavigatable = if (file == null) {
+          null
+        }
+        else {
+          val position = getLineAndColumn(searchText)
+          if (position.first >= 0 || position.second >= 0) {
+            //todo create navigation request by line&column, not by offset only
+            OpenFileDescriptor(project, file, position.first, position.second)
+          }
+          else {
+            null
+          }
+        }
 
-        @Suppress("DEPRECATION")
-        if ((modifiers and InputEvent.SHIFT_MASK) != 0 && file != null) {
-          suspend {
-            withContext(Dispatchers.EDT + ModalityState.nonModal().asContextElement()) {
-              openInRightSplit(project = project, file = file, element = extendedNavigatable, requestFocus = true)
-              if (extendedNavigatable != null) {
-                triggerLineOrColumnFeatureUsed(extendedNavigatable)
+        suspend {
+          @Suppress("DEPRECATION")
+          val navigationOptions = NavigationOptions.defaultOptions()
+            .openInRightSplit((modifiers and InputEvent.SHIFT_MASK) != 0)
+            .preserveCaret(true)
+          if (extendedNavigatable == null) {
+            if (file == null) {
+              LOG.warn("Cannot navigate to invalid PsiElement (psiElement=$psiElement, selected=$selected)")
+            }
+            else {
+              createSourceNavigationRequest(element = psiElement, file = file, searchText = searchText)?.let {
+                project.serviceAsync<NavigationService>().navigate(it, navigationOptions)
               }
             }
           }
-        }
-        else {
-          suspend {
-            if (extendedNavigatable == null) {
-              val navigationRequests = serviceAsync<NavigationRequests>()
-              readAction { navigationRequests.sourceNavigationRequest(project, file!!, -1, null) }?.let {
-                project.serviceAsync<NavigationService>().navigate(it)
-              }
-            }
-            else {
-              project.serviceAsync<NavigationService>().navigate(extendedNavigatable)
-              triggerLineOrColumnFeatureUsed(extendedNavigatable)
-            }
+          else {
+            project.serviceAsync<NavigationService>().navigate(extendedNavigatable, navigationOptions)
+            triggerLineOrColumnFeatureUsed(extendedNavigatable)
           }
         }
       }
@@ -418,6 +426,25 @@ abstract class AbstractGotoSEContributor protected constructor(event: AnActionEv
     }
 
     return true
+  }
+
+  @ApiStatus.Internal
+  protected open suspend fun createSourceNavigationRequest(
+    element: PsiElement,
+    file: com.intellij.openapi.vfs.VirtualFile,
+    searchText: String,
+  ): NavigationRequest? {
+    if (element is Navigatable) {
+      return readAction {
+        element.navigationRequest()
+      }
+    }
+    else {
+      val navigationRequests = serviceAsync<NavigationRequests>()
+      return readAction {
+        navigationRequests.sourceNavigationRequest(project = project, file = file, offset = element.textOffset, elementRange = null)
+      }
+    }
   }
 
   protected open suspend fun triggerLineOrColumnFeatureUsed(extendedNavigatable: Navigatable) {
@@ -446,16 +473,6 @@ abstract class AbstractGotoSEContributor protected constructor(event: AnActionEv
 
   @Suppress("OVERRIDE_DEPRECATION")
   override fun getElementPriority(element: Any, searchPattern: String): Int = 50
-
-  protected open fun createExtendedNavigatable(psi: PsiElement, searchText: String, modifiers: Int): Navigatable? {
-    val file = PsiUtilCore.getVirtualFile(psi)
-    val position = getLineAndColumn(searchText)
-    val positionSpecified = position.first >= 0 || position.second >= 0
-    if (file != null && positionSpecified) {
-      return OpenFileDescriptor(psi.project, file, position.first, position.second)
-    }
-    return null
-  }
 
   private fun preparePsi(originalPsiElement: PsiElement, searchText: String): PsiElement {
     var psiElement = originalPsiElement
@@ -515,10 +532,24 @@ private fun getLineAndColumnRegexpGroup(text: String, groupNumber: Int): Int {
 }
 
 @Service(Service.Level.PROJECT)
-internal class SearchEverywhereContributorCoroutineScopeHolder(coroutineScope: CoroutineScope) {
+private class SearchEverywhereContributorCoroutineScopeHolder(coroutineScope: CoroutineScope) {
   @JvmField val coroutineScope: CoroutineScope = coroutineScope.childScope("SearchEverywhereContributorCoroutineScopeHolder")
 }
 
 private fun pathToAnonymousClass(searchedText: String): String? {
-  return ClassSearchEverywhereContributor.pathToAnonymousClass(patternToDetectAnonymousClasses.matcher(searchedText))
+  return pathToAnonymousClass(patternToDetectAnonymousClasses.matcher(searchedText))
+}
+
+internal fun pathToAnonymousClass(matcher: Matcher): String? {
+  if (matcher.matches()) {
+    var path = matcher.group(2)?.trim() ?: return null
+    if (path.endsWith('$') && path.length >= 2) {
+      path = path.substring(0, path.length - 2)
+    }
+    if (!path.isEmpty()) {
+      return path
+    }
+  }
+
+  return null
 }

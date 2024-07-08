@@ -22,8 +22,11 @@ import com.intellij.psi.stubs.StubIndexExtension
 import com.intellij.util.concurrency.Semaphore
 import com.intellij.util.concurrency.ThreadingAssertions
 import com.intellij.util.indexing.IndexingFlag.cleanupProcessedFlag
+import com.intellij.util.indexing.InitialScanningSkipReporter.SourceOfScanning
 import com.intellij.util.indexing.PersistentDirtyFilesQueue.getQueueFile
 import com.intellij.util.indexing.PersistentDirtyFilesQueue.readProjectDirtyFilesQueue
+import com.intellij.util.indexing.diagnostic.ScanningType.FULL_ON_INDEX_RESTART
+import com.intellij.util.indexing.diagnostic.ScanningType.PARTIAL_ON_INDEX_RESTART
 import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.NonNls
 import org.jetbrains.annotations.TestOnly
@@ -118,19 +121,24 @@ class FileBasedIndexTumbler(private val reason: @NonNls String) {
           }
           for (project in ProjectUtil.getOpenProjects()) {
             val projectQueueFile = project.getQueueFile()
-            val projectDirtyFilesQueue = readProjectDirtyFilesQueue(projectQueueFile, registeredIndexes.wasCorrupted, ManagingFS.getInstance().creationTimestamp)
+            val projectDirtyFilesQueue = readProjectDirtyFilesQueue(projectQueueFile, ManagingFS.getInstance().creationTimestamp)
             fileBasedIndex.dirtyFiles.getProjectDirtyFiles(project)?.addFiles(projectDirtyFilesQueue.fileIds)
             fileBasedIndex.setLastSeenIndexInOrphanQueue(project, projectDirtyFilesQueue.lastSeenIndexInOrphanQueue)
+            val indexesWereCorrupted = registeredIndexes.wasCorrupted
             val indexesCleanupJob = scanAndIndexProjectAfterOpen(
               project = project,
               orphanQueue = registeredIndexes.orphanDirtyFilesQueue,
               additionalOrphanDirtyFiles = emptySet(),
               projectDirtyFilesQueue = projectDirtyFilesQueue,
 
-              allowSkippingFullScanning = allowSkippingFullScanning && !registeredIndexes.wasCorrupted,
+              allowSkippingFullScanning = allowSkippingFullScanning && !indexesWereCorrupted,
               requireReadingIndexableFilesIndexFromDisk = !allowSkippingFullScanning,
               coroutineScope = (project as ComponentManagerEx).getCoroutineScope(),
               indexingReason = "On FileBasedIndexTumbler.turnOn (reason=$reason)",
+              fullScanningType = FULL_ON_INDEX_RESTART,
+              partialScanningType = PARTIAL_ON_INDEX_RESTART,
+              registeredIndexesWereCorrupted = indexesWereCorrupted,
+              sourceOfScanning = SourceOfScanning.IndexTumblerOn,
             )
             indexesCleanupJob.forgetProjectDirtyFilesOnCompletion(fileBasedIndex, project, projectDirtyFilesQueue, registeredIndexes.orphanDirtyFilesQueue.untrimmedSize)
           }

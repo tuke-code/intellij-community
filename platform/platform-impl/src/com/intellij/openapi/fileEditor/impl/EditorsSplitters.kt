@@ -31,12 +31,15 @@ import com.intellij.openapi.fileEditor.impl.text.FileEditorDropHandler
 import com.intellij.openapi.keymap.Keymap
 import com.intellij.openapi.keymap.KeymapManagerListener
 import com.intellij.openapi.keymap.KeymapUtil
+import com.intellij.openapi.progress.blockingContext
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.project.ProjectLocator
 import com.intellij.openapi.ui.Divider
 import com.intellij.openapi.ui.OnePixelDivider
 import com.intellij.openapi.ui.Splitter
 import com.intellij.openapi.util.Iconable
 import com.intellij.openapi.util.Key
+import com.intellij.openapi.util.io.FileTooBigException
 import com.intellij.openapi.vcs.FileStatusManager
 import com.intellij.openapi.vfs.VfsUtilCore
 import com.intellij.openapi.vfs.VirtualFile
@@ -84,6 +87,7 @@ import java.awt.event.KeyEvent
 import java.beans.PropertyChangeListener
 import java.nio.file.InvalidPathException
 import java.nio.file.Path
+import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.CopyOnWriteArraySet
 import java.util.concurrent.atomic.AtomicReference
 import javax.swing.*
@@ -728,6 +732,7 @@ open class EditorsSplitters internal constructor(
   }
 
   @JvmOverloads
+  @RequiresEdt
   fun openInRightSplit(file: VirtualFile, requestFocus: Boolean = true): EditorWindow? {
     val window = currentWindow ?: return null
     val parent = window.component.parent
@@ -921,7 +926,7 @@ private class UiBuilder(private val splitters: EditorsSplitters, private val isL
     val virtualFileManager = VirtualFileManager.getInstance()
     if (session != null && !session.isLocal) {
       for ((index, fileEntry) in fileEntries.withIndex()) {
-        val file = resolveFileOrLogError(virtualFileManager, fileEntry) ?: return
+        val file = resolveFileOrLogError(fileEntry, virtualFileManager) ?: return
         session.serviceOrNull<ClientFileEditorManager>()?.openFileAsync(
           file = file,
           options = FileEditorOpenOptions(
@@ -947,152 +952,19 @@ private class UiBuilder(private val splitters: EditorsSplitters, private val isL
       editorWindow
     }
 
-    val delayedTasks = mutableListOf<Job>()
-    val placeholderIcon by lazy { EmptyIcon.create(AllIcons.FileTypes.Text) }
-
-    // the file is not opened yet - in this case we have to create editors and select the created EditorComposite
-    // resolve virtual files
+    val delayedTasks = ConcurrentLinkedQueue<Job>()
     val items = coroutineScope {
+      val placeholderIcon by lazy { EmptyIcon.create(AllIcons.FileTypes.Text) }
       fileEntries.map { fileEntry ->
         async {
-          val file = resolveFileOrLogError(virtualFileManager, fileEntry) ?: return@async null
-          val compositeCoroutineScope = splitters.coroutineScope.childScope("EditorComposite(file=${fileEntry.url})")
-          val model = fileEditorManager.createEditorCompositeModelOnStartup(
-            compositeCoroutineScope = compositeCoroutineScope,
-            fileProvider = { file },
+          computeFileEntry(
+            virtualFileManager = virtualFileManager,
             fileEntry = fileEntry,
-            isLazy = !fileEntry.currentInTab && isLazyComposite,
-          )
-
-          val tabTitleTask = compositeCoroutineScope.async(start = CoroutineStart.LAZY) {
-            EditorTabPresentationUtil.getEditorTabTitleAsync(fileEditorManager.project, file)
-          }
-          val tabIconTask = if (UISettings.getInstance().showFileIconInTabs) {
-            compositeCoroutineScope.async(start = CoroutineStart.LAZY) {
-              readAction {
-                computeFileIconImpl(file = file, flags = Iconable.ICON_FLAG_READ_STATUS, project = fileEditorManager.project)
-              }
-            }
-          }
-          else {
-            null
-          }
-
-          val tabFileColorTask = compositeCoroutineScope.async {
-            val fileStatusManager = fileEditorManager.project.serviceAsync<FileStatusManager>()
-            readAction {
-              (fileStatusManager.getStatus(file).color ?: UIUtil.getLabelForeground()) to
-                getForegroundColorForFile(fileEditorManager.project, file)
-            }
-          }
-
-          val tabEntry = fileEntry.tab
-          val initialTabTitle = if (!tabEntry.tabTitle.isNullOrEmpty() && fileEntry.ideFingerprint == ideFingerprint()) {
-            delayedTasks.add(tabTitleTask)
-            tabEntry.tabTitle
-          }
-          else {
-            tabTitleTask.start()
-            file.presentableName
-          }
-
-          val initialTabIcon = if (tabIconTask == null) {
-            null
-          }
-          else {
-            val cachedIcon = tabEntry.icon
-              ?.takeIf { fileEntry.ideFingerprint == ideFingerprint() }
-              ?.let { decodeCachedImageIconFromByteArray(it) }
-            if (cachedIcon == null) {
-              tabIconTask.start()
-            }
-            else {
-              delayedTasks.add(tabIconTask)
-            }
-
-            cachedIcon ?: placeholderIcon
-          }
-
-          val tabColorTask = compositeCoroutineScope.async(start = CoroutineStart.LAZY) {
-            val colorScheme = serviceAsync<EditorColorsManager>().schemeForCurrentUITheme
-            val attributes = if (fileEditorManager.isProblem(file)) colorScheme.getAttributes(CodeInsightColors.ERRORS_ATTRIBUTES) else null
-            val colors = tabFileColorTask.await()
-
-            var effectiveAttributes = if (fileEntry.isPreview) {
-              val italic = TextAttributes(null, null, null, null, Font.ITALIC)
-              if (attributes == null) italic else TextAttributes.merge(italic, attributes)
-            }
-            else {
-              attributes
-            }
-
-            effectiveAttributes = TextAttributes.merge(TextAttributes(), effectiveAttributes).apply {
-              foregroundColor = colorScheme.getColor(colors.second)
-            }
-
-            colors.first to effectiveAttributes
-          }
-
-          val initialTabTextAttributes = if ((tabEntry.textAttributes != null || tabEntry.foregroundColor != null) &&
-                                             fileEntry.ideFingerprint == ideFingerprint()) {
-            delayedTasks.add(tabColorTask)
-
-            tabEntry.foregroundColor?.let {
-              @Suppress("UseJBColor")
-              Color(it)
-            } to tabEntry.textAttributes?.let { state -> TextAttributes().also { it.readExternal(jsonDomToXml(state)) } }
-          }
-          else {
-            tabColorTask.start()
-            null
-          }
-
-          FileToOpen(
-            fileEntry = fileEntry,
-            scope = compositeCoroutineScope,
-            file = file,
-            model = model,
-            customizer = { tab ->
-              tab.setText(initialTabTitle)
-              tab.setIcon(initialTabIcon)
-
-              initialTabTextAttributes?.let {
-                tab.setDefaultForegroundAndAttributes(foregroundColor = it.first, attributes = it.second)
-              }
-
-              compositeCoroutineScope.launch {
-                val tooltipText = if (UISettings.getInstance().showTabsTooltips) {
-                  readAction { fileEditorManager.getFileTooltipText(file, tab.composite) }
-                }
-                else {
-                  null
-                }
-                val title = tabTitleTask.await()
-                withContext(Dispatchers.EDT + ModalityState.any().asContextElement()) {
-                  tab.setText(title)
-                  tab.setTooltipText(tooltipText)
-                }
-              }
-
-              compositeCoroutineScope.launch {
-                val (foregroundColor, attributes) = tabColorTask.await()
-                withContext(Dispatchers.EDT) {
-                  tab.setDefaultForegroundAndAttributes(
-                    foregroundColor = foregroundColor,
-                    attributes = attributes,
-                  )
-                }
-              }
-
-              if (tabIconTask != null) {
-                compositeCoroutineScope.launch {
-                  val icon = tabIconTask.await()
-                  withContext(Dispatchers.EDT + ModalityState.any().asContextElement()) {
-                    tab.setIcon(decorateFileIcon(composite = tab.composite, baseIcon = icon, uiSettings = UISettings.getInstance()))
-                  }
-                }
-              }
-            },
+            fileEditorManager = fileEditorManager,
+            delayedTasks = delayedTasks,
+            placeholderIcon = placeholderIcon,
+            splitters = splitters,
+            isLazyComposite = isLazyComposite,
           )
         }
       }
@@ -1133,6 +1005,177 @@ private class UiBuilder(private val splitters: EditorsSplitters, private val isL
   }
 }
 
+private fun computeFileEntry(
+  virtualFileManager: VirtualFileManager,
+  fileEntry: FileEntry,
+  fileEditorManager: FileEditorManagerImpl,
+  delayedTasks: MutableCollection<Job>,
+  placeholderIcon: EmptyIcon,
+  splitters: EditorsSplitters,
+  isLazyComposite: Boolean,
+): FileToOpen? {
+  val compositeCoroutineScope = splitters.coroutineScope.childScope("EditorComposite(file=${fileEntry.url})")
+
+  val notFullyPreparedFile = resolveFileOrLogError(fileEntry, virtualFileManager) ?: return null
+
+  // do not expose `file` variable to avoid using it instead of `fileProvider`
+  val fileProvider = compositeCoroutineScope.async {
+    // https://youtrack.jetbrains.com/issue/IJPL-157845/Incorrect-encoding-of-file-during-project-opening
+    if (!notFullyPreparedFile.isCharsetSet) {
+      blockingContext {
+        ProjectLocator.withPreferredProject(notFullyPreparedFile, fileEditorManager.project).use {
+          try {
+            notFullyPreparedFile.contentsToByteArray(true)
+          }
+          catch (ignore: FileTooBigException) {
+          }
+        }
+      }
+    }
+    notFullyPreparedFile
+  }
+
+  val model = fileEditorManager.createEditorCompositeModelOnStartup(
+    compositeCoroutineScope = compositeCoroutineScope,
+    fileProvider = { fileProvider.await() },
+    fileEntry = fileEntry,
+    isLazy = !fileEntry.currentInTab && isLazyComposite,
+  )
+
+  val tabTitleTask = compositeCoroutineScope.async(start = CoroutineStart.LAZY) {
+    EditorTabPresentationUtil.getEditorTabTitleAsync(fileEditorManager.project, fileProvider.await())
+  }
+  val tabIconTask = if (UISettings.getInstance().showFileIconInTabs) {
+    compositeCoroutineScope.async(start = CoroutineStart.LAZY) {
+      val file = fileProvider.await()
+      readAction {
+        computeFileIconImpl(file = file, flags = Iconable.ICON_FLAG_READ_STATUS, project = fileEditorManager.project)
+      }
+    }
+  }
+  else {
+    null
+  }
+
+  val tabFileColorTask = compositeCoroutineScope.async {
+    val fileStatusManager = fileEditorManager.project.serviceAsync<FileStatusManager>()
+    val file = fileProvider.await()
+    readAction {
+      (fileStatusManager.getStatus(file).color ?: UIUtil.getLabelForeground()) to
+        getForegroundColorForFile(fileEditorManager.project, file)
+    }
+  }
+
+  val tabEntry = fileEntry.tab
+  val initialTabTitle = if (!tabEntry.tabTitle.isNullOrEmpty() && fileEntry.ideFingerprint == ideFingerprint()) {
+    delayedTasks.add(tabTitleTask)
+    tabEntry.tabTitle
+  }
+  else {
+    tabTitleTask.start()
+    notFullyPreparedFile.presentableName
+  }
+
+  val initialTabIcon = if (tabIconTask == null) {
+    null
+  }
+  else {
+    val cachedIcon = tabEntry.icon
+      ?.takeIf { fileEntry.ideFingerprint == ideFingerprint() }
+      ?.let { decodeCachedImageIconFromByteArray(it) }
+    if (cachedIcon == null) {
+      tabIconTask.start()
+    }
+    else {
+      delayedTasks.add(tabIconTask)
+    }
+
+    cachedIcon ?: placeholderIcon
+  }
+
+  val tabColorTask = compositeCoroutineScope.async(start = CoroutineStart.LAZY) {
+    val colorScheme = serviceAsync<EditorColorsManager>().schemeForCurrentUITheme
+    val attributes = if (fileEditorManager.isProblem(notFullyPreparedFile)) colorScheme.getAttributes(CodeInsightColors.ERRORS_ATTRIBUTES) else null
+    val colors = tabFileColorTask.await()
+
+    var effectiveAttributes = if (fileEntry.isPreview) {
+      val italic = TextAttributes(null, null, null, null, Font.ITALIC)
+      if (attributes == null) italic else TextAttributes.merge(italic, attributes)
+    }
+    else {
+      attributes
+    }
+
+    effectiveAttributes = TextAttributes.merge(TextAttributes(), effectiveAttributes).apply {
+      foregroundColor = colorScheme.getColor(colors.second)
+    }
+
+    colors.first to effectiveAttributes
+  }
+
+  val initialTabTextAttributes = if ((tabEntry.textAttributes != null || tabEntry.foregroundColor != null) &&
+                                     fileEntry.ideFingerprint == ideFingerprint()) {
+    delayedTasks.add(tabColorTask)
+
+    tabEntry.foregroundColor?.let {
+      @Suppress("UseJBColor")
+      Color(it)
+    } to tabEntry.textAttributes?.let { state -> TextAttributes().also { it.readExternal(jsonDomToXml(state)) } }
+  }
+  else {
+    tabColorTask.start()
+    null
+  }
+
+  return FileToOpen(
+    fileEntry = fileEntry,
+    scope = compositeCoroutineScope,
+    file = notFullyPreparedFile,
+    model = model,
+    customizer = { tab ->
+      tab.setText(initialTabTitle)
+      tab.setIcon(initialTabIcon)
+
+      initialTabTextAttributes?.let {
+        tab.setDefaultForegroundAndAttributes(foregroundColor = it.first, attributes = it.second)
+      }
+
+      compositeCoroutineScope.launch {
+        val tooltipText = if (UISettings.getInstance().showTabsTooltips) {
+          readAction { fileEditorManager.getFileTooltipText(notFullyPreparedFile, tab.composite) }
+        }
+        else {
+          null
+        }
+        val title = tabTitleTask.await()
+        withContext(Dispatchers.EDT + ModalityState.any().asContextElement()) {
+          tab.setText(title)
+          tab.setTooltipText(tooltipText)
+        }
+      }
+
+      compositeCoroutineScope.launch {
+        val (foregroundColor, attributes) = tabColorTask.await()
+        withContext(Dispatchers.EDT) {
+          tab.setDefaultForegroundAndAttributes(
+            foregroundColor = foregroundColor,
+            attributes = attributes,
+          )
+        }
+      }
+
+      if (tabIconTask != null) {
+        compositeCoroutineScope.launch {
+          val icon = tabIconTask.await()
+          withContext(Dispatchers.EDT + ModalityState.any().asContextElement()) {
+            tab.setIcon(decorateFileIcon(composite = tab.composite, baseIcon = icon, uiSettings = UISettings.getInstance()))
+          }
+        }
+      }
+    },
+  )
+}
+
 internal data class FileToOpen(
   @JvmField val scope: CoroutineScope,
   @JvmField val file: VirtualFile,
@@ -1141,7 +1184,7 @@ internal data class FileToOpen(
   @JvmField val customizer: (TabInfo) -> Unit,
 )
 
-private fun resolveFileOrLogError(virtualFileManager: VirtualFileManager, fileEntry: FileEntry): VirtualFile? {
+private fun resolveFileOrLogError(fileEntry: FileEntry, virtualFileManager: VirtualFileManager): VirtualFile? {
   val file = virtualFileManager.findFileByUrl(fileEntry.url) ?: virtualFileManager.refreshAndFindFileByUrl(fileEntry.url)
   if (file != null && file.isValid) {
     return file

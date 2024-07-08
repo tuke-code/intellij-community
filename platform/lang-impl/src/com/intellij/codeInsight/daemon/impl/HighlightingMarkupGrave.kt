@@ -163,10 +163,12 @@ open class HighlightingMarkupGrave(project: Project, private val coroutineScope:
 
     val markupInfo = markupStore.getMarkup(file)
     if (markupInfo == null) {
+      LOG.debug("No markup in storage for ${file.id}")
       resurrectedZombies.put(file.id, true)
       logFusStatistic(file, MarkupGraveEvent.NOT_RESTORED_CACHE_MISS)
       return
     }
+    LOG.debug("Got markup fom storage for ${file.id}")
 
     if (TextEditorCache.contentHash(document) != markupInfo.contentHash) {
       // text changed since the cached markup was saved on-disk
@@ -233,6 +235,8 @@ open class HighlightingMarkupGrave(project: Project, private val coroutineScope:
       return
     }
 
+    LOG.debug("putInGrave for file with id ${file.id}")
+
     val document = FileDocumentManager.getInstance().getCachedDocument(file) ?: return
     val colorsScheme = fileEditor.editor.colorsScheme
     coroutineScope.launch {
@@ -241,6 +245,19 @@ open class HighlightingMarkupGrave(project: Project, private val coroutineScope:
         val storedMarkup = markupStore.getMarkup(file)
         val zombieDisposed = resurrectedZombies[file.id]
         val graveDecision = getCacheDecision(newMarkup = markupFromModel, oldMarkup = storedMarkup, isNewMoreRelevant = zombieDisposed)
+
+        if (LOG.isDebugEnabled) {
+          fun describeMarkup(info: FileMarkupInfo?): String {
+            if (info == null) return "null"
+            val size = info.size()
+            if (size == 0) return "empty" else return "not empty (${size} highlighters)"
+          }
+          LOG.debug("putInGrave for file with id ${file.id} with decision $graveDecision:\n" +
+                    "stored markup: ${describeMarkup(storedMarkup)}; " +
+                    "markup from model ${describeMarkup(markupFromModel)}; " +
+                    "isNewMoreRelevant $zombieDisposed")
+        }
+
         when (graveDecision) {
           CacheDecision.STORE_NEW -> {
             markupStore.putMarkup(file, markupFromModel)

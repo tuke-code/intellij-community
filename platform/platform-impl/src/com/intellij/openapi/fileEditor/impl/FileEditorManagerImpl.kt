@@ -104,6 +104,7 @@ import java.awt.event.KeyEvent
 import java.awt.event.MouseEvent
 import java.beans.PropertyChangeEvent
 import java.beans.PropertyChangeListener
+import java.util.*
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicReference
@@ -450,18 +451,23 @@ open class FileEditorManagerImpl(
   private suspend fun dumbModeFinished(project: Project, fileEditorProviderManager: FileEditorProviderManager) {
     refreshIcons()
 
-    val fileToNewProviders = openedComposites.groupBy { it.file }.mapNotNull { (file, composites) ->
-      val newProviders = fileEditorProviderManager.getDumbUnawareProviders(project, file, excludeIds = getEditorTypeIds(composites))
+    val fileToNewProviders = openedComposites.toList().mapNotNull { composite ->
+      if (composite.providerSequence.none()) {
+        // not initialized or invalid
+        return@mapNotNull null
+      }
+
+      val newProviders = fileEditorProviderManager.getDumbUnawareProviders(project, composite.file, excludeIds = getEditorTypeIds(composite))
       if (newProviders.isEmpty()) {
         null
       }
       else {
-        file to newProviders
+        ProviderChange(composite = composite, newProviders = newProviders, editorTypeIdsToRemove = emptyList())
       }
     }
 
-    for ((file, newProviders) in fileToNewProviders) {
-      updateFileEditorProviders(file = file, newProviders = newProviders)
+    for (item in fileToNewProviders) {
+      updateFileEditorProviders(item)
     }
 
     // update for non-dumb-aware EditorTabTitleProviders
@@ -469,57 +475,53 @@ open class FileEditorManagerImpl(
   }
 
   private suspend fun rootsChanged(fileEditorProviderManager: FileEditorProviderManager) {
-    val providerChanges = openedComposites.groupBy { it.file }.mapNotNull { (file, composites) ->
-      val providers = fileEditorProviderManager.getProvidersAsync(project, file)
+    val fileToProviders = IdentityHashMap<VirtualFile, List<FileEditorProvider>>()
+    val providerChanges = openedComposites.toList().mapNotNull { composite ->
+      val file = composite.file
+      val providers = fileToProviders.getOrPut(file) { fileEditorProviderManager.getProvidersAsync(project, file) }
       val editorTypeIds = providers.mapTo(LinkedHashSet()) { it.editorTypeId }
-      val oldEditorTypeIds = getEditorTypeIds(composites)
+      val oldEditorTypeIds = getEditorTypeIds(composite)
+      if (oldEditorTypeIds.isEmpty()) {
+        // not initialized or invalid
+        return@mapNotNull null
+      }
+
       val newProviders = providers.filter { !oldEditorTypeIds.contains(it.editorTypeId) }
       val editorTypeIdsToRemove = oldEditorTypeIds.filter { !editorTypeIds.contains(it) }
       if (newProviders.isEmpty() && editorTypeIdsToRemove.isEmpty()) {
         null
       }
       else {
-        Triple(file, newProviders, editorTypeIdsToRemove)
+        ProviderChange(composite = composite, newProviders = newProviders, editorTypeIdsToRemove = editorTypeIdsToRemove)
       }
     }
     if (providerChanges.isEmpty()) {
       return
     }
 
-    for ((file, newProviders, editorTypeIdsToRemove) in providerChanges) {
-      updateFileEditorProviders(file = file, newProviders = newProviders, editorTypeIdsToRemove = editorTypeIdsToRemove)
+    for (item in providerChanges) {
+      updateFileEditorProviders(item)
     }
 
     scheduleUpdateFileName(file = null)
   }
 
-  private suspend fun updateFileEditorProviders(
-    file: VirtualFile,
-    newProviders: List<FileEditorProvider>,
-    editorTypeIdsToRemove: List<String> = emptyList(),
-  ) {
+  private suspend fun updateFileEditorProviders(item: ProviderChange) {
     withContext(Dispatchers.EDT) {
-      val composites = getAllComposites(file)
-      for (composite in composites) {
-        for (editorTypeId in editorTypeIdsToRemove) {
-          composite.removeEditor(editorTypeId)
-        }
+      val composite = item.composite
+      for (editorTypeId in item.editorTypeIdsToRemove) {
+        composite.removeEditor(editorTypeId)
       }
 
-      for (composite in composites) {
-        for (provider in newProviders) {
-          composite.addEditor(editor = provider.createEditor(project, file), provider = provider)
-        }
+      for (provider in item.newProviders) {
+        composite.addEditor(editor = provider.createEditor(project, item.composite.file), provider = provider)
       }
 
       for (splitters in getAllSplitters()) {
-        splitters.updateFileBackgroundColorAsync(file)
+        splitters.updateFileBackgroundColorAsync(item.composite.file)
       }
     }
   }
-
-  private fun getEditorTypeIds(composites: List<EditorComposite>): Set<String> =
-    composites.asSequence().flatMap(EditorComposite::providerSequence).mapTo(HashSet()) { it.editorTypeId }
 
   @RequiresEdt
   fun initDockableContentFactory() {
@@ -849,7 +851,7 @@ open class FileEditorManagerImpl(
         }
       }
       else if (mode == OpenMode.RIGHT_SPLIT) {
-        openInRightSplit(file)?.let {
+        openInRightSplit(file, options.requestFocus)?.let {
           return it
         }
       }
@@ -895,9 +897,12 @@ open class FileEditorManagerImpl(
     }
     else if (mode == OpenMode.RIGHT_SPLIT) {
       withContext(Dispatchers.EDT) {
-        openInRightSplit(file)
-      }?.let {
-        return it
+        openInRightSplit(file, options.requestFocus)
+      }?.let { composite ->
+        if (composite is EditorComposite) {
+          composite.waitForAvailable()
+        }
+        return composite
       }
     }
 
@@ -972,9 +977,8 @@ open class FileEditorManagerImpl(
       if (currentWindow != null && currentWindow.inSplitter() &&
           currentWindow.tabCount == 1 &&
           currentWindow.selectedComposite?.selectedEditor === currentEditor) {
-        val siblingWindow = currentWindow.getSiblings().firstOrNull()
-        if (siblingWindow != null) {
-          return siblingWindow
+        currentWindow.siblings().firstOrNull()?.let {
+          return it
         }
       }
     }
@@ -998,18 +1002,21 @@ open class FileEditorManagerImpl(
     }.retrofit()
   }
 
-  private fun openInRightSplit(file: VirtualFile): FileEditorComposite? {
-    val active = splitters
-    val window = active.currentWindow
-    if (window == null || window.inSplitter() && file == window.selectedFile && file == window.files().lastOrNull()) {
-      // already in right splitter
-      return null
+  @RequiresEdt
+  private fun openInRightSplit(file: VirtualFile, requestFocus: Boolean): FileEditorComposite? {
+    val window = splitters.currentWindow ?: return null
+    if (window.inSplitter()) {
+      val composite = window.siblings().lastOrNull()?.composites()?.firstOrNull { it.file == file }
+      if (composite != null) {
+        // already in right splitter
+        if (requestFocus) {
+          window.setCurrentCompositeAndSelectTab(composite)
+          focusEditorOnComposite(composite = composite, splitters = window.owner)
+        }
+        return composite
+      }
     }
-
-    val split = active.openInRightSplit(file) ?: return null
-    val editorsWithProviders = split.composites().flatMap(EditorComposite::allEditorsWithProviders).toList()
-    return FileEditorComposite.createFileEditorComposite(allEditors = editorsWithProviders.map { it.fileEditor },
-                                                         allProviders = editorsWithProviders.map { it.provider })
+    return window.owner.openInRightSplit(file)?.composites()?.firstOrNull { it.file == file }
   }
 
   @Suppress("DeprecatedCallableAddReplaceWith")
@@ -1257,7 +1264,7 @@ open class FileEditorManagerImpl(
 
   internal fun createEditorCompositeModelOnStartup(
     compositeCoroutineScope: CoroutineScope,
-    fileProvider: () -> VirtualFile,
+    fileProvider: suspend () -> VirtualFile,
     fileEntry: FileEntry?,
     isLazy: Boolean,
   ): Flow<EditorCompositeModel> {
@@ -2394,7 +2401,8 @@ private suspend fun updateFileNames(allSplitters: Set<EditorsSplitters>, file: V
     for (window in splitters.windows()) {
       val composites = withContext(Dispatchers.EDT) { window.composites() }
       for (composite in composites) {
-        if (file != null && composite.file != file) {
+        // update names for other files with the same name, as it might affect UniqueNameEditorTabTitleProvider
+        if (file != null && composite.file != file && !composite.file.nameSequence.contentEquals(file.nameSequence)) {
           continue
         }
 
@@ -2427,3 +2435,13 @@ fun navigateAndSelectEditor(editor: NavigatableFileEditor, descriptor: Navigatab
   }
   return false
 }
+
+private fun getEditorTypeIds(composite: EditorComposite): Set<String> {
+  return composite.providerSequence.mapTo(HashSet()) { it.editorTypeId }
+}
+
+private data class ProviderChange(
+  @JvmField val composite: EditorComposite,
+  @JvmField val newProviders: List<FileEditorProvider>,
+  @JvmField val editorTypeIdsToRemove: List<String>,
+)

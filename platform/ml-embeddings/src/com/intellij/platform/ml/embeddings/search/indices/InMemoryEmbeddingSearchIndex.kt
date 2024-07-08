@@ -2,8 +2,8 @@
 package com.intellij.platform.ml.embeddings.search.indices
 
 import ai.grazie.emb.FloatTextEmbedding
-import com.intellij.platform.ml.embeddings.search.utils.ScoredText
 import com.intellij.concurrency.ConcurrentCollectionFactory
+import com.intellij.platform.ml.embeddings.search.utils.ScoredText
 import com.intellij.platform.ml.embeddings.search.utils.SuspendingReadWriteLock
 import com.intellij.util.containers.CollectionFactory
 import kotlinx.coroutines.flow.Flow
@@ -16,8 +16,8 @@ import java.nio.file.Path
  * Can be persisted to disk.
  */
 class InMemoryEmbeddingSearchIndex(root: Path, override var limit: Int? = null) : EmbeddingSearchIndex {
-  private var idToEmbedding: MutableMap<String, FloatTextEmbedding> = CollectionFactory.createSmallMemoryFootprintMap()
-  private val uncheckedIds: MutableSet<String> = ConcurrentCollectionFactory.createConcurrentSet()
+  private val idToEmbedding: MutableMap<EntityId, FloatTextEmbedding> = CollectionFactory.createSmallMemoryFootprintMap()
+  private val uncheckedIds: MutableSet<EntityId> = ConcurrentCollectionFactory.createConcurrentSet()
   private val lock = SuspendingReadWriteLock()
 
   private val fileManager = LocalEmbeddingIndexFileManager(root)
@@ -27,16 +27,18 @@ class InMemoryEmbeddingSearchIndex(root: Path, override var limit: Int? = null) 
   override suspend fun setLimit(value: Int?) = lock.write {
     // Shrink index if necessary:
     if (value != null && value < idToEmbedding.size) {
-      idToEmbedding = idToEmbedding.toList().take(value).toMap().toMutableMap()
+      val remaining = idToEmbedding.asSequence().take(value).map { it.toPair() }.toList()
+      idToEmbedding.clear()
+      idToEmbedding.putAll(remaining)
     }
     limit = value
   }
 
-  override suspend fun contains(id: String): Boolean = lock.read {
+  override suspend fun contains(id: EntityId): Boolean = lock.read {
     id in idToEmbedding
   }
 
-  override suspend fun lookup(id: String): FloatTextEmbedding? = lock.read { idToEmbedding[id] }
+  override suspend fun lookup(id: EntityId): FloatTextEmbedding? = lock.read { idToEmbedding[id] }
 
   override suspend fun clear() = lock.write {
     idToEmbedding.clear()
@@ -55,8 +57,10 @@ class InMemoryEmbeddingSearchIndex(root: Path, override var limit: Int? = null) 
     uncheckedIds.clear()
   }
 
-  override suspend fun addEntries(values: Iterable<Pair<String, FloatTextEmbedding>>,
-                                  shouldCount: Boolean) = lock.write {
+  override suspend fun addEntries(
+    values: Iterable<Pair<EntityId, FloatTextEmbedding>>,
+    shouldCount: Boolean,
+  ) = lock.write {
     if (limit != null) {
       val list = values.toList()
       list.forEach { uncheckedIds.remove(it.first) }
@@ -71,13 +75,19 @@ class InMemoryEmbeddingSearchIndex(root: Path, override var limit: Int? = null) 
 
   override suspend fun loadFromDisk() = lock.write {
     val (ids, embeddings) = fileManager.loadIndex() ?: return@write
-    idToEmbedding = (ids zip embeddings).toMap().toMutableMap()
+    idToEmbedding.clear()
+    idToEmbedding.putAll(ids zip embeddings)
   }
 
-  override suspend fun offload() = idToEmbedding.clear()
+  override suspend fun offload() = lock.write { idToEmbedding.clear() }
 
-  override suspend fun findClosest(searchEmbedding: FloatTextEmbedding, topK: Int, similarityThreshold: Double?): List<ScoredText> = lock.read {
-    idToEmbedding.findClosest(searchEmbedding, topK, similarityThreshold)
+  override suspend fun findClosest(
+    searchEmbedding: FloatTextEmbedding,
+    topK: Int, similarityThreshold: Double?,
+  ): List<ScoredText> = lock.read {
+    idToEmbedding.asSequence()
+      .map { (id, embedding) -> id to embedding }
+      .findClosest(searchEmbedding, topK, similarityThreshold)
   }
 
   override suspend fun streamFindClose(searchEmbedding: FloatTextEmbedding, similarityThreshold: Double?): Flow<ScoredText> {
@@ -103,7 +113,7 @@ class InMemoryEmbeddingSearchIndex(root: Path, override var limit: Int? = null) 
   }
 
   private suspend fun save() {
-    val (ids, embeddings) = idToEmbedding.toList().unzip()
+    val (ids, embeddings) = idToEmbedding.asSequence().map { (id, embedding) -> id to embedding }.unzip()
     fileManager.saveIndex(ids, embeddings)
   }
 }

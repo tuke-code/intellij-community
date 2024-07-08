@@ -313,11 +313,6 @@ public class StructureFilterPopupComponent extends FilterPopupComponent<VcsLogFi
     }
 
     @Override
-    public boolean isSoftMultiChoice() {
-      return false;
-    }
-
-    @Override
     public boolean isSelected(@NotNull AnActionEvent e) {
       return isVisible(myRoot);
     }
@@ -460,7 +455,7 @@ public class StructureFilterPopupComponent extends FilterPopupComponent<VcsLogFi
       myFilter = filter;
       myIcon = JBUIScale.scaleIcon(new SizedIcon(PlatformIcons.CHECK_ICON_SMALL, CHECKBOX_ICON_SIZE, CHECKBOX_ICON_SIZE));
       myEmptyIcon = JBUIScale.scaleIcon(EmptyIcon.create(CHECKBOX_ICON_SIZE));
-      getTemplatePresentation().setMultiChoice(false);
+      getTemplatePresentation().setKeepPopupOnPerform(KeepPopupOnPerform.Never);
     }
 
     @Override

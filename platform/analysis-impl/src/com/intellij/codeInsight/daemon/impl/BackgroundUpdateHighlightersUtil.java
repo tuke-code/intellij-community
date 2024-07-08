@@ -22,6 +22,7 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Comparing;
 import com.intellij.openapi.util.TextRange;
 import com.intellij.openapi.util.TextRangeScalarUtil;
+import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.psi.PsiFile;
 import com.intellij.util.Consumer;
 import com.intellij.util.Processor;
@@ -106,7 +107,10 @@ public final class BackgroundUpdateHighlightersUtil {
     setHighlightersInRange(range, new ArrayList<>(highlights), markup, group, session);
   }
 
-  // set highlights inside startOffset,endOffset but outside priorityRange
+  /**
+   * Sets highlights inside restrictedRange (it's the range we're updating), but outside priorityRange.
+   * This method is usually called after {@link #setHighlightersInRange} where we set highlights inside priorityRange.
+   */
   static void setHighlightersOutsideRange(@NotNull List<? extends HighlightInfo> infos,
                                           @NotNull TextRange restrictedRange,
                                           @NotNull TextRange priorityRange,
@@ -178,7 +182,7 @@ public final class BackgroundUpdateHighlightersUtil {
         createOrReuseHighlighterFor(info, session.getColorsScheme(), document, group, psiFile, (MarkupModelEx)markup, toReuse, range2markerCache, severityRegistrar);
       }
       boolean shouldClean = restrictedRange.getStartOffset() == 0 && restrictedRange.getEndOffset() == document.getTextLength();
-      ((HighlightingSessionImpl)session).updateFileLevelHighlights(fileLevelHighlights, group, shouldClean);
+      ((HighlightingSessionImpl)session).updateFileLevelHighlights(fileLevelHighlights, group, shouldClean, toReuse);
       changed[0] |= UpdateHighlightersUtil.incinerateObsoleteHighlighters(toReuse, session);
     }
     finally {
@@ -263,7 +267,7 @@ public final class BackgroundUpdateHighlightersUtil {
       for (HighlightInfo info : infosToCreateHighlightersFor) {
         createOrReuseHighlighterFor(info, session.getColorsScheme(), document, group, psiFile, markup, toReuse, range2markerCache, severityRegistrar);
       }
-      ((HighlightingSessionImpl)session).updateFileLevelHighlights(fileLevelHighlights, group, range.equalsToRange(0, document.getTextLength()));
+      ((HighlightingSessionImpl)session).updateFileLevelHighlights(fileLevelHighlights, group, range.equalsToRange(0, document.getTextLength()), toReuse);
       changed[0] |= UpdateHighlightersUtil.incinerateObsoleteHighlighters(toReuse, session);
     }
     finally {

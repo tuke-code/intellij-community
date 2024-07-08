@@ -4,6 +4,7 @@ import com.intellij.ide.ui.LafManagerListener
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.runInEdt
+import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.editor.FoldRegion
 import com.intellij.openapi.editor.colors.EditorColorsListener
@@ -18,7 +19,6 @@ import com.intellij.openapi.util.registry.Registry
 import com.intellij.util.EventDispatcher
 import com.intellij.util.SmartList
 import com.intellij.util.concurrency.ThreadingAssertions
-import org.jetbrains.annotations.TestOnly
 import org.jetbrains.plugins.notebooks.ui.isFoldingEnabledKey
 import org.jetbrains.plugins.notebooks.visualization.ui.EditorCell
 import org.jetbrains.plugins.notebooks.visualization.ui.EditorCellEventListener
@@ -26,11 +26,10 @@ import org.jetbrains.plugins.notebooks.visualization.ui.EditorCellEventListener.
 import org.jetbrains.plugins.notebooks.visualization.ui.EditorCellView
 import org.jetbrains.plugins.notebooks.visualization.ui.keepScrollingPositionWhile
 import java.util.*
-import kotlin.math.max
-import kotlin.math.min
 
 class NotebookCellInlayManager private constructor(
   val editor: EditorImpl,
+  private val shouldCheckInlayOffsets: Boolean,
 ) : Disposable, NotebookIntervalPointerFactory.ChangeListener {
   private val notebookCellLines = NotebookCellLines.get(editor)
 
@@ -64,23 +63,23 @@ class NotebookCellInlayManager private constructor(
 
   private fun updateAll() {
     if (initialized) {
-      updateConsequentInlays(0..editor.document.lineCount, force = false)
+      updateCells(cells, force = false)
     }
   }
 
   fun forceUpdateAll() = runInEdt {
     if (initialized) {
-      updateConsequentInlays(0..editor.document.lineCount, force = true)
+      updateCells(cells, force = true)
     }
   }
 
-  fun update(pointers: Collection<NotebookIntervalPointer>) = runInEdt {
+  private fun update(pointers: Collection<NotebookIntervalPointer>) = runInEdt {
     val linesList = pointers.mapNotNullTo(mutableListOf()) { it.get()?.lines }
     linesList.sortBy { it.first }
     linesList.mergeAndJoinIntersections(listOf())
 
     for (lines in linesList) {
-      updateConsequentInlays(lines, force = false)
+      updateCells(pointers.mapNotNull { it.get()?.ordinal }.sorted().map { cells[it] }, force = false)
     }
   }
 
@@ -90,6 +89,16 @@ class NotebookCellInlayManager private constructor(
 
   fun update(pointer: NotebookIntervalPointer) = runInEdt {
     update(SmartList(pointer))
+  }
+
+  private fun updateCells(cells: List<EditorCell>, force: Boolean = false) {
+    keepScrollingPositionWhile(editor) {
+      cells.forEach {
+        it.update(force)
+      }
+      updateCellsFolding(cells)
+      inlaysChanged()
+    }
   }
 
   private fun addViewportChangeListener() {
@@ -217,36 +226,8 @@ class NotebookCellInlayManager private constructor(
     EditorCellView(editor, notebookCellLines, cell, this).also { Disposer.register(cell, it) }
   }.also { Disposer.register(this, it) }
 
-  private fun ensureInlaysAndHighlightersExist(matchingCellsBeforeChange: List<NotebookCellLines.Interval>, logicalLines: IntRange) {
-    val interestingRange =
-      matchingCellsBeforeChange
-        .map { it.lines }
-        .takeIf { it.isNotEmpty() }
-        ?.let { min(logicalLines.first, it.first().first)..max(it.last().last, logicalLines.last) }
-      ?: logicalLines
-    updateConsequentInlays(interestingRange)
-  }
-
   private fun inlaysChanged() {
     changedListener?.inlaysChanged()
-  }
-
-  private fun updateConsequentInlays(interestingRange: IntRange, force: Boolean = false) {
-    ThreadingAssertions.softAssertReadAccess()
-    keepScrollingPositionWhile(editor) {
-      val matchingIntervals = notebookCellLines.getMatchingCells(interestingRange)
-
-      val matchingCells = matchingIntervals.map {
-        _cells[it.ordinal]
-      }
-      matchingCells.forEach {
-        it.update(force)
-      }
-
-      updateCellsFolding(matchingCells)
-
-      inlaysChanged()
-    }
   }
 
   private fun updateCellsFolding(editorCells: List<EditorCell>) {
@@ -263,26 +244,10 @@ class NotebookCellInlayManager private constructor(
                                           }, true, false)
   }
 
-  private fun NotebookCellLines.getMatchingCells(logicalLines: IntRange): List<NotebookCellLines.Interval> =
-    mutableListOf<NotebookCellLines.Interval>().also { result ->
-      // Since inlay appearance may depend from neighbour cells, adding one more cell at the start and at the end.
-      val iterator = intervalsIterator(logicalLines.first)
-      if (iterator.hasPrevious()) iterator.previous()
-      for (interval in iterator) {
-        result.add(interval)
-        if (interval.lines.first > logicalLines.last) break
-      }
-    }
-
-  @TestOnly
-  fun updateControllers(matchingCells: List<NotebookCellLines.Interval>, logicalLines: IntRange) {
-    ensureInlaysAndHighlightersExist(matchingCells, logicalLines)
-  }
-
   companion object {
     @JvmStatic
-    fun install(editor: EditorImpl) {
-      val notebookCellInlayManager = NotebookCellInlayManager(editor).also { Disposer.register(editor.disposable, it) }
+    fun install(editor: EditorImpl, shouldCheckInlayOffsets: Boolean) {
+      val notebookCellInlayManager = NotebookCellInlayManager(editor, shouldCheckInlayOffsets).also { Disposer.register(editor.disposable, it) }
       editor.putUserData(isFoldingEnabledKey, Registry.`is`("jupyter.editor.folding.cells"))
       NotebookIntervalPointerFactory.get(editor).changeListeners.addListener(notebookCellInlayManager, editor.disposable)
       notebookCellInlayManager.initialize()
@@ -336,6 +301,8 @@ class NotebookCellInlayManager private constructor(
   }
 
   private fun checkInlayOffsets() {
+    if (!shouldCheckInlayOffsets) return
+
     val inlaysOffsets = buildSet {
       for (cell in _cells) {
         add(editor.document.getLineStartOffset(cell.interval.lines.first))
@@ -345,7 +312,7 @@ class NotebookCellInlayManager private constructor(
     val wronglyPlacedInlays = editor.inlayModel.getBlockElementsInRange(0, editor.document.textLength)
       .filter { it.offset !in inlaysOffsets }
     if (wronglyPlacedInlays.isNotEmpty()) {
-      error("Expected offsets: $inlaysOffsets. Wrongly placed inlays: $wronglyPlacedInlays")
+      thisLogger().error("Expected offsets: $inlaysOffsets. Wrongly placed offsets: ${wronglyPlacedInlays.map { it.offset }} of inlays $wronglyPlacedInlays, for file = '${editor.virtualFile?.name}'")
     }
   }
 
@@ -376,6 +343,10 @@ class NotebookCellInlayManager private constructor(
 
   fun getCell(index: Int): EditorCell {
     return cells[index]
+  }
+
+  fun getCell(pointer: NotebookIntervalPointer): EditorCell {
+    return getCell(pointer.get()!!.ordinal)
   }
 
   fun invalidateCells() {

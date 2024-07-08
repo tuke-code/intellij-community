@@ -29,10 +29,8 @@ import com.intellij.ui.*;
 import com.intellij.ui.speedSearch.SpeedSearchUtil;
 import com.intellij.ui.table.JBTable;
 import com.intellij.util.containers.ContainerUtil;
-import com.intellij.util.ui.JBFont;
-import com.intellij.util.ui.JBUI;
-import com.intellij.util.ui.NamedColorUtil;
-import com.intellij.util.ui.UIUtil;
+import com.intellij.util.ui.*;
+import org.jetbrains.annotations.NonNls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -42,14 +40,13 @@ import javax.swing.event.ListSelectionListener;
 import javax.swing.table.*;
 import java.awt.*;
 import java.awt.datatransfer.DataFlavor;
+import java.awt.datatransfer.Transferable;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.KeyEvent;
 import java.awt.image.BufferedImage;
-import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.*;
 import java.util.List;
-import java.util.Map;
 
 /**
  * @author Kirill Kalishev
@@ -138,18 +135,7 @@ public class RegistryUi implements Disposable {
     final TableSpeedSearch search = TableSpeedSearch.installOn(myTable);
     search.setFilteringMode(true);
 
-    myTable.setTransferHandler(new TransferHandler() {
-      @Override
-      public boolean importData(@NotNull TransferSupport support) {
-        String pastedText = CopyPasteManager.getInstance().getContents(DataFlavor.stringFlavor);
-        if (pastedText == null || search.isPopupActive()) {
-          return false;
-        }
-        search.showPopup(pastedText);
-        return true;
-      }
-    });
-
+    myTable.setTransferHandler(new RegistryTransferHandler(search));
 
     myTable.setRowSorter(new TableRowSorter<>(myTable.getModel()));
     myTable.registerKeyboardAction(
@@ -626,6 +612,85 @@ public class RegistryUi implements Disposable {
     @Override
     public void actionPerformed(@NotNull ActionEvent e) {
       restoreDefaults();
+    }
+  }
+
+  private static class RegistryTransferHandler extends TransferHandler {
+    private final @NotNull TableSpeedSearch mySearch;
+
+    private RegistryTransferHandler(@NotNull TableSpeedSearch search) {
+      mySearch = search;
+    }
+
+    @Override
+    public boolean importData(@NotNull TransferSupport support) {
+      String pastedText = CopyPasteManager.getInstance().getContents(DataFlavor.stringFlavor);
+      if (pastedText == null || mySearch.isPopupActive()) {
+        return false;
+      }
+      mySearch.showPopup(pastedText);
+      return true;
+    }
+
+    @Override
+    public int getSourceActions(JComponent c) {
+      return COPY;
+    }
+
+    @Override
+    protected @Nullable Transferable createTransferable(JComponent c) {
+      JTable table = (JTable)c;
+
+      int[] selectedRows = table.getSelectedRows();
+      if (selectedRows == null || selectedRows.length == 0) {
+        return null;
+      }
+
+      String htmlText = buildHtmlText(table, selectedRows);
+      String plainText = buildPlainText(table, selectedRows);
+
+      return new TextTransferable(htmlText, plainText);
+    }
+
+    private static @NotNull String buildPlainText(@NotNull JTable table, int[] rows) {
+      StringBuilder stringBuilder = new StringBuilder();
+      int lastRow = rows[rows.length - 1];
+
+      int columnCount = table.getColumnCount();
+      for (int row : rows) {
+        for (int col = 0; col < columnCount; col++) {
+          String text = getItemAsString(table, row, col);
+          stringBuilder.append(text);
+          if (col + 1 != columnCount) {
+            stringBuilder.append('\t');
+          }
+        }
+        if (lastRow != row) {
+          stringBuilder.append('\n');
+        }
+      }
+
+      return stringBuilder.toString();
+    }
+
+    private static @NotNull String buildHtmlText(@NotNull JTable table, int[] rows) {
+      HtmlBuilder builder = new HtmlBuilder();
+      int columnCount = table.getColumnCount();
+      for (int row : rows) {
+        HtmlBuilder rowItem = new HtmlBuilder();
+        for (int col = 0; col < columnCount; col++) {
+          @NonNls String text = getItemAsString(table, row, col);
+          HtmlChunk.Element item = new HtmlBuilder().append(text).wrapWith("td");
+          rowItem.append(item);
+        }
+        builder.append(rowItem.wrapWith("tr"));
+      }
+      return builder.wrapWith("table").wrapWith("body").wrapWith("html").toString();
+    }
+
+    private static String getItemAsString(@NonNls JTable table, int row, int col) {
+      Object obj = table.getValueAt(row, col);
+      return (obj == null) ? "" : obj.toString();
     }
   }
 }

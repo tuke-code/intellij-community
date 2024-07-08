@@ -1,5 +1,5 @@
 /*
- * Copyright 2003-2023 Dave Griffith, Bas Leijdekkers
+ * Copyright 2003-2024 Dave Griffith, Bas Leijdekkers
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,9 +23,7 @@ import com.intellij.psi.util.InheritanceUtil;
 import com.intellij.psi.util.*;
 import com.intellij.util.ObjectUtils;
 import com.siyeh.HardcodedMethodConstants;
-import org.jetbrains.annotations.NonNls;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.*;
 
 import java.util.*;
 
@@ -429,6 +427,7 @@ public final class ImportUtils {
     if (memberName == null) {
       return false;
     }
+    if (hasImplicitStaticImport(javaFile, memberClass.getQualifiedName() + "." + memberName)) return true;
     final PsiImportStatementBase existingImportStatement = importList.findSingleImportStatement(memberName);
     if (existingImportStatement instanceof PsiImportStaticStatement importStaticStatement) {
       final PsiClass importClass = importStaticStatement.resolveTargetClass();
@@ -448,6 +447,60 @@ public final class ImportUtils {
     }
     return false;
   }
+
+  private static boolean hasImplicitStaticImport(@NotNull PsiJavaFile file, @NotNull String name) {
+    return createImplicitImportChecker(file).isImplicitlyImported(new Import(name, true));
+  }
+
+
+  @Contract("_ -> new")
+  public static @NotNull ImportUtils.ImplicitImportChecker createImplicitImportChecker(@NotNull PsiJavaFile file) {
+    return new ImplicitImportChecker(file);
+  }
+
+  /**
+   * The ImplicitImportChecker class provides functionality to check if a given import is implicitly
+   * imported in the context of a PsiJavaFile. It tracks both static member imports and package imports.
+   */
+  public static class ImplicitImportChecker {
+
+    @NotNull
+    private final Map<String, ImplicitlyImportedStaticMember> myStaticImportStatements = new HashMap<>();
+
+    @NotNull
+    private final Set<String> packages = new HashSet<>();
+
+    private ImplicitImportChecker(@NotNull PsiJavaFile file) {
+      for (ImplicitlyImportedStaticMember imp : file.getImplicitlyImportedStaticMembers()) {
+        myStaticImportStatements.put(imp.getContainingClass(), imp);
+      }
+      packages.addAll(Arrays.asList(file.getImplicitlyImportedPackages()));
+    }
+
+    public boolean isImplicitlyImported(@NotNull Import name) {
+      String packageOrClassName = getPackageOrClassName(name.name);
+      if (!name.isStatic && packages.contains(packageOrClassName)) return true;
+      ImplicitlyImportedStaticMember base = myStaticImportStatements.get(packageOrClassName);
+      if (base != null) {
+        if (!name.isStatic) return false;
+        if (base.isOnDemand()) {
+          return true;
+        }
+        else {
+          return name.name.equals(base.getContainingClass() + "." + base.getMemberName());
+        }
+      }
+      return false;
+    }
+  }
+
+  public static @NotNull String getPackageOrClassName(@NotNull String className){
+    int dotIndex = className.lastIndexOf('.');
+    return dotIndex < 0 ? "" : className.substring(0, dotIndex);
+  }
+
+  @ApiStatus.Internal
+  public record Import(@NotNull String name, boolean isStatic) {}
 
   private static boolean memberReferenced(PsiMember member, PsiElement context) {
     final MemberReferenceVisitor visitor = new MemberReferenceVisitor(member);

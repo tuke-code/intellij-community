@@ -6,6 +6,7 @@ import com.intellij.platform.ijent.fs.IjentFileInfo.Type.*
 import com.intellij.platform.ijent.fs.IjentPosixFileInfo
 import com.intellij.platform.ijent.fs.IjentPosixFileInfo.Type.Symlink
 import com.intellij.platform.ijent.fs.IjentWindowsFileInfo
+import org.jetbrains.annotations.VisibleForTesting
 import java.nio.file.attribute.*
 import java.nio.file.attribute.PosixFilePermission.*
 import java.time.Instant
@@ -64,7 +65,8 @@ internal class IjentNioBasicFileAttributes(private val fileInfo: IjentFileInfo) 
 /** Similar to `sun.nio.fs.UnixFileKey` */
 internal data class IjentUnixFileKey(val dev: Long, val ino: Long)
 
-internal class IjentNioPosixFileAttributes(
+@VisibleForTesting
+class IjentNioPosixFileAttributes(
   private val fileInfo: IjentPosixFileInfo,
 ) : PosixFileAttributes, BasicFileAttributes by IjentNioBasicFileAttributes(fileInfo) {
   override fun owner(): UserPrincipal =
@@ -73,8 +75,8 @@ internal class IjentNioPosixFileAttributes(
   override fun group(): GroupPrincipal =
     IjentPosixGroupPrincipal(fileInfo.permissions.group)
 
-  override fun permissions(): Set<PosixFilePermission> =
-    EnumSet.copyOf(PosixFilePermission.values().filter { pfp ->
+  override fun permissions(): Set<PosixFilePermission> {
+    val permissions = entries.filter { pfp ->
       when (pfp) {
         OWNER_READ -> fileInfo.permissions.ownerCanRead
         OWNER_WRITE -> fileInfo.permissions.ownerCanWrite
@@ -86,7 +88,9 @@ internal class IjentNioPosixFileAttributes(
         OTHERS_WRITE -> fileInfo.permissions.otherCanWrite
         OTHERS_EXECUTE -> fileInfo.permissions.otherCanExecute
       }
-    })
+    }
+    return if (permissions.isEmpty()) EnumSet.noneOf(PosixFilePermission::class.java) else EnumSet.copyOf(permissions)
+  }
 }
 
 class IjentPosixUserPrincipal(val uid: Int) : UserPrincipal {

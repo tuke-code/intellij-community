@@ -6,15 +6,20 @@ import com.intellij.openapi.diagnostic.debug
 import com.intellij.openapi.project.Project
 import com.intellij.platform.ml.embeddings.logging.EmbeddingSearchLogger
 import com.intellij.platform.ml.embeddings.search.indices.DiskSynchronizedEmbeddingSearchIndex
+import com.intellij.platform.ml.embeddings.search.indices.IndexType
 import com.intellij.platform.ml.embeddings.search.indices.IndexableEntity
 import com.intellij.platform.ml.embeddings.search.utils.ScoredText
+import com.intellij.platform.ml.embeddings.services.IndexPersistedEventsCounter
 import com.intellij.platform.ml.embeddings.services.LocalEmbeddingServiceProvider
 import com.intellij.platform.ml.embeddings.utils.generateEmbedding
 import com.intellij.util.TimeoutUtil
 import com.intellij.util.concurrency.annotations.RequiresBackgroundThread
-import kotlinx.coroutines.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.util.concurrent.atomic.AtomicInteger
@@ -25,7 +30,7 @@ abstract class DiskSynchronizedEmbeddingsStorage<T : IndexableEntity>(val projec
                                                                       private val cs: CoroutineScope) : EmbeddingsStorage {
   abstract val index: DiskSynchronizedEmbeddingSearchIndex
 
-  internal abstract val reportableIndex: EmbeddingSearchLogger.Index
+  internal abstract val reportableIndex: IndexType
 
   private val offloadRequest = MutableSharedFlow<Unit>(replay = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
   private val usageSessionCount = AtomicInteger(0)
@@ -59,6 +64,7 @@ abstract class DiskSynchronizedEmbeddingsStorage<T : IndexableEntity>(val projec
     if (isIndexLoaded) {
       index.saveToDisk()
       index.offload()
+      getIndexPersistedEventsCounter(project)?.let { cs.launch { it.sendPersistedCount(reportableIndex, project) } }
       isIndexLoaded = false
       logger.debug { "Offloaded index: ${reportableIndex.name}" }
     }
@@ -66,6 +72,8 @@ abstract class DiskSynchronizedEmbeddingsStorage<T : IndexableEntity>(val projec
       logger.debug { "Canceled index offloading, not loaded yet: ${reportableIndex.name}" }
     }
   }
+
+  private fun getIndexPersistedEventsCounter(project: Project) = IndexPersistedEventsCounter.EP_NAME.getExtensions(project).firstOrNull()
 
   suspend fun startIndexingSession() {
     usageSessionCount.incrementAndGet()

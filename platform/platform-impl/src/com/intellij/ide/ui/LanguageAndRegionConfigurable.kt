@@ -6,14 +6,14 @@ import com.intellij.help.impl.HelpManagerImpl
 import com.intellij.ide.IdeBundle
 import com.intellij.ide.Region
 import com.intellij.ide.RegionSettings
+import com.intellij.ide.RegionSettings.RegionSettingsListener
 import com.intellij.l10n.LocalizationListener
 import com.intellij.l10n.LocalizationStateService
 import com.intellij.l10n.LocalizationUtil
 import com.intellij.openapi.Disposable
-import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.components.service
 import com.intellij.openapi.extensions.ExtensionPointListener
 import com.intellij.openapi.extensions.PluginDescriptor
-import com.intellij.openapi.help.HelpManager
 import com.intellij.openapi.observable.properties.PropertyGraph
 import com.intellij.openapi.options.BoundSearchableConfigurable
 import com.intellij.openapi.ui.DialogPanel
@@ -26,6 +26,7 @@ import com.intellij.ui.dsl.builder.Panel
 import com.intellij.ui.dsl.builder.RightGap
 import com.intellij.ui.dsl.builder.bindItem
 import com.intellij.ui.dsl.builder.panel
+import com.intellij.util.application
 import com.intellij.util.messages.MessageBusConnection
 import com.intellij.util.ui.RestartDialog
 import kotlinx.coroutines.Runnable
@@ -69,14 +70,16 @@ class LanguageAndRegionUi {
 
             localizationService.setSelectedLocale(it.toLanguageTag())
 
-            ApplicationManager.getApplication().invokeLater {
-              RestartDialog.showRestartRequired()
+            application.invokeLater {
+              application.service<RestartDialog>().showRestartRequired()
             }
           }
           languageBox.bindItem(property)
 
-          connection.subscribe(LocalizationListener.UPDATE_TOPIC, Runnable {
-            model.selectedItem = LocalizationUtil.getLocale()
+          connection.subscribe(LocalizationListener.UPDATE_TOPIC, object : LocalizationListener {
+            override fun localeChanged() {
+              model.selectedItem = LocalizationUtil.getLocale()
+            }
           })
         }
         else {
@@ -109,7 +112,7 @@ class LanguageAndRegionUi {
       }
 
       panel.row(IdeBundle.message("combobox.region")) {
-        val helpUrl = (HelpManager.getInstance() as HelpManagerImpl).getHelpUrl("region-settings")
+        val helpUrl = HelpManagerImpl.getHelpUrl("region-settings")
 
         val model = CollectionComboBoxModel(Region.entries.sortedBy { it.displayOrdinal }, RegionSettings.getRegion())
         val regionBox = comboBox(model).accessibleName(IdeBundle.message("combobox.region")).widthGroup(comboGroup)
@@ -124,13 +127,15 @@ class LanguageAndRegionUi {
 
             RegionSettings.setRegion(it)
 
-            ApplicationManager.getApplication().invokeLater {
-              RestartDialog.showRestartRequired()
+            application.invokeLater {
+              application.service<RestartDialog>().showRestartRequired()
             }
           }
           regionBox.bindItem(property)
 
-          connection.subscribe(RegionSettings.UPDATE_TOPIC, Runnable { model.selectedItem = RegionSettings.getRegion() })
+          connection.subscribe(RegionSettingsListener.UPDATE_TOPIC, RegionSettingsListener {
+            model.selectedItem = RegionSettings.getRegion()
+          })
 
           regionBox.gap(RightGap.SMALL)
           cell(ContextHelpLabel.createWithBrowserLink(null, IdeBundle.message("combobox.region.hint"),
@@ -168,8 +173,8 @@ internal class LanguageAndRegionConfigurable :
     super.apply()
     if (initSelectionLanguage.toLanguageTag() != LocalizationUtil.getLocale().toLanguageTag() ||
         initSelectionRegion != RegionSettings.getRegion()) {
-      ApplicationManager.getApplication().invokeLater {
-        RestartDialog.showRestartRequired()
+      application.invokeLater {
+        application.service<RestartDialog>().showRestartRequired()
       }
     }
   }

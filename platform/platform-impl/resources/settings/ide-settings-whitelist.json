@@ -75,6 +75,7 @@
     "com.intellij.database:app:SqlFoldingSettings.*",
     "com.intellij:app:BaseRefactoringSettings.*",
     "com.intellij:app:ConsoleFoldingSettings.*",
+    "com.intellij:app:DateTimeFormatter.*",
     "com.intellij:app:EditorSettings.custom_soft_wrap_indent",
     "com.intellij:app:EditorSettings.insert_parentheses_automatically",
     "com.intellij:app:EditorSettings.is_ensure_newline_at_eof",
@@ -140,6 +141,7 @@
     "Docker:app:DockerSettings.dockerComposePath",
     "Docker:app:DockerSettings.dockerPath",
     "Git4Idea:app:Git-Application-Settings.*",
+    "hg4idea:app:HgGlobalSettings.*",
     "JavaScript:app:JSEditorOptions.*",
     "JavaScript:app:JsxEmmetOptions.*",
     "com.jetbrains.php:app:PhpAutoImport.*",
@@ -163,6 +165,10 @@
     "org.intellij.plugins.markdown:app:MarkdownCodeInsightSettings.insertNewTableRowOnShiftEnter",
     "org.intellij.plugins.markdown:app:MarkdownCodeInsightSettings.reformatTablesOnType",
     "org.intellij.plugins.markdown:app:MarkdownCodeInsightSettings.renumberListsOnType",
+    "org.jetbrains.plugins.github:app:GithubSettings.automatically_mark_as_viewed",
+    "org.jetbrains.plugins.github:app:GithubSettings.clone_git_using_ssh",
+    "org.jetbrains.plugins.github:app:GithubSettings.connection_timeout",
+    "org.jetbrains.plugins.github:app:GithubSettings.is_unread_markers_enabled",
     "org.jetbrains.plugins.go:app:DlvSettings.*",
     "org.jetbrains.plugins.go:app:Go.askConfirmationForShareInPlayground",
     "org.jetbrains.plugins.go:app:Go.convertJsonOnPaste",
@@ -201,6 +207,7 @@
     "Pythonid:app:PyDuplocatorSettings.distinguish_methods",
     "Pythonid:app:PyDuplocatorSettings.distinguish_variables",
     "Pythonid:app:PyDuplocatorSettings.lower_bound",
-    "Pythonid:app:PythonFoldingSettings.*"
+    "Pythonid:app:PythonFoldingSettings.*",
+    "Subversion:app:SvnApplicationSettings.mySvnCommandLine"
   ]
 }

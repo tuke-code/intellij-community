@@ -9,6 +9,8 @@ import com.intellij.psi.PsiPrimitiveType
 import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
 import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.analyze
+import org.jetbrains.kotlin.analysis.api.symbols.KaCallableSymbol
+import org.jetbrains.kotlin.analysis.api.symbols.KaClassSymbol
 import org.jetbrains.kotlin.analysis.api.symbols.KaFunctionSymbol
 import org.jetbrains.kotlin.analysis.api.symbols.receiverType
 import org.jetbrains.kotlin.analysis.api.types.KaClassType
@@ -19,6 +21,7 @@ import org.jetbrains.kotlin.idea.debugger.base.util.fqnToInternalName
 import org.jetbrains.kotlin.idea.debugger.base.util.internalNameToFqn
 import org.jetbrains.kotlin.idea.debugger.core.DebuggerUtils.trimIfMangledInBytecode
 import org.jetbrains.kotlin.idea.debugger.core.getJvmInternalClassName
+import org.jetbrains.kotlin.idea.debugger.core.getJvmInternalName
 import org.jetbrains.kotlin.idea.debugger.core.isInlineClass
 import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.resolve.jvm.JvmClassName
@@ -47,6 +50,7 @@ class KotlinSmartStepTargetFilterer(
     fun visitOrdinaryFunction(owner: String, name: String, signature: String) {
         val currentCount = functionCounter.increment("$owner.$name$signature") - 1
         for ((i, target) in targets.withIndex()) {
+            if (targetWasVisited[i]) continue
             if (target.shouldBeVisited(owner, name, signature, currentCount)) {
                 targetWasVisited[i] = true
                 break
@@ -55,40 +59,60 @@ class KotlinSmartStepTargetFilterer(
     }
 
     private fun KotlinMethodSmartStepTarget.shouldBeVisited(owner: String, name: String, signature: String, currentCount: Int): Boolean {
-        val actualName = name.trimIfMangledInBytecode(methodInfo.isNameMangledInBytecode)
-        // Inline class constructor argument is injected as the first
-        // argument in inline class' functions. This doesn't correspond
-        // with the PSI, so we delete the first argument from the signature
-        val updatedSignature = if (methodInfo.isInlineClassMember) signature.getSignatureWithoutFirstArgument() else signature
-        return matches(owner, actualName, updatedSignature, currentCount)
+        val (updatedOwner, updatedName, updatedSignature) = BytecodeSignature(owner, name, signature)
+            .handleMangling(methodInfo)
+            .handleValueClassMethods(methodInfo)
+            .handleDefaultArgs()
+            .handleDefaultInterfaces()
+            .handleAccessMethods()
+            .handleInvokeSuspend(methodInfo)
+        return matches(updatedOwner, updatedName, updatedSignature, currentCount)
     }
 
     private fun KotlinMethodSmartStepTarget.matches(owner: String, name: String, signature: String, currentCount: Int): Boolean {
-        if (methodInfo.name == name && ordinal == currentCount) {
-            val declaration = getDeclaration() ?: return false
-            if (declaration is KtClass) {
-                // it means the method is, in fact, the implicit primary constructor
+        if (ordinal != currentCount) return false
+        val nameMatches = if (methodInfo.isInternalMethod) internalNameMatches(name, methodInfo.name) else name == methodInfo.name
+        if (!nameMatches) return false
+        // Declaration may be empty only for invoke functions
+        // In this case, there is only one possible signature, so it should match
+        val declaration = getDeclaration() ?: return methodInfo.isInvoke
+        if (declaration is KtClass) {
+            // Standard methods may be also resolved to a class
+            when (name) {
+                "toString" -> return signature == "()Ljava/lang/String;"
+                "hashCode" -> return signature == "()I"
+                "equals" -> return signature == "(Ljava/lang/Object;)Z"
+            }
+            // it means the method is, in fact, the implicit primary constructor
+            analyze(declaration) {
                 return primaryConstructorMatches(declaration, owner, name, signature)
             }
-
-            val lightClassMethod by lazy { declaration.getLightClassMethod() }
-            if (methodInfo.isInlineClassMember || lightClassMethod == null) {
-                // Cannot create light class for functions with inline classes
-                return matchesBySignature(declaration, owner, signature)
-            }
-            return lightClassMethod!!.matches(owner, name, signature, debugProcess)
         }
-        return false
+
+        if (!methodInfo.isInlineClassMember) {
+            // Cannot create light class for functions with inline classes
+            val lightMethod = declaration.getLightClassMethod()
+            // Do not match by name, as it was already checked
+            val lightMethodMatch = lightMethod?.matches(owner, signature, debugProcess)
+            // Light method match still can fail in some Kotlin-specific cases (e.g., setter/getter signature)
+            if (lightMethodMatch == true) {
+                return true
+            }
+        }
+        return matchesBySignature(declaration, owner, signature)
     }
 
+    context(KaSession)
     private fun primaryConstructorMatches(declaration: KtClass, owner: String, name: String, signature: String): Boolean {
-        return name == "<init>" && signature == "()V" &&
-                owner.internalNameToFqn() == declaration.fqName?.asString()
+        if (name != "<init>" || signature != "()V") return false
+        val symbol = declaration.symbol as? KaClassSymbol ?: return false
+        val internalClassName = symbol.getJvmInternalName()
+        return owner == internalClassName
     }
 
     private fun matchesBySignature(declaration: KtDeclaration, owner: String, signature: String): Boolean {
         analyze(declaration) {
-            val symbol = declaration.symbol as? KaFunctionSymbol ?: return false
+            val symbol = declaration.symbol as? KaCallableSymbol ?: return false
             val declarationSignature = symbol.getJvmSignature()
             val declarationInternalName = symbol.getJvmInternalClassName()
             return signature == declarationSignature && owner.isSubClassOf(declarationInternalName)
@@ -101,9 +125,77 @@ class KotlinSmartStepTargetFilterer(
         }
 }
 
-private fun String.getSignatureWithoutFirstArgument(): String {
-    val type = Type.getType(this)
-    val arguments = type.argumentTypes.drop(1).joinToString("") { it.descriptor }
+private data class BytecodeSignature(val owner: String, val name: String, val signature: String)
+
+private fun BytecodeSignature.handleMangling(methodInfo: CallableMemberInfo): BytecodeSignature {
+    if (!methodInfo.isNameMangledInBytecode) return this
+    return copy(name = name.trimIfMangledInBytecode(true))
+}
+
+/**
+ * Inline class constructor argument is injected as the first
+ * argument in inline class' functions. This doesn't correspond
+ * with the PSI, so we delete the first argument from the signature
+ */
+private fun BytecodeSignature.handleValueClassMethods(methodInfo: CallableMemberInfo): BytecodeSignature {
+    if (!methodInfo.isInlineClassMember) return this
+    return copy(signature = buildSignature(signature, 1, fromStart = true))
+}
+
+/**
+ * Find the number of parameters in the source method.
+ * <p>
+ * If there are k params in the source method then in the modified method there are
+ * z = f(k) = k + 1 + ceil(k / 32) parameters as several int flags and one Object are added as parameters.
+ * This is the inverse function of f.
+ *
+ * @param z the number of parameters in the modified method
+ * @return the number of parameters in the source method
+ */
+private fun sourceParametersCount(z: Int): Int {
+    return z - 1 - (z - 1 + 32) / 33;
+}
+
+private fun BytecodeSignature.handleDefaultArgs(): BytecodeSignature {
+    if (!name.endsWith("\$default")) return this
+    val type = Type.getType(signature)
+    val parametersCount = type.argumentCount
+    val sourceParametersCount = sourceParametersCount(parametersCount)
+    return copy(
+        name = name.substringBefore("\$default"),
+        signature = buildSignature(signature, parametersCount - sourceParametersCount, fromStart = false)
+    )
+}
+
+private fun BytecodeSignature.handleDefaultInterfaces(): BytecodeSignature {
+    if (!owner.endsWith("\$DefaultImpls")) return this
+    return copy(
+        owner = owner.removeSuffix("\$DefaultImpls"),
+        signature = buildSignature(signature, 1, fromStart = true)
+    )
+}
+
+private fun BytecodeSignature.handleAccessMethods(): BytecodeSignature {
+    if (!name.startsWith("access\$")) return this
+    return copy(name = name.removePrefix("access\$"))
+}
+
+private fun BytecodeSignature.handleInvokeSuspend(methodInfo: CallableMemberInfo): BytecodeSignature {
+    if (!methodInfo.isSuspend || !methodInfo.isInvoke) return this
+    if (methodInfo.name != "invokeSuspend" || name != "invoke") return this
+    return copy(name = "invokeSuspend")
+}
+
+
+private fun buildSignature(
+    originalSignature: String,
+    dropCount: Int,
+    fromStart: Boolean,
+): String {
+    val type = Type.getType(originalSignature)
+    val argumentTypes = type.argumentTypes
+    val remainingArgumentTypes = if (fromStart) argumentTypes.drop(dropCount) else argumentTypes.dropLast(dropCount)
+    val arguments = remainingArgumentTypes.joinToString("") { it.descriptor }
     return "($arguments)${type.returnType.descriptor}"
 }
 
@@ -114,11 +206,11 @@ private fun KtDeclaration.getLightClassMethod(): PsiMethod? =
         else -> null
     }
 
-private fun PsiMethod.matches(className: String, methodName: String, signature: String, debugProcess: DebugProcessImpl): Boolean =
+private fun PsiMethod.matches(className: String, signature: String, debugProcess: DebugProcessImpl): Boolean =
     DebuggerUtilsEx.methodMatches(
         this,
         className.internalNameToFqn(),
-        methodName,
+        null,
         signature,
         debugProcess
     )
@@ -137,12 +229,19 @@ private fun String.isSubClassOf(baseInternalName: String?): Boolean {
 }
 
 context(KaSession)
-private fun KaFunctionSymbol.getJvmSignature(): String? {
+private fun KaCallableSymbol.getJvmSignature(): String? {
     val element = psi ?: return null
     val receiver = receiverType?.jvmName(element) ?: ""
-    val parameterTypes = valueParameters.map { it.returnType.jvmName(element) ?: return null }.joinToString("")
-    val returnType = returnType.jvmName(element) ?: return null
-    return "($receiver$parameterTypes)$returnType"
+    val isSuspend = this is KaFunctionSymbol && isSuspend()
+    val parameterTypes = if (this is KaFunctionSymbol) {
+        valueParameters.map { it.returnType.jvmName(element) ?: return null }.joinToString("")
+    } else ""
+    val returnType = when {
+        isSuspend -> "Ljava/lang/Object;"
+        else -> returnType.jvmName(element) ?: return null
+    }
+    val continuationParameter = if (isSuspend) "Lkotlin/coroutines/Continuation;" else ""
+    return "($receiver$parameterTypes$continuationParameter)$returnType"
 }
 
 context(KaSession)

@@ -6,6 +6,7 @@ import com.intellij.openapi.application.PathManager
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.util.registry.Registry
 import com.intellij.platform.backend.workspace.GlobalWorkspaceModelCache
+import com.intellij.platform.workspace.jps.serialization.impl.ApplicationLevelUrlRelativizer
 import com.intellij.platform.workspace.storage.MutableEntityStorage
 import com.intellij.platform.workspace.storage.impl.isConsistent
 import com.intellij.platform.workspace.storage.url.VirtualFileUrlManager
@@ -26,7 +27,7 @@ internal class GlobalWorkspaceModelCacheImpl(coroutineScope: CoroutineScope) : G
 
   private val urlRelativizer =
     if (Registry.`is`("ide.workspace.model.store.relative.paths.in.cache", true)) {
-      ApplicationLevelUrlRelativizer()
+      ApplicationLevelUrlRelativizer(insideIdeProcess = true)
     } else {
       null
     }

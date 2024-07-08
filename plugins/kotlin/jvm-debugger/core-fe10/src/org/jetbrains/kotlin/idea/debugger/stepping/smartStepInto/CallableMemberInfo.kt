@@ -6,8 +6,6 @@ import org.jetbrains.kotlin.analysis.api.symbols.KaConstructorSymbol
 import org.jetbrains.kotlin.analysis.api.symbols.KaFunctionSymbol
 import org.jetbrains.kotlin.analysis.api.symbols.KaNamedFunctionSymbol
 import org.jetbrains.kotlin.analysis.api.symbols.KaSymbolVisibility
-import org.jetbrains.kotlin.analysis.api.symbols.markers.KaSymbolWithVisibility
-import org.jetbrains.kotlin.descriptors.Visibilities
 import org.jetbrains.kotlin.idea.debugger.core.getByteCodeMethodName
 import org.jetbrains.kotlin.idea.debugger.core.getContainingClassOrObjectSymbol
 import org.jetbrains.kotlin.idea.debugger.core.isInlineClass
@@ -16,14 +14,14 @@ data class CallableMemberInfo(
     val isInvoke: Boolean,
     val isSuspend: Boolean,
     val isInlineClassMember: Boolean,
-    val hasInlineClassInValueParameters: Boolean,
+    val hasInlineClassInParameters: Boolean,
     val isInternalMethod: Boolean,
     val isExtension: Boolean,
     val isInline: Boolean,
     val name: String,
     var ordinal: Int,
 ) {
-    val isNameMangledInBytecode = isInlineClassMember || hasInlineClassInValueParameters
+    val isNameMangledInBytecode = isInlineClassMember || hasInlineClassInParameters
 }
 
 context(KaSession)
@@ -33,14 +31,14 @@ internal fun CallableMemberInfo(
     name: String = symbol.methodName()
 ): CallableMemberInfo {
     val isInvoke = symbol is KaNamedFunctionSymbol && symbol.isBuiltinFunctionInvoke
-    val isSuspend = symbol is KaNamedFunctionSymbol && symbol.isSuspend
+    val isSuspend = symbol.isSuspend()
     val effectiveName = if (isInvoke && isSuspend) "invokeSuspend" else name
     return CallableMemberInfo(
         isInvoke = isInvoke,
         isSuspend = isSuspend,
         isInlineClassMember = symbol.isInsideInlineClass(),
-        hasInlineClassInValueParameters = symbol.containsInlineClassInValueArguments(),
-        isInternalMethod = symbol is KaSymbolWithVisibility && symbol.visibility == KaSymbolVisibility.INTERNAL,
+        hasInlineClassInParameters = symbol.containsInlineClassInParameters(),
+        isInternalMethod = symbol.visibility == KaSymbolVisibility.INTERNAL,
         isExtension = symbol.isExtension,
         isInline = symbol is KaNamedFunctionSymbol && symbol.isInline,
         name = effectiveName,
@@ -48,9 +46,12 @@ internal fun CallableMemberInfo(
     )
 }
 
+internal fun KaFunctionSymbol.isSuspend(): Boolean = this is KaNamedFunctionSymbol && this.isSuspend
+
 context(KaSession)
-internal fun KaFunctionSymbol.containsInlineClassInValueArguments(): Boolean =
+internal fun KaFunctionSymbol.containsInlineClassInParameters(): Boolean =
     valueParameters.any { it.returnType.expandedSymbol?.isInlineClass() == true }
+            || receiverParameter?.type?.expandedSymbol?.isInlineClass() == true
 
 private fun KaFunctionSymbol.methodName() = when (this) {
     is KaNamedFunctionSymbol -> getByteCodeMethodName()
@@ -60,3 +61,4 @@ private fun KaFunctionSymbol.methodName() = when (this) {
 
 context(KaSession)
 internal fun KaFunctionSymbol.isInsideInlineClass(): Boolean = getContainingClassOrObjectSymbol()?.isInlineClass() == true
+

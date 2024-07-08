@@ -172,7 +172,11 @@ object DebuggerDiagnosticsUtil {
   @JvmOverloads
   fun getAttachments(process: DebugProcessImpl, first: Attachment? = null): Array<Attachment?> {
     val paramAttachment = if (first != null) listOf(first) else emptyList()
-    return (paramAttachment + createStateAttachments(process)).toArray(Attachment.EMPTY_ARRAY)
+    val result = paramAttachment + createStateAttachments(process)
+    for (attachment in result) {
+      attachment.isIncluded = true
+    }
+    return result.toArray(Attachment.EMPTY_ARRAY)
   }
 
   @JvmStatic
@@ -183,10 +187,15 @@ object DebuggerDiagnosticsUtil {
     else {
       try {
         recursionTracker.set(true)
-        return listOf(getDebuggerStateOverview(process),
-                      createThreadsAttachment(process),
-                      Attachment("IDE thread dump", noErr { ThreadDumper.dumpThreadsToString() })) +
-               process.suspendManager.eventContexts.map { it.toAttachment() }
+
+        return buildList {
+          add(getDebuggerStateOverview(process))
+          if (process.isAttached) {
+            add(createThreadsAttachment(process))
+          }
+          add(Attachment("IDE thread dump", noErr { ThreadDumper.dumpThreadsToString() }))
+          addAll(process.suspendManager.eventContexts.map { it.toAttachment() })
+        }
       }
       finally {
         recursionTracker.remove()

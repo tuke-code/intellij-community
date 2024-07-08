@@ -1368,6 +1368,11 @@ public abstract class K2IndyLambdaKotlinSteppingTestGenerated extends AbstractK2
             runTest("../testData/stepping/custom/filterInlineFunctionCalls.kt");
         }
 
+        @TestMetadata("filterInternalMethod.kt")
+        public void testFilterInternalMethod() throws Exception {
+            runTest("../testData/stepping/custom/filterInternalMethod.kt");
+        }
+
         @TestMetadata("filterNestedFunctionCalls.kt")
         public void testFilterNestedFunctionCalls() throws Exception {
             runTest("../testData/stepping/custom/filterNestedFunctionCalls.kt");
@@ -1393,9 +1398,19 @@ public abstract class K2IndyLambdaKotlinSteppingTestGenerated extends AbstractK2
             runTest("../testData/stepping/custom/filterSingleFunctionCall.kt");
         }
 
+        @TestMetadata("filterSmartStepIntoInterfaceImpl.kt")
+        public void testFilterSmartStepIntoInterfaceImpl() throws Exception {
+            runTest("../testData/stepping/custom/filterSmartStepIntoInterfaceImpl.kt");
+        }
+
         @TestMetadata("filterSmartStepWithInlineClass.kt")
         public void testFilterSmartStepWithInlineClass() throws Exception {
             runTest("../testData/stepping/custom/filterSmartStepWithInlineClass.kt");
+        }
+
+        @TestMetadata("filterSuspendCalls.kt")
+        public void testFilterSuspendCalls() throws Exception {
+            runTest("../testData/stepping/custom/filterSuspendCalls.kt");
         }
 
         @TestMetadata("finallyBlock.kt")
@@ -1851,6 +1866,11 @@ public abstract class K2IndyLambdaKotlinSteppingTestGenerated extends AbstractK2
         @TestMetadata("smartStepIntoToLambdaParameterAfterSam.kt")
         public void testSmartStepIntoToLambdaParameterAfterSam() throws Exception {
             runTest("../testData/stepping/custom/smartStepIntoToLambdaParameterAfterSam.kt");
+        }
+
+        @TestMetadata("smartStepIntoWithDefaultParameters.kt")
+        public void testSmartStepIntoWithDefaultParameters() throws Exception {
+            runTest("../testData/stepping/custom/smartStepIntoWithDefaultParameters.kt");
         }
 
         @TestMetadata("smartStepIntoWithDelegateWithSameName.kt")

@@ -330,19 +330,20 @@ private fun findRemoteMeta(clazz: Class<*>): Remote? {
 }
 
 private fun mergeRdTargets(
-  rdTarget: RdTarget,
+  forceRdTarget: RdTarget,
   remote: Remote,
   vararg args: Any?
 ): RdTarget {
-  val rdTargets = args.filterIsInstance<RefWrapper>()
+  val argsRdTargets = args.filterIsInstance<RefWrapper>()
     .map { it.getRef().rdTarget() }
 
-  return (rdTargets + rdTarget + remote.rdTarget).reduce { acc, b ->
+  return (argsRdTargets + forceRdTarget + remote.rdTarget).reduce { acc, b ->
     if (acc == RdTarget.DEFAULT) b
     else if (b == RdTarget.DEFAULT) acc
     else if (acc == b) acc
-    else throw IllegalStateException("Inconsistent rdTargets. " +
-                                     "ForceRdTarget=$rdTarget " +
+    else throw IllegalStateException("Inconsistent rdTargets. Use can not request service with non default RtTarget as service of another non default RtTarget." +
+                                     "Consider introducing a separate service or changing type of the service to RdDefault." +
+                                     "ForceRdTarget=$forceRdTarget " +
                                      "Remote(value=${remote.value}, rdTarget=${remote.rdTarget}), " +
                                      "Args: [${args.filterIsInstance<RefWrapper>().map { "${it.getRef().rdTarget()} -> $it" }.joinToString()}]"
     )

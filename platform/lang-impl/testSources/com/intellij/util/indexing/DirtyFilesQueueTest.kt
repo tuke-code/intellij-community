@@ -3,6 +3,7 @@ package com.intellij.util.indexing
 
 import com.intellij.find.TextSearchService
 import com.intellij.ide.impl.ProjectUtil
+import com.intellij.ide.impl.ProjectUtilCore
 import com.intellij.ide.plugins.PluginManagerCore
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.EDT
@@ -13,6 +14,7 @@ import com.intellij.openapi.fileTypes.ExtensionFileNameMatcher
 import com.intellij.openapi.fileTypes.FileTypeManager
 import com.intellij.openapi.fileTypes.impl.FileTypeManagerImpl
 import com.intellij.openapi.module.Module
+import com.intellij.openapi.module.ModuleManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.getProjectCachePath
 import com.intellij.openapi.roots.ModuleRootManager
@@ -27,6 +29,7 @@ import com.intellij.openapi.vfs.writeText
 import com.intellij.psi.search.FileTypeIndex
 import com.intellij.psi.search.GlobalSearchScope
 import com.intellij.testFramework.*
+import com.intellij.testFramework.LightProjectDescriptor.TEST_MODULE_NAME
 import com.intellij.testFramework.TestActionEvent.createTestEvent
 import com.intellij.testFramework.assertions.Assertions.assertThat
 import com.intellij.testFramework.utils.vfs.createFile
@@ -37,7 +40,6 @@ import com.intellij.util.indexing.PersistentDirtyFilesQueue.getQueuesDir
 import com.intellij.util.indexing.diagnostic.IndexDiagnosticDumper
 import com.intellij.util.indexing.diagnostic.IndexDiagnosticDumper.Companion.readJsonIndexingActivityDiagnostic
 import com.intellij.util.indexing.diagnostic.IndexDiagnosticDumperUtils
-import com.intellij.util.indexing.diagnostic.ScanningType
 import com.intellij.util.indexing.diagnostic.dto.JsonIndexingActivityDiagnostic
 import com.intellij.util.indexing.diagnostic.dto.JsonProjectScanningHistory
 import com.intellij.util.indexing.diagnostic.dto.JsonProjectScanningHistoryTimes
@@ -46,6 +48,7 @@ import com.intellij.workspaceModel.ide.impl.WorkspaceModelCacheImpl
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import org.junit.*
+import org.junit.rules.TestName
 import org.junit.runner.RunWith
 import org.junit.runners.JUnit4
 import java.nio.file.Path
@@ -66,6 +69,10 @@ class DirtyFilesQueueTest {
   @Rule
   @JvmField
   val tempDir: TemporaryDirectory = TemporaryDirectory()
+
+  @Rule
+  @JvmField
+  val testNameRule = TestName()
 
   private lateinit var testRootDisposable: CheckedDisposable
 
@@ -100,7 +107,7 @@ class DirtyFilesQueueTest {
   @Test
   fun `test queues removed from disk after invalidating caches`() {
     runBlocking {
-      openProject("test_queues_removed_from_disk_after_invalidating_caches") { project, module ->
+      openProject(testNameRule.methodName) { project, module ->
         val src = tempDir.createVirtualDir("src")
         writeAction {
           val rootModel = ModuleRootManager.getInstance(module).modifiableModel
@@ -144,16 +151,15 @@ class DirtyFilesQueueTest {
 
   private fun doTestFileIsIndexedAfterItWasEditedWhenProjectWasClosed(fileCount: Int, expectFullScanning: Boolean, restartApp: Boolean) {
     runBlocking {
-      val name = "test_file_is_indexed_after_it_was_edited_when_project_was_closed_fileCount_${fileCount}_expecteFullScanning_${expectFullScanning}"
-      val projectFile = TemporaryDirectory.generateTemporaryPath("project_${name}")
+      val projectFile = TemporaryDirectory.generateTemporaryPath("project_${testNameRule.methodName.replace(' ', '_')}")
       val fileNames = (0 until fileCount).map { "A$it.txt" }
       val commonPrefix1 = "common_prefix_1_" + (0 until 10).map { Random.nextInt('A'.code, 'Z'.code).toChar() }.joinToString("")
       val commonPrefix2 = "common_prefix_2_" + (0 until 10).map { Random.nextInt('A'.code, 'Z'.code).toChar() }.joinToString("")
 
-      val files = openProject(name, projectFile, save = true) { project, module ->
+      val files = openProject(testNameRule.methodName, projectFile, save = true) { project, module ->
         val src = tempDir.createVirtualDir("src")
         writeAction {
-          val rootModel = ModuleRootManager.getInstance(module).modifiableModel
+          val rootModel = ModuleRootManager.getInstance(module!!).modifiableModel
           rootModel.addContentEntry(src)
           rootModel.commit()
         }
@@ -179,7 +185,7 @@ class DirtyFilesQueueTest {
       if (restartApp) {
         restart(skipFullScanning = true) // persist orphan queue
       }
-      openProject(name, projectFile, withIndexingHistory = true) { project, _ ->
+      openProject(testNameRule.methodName, projectFile, withIndexingHistory = true) { project, _ ->
         smartReadAction(project) {
           val foundFiles = findFilesWithText(commonPrefix2, project)
           assertThat(foundFiles).containsAll(files)
@@ -223,16 +229,15 @@ class DirtyFilesQueueTest {
   }
 
   private fun testDirtyFileIsIndexedAfterFileBasedIndexIsRestarted(skipFullScanning: Boolean) {
-    val projectName = "test_dirty_file_is_indexed_after_FileBasedIndex_is_restarted_${if (skipFullScanning) "(skip_full_scanning)" else "(with_full_scanning)"}"
     runBlocking {
-      openProject(projectName, withIndexingHistory = true) { project, module ->
+      openProject(testNameRule.methodName, withIndexingHistory = true) { project, module ->
         val fileBasedIndex = FileBasedIndex.getInstance() as FileBasedIndexImpl
         val filetype = FakeFileType()
         registerFiletype(filetype)
         val src = tempDir.createVirtualDir("src")
 
         writeAction {
-          val rootModel = ModuleRootManager.getInstance(module).modifiableModel
+          val rootModel = ModuleRootManager.getInstance(module!!).modifiableModel
           rootModel.addContentEntry(src)
           rootModel.commit()
         }
@@ -254,16 +259,15 @@ class DirtyFilesQueueTest {
 
   @Test
   fun `test removed dirty file is removed from indexes after FileBasedIndex is restarted (skip full scanning)`() {
-    val projectName = "test_removed_dirty_file_is_removed_from_indexes_after_FileBasedIndex_is_restarted_(skip_full_scanning)"
     runBlocking {
-      openProject(projectName, withIndexingHistory = true) { project, module ->
+      openProject(testNameRule.methodName, withIndexingHistory = true) { project, module ->
         val fileBasedIndex = FileBasedIndex.getInstance() as FileBasedIndexImpl
         val filetype = FakeFileType()
         registerFiletype(filetype)
         val src = tempDir.createVirtualDir("src")
 
         val file = writeAction {
-          val rootModel = ModuleRootManager.getInstance(module).modifiableModel
+          val rootModel = ModuleRootManager.getInstance(module!!).modifiableModel
           rootModel.addContentEntry(src)
           rootModel.commit()
           src.createFile("A.${filetype.defaultExtension}")
@@ -292,6 +296,7 @@ class DirtyFilesQueueTest {
                                       save: Boolean = false,
                                       withIndexingHistory: Boolean = false,
                                       action: suspend (Project, Module) -> T): T {
+    val reopenProject = ProjectUtilCore.isValidProjectPath(projectFile)
     projectFile.createDirectories()
     val options = createTestOpenProjectOptions().copy(projectName = name)
     if (withIndexingHistory) {
@@ -302,7 +307,7 @@ class DirtyFilesQueueTest {
       WorkspaceModelCacheImpl.forceEnableCaching(testRootDisposable)
     }
     val project = ProjectUtil.openOrImportAsync(projectFile, options)!!
-    val module = configureModule(project)
+    val module = if (reopenProject) ModuleManager.getInstance(project).findModuleByName(TEST_MODULE_NAME)!! else configureModule(project)
     return project.useProjectAsync(save = save) {
       val res = action(project, module)
       IndexingTestUtil.suspendUntilIndexesAreReady(project)
@@ -339,7 +344,7 @@ class DirtyFilesQueueTest {
 
   private fun assertIsFullScanning(scanning: JsonIndexingActivityDiagnostic, fullScanning: Boolean) {
     val times = (scanning.projectIndexingActivityHistory.times as JsonProjectScanningHistoryTimes)
-    assertThat(times.scanningType).isEqualTo(if (fullScanning) ScanningType.FULL_ON_PROJECT_OPEN else ScanningType.PARTIAL_ON_PROJECT_OPEN)
+    assertThat(times.scanningType.isFull).isEqualTo(fullScanning)
   }
 
   private fun findScanningTriggeredBy(project: Project, @Suppress("SameParameterValue") reason: String): JsonIndexingActivityDiagnostic {

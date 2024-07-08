@@ -1177,6 +1177,11 @@ public abstract class ExtractionTestGenerated extends AbstractExtractionTest {
                 runTest("testData/refactoring/extractFunction/basic/privateSetter.kt");
             }
 
+            @TestMetadata("quotedName.kt")
+            public void testQuotedName() throws Exception {
+                runTest("testData/refactoring/extractFunction/basic/quotedName.kt");
+            }
+
             @TestMetadata("refInReturn.kt")
             public void testRefInReturn() throws Exception {
                 runTest("testData/refactoring/extractFunction/basic/refInReturn.kt");
@@ -3934,6 +3939,11 @@ public abstract class ExtractionTestGenerated extends AbstractExtractionTest {
             @TestMetadata("propertyAccessor.kt")
             public void testPropertyAccessor() throws Exception {
                 runTest("testData/refactoring/introduceParameter/propertyAccessor.kt");
+            }
+
+            @TestMetadata("quotedName.kt")
+            public void testQuotedName() throws Exception {
+                runTest("testData/refactoring/introduceParameter/quotedName.kt");
             }
 
             @TestMetadata("resultedType.kt")

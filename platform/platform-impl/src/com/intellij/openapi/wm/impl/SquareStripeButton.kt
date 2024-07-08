@@ -6,7 +6,6 @@ import com.intellij.icons.AllIcons
 import com.intellij.ide.HelpTooltip
 import com.intellij.ide.actions.ActivateToolWindowAction
 import com.intellij.ide.actions.ToolWindowMoveAction
-import com.intellij.ide.actions.ToolWindowShowNamesAction
 import com.intellij.ide.ui.UISettings
 import com.intellij.openapi.actionSystem.*
 import com.intellij.openapi.actionSystem.impl.ActionButton
@@ -135,7 +134,7 @@ internal class SquareStripeButton(action: SquareAnActionButton, val toolWindow: 
           val text = toolWindow.stripeShortTitleProvider?.get() ?: toolWindow.stripeTitleProvider.get()
           val button = this@SquareStripeButton
           val insets = button.insets
-          val textOffset = if (UISettings.Companion.getInstance().compactMode) 6 else 8
+          val textOffset = if (UISettings.Companion.getInstance().compactMode) 4 else 6
           val x = insets.left + JBUI.scale(textOffset)
           val y = iconPosition.y + JBUI.scale(3)
           val totalWidth = button.width - insets.left - insets.right - JBUI.scale(textOffset * 2)
@@ -296,7 +295,7 @@ private fun createPopupGroup(toolWindow: ToolWindowImpl): DefaultActionGroup {
   group.add(createMoveGroup())
   group.addSeparator()
   if (ResizeStripeManager.enabled()) {
-    group.add(ToolWindowShowNamesAction())
+    group.add(ActionManager.getInstance().getAction("ToolWindowShowNamesAction")!!)
   }
   return group
 }

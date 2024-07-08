@@ -433,12 +433,28 @@ public final class JBUI {
         return JBColor.namedColor("Button.endBackground", JBColor.namedColor("Button.darcula.endColor", 0x414648));
       }
 
+      public static @NotNull Color buttonForeground() {
+        return JBColor.namedColor("Button.foreground", 0x000000, 0xDFE1E5);
+      }
+
+      public static @NotNull Color buttonLoadingForeground() {
+        return JBColor.namedColor("Button.loadingForeground", 0x818594, 0x868A91);
+      }
+
       public static @NotNull Color defaultButtonColorStart() {
         return JBColor.namedColor("Button.default.startBackground", JBColor.namedColor("Button.darcula.defaultStartColor", 0x384f6b));
       }
 
       public static @NotNull Color defaultButtonColorEnd() {
         return JBColor.namedColor("Button.default.endBackground", JBColor.namedColor("Button.darcula.defaultEndColor", 0x233143));
+      }
+
+      public static @NotNull Color defaultButtonForeground() {
+        return JBColor.namedColor("Button.default.foreground", 0xFFFFFF, 0xFFFFFF);
+      }
+
+      public static @NotNull Color defaultButtonLoadingForeground() {
+        return JBColor.namedColor("Button.default.loadingForeground", 0xD3D5DB, 0xCED0D6);
       }
 
       public static @NotNull Color focusBorderColor(boolean isDefaultButton) {
@@ -1260,11 +1276,11 @@ public final class JBUI {
       }
 
       public static @NotNull Insets stripeToolbarButtonIconPadding(boolean compactMode, boolean showNames) {
-        return insets(stripeToolbarButtonIconPaddingKey(), compactMode
-                                                           ? defaultStripeToolbarButtonIconPaddingForCompactMode()
-                                                           : showNames
-                                                             ? defaultStripeToolbarButtonIconPaddingForNames()
-                                                             : defaultStripeToolbarButtonIconPadding());
+        return insets(stripeToolbarButtonIconPaddingKey(), showNames
+                                                           ? compactMode
+                                                             ? defaultStripeToolbarButtonIconPaddingForCompactMode()
+                                                             : defaultStripeToolbarButtonIconPaddingForNames()
+                                                           : defaultStripeToolbarButtonIconPadding());
       }
 
       public static @NotNull String stripeToolbarButtonIconPaddingKey() {
@@ -1280,7 +1296,7 @@ public final class JBUI {
       }
 
       public static @NotNull JBInsets defaultStripeToolbarButtonIconPaddingForCompactMode() {
-        return insets(3, 2, 4, 2);
+        return insets(3);
       }
     }
 
@@ -2455,13 +2471,21 @@ public final class JBUI {
       public static final class LicenseList {
         private static final @NotNull Color LICENSE_DETAILS_COLOR =
           JBColor.namedColor("LicenseDialog.LicenseList.licenseDetailsForeground", 0xC9CCD6, 0x9DA0A8);
-
         private static final @NotNull Color SEPARATOR_COLOR =
-          JBColor.namedColor("LicenseDialog.LicenseList.separatorColor", 0x818594, 0x6F737A);
+          JBColor.namedColor("LicenseDialog.LicenseList.separatorColor", 0xD3D5DB, 0x43454A);
 
         public static @NotNull Color getLicenseDetailsColor() {
           return LICENSE_DETAILS_COLOR;
         }
+
+        public static @NotNull Color getSeparatorColor() {
+          return SEPARATOR_COLOR;
+        }
+      }
+
+      public static final class LicenseServer {
+        private static final @NotNull Color SEPARATOR_COLOR =
+          JBColor.namedColor("LicenseDialog.LicenseServer.separatorColor", 0xEBECF0, 0x393B40);
 
         public static @NotNull Color getSeparatorColor() {
           return SEPARATOR_COLOR;

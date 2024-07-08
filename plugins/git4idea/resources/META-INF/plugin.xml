@@ -704,6 +704,8 @@
 
     <applicationService serviceImplementation="git4idea.index.ui.GitStageUiApplicationSettings"/>
 
+    <recentProjectsBranchesProvider implementation="git4idea.repo.GitRecentProjectsBranchesProvider"/>
+
     <vcs.taskHandler implementation="git4idea.GitTaskHandler"/>
 
     <logHighlighterFactory implementation="git4idea.branch.DeepComparator$Factory"/>
@@ -856,8 +858,10 @@
   </extensions>
 
   <extensionPoints>
+    <!--suppress PluginXmlValidity -->
     <extensionPoint interface="git4idea.remote.GitHttpAuthDataProvider" name="GitHttpAuthDataProvider" dynamic="true"/>
     <extensionPoint interface="git4idea.remote.GitRepositoryHostingService" name="gitRepositoryHostingService" dynamic="true"/>
+    <!--suppress PluginXmlValidity -->
     <extensionPoint interface="git4idea.checkin.GitCheckinExplicitMovementProvider"
                     name="GitCheckinExplicitMovementProvider"
                     dynamic="true"/>
@@ -899,8 +903,5 @@
     <listener class="git4idea.ui.branch.GitBranchWidget$SettingsListener"
               activeInHeadlessMode="false" activeInTestMode="false"
               topic="com.intellij.ide.ui.UISettingsListener"/>
-    <listener class="git4idea.branch.RecentProjectBranchUpdater"
-              activeInHeadlessMode="false" activeInTestMode="false"
-              topic="com.intellij.openapi.vcs.BranchChangeListener"/>
   </projectListeners>
 </idea-plugin>

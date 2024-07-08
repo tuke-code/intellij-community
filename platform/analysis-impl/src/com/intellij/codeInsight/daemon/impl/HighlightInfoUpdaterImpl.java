@@ -282,6 +282,7 @@ final class HighlightInfoUpdaterImpl extends HighlightInfoUpdater implements Dis
    *               {@code Class<? extends Annotator>}: the tool is an {@link com.intellij.lang.annotation.Annotator} of the corresponding class
    *               {@code Class<? extends HighlightVisitor>}: the tool is a {@link HighlightVisitor} of the corresponding class
    */
+  @Override
   synchronized void psiElementVisited(@NotNull Object toolId,
                                       @NotNull PsiElement visitedPsiElement,
                                       @NotNull List<? extends HighlightInfo> newInfos,
@@ -341,7 +342,7 @@ final class HighlightInfoUpdaterImpl extends HighlightInfoUpdater implements Dis
 
       for (HighlightInfo info : newInfos) {
         if (info.isFileLevelAnnotation()) {
-          RangeHighlighterEx salvagedHighlighter = toReuse.pickupHighlighterFromGarbageBin(0, psiFile.getTextLength(), -409423948);
+          RangeHighlighterEx salvagedHighlighter = toReuse.pickupFileLevelRangeHighlighter(psiFile.getTextLength());
           HighlightInfo oldFileInfo = salvagedHighlighter == null ? null : HighlightInfo.fromRangeHighlighter(salvagedHighlighter);
 
           if (oldFileInfo != null) {

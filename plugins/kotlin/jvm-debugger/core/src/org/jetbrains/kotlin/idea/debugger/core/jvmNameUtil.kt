@@ -7,10 +7,11 @@ import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.analyze
 import org.jetbrains.kotlin.analysis.api.annotations.KaAnnotationValue
-import org.jetbrains.kotlin.analysis.api.annotations.annotations
 import org.jetbrains.kotlin.analysis.api.base.KaConstantValue
 import org.jetbrains.kotlin.analysis.api.symbols.*
+import org.jetbrains.kotlin.analysis.decompiler.psi.file.KtClsFile
 import org.jetbrains.kotlin.fileClasses.JvmFileClassUtil
+import org.jetbrains.kotlin.fileClasses.javaFileFacadeFqName
 import org.jetbrains.kotlin.idea.debugger.base.util.fqnToInternalName
 import org.jetbrains.kotlin.idea.debugger.base.util.internalNameToFqn
 import org.jetbrains.kotlin.psi.KtDeclaration
@@ -43,21 +44,30 @@ fun KtDeclaration.getClassName(): String? = analyze(this) {
 
 context(KaSession)
 @ApiStatus.Internal
-fun KaFunctionSymbol.getJvmInternalClassName(): String? {
+fun KaCallableSymbol.getJvmInternalClassName(): String? {
     val classOrObject = getContainingClassOrObjectSymbol()
-    return if (classOrObject == null) {
-        val fileSymbol = containingFile ?: return null
-        val file = fileSymbol.psi as? KtFile ?: return null
-        JvmFileClassUtil.getFileClassInfoNoResolve(file).facadeClassFqName.asString().fqnToInternalName()
-    } else {
-        val classId = classOrObject.classId ?: return null
-        JvmClassName.internalNameByClassId(classId)
+    if (classOrObject != null) {
+        return classOrObject.getJvmInternalName()
     }
+    val fileSymbol = containingFile ?: return null
+    val file = fileSymbol.psi as? KtFile ?: return null
+    if (file is KtClsFile) {
+        return file.javaFileFacadeFqName.asString().fqnToInternalName()
+    }
+    return JvmFileClassUtil.getFileClassInfoNoResolve(file).facadeClassFqName.asString().fqnToInternalName()
+}
+
+@ApiStatus.Internal
+fun KaClassSymbol.getJvmInternalName(): String? {
+    val classId = classId ?: return null
+    val internalName = JvmClassName.internalNameByClassId(classId)
+    if (internalName == "kotlin/Any") return "java/lang/Object"
+    return internalName
 }
 
 context(KaSession)
 @ApiStatus.Internal
-fun KaFunctionSymbol.getContainingClassOrObjectSymbol(): KaClassSymbol? {
+fun KaCallableSymbol.getContainingClassOrObjectSymbol(): KaClassSymbol? {
     var symbol = containingSymbol
     while (symbol != null) {
         if (symbol is KaClassSymbol) return symbol

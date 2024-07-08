@@ -668,6 +668,7 @@
       "testResourcesRoot.svg": "modules/testResourcesRoot.svg",
       "testRoot.svg": "modules/testRoot.svg",
       "testSourceFolder.svg": "nodes/testSourceFolder.svg",
+      "textArea.svg": "nodes/textArea.svg",
       "type.svg": "nodes/type.svg",
       "unloadedModule.svg": "modules/unloadedModule.svg",
       "upFolder.svg": "nodes/upFolder.svg",
@@ -831,7 +832,7 @@
     "toolbar": {
       "unknown.svg": "toolbar/unknown.svg"
     },
-    "toolwindow": {
+    "toolwindows": {
       "ant.svg": "toolwindows/toolWindowAnt.svg",
       "bookmarks.svg": "toolwindows/toolWindowBookmarks.svg",
       "build.svg": "toolwindows/toolWindowBuild.svg",
@@ -872,7 +873,10 @@
     "vcs": {
       "diff.svg": "actions/diff.svg",
       "changes.svg": "actions/listChanges.svg",
-      "commit.svg": "actions/commit.svg",
+      "commit.svg": [
+        "actions/commit.svg",
+        "vcs/commitNode.svg"
+      ],
       "revert.svg": "actions/rollback.svg",
       "update.svg": "actions/checkOut.svg",
       "fetch.svg": "vcs/fetch.svg",

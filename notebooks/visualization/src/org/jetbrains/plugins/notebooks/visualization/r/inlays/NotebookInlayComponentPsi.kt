@@ -321,9 +321,7 @@ abstract class NotebookInlayComponent(protected val editor: EditorImpl)
       shouldLimitMaxHeight = false
     }
 
-    InlayStateCustomizer.EP.extensionList
-      .filter { it.isApplicableTo(output::class.java) }
-      .forEach { customizer -> customizer.customize(output) }
+    InlayStateCustomizer.customize(output)
 
     if (UiCustomizer.instance.isResizeOutputToPreviewHeight && size.height == InlayDimensions.smallHeight) {
       deltaSize(0, InlayDimensions.previewHeight - size.height)
@@ -340,22 +338,21 @@ abstract class NotebookInlayComponent(protected val editor: EditorImpl)
       if (state != null) {
         remove(state)
       }
-      state = MultiOutputProvider.EP.extensionList.firstOrNull()?.create(editor, disposable) ?: TabbedMultiOutput(editor, disposable)
-      state?.apply {
-        onHeightCalculated = { height ->
+      state = TabbedMultiOutput(editor, disposable).also { st ->
+        st.onHeightCalculated = { height ->
           ApplicationManager.getApplication().invokeLater {
             adjustSize(height)
           }
         }
-        clearAction = cleanup
-      }?.also { addState(it) }
+        st.clearAction = cleanup
+        addState(st)
+      }
     }
+
     resizable = true
-    (state as? NotebookInlayMultiOutput)?.let { st ->
+    (state as? NotebookInlayMultiOutput)?.also { st ->
       st.onOutputs(inlayOutputs)
-      InlayStateCustomizer.EP.extensionList
-        .filter { it.isApplicableTo(st::class.java) }
-        .forEach { customizer -> customizer.customize(st) }
+      InlayStateCustomizer.customize(st)
     }
   }
 

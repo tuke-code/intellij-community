@@ -248,7 +248,7 @@ The Python plug-in provides smart editing for Python scripts. The feature set of
                      key="INSP.NAME.requirements" groupKey="INSP.GROUP.python" enabledByDefault="true" level="WARNING"
                      implementationClass="com.jetbrains.python.inspections.PyPackageRequirementsInspection"/>
     <localInspection language="Python" shortName="PyPep8Inspection" suppressId="PyPep8" bundle="messages.PyPsiBundle"
-                     key="INSP.pep8.coding.style.violation" groupKey="INSP.GROUP.python" enabledByDefault="true" level="WEAK WARNING"
+                     key="INSP.pep8.coding.style.violation" groupKey="INSP.GROUP.python" enabledByDefault="true" level="INFORMATION"
                      implementationClass="com.jetbrains.python.inspections.PyPep8Inspection" unfair="true"/>
     <localInspection language="Python" shortName="PyInterpreterInspection" suppressId="PyInterpreter" bundle="messages.PyPsiBundle"
                      key="INSP.NAME.invalid.interpreter" groupKey="INSP.GROUP.python" enabledByDefault="true" level="WARNING"
@@ -361,6 +361,7 @@ The Python plug-in provides smart editing for Python scripts. The feature set of
     <editorSmartKeysConfigurable instance="com.jetbrains.python.codeInsight.PySmartKeysOptions" id="editor.preferences.pyOptions"
                                  bundle="messages.PyBundle"
                                  key="configurable.PySmartKeysOptions.display.name"/>
+    <codeCompletionConfigurable instance="com.jetbrains.python.codeInsight.completion.PythonCodeCompletionConfigurable"/>
 
 
     <psi.referenceContributor implementation="com.jetbrains.python.codeInsight.PyConsoleFileReferenceContributor" language="Python"
@@ -622,6 +623,10 @@ The Python plug-in provides smart editing for Python scripts. The feature set of
 
     <registryKey key="python.new.interpreter.creation.ui" defaultValue="true"
                  description="Enable new UI for adding Python interpreter in New Project dialog."/>
+
+    <!-- Parameter Info -->
+    <registryKey key="python.parameter.info.show.all.hints" defaultValue="false"
+                 description="Show type hints for all parameters in parameter info window"/>
   </extensions>
 
   <extensionPoints>

@@ -99,9 +99,9 @@ public final class JavaDifferentiateStrategy extends JvmDifferentiateStrategyImp
     JvmClass.Diff classDiff = change.getDiff();
     debug("Processing changed class ", changedClass.getName());
     
-    if (classDiff.superClassChanged() || classDiff.signatureChanged() || classDiff.becameSealed() || !classDiff.interfaces().unchanged()) {
+    if (classDiff.superClassChanged() || classDiff.signatureChanged() || !classDiff.interfaces().unchanged()) {
       boolean extendsChanged = classDiff.superClassChanged() && !classDiff.extendsAdded();
-      boolean affectUsages = classDiff.signatureChanged() || extendsChanged || !isEmpty(classDiff.interfaces().removed());
+      boolean affectUsages = classDiff.signatureChanged() || extendsChanged || !classDiff.interfaces().unchanged();
       affectSubclasses(context, future, change.getNow().getReferenceID(), affectUsages);
 
       if (extendsChanged) {
@@ -123,6 +123,14 @@ public final class JavaDifferentiateStrategy extends JvmDifferentiateStrategyImp
           debug("Affecting usages in generic type parameter bounds of class: ", parent);
           context.affectUsage(new ClassAsGenericBoundUsage(parent));
         }
+      }
+    }
+    else if (change.getNow().isSealed()) {
+      ReferenceID fromClass = change.getNow().getReferenceID();
+      Set<ReferenceID> permitted = collect(map(filter(change.getNow().getUsages(), u -> u instanceof ClassPermitsUsage), Usage::getElementOwner), new SmartHashSet<>());
+      debug("Affecting non-permitted subclasses of a sealed class: ", fromClass);
+      for (ReferenceID cl : filter(future.allSubclasses(fromClass), c -> !permitted.contains(c))) {
+        affectNodeSources(context, cl, "Affecting source file of a non-permitted subclass: ", future);
       }
     }
 

@@ -69,7 +69,7 @@ public class SuspendManagerImpl implements SuspendManager {
             myFrozenThreads.remove(getEventThread());
             getEventThread().resume();
             if (LOG.isDebugEnabled()) {
-              LOG.debug("Thread resumed : " + getEventThread().toString());
+              LOG.debug("Thread resumed : " + getEventThread());
             }
           }
           case EventRequest.SUSPEND_NONE -> LOG.debug("None resumed");
@@ -112,7 +112,8 @@ public class SuspendManagerImpl implements SuspendManager {
     myEventContexts.addFirst(suspendContext);
     suspends++;
     if (LOG.isDebugEnabled()) {
-      LOG.debug("Push context : Suspends = " + suspends);
+      LOG.debug("Push context : " + suspendContext);
+      LOG.debug("Suspends = " + suspends);
     }
 
     if (DebuggerUtils.isAlwaysSuspendThreadBeforeSwitch()) {
@@ -243,10 +244,17 @@ public class SuspendManagerImpl implements SuspendManager {
       logError("Thread " + thread + " is already suspended at the breakpoint for " + context);
     }
 
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Thread " + thread + " is going to be suspended in " + context);
+    }
+
     if (context.isExplicitlyResumed(thread)) {
       context.myResumedThreads.remove(thread);
       context.myNotExecutableThreads.remove(thread);
       performIfNoNewInvocationWatcherTrackThisContext(context, () -> thread.suspend());
+    }
+    else {
+      logError("Thread " + thread + " is trying to be suspended in " + context + " but it is not in explicitly resumed threads");
     }
   }
 
@@ -254,6 +262,13 @@ public class SuspendManagerImpl implements SuspendManager {
   public void resumeThread(@NotNull SuspendContextImpl context, @NotNull ThreadReferenceProxyImpl thread) {
     if (context.isExplicitlyResumed(thread)) {
       logError("Thread " + thread + " was in explicitly resumed threads for " + context);
+    }
+
+    if (context.getSuspendPolicy() == EventRequest.SUSPEND_EVENT_THREAD && context.getEventThread() != thread) {
+      logError("Suspend-thread context " + context + " should not resume another thread " + thread);
+    }
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Thread " + thread + " is going to be resumed in " + context);
     }
 
     if (context.myResumedThreads == null) {
@@ -269,6 +284,9 @@ public class SuspendManagerImpl implements SuspendManager {
     if (watching != null && watching.mySuspendAllContext == context) {
       // Now there is a long invocation in progress, so do not perform actual operations.
       // The watcher will block all when the invocation finished.
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("No actual thread suspending/resuming happens in " + context + " because of suspend all invocation is going");
+      }
     }
     else {
       runnable.run();

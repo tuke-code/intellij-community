@@ -140,14 +140,15 @@ public final class XLineBreakpointImpl<P extends XBreakpointProperties> extends 
           highlighter = null;
         }
 
-        MarkupModelEx markupModel;
+        updateIcon();
+
         if (highlighter == null) {
           int line = getLine();
           if (line >= finalDocument.getLineCount()) {
             callOnUpdate.run();
             return;
           }
-          markupModel = (MarkupModelEx)DocumentMarkupModel.forDocument(finalDocument, getProject(), true);
+          MarkupModelEx markupModel = (MarkupModelEx)DocumentMarkupModel.forDocument(finalDocument, getProject(), true);
           if (range != null && !range.isEmpty()) {
             TextRange lineRange = DocumentUtil.getLineTextRange(finalDocument, line);
             if (range.intersects(lineRange)) {
@@ -172,13 +173,7 @@ public final class XLineBreakpointImpl<P extends XBreakpointProperties> extends 
           redrawInlineInlays();
         }
         else {
-          markupModel = null;
-        }
-
-        updateIcon();
-
-        if (markupModel == null) {
-          markupModel = (MarkupModelEx)DocumentMarkupModel.forDocument(finalDocument, getProject(), false);
+          MarkupModelEx markupModel = (MarkupModelEx)DocumentMarkupModel.forDocument(finalDocument, getProject(), false);
           if (markupModel != null) {
             // renderersChanged false - we don't change gutter size
             MarkupEditorFilter filter = highlighter.getEditorFilter();

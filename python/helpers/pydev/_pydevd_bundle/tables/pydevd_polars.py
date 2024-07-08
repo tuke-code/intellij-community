@@ -50,6 +50,7 @@ def __create_config():
     # type: () -> pl.Config
     cfg = pl.Config()
     cfg.set_tbl_cols(-1)  # Unlimited
+    cfg.set_tbl_rows(-1)  # Unlimited
     cfg.set_fmt_str_lengths(MAX_COLWIDTH)  # No option to set unlimited, so it's 100_000
     return cfg
 
@@ -62,12 +63,6 @@ def get_column_descriptions(table):
         return get_data(described_results, None, None)
     else:
         return ""
-
-
-# Polars compute NaN-s in describe. So, we don't need get_value_counts for Polars
-def get_value_counts(table):
-    # type: (Union[pl.DataFrame, pl.Series]) -> str
-    return ""
 
 
 class ColumnVisualisationType:

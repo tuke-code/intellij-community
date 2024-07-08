@@ -29,9 +29,9 @@ import com.intellij.internal.statistic.IntentionFUSCollector;
 import com.intellij.lang.LangBundle;
 import com.intellij.lang.injection.InjectedLanguageManager;
 import com.intellij.modcommand.ActionContext;
-import com.intellij.modcommand.ModCommand;
 import com.intellij.modcommand.ModCommandAction;
-import com.intellij.modcommand.ModCommandExecutor;
+import com.intellij.modcommand.ModCommandService;
+import com.intellij.modcommand.ModCommandWithContext;
 import com.intellij.openapi.application.AccessToken;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ReadAction;
@@ -59,7 +59,6 @@ import com.intellij.util.SlowOperations;
 import com.intellij.util.ThreeState;
 import com.intellij.util.TripleFunction;
 import com.intellij.util.concurrency.ThreadingAssertions;
-import com.intellij.util.concurrency.annotations.RequiresBackgroundThread;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -321,52 +320,13 @@ public class ShowIntentionActionsHandler implements CodeInsightActionHandler {
                                           @Nullable Editor hostEditor,
                                           @NotNull @NlsContexts.Command String commandName,
                                           @NotNull ModCommandAction commandAction, int fixOffset) {
-    record ContextAndCommand(@NotNull ActionContext context, @NotNull ModCommand command) { }
-    ThrowableComputable<ContextAndCommand, RuntimeException> computable =
-      () -> ReadAction.nonBlocking(() -> {
-          ActionContext context = chooseContextForAction(hostFile, hostEditor, commandAction);
-          if (context == null) return null;
-          ActionContext adjusted = fixOffset >= 0 ? context.withOffset(fixOffset) : context;
-          return new ContextAndCommand(adjusted, commandAction.perform(adjusted));
-        })
-        .expireWhen(() -> hostFile.getProject().isDisposed())
-        .executeSynchronously();
-    ContextAndCommand contextAndCommand = ProgressManager.getInstance().
-      runProcessWithProgressSynchronously(computable, commandName, true, hostFile.getProject());
+    ModCommandWithContext
+      contextAndCommand = ModCommandService.getInstance().chooseFileAndPerform(hostFile, hostEditor, commandAction, fixOffset);
     if (contextAndCommand == null) return;
     ActionContext context = contextAndCommand.context();
     Project project = context.project();
     IntentionFUSCollector.record(project, commandAction, context.file().getLanguage(), hostEditor, fixOffset);
-    CommandProcessor.getInstance().executeCommand(project, () -> {
-      ModCommandExecutor.getInstance().executeInteractively(context, contextAndCommand.command(), hostEditor);
-    }, commandName, null);
-  }
-
-  @Nullable
-  @RequiresBackgroundThread
-  private static ActionContext chooseContextForAction(@NotNull PsiFile hostFile,
-                                                      @Nullable Editor hostEditor,
-                                                      @NotNull ModCommandAction commandAction) {
-    if (hostEditor == null) {
-      return ActionContext.from(null, hostFile);
-    }
-    PsiFile injectedFile = InjectedLanguageUtilBase.findInjectedPsiNoCommit(hostFile, hostEditor.getCaretModel().getOffset());
-    Editor injectedEditor = null;
-    if (injectedFile != null && !(hostEditor instanceof IntentionPreviewEditor)) {
-      injectedEditor = InjectedLanguageUtil.getInjectedEditorForInjectedFile(hostEditor, injectedFile);
-      ActionContext injectedContext = ActionContext.from(injectedEditor, injectedFile);
-      if (commandAction.getPresentation(injectedContext) != null) {
-        return injectedContext;
-      }
-    }
-
-    if (hostEditor != injectedEditor) {
-      ActionContext hostContext = ActionContext.from(hostEditor, hostFile);
-      if (commandAction.getPresentation(hostContext) != null) {
-        return hostContext;
-      }
-    }
-    return null;
+    CommandProcessor.getInstance().executeCommand(project, () -> contextAndCommand.executeInteractively(hostEditor), commandName, null);
   }
 
   private static void checkPsiTextConsistency(@NotNull PsiFile hostFile) {

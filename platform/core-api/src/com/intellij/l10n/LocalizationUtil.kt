@@ -54,8 +54,9 @@ object LocalizationUtil {
 
   @Internal
   @JvmOverloads
-  fun getPluginClassLoader(defaultLoader: ClassLoader? = null): ClassLoader? {
-    val langBundle = findLanguageBundle() ?: return null
+  fun getPluginClassLoader(defaultLoader: ClassLoader? = null, locale: Locale = getLocale()): ClassLoader? {
+    if (locale == Locale.ENGLISH || locale == Locale.ROOT) return null
+    val langBundle = findLanguageBundle(locale) ?: return null
     return langBundle.pluginDescriptor?.classLoader ?: defaultLoader
   }
 
@@ -206,7 +207,7 @@ object LocalizationUtil {
 
   @Internal
   fun getAllAvailableLocales(): Pair<List<Locale>, Map<Locale, String>> {
-    val list = ArrayList<Locale>()
+    val list = HashSet<Locale>()
     val map = HashMap<Locale, String>()
 
     for (bundleEP in getAllLanguageBundleExtensions()) {

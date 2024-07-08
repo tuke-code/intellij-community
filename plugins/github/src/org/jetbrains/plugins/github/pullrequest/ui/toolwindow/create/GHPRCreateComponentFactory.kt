@@ -88,7 +88,6 @@ internal object GHPRCreateComponentFactory {
   private fun CoroutineScope.create(vm: GHPRCreateViewModel): JComponent {
     val topPanel = JPanel(null).apply {
       isOpaque = false
-      InternalDecoratorImpl.preventRecursiveBackgroundUpdateOnToolwindow(this)
       layout = MigLayout(LC().gridGap("0", "0").insets("0").flowY().fill())
 
       add(directionSelector(vm), CC().pushX().gap(SIDE_GAPS_L, SIDE_GAPS_L, SIDE_GAPS_M, SIDE_GAPS_M))
@@ -99,7 +98,6 @@ internal object GHPRCreateComponentFactory {
 
     val bottomPanel = JPanel(null).apply {
       isOpaque = false
-      InternalDecoratorImpl.preventRecursiveBackgroundUpdateOnToolwindow(this)
       border = IdeBorderFactory.createBorder(SideBorder.TOP)
 
       layout = MigLayout(LC().gridGap("0", "0").insets("0").flowY().fill())
@@ -179,9 +177,20 @@ internal object GHPRCreateComponentFactory {
         }
       }
     }
-    val textPanel = JPanel(null).apply {
+    val textPanel = object : JPanel(null) {
+      override fun addNotify() {
+        super.addNotify()
+        InternalDecoratorImpl.componentWithEditorBackgroundAdded(this)
+      }
+
+      override fun removeNotify() {
+        super.removeNotify()
+        InternalDecoratorImpl.componentWithEditorBackgroundRemoved(this)
+      }
+    }.apply {
       isOpaque = true
       background = JBColor.lazy { EditorColorsManager.getInstance().globalScheme.defaultBackground }
+      InternalDecoratorImpl.preventRecursiveBackgroundUpdateOnToolwindow(this)
     }
 
     launchNow {
@@ -269,6 +278,8 @@ internal object GHPRCreateComponentFactory {
     val scrollPane = ScrollPaneFactory.createScrollPane(null, true).apply {
       horizontalScrollBarPolicy = ScrollPaneFactory.HORIZONTAL_SCROLLBAR_NEVER
     }
+    ScrollableContentBorder.setup(scrollPane, Side.TOP)
+
     val panel = JPanel(BorderLayout()).apply {
       add(commitsPanel, BorderLayout.NORTH)
       add(scrollPane, BorderLayout.CENTER)
@@ -299,7 +310,7 @@ internal object GHPRCreateComponentFactory {
 
   private fun CoroutineScope.createChangesPanel(changeListVm: CodeReviewChangeListViewModel): JComponent =
     CodeReviewChangeListComponentFactory.createIn(this, changeListVm, null,
-                                                         message("pull.request.commit.does.not.contain.changes")).also {
+                                                  message("pull.request.commit.does.not.contain.changes")).also {
       it.installPopupHandler(ActionManager.getInstance().getAction("Github.PullRequest.Changes.Popup") as ActionGroup)
     }
 
@@ -392,6 +403,7 @@ internal object GHPRCreateComponentFactory {
             }
             else -> Unit
           }
+          revalidate()
 
           try {
             awaitCancellation()
@@ -439,16 +451,20 @@ private fun createCommitsPopupPresenter(commit: VcsCommitMetadata) = CommitPrese
   committedDate = Date(commit.authorTime)
 )
 
-private fun CoroutineScope.createReviewersListPanelHandle(vm: LabeledListPanelViewModel<GHPullRequestRequestedReviewer>,
-                                                          avatarIconsProvider: GHAvatarIconsProvider) =
+private fun CoroutineScope.createReviewersListPanelHandle(
+  vm: LabeledListPanelViewModel<GHPullRequestRequestedReviewer>,
+  avatarIconsProvider: GHAvatarIconsProvider,
+) =
   LabeledListPanelHandle(this, vm,
                          message("pull.request.no.reviewers"),
                          message("pull.request.reviewers"),
                          { UserLabel(it, avatarIconsProvider) },
                          GHUIUtil.SelectionPresenters.PRReviewers(avatarIconsProvider))
 
-private fun CoroutineScope.createAssigneesListPanelHandle(vm: LabeledListPanelViewModel<GHUser>,
-                                                          avatarIconsProvider: GHAvatarIconsProvider) =
+private fun CoroutineScope.createAssigneesListPanelHandle(
+  vm: LabeledListPanelViewModel<GHUser>,
+  avatarIconsProvider: GHAvatarIconsProvider,
+) =
   LabeledListPanelHandle(this, vm,
                          message("pull.request.unassigned"),
                          message("pull.request.assignees"),

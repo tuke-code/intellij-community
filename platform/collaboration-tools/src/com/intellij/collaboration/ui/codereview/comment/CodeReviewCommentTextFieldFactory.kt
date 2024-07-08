@@ -14,15 +14,15 @@ import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.editor.EditorFactory
 import com.intellij.openapi.editor.event.DocumentEvent
 import com.intellij.openapi.editor.event.DocumentListener
+import com.intellij.openapi.editor.ex.EditorEx
+import com.intellij.ui.JBColor
+import com.intellij.util.asSafely
 import com.intellij.util.ui.UIUtil
 import com.intellij.util.ui.update.Activatable
 import com.intellij.util.ui.update.UiNotifyConnector
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.launch
 import org.jetbrains.annotations.Nls
 import java.awt.Rectangle
 import java.awt.event.ComponentAdapter
@@ -34,14 +34,23 @@ object CodeReviewCommentTextFieldFactory {
   fun createIn(cs: CoroutineScope, vm: CodeReviewSubmittableTextViewModel,
                actions: CommentInputActionsComponentFactory.Config,
                icon: CommentTextFieldFactory.IconConfig? = null): JComponent {
-    val editor = CodeReviewMarkdownEditor.create(vm.project)
+    val editor = CodeReviewMarkdownEditor.create(vm.project).apply {
+      component.isOpaque = false
+      val fieldBackground = JBColor.lazy {
+        if (component.isEnabled) UIUtil.getTextFieldBackground() else UIUtil.getTextFieldDisabledBackground()
+      }
+      component.background = fieldBackground
+      asSafely<EditorEx>()?.backgroundColor = fieldBackground
+    }
     cs.launchNow {
       try {
         editor.document.bindTextIn(this, vm.text)
         awaitCancellation()
       }
       finally {
-        EditorFactory.getInstance().releaseEditor(editor)
+        withContext(NonCancellable) {
+          EditorFactory.getInstance().releaseEditor(editor)
+        }
       }
     }
     // also forces component revalidation on newline

@@ -2263,6 +2263,9 @@ com.intellij.ui.icons.CompositeIcon
 - a:getIconCount():I
 com.intellij.ui.icons.DarkIconProvider
 - a:getDarkIcon(Z):javax.swing.Icon
+com.intellij.ui.icons.IconPathProvider
+- a:getExpUIPath():java.lang.String
+- a:getOriginalPath():java.lang.String
 com.intellij.ui.icons.IconReplacer
 - replaceIcon(javax.swing.Icon):javax.swing.Icon
 com.intellij.ui.icons.ReplaceableIcon
@@ -5001,6 +5004,7 @@ c:com.intellij.util.io.Compressor$Zip
 - p:writeDirectoryEntry(java.lang.String,J):V
 - p:writeFileEntry(java.lang.String,java.io.InputStream,J,J,I,java.lang.String):V
 f:com.intellij.util.io.CoroutinesKt
+- sf:await(java.util.concurrent.CompletableFuture,kotlin.coroutines.Continuation):java.lang.Object
 - sf:await(java.util.concurrent.Future,kotlin.coroutines.Continuation):java.lang.Object
 - sf:awaitFor(com.intellij.util.concurrency.Semaphore,kotlin.coroutines.Continuation):java.lang.Object
 f:com.intellij.util.io.CountingGZIPInputStream
