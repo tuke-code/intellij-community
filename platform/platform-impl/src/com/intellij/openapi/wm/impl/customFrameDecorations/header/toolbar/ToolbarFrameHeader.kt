@@ -18,7 +18,6 @@ import com.intellij.openapi.wm.impl.customFrameDecorations.header.titleLabel.Sim
 import com.intellij.openapi.wm.impl.headertoolbar.MainToolbar
 import com.intellij.openapi.wm.impl.headertoolbar.computeMainActionGroups
 import com.intellij.platform.ide.menu.IdeJMenuBar
-import com.intellij.platform.ide.menu.collectGlobalMenu
 import com.intellij.platform.util.coroutines.childScope
 import com.intellij.ui.ScreenUtil
 import com.intellij.ui.WindowMoveListener
@@ -156,11 +155,6 @@ internal class ToolbarFrameHeader(private val coroutineScope: CoroutineScope,
         }
       }
     }
-    collectGlobalMenu(coroutineScope) { globalMenuPresent ->
-      ideMenuBar.isVisible = !globalMenuPresent
-      // Repaint gradient
-      repaint()
-    }
   }
 
   override fun updateSize() {
@@ -193,9 +187,14 @@ internal class ToolbarFrameHeader(private val coroutineScope: CoroutineScope,
       add(productIcon, gb.nextLine().next().anchor(WEST).insetLeft(H))
       add(headerContent, gb.next().fillCell().anchor(GridBagConstraints.CENTER).weightx(1.0).weighty(1.0))
       buttonPanes?.let { add(wrap(it.getContent()), gb.next().anchor(GridBagConstraints.EAST)) }
+      updateHeaderContentBorder(true)
     }
     else {
-      buttonPanes?.let { add(wrap(it.getContent()), gb.nextLine().next().anchor(WEST)) }
+      val buttonPanes = buttonPanes
+      if (buttonPanes != null) {
+        add(wrap(buttonPanes.getContent()), gb.nextLine().next().anchor(WEST))
+      }
+      updateHeaderContentBorder(buttonPanes == null)
       add(headerContent, gb.next().fillCell().anchor(GridBagConstraints.CENTER).weightx(1.0).weighty(1.0))
     }
   }
@@ -345,13 +344,16 @@ internal class ToolbarFrameHeader(private val coroutineScope: CoroutineScope,
     }
 
     val result = NonOpaquePanel(CardLayout()).apply {
-      border = JBUI.Borders.emptyLeft(JBUI.scale(16))
       background = null
       add(ShowMode.MENU.name, menuPnl)
       add(ShowMode.TOOLBAR.name, toolbarPnl)
     }
 
     return result
+  }
+
+  private fun updateHeaderContentBorder(iconRightPosition: Boolean) {
+    headerContent.border = JBUI.Borders.emptyLeft(JBUI.scale(if (iconRightPosition) 16 else 4))
   }
 
   private fun updateLayout() {

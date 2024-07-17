@@ -1053,7 +1053,7 @@
                 icon="AllIcons.Toolwindows.Notifications"
                 factoryClass="com.intellij.notification.impl.NotificationsToolWindowFactory"/>
 
-    <toolWindow id="Meet New UI" anchor="right" secondary="false" icon="com.intellij.icons.AllIcons.Toolwindow.MeetNewUi"
+    <toolWindow id="Meet New UI" anchor="right" secondary="false" icon="com.intellij.icons.AllIcons.Toolwindows.MeetNewUi"
                 factoryClass="com.intellij.ide.ui.experimental.meetNewUi.MeetNewUiToolWindowFactory"/>
 
     <applicationService serviceInterface="com.intellij.ide.TypePresentationService"
@@ -1234,7 +1234,7 @@
     <registryKey key="jdk.downloader.reuse.downloading" defaultValue="true"
                  description="Allow to reuse currently downloading with the JDK Downloader JDK instead of downloading it again"/>
     <registryKey key="jdk.auto.run.configurations" defaultValue="true" description="Tries to find an SDK for a run configuration"/>
-    <registryKey key="jdk.download.consent" defaultValue="false" description="Prompts before downloading JDKs if false"/>
+    <registryKey key="sdk.download.consent" defaultValue="false" description="Prompts before downloading SDKs if false"/>
 
     <actionPromoter implementation="com.intellij.execution.testframework.TestTreeViewActionsPromoter"/>
     <smartSelectProvider implementation="com.intellij.ui.tree.TreeSmartSelectProvider"/>
@@ -1437,7 +1437,6 @@
 
 
     <actionConfigurationCustomizer implementation="com.intellij.platform.ide.menu.IdeMainMenuActionCustomizer"/>
-    <actionConfigurationCustomizer implementation="com.intellij.platform.ide.menu.GlobalMenuLinux$MyActionTuner"/>
 
     <titleInfoProvider implementation="com.intellij.openapi.wm.impl.simpleTitleParts.ProductTitleInfoProvider"/>
     <titleInfoProvider implementation="com.intellij.openapi.wm.impl.simpleTitleParts.ProductVersionTitleInfoProvider"/>
@@ -1828,6 +1827,7 @@
 
     <postStartupActivity implementation="com.intellij.execution.wsl.ijent.nio.toggle.IjentInProjectStarter"
                          os="windows"/>
+    <applicationInitializedListener implementation="com.intellij.ide.SwingTooltipManagerCustomizer"/>
   </extensions>
 
   <applicationListeners>

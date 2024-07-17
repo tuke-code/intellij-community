@@ -98,6 +98,7 @@ class MavenProjectsNavigatorTest : MavenMultiVersionImportingTestCase() {
       <artifactId>m</artifactId>
       <version>1</version>
       """.trimIndent())
+    refreshFiles(listOf(m))
     readFiles(m)
 
     assertEquals(1, rootNodes.size)
@@ -151,11 +152,12 @@ class MavenProjectsNavigatorTest : MavenMultiVersionImportingTestCase() {
       <artifactId>m</artifactId>
       <version>1</version>
       """.trimIndent())
+    refreshFiles(listOf(m))
     readFiles(projectPom, m)
 
     assertEquals(2, rootNodes.size)
 
-    createProjectPom("""
+    updateProjectPom("""
                        <groupId>test</groupId>
                        <artifactId>project</artifactId>
                        <version>1</version>
@@ -333,7 +335,7 @@ class MavenProjectsNavigatorTest : MavenMultiVersionImportingTestCase() {
     assertEquals(m1, rootNodes[0].virtualFile)
     assertEquals(m2, rootNodes[1].virtualFile)
 
-    createModulePom("m2", """
+    updateModulePom("m2", """
       <groupId>test</groupId>
       <artifactId>am2</artifactId>
       <version>1</version>

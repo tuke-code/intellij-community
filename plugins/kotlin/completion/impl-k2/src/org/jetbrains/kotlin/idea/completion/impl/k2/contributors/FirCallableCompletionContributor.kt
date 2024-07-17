@@ -23,8 +23,6 @@ import org.jetbrains.kotlin.analysis.api.scopes.KaScope
 import org.jetbrains.kotlin.analysis.api.signatures.KaCallableSignature
 import org.jetbrains.kotlin.analysis.api.signatures.KaFunctionSignature
 import org.jetbrains.kotlin.analysis.api.symbols.*
-import org.jetbrains.kotlin.analysis.api.symbols.markers.KaPossibleMultiplatformSymbol
-import org.jetbrains.kotlin.analysis.api.symbols.markers.KaSymbolKind
 import org.jetbrains.kotlin.analysis.api.types.KaErrorType
 import org.jetbrains.kotlin.analysis.api.types.KaType
 import org.jetbrains.kotlin.idea.base.analysis.api.utils.collectReceiverTypesForExplicitReceiverExpression
@@ -107,7 +105,7 @@ internal open class FirCallableCompletionContributor(
 
     context(KaSession)
     protected open fun filter(symbol: KaCallableSymbol, sessionParameters: FirCompletionSessionParameters): Boolean =
-        sessionParameters.allowExpectedDeclarations || !(symbol is KaPossibleMultiplatformSymbol && symbol.isExpect)
+        sessionParameters.allowExpectedDeclarations || !symbol.isExpect
 
     private val shouldCompleteTopLevelCallablesFromIndex: Boolean
         get() = prefixMatcher.prefix.isNotEmpty()
@@ -253,11 +251,11 @@ internal open class FirCallableCompletionContributor(
             symbol is KaPackageSymbol -> collectDotCompletionForPackageReceiver(symbol, visibilityChecker, sessionParameters)
 
             else -> sequence {
-                if (symbol is KaNamedClassOrObjectSymbol && symbol.hasImportantStaticMemberScope) {
+                if (symbol is KaNamedClassSymbol && symbol.hasImportantStaticMemberScope) {
                     yieldAll(collectDotCompletionFromStaticScope(symbol, withCompanionScope = false, visibilityChecker, sessionParameters))
                 }
 
-                if (symbol !is KaNamedClassOrObjectSymbol || symbol.canBeUsedAsReceiver) {
+                if (symbol !is KaNamedClassSymbol || symbol.canBeUsedAsReceiver) {
                     yieldAll(
                         collectDotCompletionForCallableReceiver(
                             scopeContext,
@@ -272,11 +270,11 @@ internal open class FirCallableCompletionContributor(
         }
     }
 
-    protected val KaNamedClassOrObjectSymbol.hasImportantStaticMemberScope: Boolean
+    protected val KaNamedClassSymbol.hasImportantStaticMemberScope: Boolean
         get() = classKind == KaClassKind.ENUM_CLASS ||
                 origin.isJavaSourceOrLibrary()
 
-    private val KaNamedClassOrObjectSymbol.canBeUsedAsReceiver: Boolean
+    private val KaNamedClassSymbol.canBeUsedAsReceiver: Boolean
         get() = classKind.isObject || companionObject != null
 
     context(KaSession)
@@ -290,7 +288,7 @@ internal open class FirCallableCompletionContributor(
         val packageScopeKind = KaScopeKinds.PackageMemberScope(CompletionSymbolOrigin.SCOPE_OUTSIDE_TOWER_INDEX)
 
         return packageScope
-            .getCallableSymbols(scopeNameFilter)
+            .callables(scopeNameFilter)
             .filterNot { it.isExtension }
             .filter { visibilityChecker.isVisible(it) }
             .filter { filter(it, sessionParameters) }
@@ -405,7 +403,7 @@ internal open class FirCallableCompletionContributor(
 
     context(KaSession)
     protected fun collectDotCompletionFromStaticScope(
-        symbol: KaNamedClassOrObjectSymbol,
+        symbol: KaNamedClassSymbol,
         withCompanionScope: Boolean,
         visibilityChecker: CompletionVisibilityChecker,
         sessionParameters: FirCompletionSessionParameters,
@@ -471,7 +469,7 @@ internal open class FirCallableCompletionContributor(
         visibilityChecker: CompletionVisibilityChecker,
         sessionParameters: FirCompletionSessionParameters,
     ): Collection<ApplicableExtension> =
-        scope.getCallableSymbols(scopeNameFilter)
+        scope.callables(scopeNameFilter)
             .filter { it.canBeUsedAsExtension() }
             .filter { visibilityChecker.isVisible(it) }
             .filter { filter(it, sessionParameters) }
@@ -618,14 +616,14 @@ internal open class FirCallableCompletionContributor(
 
     context(KaSession)
     private fun KaJavaFieldSymbol.hasPrimitiveOrStringReturnType(): Boolean =
-        (psi as? PsiField)?.type is PsiPrimitiveType || returnType.isString
+        (psi as? PsiField)?.type is PsiPrimitiveType || returnType.isStringType
 
     context(KaSession)
     private fun KaCallableSymbol.hasConstEvaluationAnnotation(): Boolean =
         annotations.any { it.classId == StandardClassIds.Annotations.IntrinsicConstEvaluation }
 
     context(KaSession)
-    protected fun KaNamedClassOrObjectSymbol.staticScope(withCompanionScope: Boolean = true): KaScope = buildList {
+    protected fun KaNamedClassSymbol.staticScope(withCompanionScope: Boolean = true): KaScope = buildList {
         if (withCompanionScope) {
             addIfNotNull(companionObject?.memberScope)
         }
@@ -662,7 +660,7 @@ internal class FirCallableReferenceCompletionContributor(
     context(KaSession)
     override fun filter(symbol: KaCallableSymbol, sessionParameters: FirCompletionSessionParameters): Boolean = when {
         // References to elements which are members and extensions at the same time are not allowed
-        symbol.isExtension && symbol.symbolKind == KaSymbolKind.CLASS_MEMBER -> false
+        symbol.isExtension && symbol.location == KaSymbolLocation.CLASS -> false
 
         // References to variables and parameters are unsupported
         symbol is KaValueParameterSymbol || symbol is KaLocalVariableSymbol || symbol is KaBackingFieldSymbol -> false
@@ -686,7 +684,7 @@ internal class FirCallableReferenceCompletionContributor(
 
         return when (val symbol = explicitReceiver.reference()?.resolveToExpandedSymbol()) {
             is KaPackageSymbol -> emptySequence()
-            is KaNamedClassOrObjectSymbol -> sequence {
+            is KaNamedClassSymbol -> sequence {
                 if (symbol.hasImportantStaticMemberScope) {
                     yieldAll(collectDotCompletionFromStaticScope(symbol, withCompanionScope = false, visibilityChecker, sessionParameters))
                 }
@@ -784,7 +782,7 @@ internal class FirKDocCallableCompletionContributor(
                     listOf(KaScopeWithKindImpl(parentSymbol.packageScope, packageScopeKind))
                 }
 
-                is KaNamedClassOrObjectSymbol -> buildList {
+                is KaNamedClassSymbol -> buildList {
                     val type = parentSymbol.defaultType
 
                     type.scope?.declarationScope?.let { typeScope ->
@@ -801,7 +799,7 @@ internal class FirKDocCallableCompletionContributor(
         }
 
         for (scopeWithKind in scopesWithKinds) {
-            scopeWithKind.scope.getCallableSymbols(scopeNameFilter)
+            scopeWithKind.scope.callables(scopeNameFilter)
                 .filter { it !is KaSyntheticJavaPropertySymbol }
                 .forEach { symbol ->
                     yield(

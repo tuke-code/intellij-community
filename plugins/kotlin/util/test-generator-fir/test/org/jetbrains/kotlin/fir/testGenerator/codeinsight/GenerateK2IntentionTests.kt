@@ -1,11 +1,13 @@
-// Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.kotlin.fir.testGenerator.codeinsight
 
 import org.jetbrains.kotlin.idea.k2.codeInsight.intentions.shared.AbstractSharedK2IntentionTest
 import org.jetbrains.kotlin.idea.k2.intentions.tests.AbstractK2GotoTestOrCodeActionTest
 import org.jetbrains.kotlin.idea.k2.intentions.tests.AbstractK2IntentionTest
+import org.jetbrains.kotlin.idea.k2.intentions.tests.AbstractK2MultiFileIntentionTest
 import org.jetbrains.kotlin.testGenerator.model.*
 import org.jetbrains.kotlin.testGenerator.model.GroupCategory.*
+import org.jetbrains.kotlin.testGenerator.model.Patterns.TEST
 
 
 internal fun MutableTWorkspace.generateK2IntentionTests() {
@@ -54,6 +56,7 @@ internal fun MutableTWorkspace.generateK2IntentionTests() {
             model("${idea}intentions/invertIfCondition", pattern = pattern)
             model("${idea}intentions/lambdaToAnonymousFunction", pattern = pattern)
             model("${idea}intentions/removeExplicitTypeArguments", pattern = pattern)
+            model("${idea}intentions/replaceWithOrdinaryAssignment", pattern = pattern)
             model("${idea}intentions/specifyExplicitLambdaSignature", pattern = pattern)
             model("${idea}intentions/changeVisibility", pattern = pattern)
 
@@ -79,7 +82,7 @@ internal fun MutableTWorkspace.generateK2IntentionTests() {
             model("${idea}intentions/replaceUntilWithRangeTo", pattern = pattern, isIgnored = true)
             model("${idea}intentions/convertLateinitPropertyToNullable", pattern = pattern, isIgnored = true)
             model("${idea}intentions/swapStringEqualsIgnoreCase", pattern = pattern, isIgnored = true)
-            model("${idea}intentions/replaceExplicitFunctionLiteralParamWithIt", pattern = pattern, isIgnored = true)
+            model("${idea}intentions/replaceExplicitFunctionLiteralParamWithIt", pattern = pattern)
             model("${idea}intentions/nullableBooleanEqualityCheckToElvis", pattern = pattern, isIgnored = true)
             model("${idea}intentions/convertOrdinaryPropertyToLazy", pattern = pattern, isIgnored = true)
             model("${idea}intentions/replaceWithOrdinaryAssignment", pattern = pattern, isIgnored = true)
@@ -116,7 +119,7 @@ internal fun MutableTWorkspace.generateK2IntentionTests() {
             model("${idea}intentions/convertLazyPropertyToOrdinary", pattern = pattern, isIgnored = true)
             model("${idea}intentions/convertVarargParameterToArray", pattern = pattern, isIgnored = true)
             model("${idea}intentions/removeExplicitLambdaParameterTypes", pattern = pattern, isIgnored = true)
-            model("${idea}intentions/convertPrimaryConstructorToSecondary", pattern = pattern, isIgnored = true)
+            model("${idea}intentions/convertPrimaryConstructorToSecondary", pattern = pattern)
             model("${idea}intentions/convertArgumentToSet", pattern = pattern, isIgnored = true)
             model("${idea}intentions/addAnnotationUseSiteTarget", pattern = pattern, isIgnored = true)
             model("${idea}intentions/convertEnumToSealedClass", pattern = pattern, isIgnored = true)
@@ -128,8 +131,12 @@ internal fun MutableTWorkspace.generateK2IntentionTests() {
             model("${idea}intentions/convertFilteringFunctionWithDemorgansLaw", pattern = pattern, isIgnored = true)
             model("${idea}intentions/removeExplicitSuperQualifier", pattern = pattern, isIgnored = true)
             model("${idea}intentions/mergeElseIf", pattern = pattern, isIgnored = true)
+            model("${idea}intentions/branched/elvisToIfThen", pattern = pattern)
+            model("${idea}intentions/branched/safeAccessToIfThen", pattern = pattern)
             model("${idea}intentions/branched/ifWhen/ifToWhen", pattern = pattern)
             model("${idea}intentions/branched/when/flatten", pattern = pattern)
+            model("${idea}intentions/branched/when/eliminateSubject", pattern = pattern)
+            model("${idea}intentions/branched/doubleBangToIfThen", pattern = pattern)
             model("${idea}intentions/introduceVariable", pattern = pattern)
 
             //model("${idea}intentions/loopToCallChain", pattern = pattern, isIgnored = true)
@@ -149,7 +156,7 @@ internal fun MutableTWorkspace.generateK2IntentionTests() {
             //model("${idea}intentions/loopToCallChain/introduceIndex", pattern = pattern, isIgnored = true)
             //model("${idea}intentions/loopToCallChain/indexOf", pattern = pattern, isIgnored = true)
             model("${idea}intentions/moveMemberToTopLevel", pattern = pattern, isIgnored = true)
-            model("${idea}intentions/anonymousFunctionToLambda", pattern = pattern, isIgnored = true)
+            model("${idea}intentions/anonymousFunctionToLambda", pattern = pattern)
             model("${idea}intentions/copyConcatenatedStringToClipboard", pattern = pattern, isIgnored = true)
             model("${idea}intentions/inlayHints", pattern = pattern, isIgnored = true)
             model("${idea}intentions/convertToScope", pattern = pattern)
@@ -167,7 +174,7 @@ internal fun MutableTWorkspace.generateK2IntentionTests() {
             model("${idea}intentions/moveOutOfCompanion", pattern = pattern, isIgnored = true)
             model("${idea}intentions/moveToCompanion", pattern = pattern, isIgnored = true)
             model("${idea}intentions/destructuringInLambda", pattern = pattern, isIgnored = true)
-            model("${idea}intentions/addThrowsAnnotation", pattern = pattern, isIgnored = true)
+            model("${idea}intentions/addThrowsAnnotation", pattern = pattern)
             model("${idea}intentions/replaceItWithExplicitFunctionLiteralParam", pattern = pattern)
             model("${idea}intentions/iterationOverMap", pattern = pattern, isIgnored = true)
             model("${idea}intentions/convertPropertyToFunction", pattern = pattern, isIgnored = true)
@@ -178,6 +185,10 @@ internal fun MutableTWorkspace.generateK2IntentionTests() {
             model("${idea}intentions/convertBlockCommentToLineComment", pattern = pattern, isIgnored = true)
             model("${idea}intentions/removeSingleExpressionStringTemplate", pattern = pattern, isIgnored = true)
             model("${idea}intentions/convertLambdaToMultiLine", pattern = pattern, isIgnored = true)
+        }
+
+        testClass<AbstractK2MultiFileIntentionTest> {
+            model("${idea}/multiFileIntentions/moveDeclarationToSeparateFile", pattern = TEST, flatten = true)
         }
 
         testClass<AbstractK2GotoTestOrCodeActionTest> {

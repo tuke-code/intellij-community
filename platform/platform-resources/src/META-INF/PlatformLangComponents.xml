@@ -150,8 +150,6 @@
       serviceInterface="com.intellij.formatting.visualLayer.VirtualFormattingIndentGuideInfo"
       serviceImplementation="com.intellij.formatting.visualLayer.PlatformVirtualFormattingIndentGuideInfo" />
 
-    <applicationService serviceImplementation="com.intellij.ide.IdeTooltipManager" preload="notHeadless"/>
-
     <applicationService serviceInterface="com.intellij.refactoring.RefactoringUiService" serviceImplementation="com.intellij.refactoring.RefactoringUiServiceImpl"/>
     
     <projectService serviceInterface="com.intellij.openapi.roots.impl.PushedFilePropertiesUpdater"
@@ -241,9 +239,6 @@
               topic="com.intellij.psi.util.PsiModificationTracker$Listener"/>
     <listener class="com.intellij.openapi.vfs.newvfs.impl.CachedFileType$ReparseListener"
               topic="com.intellij.openapi.vfs.newvfs.BulkFileListener"/>
-
-    <listener class="com.intellij.ide.IdeTooltipManager$MyRegistryListener"
-              topic="com.intellij.openapi.util.registry.RegistryValueListener"/>
 
     <listener class="com.intellij.openapi.keymap.impl.ModifierKeyDoubleClickHandler$MyAnActionListener"
               topic="com.intellij.openapi.actionSystem.ex.AnActionListener"/>

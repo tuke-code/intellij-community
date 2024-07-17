@@ -20,10 +20,10 @@ import com.intellij.util.EventDispatcher
 import com.intellij.util.SmartList
 import com.intellij.util.concurrency.ThreadingAssertions
 import org.jetbrains.plugins.notebooks.ui.isFoldingEnabledKey
-import org.jetbrains.plugins.notebooks.visualization.ui.EditorCell
-import org.jetbrains.plugins.notebooks.visualization.ui.EditorCellEventListener
+import org.jetbrains.plugins.notebooks.visualization.ui.*
 import org.jetbrains.plugins.notebooks.visualization.ui.EditorCellEventListener.*
-import org.jetbrains.plugins.notebooks.visualization.ui.EditorCellView
+import org.jetbrains.plugins.notebooks.visualization.ui.EditorCellViewEventListener.CellViewCreated
+import org.jetbrains.plugins.notebooks.visualization.ui.EditorCellViewEventListener.CellViewRemoved
 import org.jetbrains.plugins.notebooks.visualization.ui.keepScrollingPositionWhile
 import java.util.*
 
@@ -46,9 +46,18 @@ class NotebookCellInlayManager private constructor(
 
   private val cellEventListeners = EventDispatcher.create(EditorCellEventListener::class.java)
 
+  private val cellViewEventListeners = EventDispatcher.create(EditorCellViewEventListener::class.java)
+
   private val invalidationListeners = mutableListOf<Runnable>()
 
   private var valid = false
+
+  fun update(block: () -> Unit) {
+    keepScrollingPositionWhile(editor) {
+      block()
+    }
+    inlaysChanged()
+  }
 
   override fun dispose() {}
 
@@ -56,8 +65,10 @@ class NotebookCellInlayManager private constructor(
     _cells[interval.ordinal]
 
   fun updateAllOutputs() {
-    _cells.forEach {
-      it.view?.updateOutputs()
+    update {
+      _cells.forEach {
+        it.updateOutputs()
+      }
     }
   }
 
@@ -92,12 +103,11 @@ class NotebookCellInlayManager private constructor(
   }
 
   private fun updateCells(cells: List<EditorCell>, force: Boolean = false) {
-    keepScrollingPositionWhile(editor) {
+    update {
       cells.forEach {
         it.update(force)
       }
       updateCellsFolding(cells)
-      inlaysChanged()
     }
   }
 
@@ -222,7 +232,7 @@ class NotebookCellInlayManager private constructor(
     inlaysChanged()
   }
 
-  private fun createCell(interval: NotebookIntervalPointer) = EditorCell(editor, interval) { cell ->
+  private fun createCell(interval: NotebookIntervalPointer) = EditorCell(editor, this, interval) { cell ->
     EditorCellView(editor, notebookCellLines, cell, this).also { Disposer.register(cell, it) }
   }.also { Disposer.register(this, it) }
 
@@ -339,6 +349,18 @@ class NotebookCellInlayManager private constructor(
 
   fun addCellEventsListener(editorCellEventListener: EditorCellEventListener, disposable: Disposable) {
     cellEventListeners.addListener(editorCellEventListener, disposable)
+  }
+
+  fun addCellViewEventsListener(editorCellViewEventListener: EditorCellViewEventListener, disposable: Disposable) {
+    cellViewEventListeners.addListener(editorCellViewEventListener, disposable)
+  }
+
+  internal fun fireCellViewCreated(cellView: EditorCellView) {
+    cellViewEventListeners.multicaster.onEditorCellViewEvents(listOf(CellViewCreated(cellView)))
+  }
+
+  internal fun fireCellViewRemoved(cellView: EditorCellView) {
+    cellViewEventListeners.multicaster.onEditorCellViewEvents(listOf(CellViewRemoved(cellView)))
   }
 
   fun getCell(index: Int): EditorCell {

@@ -79,6 +79,7 @@ abstract class StatisticsEventLoggerProvider(val recorderId: String,
 
   private val localLogger: StatisticsEventLogger by lazy { createLocalLogger() }
   private val actualLogger: StatisticsEventLogger by lazy { createLogger() }
+  internal val eventLogSystemLogger: EventLogSystemCollector by lazy { EventLogSystemCollector(this) }
 
   open val logger: StatisticsEventLogger
     get() = if (isLoggingEnabled()) actualLogger else localLogger

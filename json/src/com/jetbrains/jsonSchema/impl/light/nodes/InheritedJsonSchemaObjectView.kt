@@ -36,7 +36,7 @@ internal class InheritedJsonSchemaObjectView(
   }
 
   override fun readChildNodeValue(vararg childNodeName: String): String? {
-    return baseIfConditionOrOtherWithArgument(JsonSchemaObject::readChildNodeValue, childNodeName, Any?::isNotNull)
+    return baseIfConditionOrOtherWithArgument(JsonSchemaObject::readChildNodeValue, childNodeName, String?::isNotBlank)
   }
 
   override fun hasChildNode(vararg childNodeName: String): Boolean {
@@ -187,7 +187,7 @@ internal class InheritedJsonSchemaObjectView(
   }
 
   override fun getUnevaluatedPropertiesSchema(): JsonSchemaObject? {
-    return baseIfConditionOrOther(JsonSchemaObject::getUnevaluatedPropertiesSchema, Any?::isNotNull)
+    return other.unevaluatedPropertiesSchema
   }
 
   override fun getAdditionalItemsAllowed(): Boolean? {
@@ -207,7 +207,7 @@ internal class InheritedJsonSchemaObjectView(
   }
 
   override fun getUnevaluatedItemsSchema(): JsonSchemaObject? {
-    return baseIfConditionOrOther(JsonSchemaObject::getUnevaluatedItemsSchema, Any?::isNotNull)
+    return other.unevaluatedItemsSchema
   }
 
   override fun getContainsSchema(): JsonSchemaObject? {

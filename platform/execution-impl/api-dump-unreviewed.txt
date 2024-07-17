@@ -467,6 +467,7 @@ c:com.intellij.execution.actions.RunConfigurationsComboBoxAction
 - <init>():V
 - actionPerformed(com.intellij.openapi.actionSystem.AnActionEvent):V
 - p:addTargetGroup(com.intellij.openapi.project.Project,com.intellij.openapi.actionSystem.DefaultActionGroup):V
+- p:createActionPopup(com.intellij.openapi.actionSystem.DefaultActionGroup,com.intellij.openapi.actionSystem.DataContext,java.lang.Runnable):com.intellij.openapi.ui.popup.JBPopup
 - createCustomComponent(com.intellij.openapi.actionSystem.Presentation,java.lang.String):javax.swing.JComponent
 - p:createFinalAction(com.intellij.openapi.project.Project,com.intellij.execution.RunnerAndConfigurationSettings):com.intellij.openapi.actionSystem.AnAction
 - p:createPopupActionGroup(javax.swing.JComponent,com.intellij.openapi.actionSystem.DataContext):com.intellij.openapi.actionSystem.DefaultActionGroup
@@ -887,7 +888,7 @@ c:com.intellij.execution.impl.ExecutionManagerImpl
 - sf:Companion:com.intellij.execution.impl.ExecutionManagerImpl$Companion
 - sf:EXECUTION_SESSION_ID_KEY:com.intellij.openapi.util.Key
 - sf:EXECUTION_SKIP_RUN:com.intellij.openapi.util.Key
-- <init>(com.intellij.openapi.project.Project):V
+- <init>(com.intellij.openapi.project.Project,kotlinx.coroutines.CoroutineScope):V
 - compileAndRun(java.lang.Runnable,com.intellij.execution.runners.ExecutionEnvironment,java.lang.Runnable):V
 - dispose():V
 - p:executeConfiguration(com.intellij.execution.runners.ExecutionEnvironment,com.intellij.execution.runners.ProgramRunner,Z,com.intellij.openapi.project.Project,com.intellij.execution.RunnerAndConfigurationSettings):V
@@ -2446,7 +2447,9 @@ com.intellij.execution.runToolbar.ExecutorRunToolbarAction
 - a:getProcess():com.intellij.execution.runToolbar.RunToolbarProcess
 - getRightSideType():com.intellij.execution.runToolbar.RTBarAction$Type
 c:com.intellij.execution.runToolbar.FixWidthSegmentedActionToolbarComponent
-- com.intellij.openapi.actionSystem.impl.segmentedActionBar.SegmentedActionToolbarComponent
+- com.intellij.openapi.actionSystem.ActionToolbar
+- com.intellij.ui.switcher.QuickActionProvider
+- javax.swing.JPanel
 - <init>(java.lang.String,com.intellij.openapi.actionSystem.ActionGroup):V
 - addNotify():V
 - pf:getProject():com.intellij.openapi.project.Project
@@ -2757,7 +2760,6 @@ f:com.intellij.execution.runners.RunContentBuilder$ConsoleToFrontListener
 - textAdded(java.lang.String,com.intellij.execution.ui.ConsoleViewContentType):V
 a:com.intellij.execution.runners.RunTab
 - com.intellij.openapi.Disposable
-- com.intellij.openapi.actionSystem.DataProvider
 - *sf:KEY:com.intellij.openapi.actionSystem.DataKey
 - *sf:PREFERRED_PLACE:com.intellij.openapi.util.Key
 - p:myEnvironment:com.intellij.execution.runners.ExecutionEnvironment
@@ -2768,7 +2770,6 @@ a:com.intellij.execution.runners.RunTab
 - p:<init>(com.intellij.execution.runners.ExecutionEnvironment,java.lang.String):V
 - p:<init>(com.intellij.openapi.project.Project,com.intellij.psi.search.GlobalSearchScope,java.lang.String,java.lang.String,java.lang.String):V
 - dispose():V
-- getData(java.lang.String):java.lang.Object
 - getLogConsoleManager():com.intellij.diagnostic.logging.LogConsoleManagerBase
 - p:getSupplier():com.intellij.openapi.wm.impl.content.SingleContentSupplier
 - pf:initLogConsoles(com.intellij.execution.configurations.RunProfile,com.intellij.execution.ui.RunContentDescriptor,com.intellij.execution.ui.ExecutionConsole):V
@@ -3463,7 +3464,6 @@ f:com.intellij.execution.ui.layout.impl.RunnerLayoutUiImpl
 - com.intellij.execution.ui.layout.LayoutStateDefaults
 - com.intellij.execution.ui.layout.LayoutViewOptions
 - com.intellij.openapi.Disposable$Parent
-- com.intellij.openapi.actionSystem.DataProvider
 - sf:CONTENT_TYPE:com.intellij.openapi.util.Key
 - <init>(com.intellij.openapi.project.Project,com.intellij.openapi.Disposable,java.lang.String,java.lang.String,java.lang.String):V
 - addContent(com.intellij.ui.content.Content):com.intellij.ui.content.Content
@@ -3481,8 +3481,8 @@ f:com.intellij.execution.ui.layout.impl.RunnerLayoutUiImpl
 - getActions():java.util.List
 - getComponent():javax.swing.JComponent
 - getContentManager():com.intellij.ui.content.ContentManager
+- getContentUI():com.intellij.execution.ui.layout.impl.RunnerContentUi
 - getContents():com.intellij.ui.content.Content[]
-- getData(java.lang.String):java.lang.Object
 - getDefaults():com.intellij.execution.ui.layout.LayoutStateDefaults
 - getLayout():com.intellij.execution.ui.layout.impl.RunnerLayout
 - getLayoutActions():com.intellij.openapi.actionSystem.AnAction

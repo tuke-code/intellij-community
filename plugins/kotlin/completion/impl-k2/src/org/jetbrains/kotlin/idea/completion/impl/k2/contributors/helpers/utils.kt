@@ -110,7 +110,7 @@ internal fun collectNonExtensionsForType(
             filterOutJavaGettersAndSetters(type, visibilityChecker, scopeNameFilter, symbolFilter)
         }
 
-    val innerClasses = typeScope.getClassifierSymbols(scopeNameFilter).filterIsInstance<KaNamedClassOrObjectSymbol>().filter { it.isInner }
+    val innerClasses = typeScope.getClassifierSymbols(scopeNameFilter).filterIsInstance<KaNamedClassSymbol>().filter { it.isInner }
     val innerClassesConstructors = innerClasses.flatMap { it.declaredMemberScope.constructors }.map { it.asSignature() }
 
     val nonExtensionsFromType = (callables + innerClassesConstructors).filterNonExtensions(visibilityChecker, symbolFilter)
@@ -124,7 +124,7 @@ internal fun collectNonExtensionsForType(
 
 context(KaSession)
 private val KaSyntheticJavaPropertySymbol.getterAndUnitSetter: List<KaCallableSymbol>
-    get() = listOfNotNull(javaGetterSymbol, javaSetterSymbol?.takeIf { it.returnType.isUnit })
+    get() = listOfNotNull(javaGetterSymbol, javaSetterSymbol?.takeIf { it.returnType.isUnitType })
 
 context(KaSession)
 @OptIn(KaExperimentalApi::class)
@@ -156,7 +156,7 @@ internal fun collectNonExtensionsFromScope(
     scopeNameFilter: (Name) -> Boolean,
     sessionParameters: FirCompletionSessionParameters,
     symbolFilter: (KaCallableSymbol) -> Boolean,
-): Sequence<KaCallableSignature<*>> = scope.getCallableSymbols(scopeNameFilter.getAndSetAware())
+): Sequence<KaCallableSignature<*>> = scope.callables(scopeNameFilter.getAndSetAware())
     .map { it.asSignature() }
     .filterNonExtensions(visibilityChecker, symbolFilter)
     .applyIf(sessionParameters.excludeEnumEntries) { filterNot { isEnumEntriesProperty(it.symbol) } }
@@ -198,5 +198,5 @@ private fun isEnumEntriesProperty(symbol: KaCallableSymbol): Boolean {
     return symbol is KaPropertySymbol &&
             symbol.isStatic &&
             symbol.callableId?.callableName == StandardNames.ENUM_ENTRIES &&
-            (symbol.containingSymbol as? KaClassSymbol)?.classKind == KaClassKind.ENUM_CLASS
+            (symbol.containingDeclaration as? KaClassSymbol)?.classKind == KaClassKind.ENUM_CLASS
 }

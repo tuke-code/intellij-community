@@ -21,8 +21,6 @@ import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.resolution.singleFunctionCallOrNull
 import org.jetbrains.kotlin.analysis.api.resolution.symbol
 import org.jetbrains.kotlin.analysis.api.symbols.*
-import org.jetbrains.kotlin.analysis.api.symbols.markers.KaSymbolWithModality
-import org.jetbrains.kotlin.analysis.api.symbols.markers.KaSymbolWithVisibility
 import org.jetbrains.kotlin.analysis.api.symbols.markers.isPrivateOrPrivateToThis
 import org.jetbrains.kotlin.asJava.LightClassUtil
 import org.jetbrains.kotlin.asJava.classes.KtLightClass
@@ -127,7 +125,7 @@ object KotlinUnusedSymbolUtil {
   fun getPsiToReportProblem(declaration: KtNamedDeclaration, isJavaEntryPointInspection: UnusedDeclarationInspectionBase): PsiElement? {
       val symbol = declaration.symbol
       if (declaration.languageVersionSettings.getFlag(
-          AnalysisFlags.explicitApiMode) != ExplicitApiMode.DISABLED && (symbol as? KaSymbolWithVisibility)?.compilerVisibility?.isPublicAPI == true) {
+          AnalysisFlags.explicitApiMode) != ExplicitApiMode.DISABLED && symbol.compilerVisibility.isPublicAPI) {
           return null
       }
       if (symbol is KaNamedFunctionSymbol && symbol.isOperator) return null
@@ -433,7 +431,7 @@ object KotlinUnusedSymbolUtil {
           kotlinOptions = searchOptions
       )
       val originalDeclaration = (symbol as? KaTypeAliasSymbol)?.expandedType?.expandedSymbol?.psi as? KtNamedDeclaration
-      if (symbol !is KaNamedFunctionSymbol || !symbol.annotationsList.hasAnnotation(ClassId.topLevel(FqName("kotlin.jvm.JvmName")))) {
+      if (symbol !is KaNamedFunctionSymbol || !symbol.annotations.contains(ClassId.topLevel(FqName("kotlin.jvm.JvmName")))) {
           if (declaration is KtSecondaryConstructor &&
               declarationContainingClass != null &&
               // when too many occurrences of this class, consider it used
@@ -635,7 +633,7 @@ object KotlinUnusedSymbolUtil {
   private fun KtCallableDeclaration.canBeHandledByLightMethods(symbol: KaDeclarationSymbol?): Boolean {
       return when {
           symbol is KaConstructorSymbol -> {
-              val classSymbol = symbol.containingSymbol as? KaNamedClassOrObjectSymbol ?: return false
+              val classSymbol = symbol.containingDeclaration as? KaNamedClassSymbol ?: return false
               !classSymbol.isInline && !classSymbol.visibility.isPrivateOrPrivateToThis()
           }
           hasModifier(KtTokens.INTERNAL_KEYWORD) -> false
@@ -646,9 +644,9 @@ object KotlinUnusedSymbolUtil {
 
   context(KaSession)
   private fun KaNamedFunctionSymbol.hasInlineClassParameters(): Boolean {
-      val receiverParameterClassSymbol = receiverType?.expandedSymbol as? KaNamedClassOrObjectSymbol
+      val receiverParameterClassSymbol = receiverType?.expandedSymbol as? KaNamedClassSymbol
       return receiverParameterClassSymbol?.isInline == true || valueParameters.any {
-          val namedClassOrObjectSymbol = it.returnType.expandedSymbol as? KaNamedClassOrObjectSymbol ?: return@any false
+          val namedClassOrObjectSymbol = it.returnType.expandedSymbol as? KaNamedClassSymbol ?: return@any false
           namedClassOrObjectSymbol.isInline
       }
   }
@@ -668,12 +666,12 @@ object KotlinUnusedSymbolUtil {
       val ownerClass = declaration.containingClassOrObject as? KtClass ?: return false
       if (!ownerClass.isInheritable()) return false
       val callableSymbol = symbol as? KaCallableSymbol ?: return false
-      if ((callableSymbol as? KaSymbolWithModality)?.modality == KaSymbolModality.ABSTRACT) return false
+      if (callableSymbol.modality == KaSymbolModality.ABSTRACT) return false
       return ownerClass.findAllInheritors(useScope).any { element: PsiElement ->
           when (element) {
               is KtClassOrObject -> {
-                  val overridingCallableSymbol = element.getClassOrObjectSymbol()?.memberScope
-                      ?.getCallableSymbols { name -> name == callableSymbol.callableId?.callableName }?.filter {
+                  val overridingCallableSymbol = element.classSymbol?.memberScope
+                      ?.callables { name -> name == callableSymbol.callableId?.callableName }?.filter {
                           it.fakeOverrideOriginal == callableSymbol
                       }?.singleOrNull() ?: return@any false
                   overridingCallableSymbol != callableSymbol && overridingCallableSymbol.intersectionOverriddenSymbols

@@ -1,3 +1,4 @@
+// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.kotlin.idea.quickfix
 
 import com.intellij.codeInsight.intention.IntentionAction
@@ -153,9 +154,9 @@ class QuickFixRegistrar : QuickFixContributor {
         NON_PRIVATE_OR_PROTECTED_CONSTRUCTOR_IN_SEALED.registerFactory(RemoveModifierFixBase.removeNonRedundantModifier)
         TYPE_CANT_BE_USED_FOR_CONST_VAL.registerFactory(RemoveModifierFixBase.removeNonRedundantModifier)
         DEPRECATED_BINARY_MOD.registerFactory(RemoveModifierFixBase.removeNonRedundantModifier)
-        DEPRECATED_BINARY_MOD.registerFactory(RenameModToRemFix.Factory)
+        DEPRECATED_BINARY_MOD.registerFactory(RenameModToRemFixFactory)
         FORBIDDEN_BINARY_MOD.registerFactory(RemoveModifierFixBase.removeNonRedundantModifier)
-        FORBIDDEN_BINARY_MOD.registerFactory(RenameModToRemFix.Factory)
+        FORBIDDEN_BINARY_MOD.registerFactory(RenameModToRemFixFactory)
 
         NO_EXPLICIT_VISIBILITY_IN_API_MODE.registerFactory(ChangeVisibilityFix.SetExplicitVisibilityFactory)
         NO_EXPLICIT_VISIBILITY_IN_API_MODE_WARNING.registerFactory(ChangeVisibilityFix.SetExplicitVisibilityFactory)
@@ -500,9 +501,9 @@ class QuickFixRegistrar : QuickFixContributor {
         EXPLICIT_DELEGATION_CALL_REQUIRED.registerFactory(InsertDelegationCallQuickfix.InsertThisDelegationCallFactory)
         EXPLICIT_DELEGATION_CALL_REQUIRED.registerFactory(InsertDelegationCallQuickfix.InsertSuperDelegationCallFactory)
 
-        MISSING_CONSTRUCTOR_KEYWORD.registerFactory(MissingConstructorKeywordFix)
+        MISSING_CONSTRUCTOR_KEYWORD.registerFactory(MissingConstructorKeywordFixFactory)
 
-        MISSING_CONSTRUCTOR_BRACKETS.registerFactory(MissingConstructorBracketsFix)
+        MISSING_CONSTRUCTOR_BRACKETS.registerFactory(MissingConstructorBracketsFixFactory)
 
         ANONYMOUS_FUNCTION_WITH_NAME.registerFactory(RemoveNameFromFunctionExpressionFix)
 
@@ -638,7 +639,7 @@ class QuickFixRegistrar : QuickFixContributor {
         UNRESOLVED_REFERENCE.registerFactory(AddSuspendModifierFix.UnresolvedReferenceFactory)
         UNRESOLVED_REFERENCE_WRONG_RECEIVER.registerFactory(AddSuspendModifierFix.UnresolvedReferenceFactory)
 
-        UNRESOLVED_REFERENCE.registerFactory(CreateLabelFix)
+        UNRESOLVED_REFERENCE.registerFactory(CreateLabelFixFactory)
         YIELD_IS_RESERVED.registerFactory(UnsupportedYieldFix)
         INVALID_TYPE_OF_ANNOTATION_MEMBER.registerFactory(TypeOfAnnotationMemberFixFactory)
 
@@ -768,7 +769,7 @@ class QuickFixRegistrar : QuickFixContributor {
 
         ILLEGAL_ESCAPE.registerFactory(ConvertIllegalEscapeToUnicodeEscapeFix)
 
-        MODIFIER_FORM_FOR_NON_BUILT_IN_SUSPEND.registerFactory(AddEmptyArgumentListFix)
+        MODIFIER_FORM_FOR_NON_BUILT_IN_SUSPEND.registerFactory(AddEmptyArgumentListFixFactory)
 
         NON_PUBLIC_CALL_FROM_PUBLIC_INLINE.registerFactory(CallFromPublicInlineFactory)
         PROTECTED_CALL_FROM_PUBLIC_INLINE.registerFactory(CallFromPublicInlineFactory)

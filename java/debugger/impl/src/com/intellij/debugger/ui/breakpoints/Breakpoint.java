@@ -75,7 +75,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.stream.Stream;
 
-public abstract class Breakpoint<P extends JavaBreakpointProperties> implements FilteredRequestor, ClassPrepareRequestor, OverheadProducer {
+public abstract class Breakpoint<P extends JavaBreakpointProperties> implements FilteredRequestor, ClassPrepareRequestor, OverheadProducer, InternalDebugLoggingRequestor {
   public static final Key<Breakpoint<?>> DATA_KEY = Key.create("JavaBreakpoint");
   private static final Key<Long> HIT_COUNTER = Key.create("HIT_COUNTER");
 
@@ -85,6 +85,8 @@ public abstract class Breakpoint<P extends JavaBreakpointProperties> implements 
 
   @NonNls private static final String LOG_MESSAGE_OPTION_NAME = "LOG_MESSAGE";
   protected boolean myCachedVerifiedState = false;
+
+  private boolean myIsDebugLogBreakpoint;
 
   protected Breakpoint(@NotNull Project project, XBreakpoint<P> xBreakpoint) {
     myProject = project;
@@ -399,10 +401,10 @@ public abstract class Breakpoint<P extends JavaBreakpointProperties> implements 
   public boolean evaluateCondition(final EvaluationContextImpl context, LocatableEvent event) throws EvaluateException {
     DebugProcessImpl debugProcess = context.getDebugProcess();
     if (isCountFilterEnabled() && !isConditionEnabled()) {
-      debugProcess.getVirtualMachineProxy().suspend();
+      context.getSuspendContext().getVirtualMachine().suspend();
       debugProcess.getRequestsManager().deleteRequest(this);
       createRequest(debugProcess);
-      debugProcess.getVirtualMachineProxy().resume();
+      context.getSuspendContext().getVirtualMachine().resume();
     }
 
     StackFrameProxyImpl frame = context.getFrameProxy();
@@ -809,5 +811,14 @@ public abstract class Breakpoint<P extends JavaBreakpointProperties> implements 
 
   protected void fireBreakpointChanged() {
     ((XBreakpointBase<?, ?, ?>)myXBreakpoint).fireBreakpointChanged();
+  }
+
+  public void setIsDebugLogBreakpoint(boolean isDebugLogBreakpoint) {
+    myIsDebugLogBreakpoint = isDebugLogBreakpoint;
+  }
+
+  @Override
+  public boolean isDebugLogBreakpoint() {
+    return myIsDebugLogBreakpoint;
   }
 }

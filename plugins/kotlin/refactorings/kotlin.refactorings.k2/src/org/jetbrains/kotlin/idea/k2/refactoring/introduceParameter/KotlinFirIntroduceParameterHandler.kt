@@ -165,7 +165,7 @@ class KotlinFirIntroduceParameterHandler(private val helper: KotlinIntroducePara
             val expressionType = expressionTypeEvaluator.invoke(this)
             message = if (expressionType == null) {
                 KotlinBundle.message("error.text.expression.has.no.type")
-            } else if (expressionType.isUnit || expressionType.isNothing) {
+            } else if (expressionType.isUnitType || expressionType.isNothingType) {
                 KotlinBundle.message(
                     "cannot.introduce.parameter.of.0.type",
                     expressionType.render(KaTypeRendererForSource.WITH_SHORT_NAMES, position = Variance.INVARIANT),
@@ -286,7 +286,7 @@ class KotlinFirIntroduceParameterHandler(private val helper: KotlinIntroducePara
         val types = analyzeInModalWindow(physicalExpression, KotlinBundle.message("find.usages.prepare.dialog.progress")) {
             buildList {
                 add(replacementType.render(KaTypeRendererForSource.WITH_SHORT_NAMES, position = Variance.INVARIANT))
-                replacementType.getAllSuperTypes(true).mapTo(this) {
+                replacementType.allSupertypes(shouldApproximate = true).mapTo(this) {
                     it.render(KaTypeRendererForSource.WITH_SHORT_NAMES, position = Variance.INVARIANT)
                 }
             }

@@ -8,7 +8,6 @@ import com.intellij.openapi.util.registry.Registry
 import com.intellij.psi.PsiDirectory
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
-import com.intellij.refactoring.move.MoveCallback
 import com.intellij.refactoring.move.moveFilesOrDirectories.MoveFileHandler
 import com.intellij.refactoring.move.moveFilesOrDirectories.MoveFilesOrDirectoriesProcessor
 import com.intellij.refactoring.util.MoveRenameUsageInfo
@@ -18,26 +17,20 @@ import org.jetbrains.kotlin.analysis.api.permissions.KaAllowAnalysisOnEdt
 import org.jetbrains.kotlin.analysis.api.permissions.allowAnalysisOnEdt
 import org.jetbrains.kotlin.idea.core.getFqNameWithImplicitPrefix
 import org.jetbrains.kotlin.idea.core.getFqNameWithImplicitPrefixOrRoot
-import org.jetbrains.kotlin.idea.k2.refactoring.move.descriptor.K2MoveDescriptor
+import org.jetbrains.kotlin.idea.k2.refactoring.move.descriptor.K2MoveOperationDescriptor
 import org.jetbrains.kotlin.idea.k2.refactoring.move.processor.K2MoveRenameUsageInfo.Companion.unMarkNonUpdatableUsages
 import org.jetbrains.kotlin.psi.CopyablePsiUserDataProperty
 import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.psi.KtNamedDeclaration
 
-/**
- * K2 move refactoring processor that moves whole files or sets of files. The main difference between this processor and
- * [K2MoveDeclarationsRefactoringProcessor] is that this processor moves the file as a whole and adjusts imports later while
- * [K2MoveDeclarationsRefactoringProcessor] moves the individual declarations and generates the imports from them. Most of the Kotlin
- * specific logic for this refactoring processor is implemented in [K2MoveFilesHandler].
- */
-class K2MoveFilesOrDirectoriesRefactoringProcessor(descriptor: K2MoveDescriptor.Files) : MoveFilesOrDirectoriesProcessor(
+class K2MoveFilesOrDirectoriesRefactoringProcessor(descriptor: K2MoveOperationDescriptor.Files) : MoveFilesOrDirectoriesProcessor(
     descriptor.project,
-    descriptor.source.elements.toTypedArray(),
-    runWriteAction { descriptor.target.getOrCreateTarget() as PsiDirectory },
+    descriptor.sourceElements.toTypedArray(),
+    runWriteAction { descriptor.moveDescriptors.first().target.getOrCreateTarget(descriptor.dirStructureMatchesPkg) as PsiDirectory }, // TODO how to do multi target move?
     descriptor.searchReferences,
     descriptor.searchInComments,
     descriptor.searchForText,
-    MoveCallback { },
+    descriptor.moveCallBack,
     Runnable { }
 ) {
     private fun PsiElement.allFiles(): List<KtFile> = when (this) {
@@ -55,8 +48,13 @@ class K2MoveFilesOrDirectoriesRefactoringProcessor(descriptor: K2MoveDescriptor.
             .flatMap { file -> file.declarations }
             .flatMap { declaration -> (declaration as? KtNamedDeclaration)?.withChildDeclarations() ?: emptyList() }
         unMarkNonUpdatableUsages(declarationsToMove)
-        val usages = refUsages.get()?.filterNotNull() ?: return false
-        refUsages.set(usages.filterUpdatable(declarationsToMove).toTypedArray())
+        val updatableUsages = refUsages.get()
+            ?.filter { if (it is K2MoveRenameUsageInfo) it.isUpdatable(declarationsToMove) else false }
+            ?.filterIsInstance<K2MoveRenameUsageInfo>()
+            ?: return false
+        refUsages.set(updatableUsages.toTypedArray())
+        val usagesByFile = updatableUsages.groupBy { it.referencedElement?.containingFile }
+        usagesByFile.forEach { file, usages -> myFoundUsages.replace(file, usages) }
         return true
     }
 }

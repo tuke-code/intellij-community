@@ -59,6 +59,7 @@ class AddMavenDependencyQuickFixTest : MavenDomWithIndicesTestCase() {
                     <version>1</version>
                     """.trimIndent())
 
+    refreshFiles(listOf(f))
     fixture.configureFromExistingVirtualFile(f)
 
     val intentionAction = findAddMavenIntention()
@@ -96,6 +97,7 @@ class AddMavenDependencyQuickFixTest : MavenDomWithIndicesTestCase() {
                     <version>1</version>
                     """.trimIndent())
 
+    refreshFiles(listOf(f))
     fixture.configureFromExistingVirtualFile(f)
 
     val intentionAction = findAddMavenIntention()
@@ -159,6 +161,7 @@ class AddMavenDependencyQuickFixTest : MavenDomWithIndicesTestCase() {
                     </dependencies>
                     """.trimIndent())
 
+    refreshFiles(listOf(f))
     fixture.configureFromExistingVirtualFile(f)
 
     val intentionAction = findAddMavenIntention()
@@ -207,6 +210,7 @@ class AddMavenDependencyQuickFixTest : MavenDomWithIndicesTestCase() {
                     <version>1</version>
                     """.trimIndent())
 
+    refreshFiles(listOf(f))
     fixture.configureFromExistingVirtualFile(f)
 
     val intentionAction = findAddMavenIntention()

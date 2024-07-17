@@ -10,7 +10,7 @@ import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.diagnostics.KaDiagnosticWithPsi
 import org.jetbrains.kotlin.analysis.api.fir.diagnostics.KaFirDiagnostic
 import org.jetbrains.kotlin.analysis.api.symbols.*
-import org.jetbrains.kotlin.analysis.api.symbols.markers.KaSymbolWithMembers
+import org.jetbrains.kotlin.analysis.api.symbols.markers.KaDeclarationContainerSymbol
 import org.jetbrains.kotlin.analysis.api.types.KaFunctionType
 import org.jetbrains.kotlin.analysis.api.types.KaClassType
 import org.jetbrains.kotlin.analysis.api.types.KaType
@@ -113,11 +113,11 @@ object ChangeTypeQuickFixFactories {
             addAll(returnedExpressions.mapNotNull { returnExpr ->
                 (property?.getPropertyInitializerType() ?: returnExpr.expressionType)?.let { getActualType(it) }
             })
-            if (!candidateType.isUnit) {
+            if (!candidateType.isUnitType) {
                 add(candidateType)
             }
         }.distinct()
-        return commonSuperType(returnTypes) ?: candidateType
+        return if (returnTypes.isNotEmpty()) returnTypes.commonSupertype else candidateType
     }
 
     context(KaSession)
@@ -229,9 +229,9 @@ object ChangeTypeQuickFixFactories {
             buildList {
                 add(UpdateTypeQuickFix(entryWithWrongType, TargetType.VARIABLE, createTypeInfo(diagnostic.destructingType)))
 
-                val classSymbol = (diagnostic.psi.expressionType as? KaClassType)?.symbol as? KaSymbolWithMembers ?: return@buildList
+                val classSymbol = (diagnostic.psi.expressionType as? KaClassType)?.symbol as? KaDeclarationContainerSymbol ?: return@buildList
                 val componentFunction = classSymbol.memberScope
-                    .getCallableSymbols(diagnostic.componentFunctionName)
+                    .callables(diagnostic.componentFunctionName)
                     .firstOrNull()?.psi as? KtCallableDeclaration
                     ?: return@buildList
                 add(UpdateTypeQuickFix(componentFunction, TargetType.CALLED_FUNCTION, createTypeInfo(diagnostic.expectedType)))
@@ -337,7 +337,7 @@ context(KaSession)
 fun KaType.isNumberOrUNumberType(): Boolean = isNumberType() || isUNumberType()
 
 context(KaSession)
-fun KaType.isNumberType(): Boolean = isPrimitive && !isBoolean && !isChar
+fun KaType.isNumberType(): Boolean = isPrimitive && !isBooleanType && !isCharType
 
 context(KaSession)
-fun KaType.isUNumberType(): Boolean = isUByte || isUShort || isUInt || isULong
+fun KaType.isUNumberType(): Boolean = isUByteType || isUShortType || isUIntType || isULongType

@@ -120,7 +120,7 @@ class UsePropertyAccessSyntaxInspection : LocalInspectionTool(), CleanupLocalIns
             val receiverType =
                 callableReferenceExpression.resolveToCall()
                     ?.successfulFunctionCallOrNull()?.partiallyAppliedSymbol?.dispatchReceiver?.type?.lowerBoundIfFlexible()
-                    ?: callableReferenceExpression.getReceiverKtType()?.lowerBoundIfFlexible() ?: return
+                    ?: callableReferenceExpression.receiverType?.lowerBoundIfFlexible() ?: return
 
             val syntheticProperty = getSyntheticProperty(propertyNames, receiverType) ?: return
 
@@ -205,13 +205,13 @@ class UsePropertyAccessSyntaxInspection : LocalInspectionTool(), CleanupLocalIns
                 val setterIsExpressionForFunction = methodIsExpressionForFunction(qualifiedOrCall)
                 val setterIsExpressionForPropertyAccessor = methodIsExpressionForPropertyAccessor(qualifiedOrCall)
                 if (setterIsExpressionForFunction || setterIsExpressionForPropertyAccessor) {
-                    if (!returnType.isUnit) {
+                    if (!returnType.isUnitType) {
                         // Covered with the test "dontReplaceSetterForFunctionWithExpressionBody"
                         return
                     }
                     convertExpressionToBlockBodyData = ConvertExpressionToBlockBodyData(
-                        returnType.isUnit,
-                        returnType.isNothing,
+                        returnType.isUnitType,
+                        returnType.isNothingType,
                         returnType.isMarkedNullable,
                         returnType.render(position = Variance.OUT_VARIANCE)
                     )
@@ -424,7 +424,7 @@ class UsePropertyAccessSyntaxInspection : LocalInspectionTool(), CleanupLocalIns
     context(KaSession)
     @OptIn(KaExperimentalApi::class)
     private fun receiverOrItsAncestorsContainVisibleFieldWithSameName(receiverType: KaType, propertyName: String): Boolean {
-        val fieldWithSameName = receiverType.scope?.declarationScope?.getCallableSymbols()
+        val fieldWithSameName = receiverType.scope?.declarationScope?.callables
             ?.filter { it is KaJavaFieldSymbol && it.name.toString() == propertyName && !it.visibility.isPrivateOrPrivateToThis() }
             ?.singleOrNull()
         return fieldWithSameName != null
@@ -475,7 +475,7 @@ class UsePropertyAccessSyntaxInspection : LocalInspectionTool(), CleanupLocalIns
         }
 
         val syntheticPropertyReturnType = syntheticProperty.returnType.lowerBoundIfFlexible()
-        return syntheticPropertyReturnType.isEqualTo(propertyExpectedType)
+        return syntheticPropertyReturnType.semanticallyEquals(propertyExpectedType)
     }
 
     context(KaSession)
@@ -550,7 +550,7 @@ class UsePropertyAccessSyntaxInspection : LocalInspectionTool(), CleanupLocalIns
         val replacementReceiverType =
             resolvedCall.successfulVariableAccessCall()?.partiallyAppliedSymbol?.dispatchReceiver?.type?.lowerBoundIfFlexible()
                 ?: return false
-        return replacementReceiverType.isEqualTo(expectedReceiverType)
+        return replacementReceiverType.semanticallyEquals(expectedReceiverType)
     }
 
     private fun functionNameIsInNotPropertiesList(symbol: KaCallableSymbol, callExpression: KtExpression): Boolean {
@@ -564,7 +564,7 @@ class UsePropertyAccessSyntaxInspection : LocalInspectionTool(), CleanupLocalIns
     private fun functionOriginateNotFromJava(allOverriddenSymbols: List<KaCallableSymbol>): Boolean {
         for (overriddenSymbol in allOverriddenSymbols) {
             if (overriddenSymbol.origin.isJavaSourceOrLibrary()) {
-                val symbolAnnotations = overriddenSymbol.annotationsList.annotations
+                val symbolAnnotations = overriddenSymbol.annotations
                 if (symbolAnnotations.any { it.classId?.asFqNameString()?.equals(JAVA_LANG_OVERRIDE) == true }) {
                     // This is Java's @Override, continue searching for Java method but not overridden
                     continue

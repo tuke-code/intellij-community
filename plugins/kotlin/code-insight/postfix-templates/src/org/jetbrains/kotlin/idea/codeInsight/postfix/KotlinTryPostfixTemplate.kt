@@ -123,13 +123,12 @@ private class ExceptionClassCollector : KtTreeVisitor<Unit?>() {
                 val symbol = call.symbol
                 if (symbol is KaPropertySymbol) {
                     when (call.simpleAccess) {
-                        KaSimpleVariableAccess.Read -> symbol.getter?.let { processCallable(it) }
+                        is KaSimpleVariableAccess.Read -> symbol.getter?.let { processCallable(it) }
                         is KaSimpleVariableAccess.Write -> symbol.setter?.let { processCallable(it) }
-                        else -> {}
                     }
                 }
             }
-            is KaCompoundVariableAccessCall -> processCallable(call.compoundAccess.operationPartiallyAppliedSymbol.symbol)
+            is KaCompoundVariableAccessCall -> processCallable(call.compoundOperation.operationPartiallyAppliedSymbol.symbol)
             is KaCompoundArrayAccessCall -> {
                 processCallable(call.getPartiallyAppliedSymbol.symbol)
                 processCallable(call.setPartiallyAppliedSymbol.symbol)

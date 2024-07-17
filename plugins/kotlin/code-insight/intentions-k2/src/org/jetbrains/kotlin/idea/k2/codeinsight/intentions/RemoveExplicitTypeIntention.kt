@@ -6,7 +6,6 @@ import com.intellij.modcommand.ModPsiUpdater
 import com.intellij.openapi.util.TextRange
 import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
 import org.jetbrains.kotlin.analysis.api.KaSession
-import org.jetbrains.kotlin.analysis.api.symbols.markers.KaSymbolWithVisibility
 import org.jetbrains.kotlin.analysis.api.symbols.receiverType
 import org.jetbrains.kotlin.analysis.api.symbols.typeParameters
 import org.jetbrains.kotlin.analysis.api.types.KaErrorType
@@ -57,7 +56,7 @@ internal class RemoveExplicitTypeIntention :
     context(KaSession)
     override fun prepareContext(element: KtDeclaration): Unit? = when {
         element is KtParameter -> true
-        element is KtNamedFunction && element.hasBlockBody() -> element.returnType.isUnit
+        element is KtNamedFunction && element.hasBlockBody() -> element.returnType.isUnitType
         element is KtCallableDeclaration && publicReturnTypeShouldBePresentInApiMode(element) -> false
         else -> !element.isExplicitTypeReferenceNeededForTypeInferenceByAnalyze()
     }.asUnit
@@ -80,8 +79,7 @@ internal class RemoveExplicitTypeIntention :
         if (declaration is KtFunction && declaration.isLocal) return false
         if (declaration is KtProperty && declaration.isLocal) return false
 
-        val symbolWithVisibility = declaration.symbol as? KaSymbolWithVisibility ?: return false
-        return isPublicApi(symbolWithVisibility)
+        return isPublicApi(declaration.symbol)
     }
 
     context(KaSession)
@@ -102,9 +100,9 @@ internal class RemoveExplicitTypeIntention :
 
         val initializerType = initializer.expressionType ?: return true
         val typeCanBeRemoved = if (isVar) {
-            initializerType.isEqualTo(explicitType)
+            initializerType.semanticallyEquals(explicitType)
         } else {
-            initializerType.isSubTypeOf(explicitType)
+            initializerType.isSubtypeOf(explicitType)
         }
         return !typeCanBeRemoved
     }
@@ -125,7 +123,7 @@ internal class RemoveExplicitTypeIntention :
             val classId = initializer.getClassId()
             val let = classId?.let { buildClassType(it) }
             val superType = typeReference.type
-            val subTypeOf = let?.isSubTypeOf(superType)
+            val subTypeOf = let?.isSubtypeOf(superType)
             subTypeOf == true
         }
         is KtCallExpression -> initializer.typeArgumentList != null || !returnTypeOfCallDependsOnTypeParameters(initializer)
@@ -161,7 +159,7 @@ internal class RemoveExplicitTypeIntention :
         val resolved = callableReferenceExpression.callableReference.references.firstNotNullOfOrNull { it.resolve() } ?: return false
         if (resolved !is KtNamedFunction) return true
 
-        val symbol = resolved.getFunctionLikeSymbol()
+        val symbol = resolved.symbol
 
         @OptIn(KaExperimentalApi::class)
         val typeParameters = symbol.typeParameters

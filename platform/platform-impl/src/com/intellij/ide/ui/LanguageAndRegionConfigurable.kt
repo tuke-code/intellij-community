@@ -29,7 +29,6 @@ import com.intellij.ui.dsl.builder.panel
 import com.intellij.util.application
 import com.intellij.util.messages.MessageBusConnection
 import com.intellij.util.ui.RestartDialog
-import kotlinx.coroutines.Runnable
 import org.jetbrains.annotations.ApiStatus.Internal
 import java.net.URL
 import java.util.*
@@ -153,10 +152,11 @@ class LanguageAndRegionUi {
       }
     }
   }
+
 }
 
 internal class LanguageAndRegionConfigurable :
-  BoundSearchableConfigurable(IdeBundle.message("title.language.and.region"), "region-settings", "preferences.language.and.region") {
+  BoundSearchableConfigurable(IdeBundle.message("title.language.and.region"), "language-region-settings", "preferences.language.and.region") {
   private lateinit var initSelectionLanguage: Locale
   private lateinit var initSelectionRegion: Region
 

@@ -17,7 +17,7 @@ import org.jetbrains.kotlin.analysis.api.analyze
 import org.jetbrains.kotlin.analysis.api.permissions.KaAllowAnalysisOnEdt
 import org.jetbrains.kotlin.analysis.api.permissions.allowAnalysisOnEdt
 import org.jetbrains.kotlin.analysis.api.symbols.*
-import org.jetbrains.kotlin.analysis.api.symbols.markers.KaSymbolWithMembers
+import org.jetbrains.kotlin.analysis.api.symbols.markers.KaDeclarationContainerSymbol
 import org.jetbrains.kotlin.analysis.api.types.KaFunctionType
 import org.jetbrains.kotlin.asJava.toLightElements
 import org.jetbrains.kotlin.idea.base.analysis.api.utils.shortenReferences
@@ -69,7 +69,7 @@ sealed class K2MoveRenameUsageInfo(
         override fun retarget(to: PsiNamedElement): PsiElement? {
             if (to !is KtNamedDeclaration) error("Usage must reference a Kotlin element")
             val element = element ?: return element
-            val newLightElement = to.toLightElements()[lightElementIndex]
+            val newLightElement = to.toLightElements()[lightElementIndex].nameDeterminant()
             if (element.reference?.isReferenceTo(newLightElement) == true) return element
             if (element is PsiReferenceExpression
                 && wasMember
@@ -137,10 +137,10 @@ sealed class K2MoveRenameUsageInfo(
             if (refExpr.isUnqualifiable()) return true
             val refChain = (refExpr.getTopmostParentQualifiedExpressionForReceiver() ?: refExpr)
                 .collectDescendantsOfType<KtSimpleNameExpression>()
-                .filter { it.canBeUsedInImport() }
+                .filter { it.canBeUsedInImport() && it.isNameDeterminantInQualifiedChain() }
             return if (isInternal) {
                 // for internal usages, update the first name determinant in the call chain
-                refChain.firstOrNull { simpleNameExpr -> simpleNameExpr.isNameDeterminantInQualifiedChain() } == refExpr
+                refChain.firstOrNull() == refExpr
             } else {
                 // for external usages, update the first reference to a moved element
                 refChain.firstOrNull { simpleNameExpr -> simpleNameExpr.mainReference.resolve() in movedElements } == refExpr
@@ -159,7 +159,7 @@ sealed class K2MoveRenameUsageInfo(
                 val resolvedSymbol = mainReference.resolveToSymbol()
                 if (resolvedSymbol is KaClassSymbol && resolvedSymbol.classKind == KaClassKind.COMPANION_OBJECT) return true
                 if (resolvedSymbol is KaConstructorSymbol) return true
-                val containingSymbol = resolvedSymbol?.containingSymbol
+                val containingSymbol = resolvedSymbol?.containingDeclaration
                 if (resolvedSymbol is KaPackageSymbol) return false // ignore packages
                 if (containingSymbol == null) return true // top levels are static
                 if (containingSymbol is KaClassSymbol) {
@@ -168,8 +168,8 @@ sealed class K2MoveRenameUsageInfo(
                         else -> {}
                     }
                 }
-                if (containingSymbol is KaSymbolWithMembers) {
-                    if (resolvedSymbol in containingSymbol.staticMemberScope.getAllSymbols()) return true
+                if (containingSymbol is KaDeclarationContainerSymbol) {
+                    if (resolvedSymbol in containingSymbol.staticMemberScope.declarations) return true
                 }
                 return false
             }

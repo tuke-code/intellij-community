@@ -2315,8 +2315,8 @@ f:com.intellij.openapi.vcs.changes.VcsEditorTabFilesManager
 - sf:findFloatingWindowForFile(com.intellij.openapi.fileEditor.ex.FileEditorManagerEx,com.intellij.openapi.vfs.VirtualFile):com.intellij.openapi.fileEditor.impl.EditorWindow
 - sf:getInstance():com.intellij.openapi.vcs.changes.VcsEditorTabFilesManager
 - f:getShouldOpenInNewWindow():Z
-- f:openFile(com.intellij.openapi.project.Project,com.intellij.openapi.vfs.VirtualFile,Z):com.intellij.openapi.fileEditor.FileEditor[]
-- f:openFile(com.intellij.openapi.project.Project,com.intellij.openapi.vfs.VirtualFile,Z,Z,Z):com.intellij.openapi.fileEditor.FileEditor[]
+- f:openFile(com.intellij.openapi.project.Project,com.intellij.openapi.vfs.VirtualFile,Z):java.util.List
+- f:openFile(com.intellij.openapi.project.Project,com.intellij.openapi.vfs.VirtualFile,Z,Z,Z):java.util.List
 f:com.intellij.openapi.vcs.changes.VcsEditorTabFilesManager$Companion
 - f:findFloatingWindowForFile(com.intellij.openapi.fileEditor.ex.FileEditorManagerEx,com.intellij.openapi.vfs.VirtualFile):com.intellij.openapi.fileEditor.impl.EditorWindow
 - f:getInstance():com.intellij.openapi.vcs.changes.VcsEditorTabFilesManager
@@ -3168,12 +3168,15 @@ c:com.intellij.openapi.vcs.changes.committed.CommittedChangesTreeBrowser
 - com.intellij.openapi.Disposable
 - com.intellij.openapi.actionSystem.DataProvider
 - com.intellij.openapi.vcs.changes.committed.DecoratorManager
+- sf:COMMITTED_CHANGES_TREE_DATA_KEY:com.intellij.openapi.actionSystem.DataKey
 - sf:ITEMS_RELOADED:com.intellij.util.messages.Topic
 - sf:ourHelpId:java.lang.String
 - <init>(com.intellij.openapi.project.Project,java.util.List):V
 - addFilter(com.intellij.openapi.vcs.changes.committed.ChangeListFilteringStrategy):V
 - append(java.util.List):V
 - s:collectChanges(java.util.List,Z):java.util.List
+- collectChangesWithMovedChildren():com.intellij.openapi.vcs.changes.Change[]
+- collectSelectedChangesWithMovedChildren():com.intellij.openapi.vcs.changes.Change[]
 - createGroupFilterToolbar(com.intellij.openapi.project.Project,com.intellij.openapi.actionSystem.ActionGroup,com.intellij.openapi.actionSystem.ActionGroup,java.util.List):com.intellij.openapi.actionSystem.ActionToolbar
 - dispose():V
 - getChangesTree():com.intellij.ui.treeStructure.Tree
@@ -7537,6 +7540,7 @@ c:com.intellij.openapi.vcs.ui.CommitMessage
 - s:getEditor(com.intellij.openapi.editor.Document):com.intellij.openapi.editor.Editor
 - getEditorField():com.intellij.ui.EditorTextField
 - getText():java.lang.String
+- s:isCommitMessage(com.intellij.openapi.editor.Document):Z
 - s:isCommitMessage(com.intellij.psi.PsiElement):Z
 - requestFocusInMessage():V
 - setChangesSupplier(java.util.function.Supplier):V
@@ -8579,11 +8583,11 @@ f:com.intellij.vcs.commit.CommitCheckFailure$Unknown
 - sf:INSTANCE:com.intellij.vcs.commit.CommitCheckFailure$Unknown
 c:com.intellij.vcs.commit.CommitCheckFailure$WithDescription
 - com.intellij.vcs.commit.CommitCheckFailure
-- <init>(java.lang.String):V
-- f:getText():java.lang.String
+- <init>(com.intellij.openapi.util.text.HtmlChunk):V
+- f:getText():com.intellij.openapi.util.text.HtmlChunk
 f:com.intellij.vcs.commit.CommitCheckFailure$WithDetails
 - com.intellij.vcs.commit.CommitCheckFailure$WithDescription
-- <init>(java.lang.String,java.lang.String,java.lang.String,kotlin.jvm.functions.Function1):V
+- <init>(com.intellij.openapi.util.text.HtmlChunk,java.lang.String,java.lang.String,kotlin.jvm.functions.Function1):V
 - f:getViewDetails():kotlin.jvm.functions.Function1
 - f:getViewDetailsActionText():java.lang.String
 - f:getViewDetailsLinkText():java.lang.String

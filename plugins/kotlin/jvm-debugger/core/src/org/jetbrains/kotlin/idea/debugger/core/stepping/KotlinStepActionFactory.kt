@@ -35,8 +35,8 @@ object KotlinStepActionFactory {
 
                 override fun contextAction(suspendContext: SuspendContextImpl) {
                     if (suspendContext.location?.let { isInSuspendMethod(it) } == true) {
-                        CoroutineBreakpointFacility.installResumeBreakpointInCurrentMethod(suspendContext)
                         applyThreadFilter(getThreadFilterFromContext(suspendContext))
+                        CoroutineBreakpointFacility.installResumeBreakpointInCurrentMethod(suspendContext)
                     }
                     super.contextAction(suspendContext)
                 }
@@ -116,14 +116,15 @@ object KotlinStepActionFactory {
 
     fun createStepOutCommand(
         debugProcess: DebugProcessImpl,
-        suspendContext: SuspendContextImpl?
+        suspendContext: SuspendContextImpl?,
+        filter: MethodFilter? = null,
     ): DebugProcessImpl.StepOutCommand {
         return with(debugProcess) {
-            object : DebugProcessImpl.StepOutCommand(suspendContext, StepRequest.STEP_LINE) {
+            object : DebugProcessImpl.StepOutCommand(suspendContext, StepRequest.STEP_LINE, filter) {
                 override fun contextAction(suspendContext: SuspendContextImpl) {
                     if (suspendContext.location?.let { isInSuspendMethod(it) } == true) {
-                        CoroutineBreakpointFacility.installResumeBreakpointInCallerMethod(suspendContext)
                         applyThreadFilter(getThreadFilterFromContext(suspendContext))
+                        CoroutineBreakpointFacility.installResumeBreakpointInCallerMethod(suspendContext)
                     }
                     super.contextAction(suspendContext)
                 }
@@ -133,11 +134,12 @@ object KotlinStepActionFactory {
                     stepThread: ThreadReferenceProxyImpl,
                     parentHint: RequestHint?
                 ): RequestHint {
-                    val suspendReturnIndex = if (suspendContext.location?.let { isInSuspendMethod(it) } == true) {
-                        getLocationOfCoroutineSuspendReturn(StackFrameInterceptor.instance?.callerLocation(suspendContext))
-                    } else -1
+                    val resumeLocation = StackFrameInterceptor.instance?.callerLocation(suspendContext)
+                    val suspendReturnLocation = if (suspendContext.location?.let { isInSuspendMethod(it) } == true) {
+                        getLocationOfCoroutineSuspendReturn(resumeLocation)
+                    } else null
                     val hint: RequestHint =
-                        KotlinStepOutRequestHint(suspendReturnIndex, stepThread, suspendContext, StepRequest.STEP_MIN, StepRequest.STEP_OUT, null, parentHint)
+                        KotlinStepOutRequestHint(suspendReturnLocation, stepThread, suspendContext, StepRequest.STEP_MIN, StepRequest.STEP_OUT, filter, parentHint)
                     hint.isIgnoreFilters = debugProcess.session.shouldIgnoreSteppingFilters()
                     return hint
                 }

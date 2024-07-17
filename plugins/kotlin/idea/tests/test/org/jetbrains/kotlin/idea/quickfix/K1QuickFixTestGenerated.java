@@ -9757,9 +9757,9 @@ public abstract class K1QuickFixTestGenerated extends AbstractK1QuickFixTest {
             runTest("testData/quickfix/implement/local.kt");
         }
 
-        @TestMetadata("menyImplMemberNotImplemented.kt")
-        public void testMenyImplMemberNotImplemented() throws Exception {
-            runTest("testData/quickfix/implement/menyImplMemberNotImplemented.kt");
+        @TestMetadata("manyImplMemberNotImplemented.kt")
+        public void testManyImplMemberNotImplemented() throws Exception {
+            runTest("testData/quickfix/implement/manyImplMemberNotImplemented.kt");
         }
 
         @TestMetadata("nested.kt")
@@ -12398,11 +12398,6 @@ public abstract class K1QuickFixTestGenerated extends AbstractK1QuickFixTest {
                 runTest("testData/quickfix/optIn/basicFunctionNotApplicable.kt");
             }
 
-            @TestMetadata("basicFunctionNotApplicableFir.kt")
-            public void testBasicFunctionNotApplicableFir() throws Exception {
-                runTest("testData/quickfix/optIn/basicFunctionNotApplicableFir.kt");
-            }
-
             @TestMetadata("basicModule.kt")
             public void testBasicModule() throws Exception {
                 runTest("testData/quickfix/optIn/basicModule.kt");
@@ -12551,11 +12546,6 @@ public abstract class K1QuickFixTestGenerated extends AbstractK1QuickFixTest {
             @TestMetadata("override.kt")
             public void testOverride() throws Exception {
                 runTest("testData/quickfix/optIn/override.kt");
-            }
-
-            @TestMetadata("overrideFir.kt")
-            public void testOverrideFir() throws Exception {
-                runTest("testData/quickfix/optIn/overrideFir.kt");
             }
 
             @TestMetadata("propagateOptIn.kt")
@@ -17027,6 +17017,16 @@ public abstract class K1QuickFixTestGenerated extends AbstractK1QuickFixTest {
             runTest("testData/quickfix/surroundWithNullCheck/unsafeCallInsideWhile.kt");
         }
 
+        @TestMetadata("unstableTopLevelValueWithGetter.kt")
+        public void testUnstableTopLevelValueWithGetter() throws Exception {
+            runTest("testData/quickfix/surroundWithNullCheck/unstableTopLevelValueWithGetter.kt");
+        }
+
+        @TestMetadata("unstableTopLevelVariable.kt")
+        public void testUnstableTopLevelVariable() throws Exception {
+            runTest("testData/quickfix/surroundWithNullCheck/unstableTopLevelVariable.kt");
+        }
+
         @TestMetadata("unstableValue.kt")
         public void testUnstableValue() throws Exception {
             runTest("testData/quickfix/surroundWithNullCheck/unstableValue.kt");
@@ -19557,29 +19557,9 @@ public abstract class K1QuickFixTestGenerated extends AbstractK1QuickFixTest {
                 KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
             }
 
-            @TestMetadata("enumEntryCall.kt")
-            public void testEnumEntryCall() throws Exception {
-                runTest("testData/quickfix/variables/changeToPropertyAccess/enumEntryCall.kt");
-            }
-
             @TestMetadata("nonSimpleName.kt")
             public void testNonSimpleName() throws Exception {
                 runTest("testData/quickfix/variables/changeToPropertyAccess/nonSimpleName.kt");
-            }
-
-            @TestMetadata("objectCall.kt")
-            public void testObjectCall() throws Exception {
-                runTest("testData/quickfix/variables/changeToPropertyAccess/objectCall.kt");
-            }
-
-            @TestMetadata("propertyCall.kt")
-            public void testPropertyCall() throws Exception {
-                runTest("testData/quickfix/variables/changeToPropertyAccess/propertyCall.kt");
-            }
-
-            @TestMetadata("propertyCallWithArguments.kt")
-            public void testPropertyCallWithArguments() throws Exception {
-                runTest("testData/quickfix/variables/changeToPropertyAccess/propertyCallWithArguments.kt");
             }
         }
 

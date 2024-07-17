@@ -3,38 +3,39 @@ package org.jetbrains.kotlin.idea.gradleJava.run
 
 import com.intellij.psi.PsiElement
 import com.intellij.psi.impl.source.tree.LeafPsiElement
+import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.kotlin.analysis.api.analyze
-import org.jetbrains.kotlin.analysis.api.resolution.*
+import org.jetbrains.kotlin.analysis.api.resolution.KaCallableMemberCall
+import org.jetbrains.kotlin.analysis.api.resolution.singleCallOrNull
+import org.jetbrains.kotlin.analysis.api.resolution.singleFunctionCallOrNull
+import org.jetbrains.kotlin.analysis.api.resolution.symbol
 import org.jetbrains.kotlin.analysis.api.types.symbol
 import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.psi.psiUtil.getParentOfType
 import org.jetbrains.kotlin.utils.addToStdlib.safeAs
-import org.jetbrains.plugins.gradle.service.execution.GradleRunConfiguration
 import org.jetbrains.plugins.gradle.service.resolve.GradleCommonClassNames.GRADLE_API_PROJECT
 import org.jetbrains.plugins.gradle.service.resolve.GradleCommonClassNames.GRADLE_API_TASK_CONTAINER
-import org.jetbrains.plugins.gradle.util.GradleConstants
 import org.jetbrains.plugins.gradle.util.GradleConstants.KOTLIN_DSL_SCRIPT_EXTENSION
 
 
 private const val GRADLE_KOTLIN_PROJECT_DELEGATE = "org.gradle.kotlin.dsl.support.delegates.ProjectDelegate"
 
-internal fun isGradleConfiguration(configuration: GradleRunConfiguration) =
-    GradleConstants.SYSTEM_ID == configuration.settings.externalSystemId
-
-internal fun isInGradleKotlinScript(psiElement: PsiElement): Boolean {
+@ApiStatus.Internal
+fun isInGradleKotlinScript(psiElement: PsiElement): Boolean {
     val file = psiElement.containingFile?.virtualFile ?: return false
     return file.name.endsWith(".$KOTLIN_DSL_SCRIPT_EXTENSION")
 }
 
-internal fun isTaskNameLineMarkerCandidate(element: PsiElement): Boolean {
+internal fun isRunTaskInGutterCandidate(element: PsiElement): Boolean {
     if (element !is LeafPsiElement) return false
     return isOpenQuoteOfStringArgumentInCall(element)
             || isIdentifierInPropertyWithDelegate(element)
 }
 
-internal fun findTaskNameAround(element: PsiElement): String? {
+@ApiStatus.Internal
+fun findTaskNameAround(element: PsiElement): String? {
     return findTaskNameInSurroundingCallExpression(element)
         ?: findTaskNameInSurroundingProperty(element)
 }
@@ -101,9 +102,11 @@ private fun getReceiverClassFqName(functionCall: KaCallableMemberCall<*, *>): Fq
     return type?.symbol?.classId?.asSingleFqName()
 }
 
+private val taskContainerMethods = setOf("register", "create", "named", "registering", "creating")
+
 private fun isMethodOfTaskContainer(methodName: String, fqClassName: FqName) =
     fqClassName == FqName(GRADLE_API_TASK_CONTAINER)
-            && methodName in setOf("register", "create", "named", "registering", "creating")
+            && methodName in taskContainerMethods
 
 private fun isMethodOfProject(methodName: String, fqClassName: FqName) =
     (methodName == "task") && (fqClassName == FqName(GRADLE_API_PROJECT)

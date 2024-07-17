@@ -94,18 +94,26 @@ object LocalizationUtil {
   fun getResourceAsStream(defaultLoader: ClassLoader?, path: Path, specialLocale: Locale? = null): InputStream? {
     val locale = specialLocale ?: getLocale()
     val localizedPaths = getLocalizedPaths(path, locale)
-    getPluginClassLoader()?.getResourceAsStream(FileUtil.toSystemIndependentName(path.pathString))?.let { return it }
     for (localizedPath in localizedPaths) {
       val pathString = FileUtil.toSystemIndependentName(localizedPath.pathString)
       defaultLoader?.getResourceAsStream(pathString)?.let { return it }
     }
-    return null
+    return getPluginClassLoader()?.getResourceAsStream(path.pathString) ?:
+    defaultLoader?.getResourceAsStream(path.pathString)
+  }
+
+  @Internal
+  @JvmOverloads
+  fun getLocalizedPathsWithDefault(path: Path, specialLocale: Locale? = null): List<Path> {
+    val locale = specialLocale ?: getLocale()
+    return getLocalizedPaths(path, locale).toMutableList().plusElement(path).distinct()
   }
 
   @Internal
   @JvmOverloads
   fun getLocalizedPaths(path: Path, specialLocale: Locale? = null): List<Path> {
     val locale = specialLocale ?: getLocale()
+    if (locale == Locale.ROOT) return emptyList()
     return listOf(
       //localizations/zh/CN/inspectionDescriptions/name.html
       path.convertToLocalizationFolderUsage(locale, true),
@@ -118,9 +126,6 @@ object LocalizationUtil {
 
       //inspectionDescriptions/name_zh.html
       path.convertPathToLocaleSuffixUsage(locale, false),
-
-      //inspectionDescriptions/name.html
-      path
     ).distinct()
   }
 

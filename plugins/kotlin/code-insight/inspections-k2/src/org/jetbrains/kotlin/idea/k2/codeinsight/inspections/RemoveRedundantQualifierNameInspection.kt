@@ -55,7 +55,7 @@ internal class RemoveRedundantQualifierNameInspection : AbstractKotlinInspection
                 }
             },
             callableShortenStrategy = { callableSymbol ->
-                val containingSymbol = callableSymbol.containingSymbol
+                val containingSymbol = callableSymbol.containingDeclaration
 
                 if (callableSymbol !is KaEnumEntrySymbol && (containingSymbol.isEnumClass() || containingSymbol.isEnumCompanionObject())) {
                     ShortenStrategy.DO_NOT_SHORTEN
@@ -93,10 +93,10 @@ internal class RemoveRedundantQualifierNameInspection : AbstractKotlinInspection
 }
 
 context (KaSession)
-private fun KaDeclarationSymbol.getContainingClassForCompanionObject(): KaNamedClassOrObjectSymbol? {
+private fun KaDeclarationSymbol.getContainingClassForCompanionObject(): KaNamedClassSymbol? {
     if (this !is KaClassSymbol || this.classKind != KaClassKind.COMPANION_OBJECT) return null
 
-    val containingClass = containingSymbol as? KaNamedClassOrObjectSymbol
+    val containingClass = containingDeclaration as? KaNamedClassSymbol
     return containingClass?.takeIf { it.companionObject == this }
 }
 

@@ -70,7 +70,7 @@ internal class SelfAssignmentInspection : KotlinApplicableInspectionBase.Simple<
         if (!rightDeclaration.isVar) return null
         if (rightDeclaration is KtProperty) {
             if (rightDeclaration.isOverridable()) return null
-            if (rightDeclaration.accessors.any { !it.getPropertyAccessorSymbol().isDefault }) return null
+            if (rightDeclaration.accessors.any { !it.symbol.isDefault }) return null
         }
 
         if (left.receiver(leftCallee) != right.receiver(rightCallee)) return null
@@ -101,6 +101,6 @@ internal class SelfAssignmentInspection : KotlinApplicableInspectionBase.Simple<
             is KtNameReferenceExpression -> return receiverExpression.mainReference.resolveToSymbol()
         }
 
-        return callSymbol.containingSymbol as? KaClassSymbol
+        return callSymbol.containingDeclaration as? KaClassSymbol
     }
 }

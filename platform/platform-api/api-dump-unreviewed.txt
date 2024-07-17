@@ -583,12 +583,6 @@ e:com.intellij.ide.HelpTooltip$Alignment
 - a:getPointFor(java.awt.Component,java.awt.Dimension,java.awt.Point):java.awt.Point
 - s:valueOf(java.lang.String):com.intellij.ide.HelpTooltip$Alignment
 - s:values():com.intellij.ide.HelpTooltip$Alignment[]
-f:com.intellij.ide.HelpTooltipManager
-- com.intellij.ide.HelpTooltip
-- sf:SHORTCUT_PROPERTY:com.intellij.openapi.util.Key
-- <init>():V
-- hideTooltip():V
-- showTooltip(javax.swing.JComponent,java.awt.event.MouseEvent):V
 f:com.intellij.ide.IdeBundle
 - sf:BUNDLE:java.lang.String
 - s:message(java.lang.String,java.lang.Object[]):java.lang.String
@@ -1595,7 +1589,7 @@ c:com.intellij.openapi.actionSystem.ActionGroupWrapper
 - isDumbAware():Z
 - isInInjectedContext():Z
 - isPerformWithDocumentsCommitted():Z
-- postProcessVisibleChildren(java.util.List,com.intellij.openapi.actionSystem.UpdateSession):java.util.List
+- postProcessVisibleChildren(com.intellij.openapi.actionSystem.AnActionEvent,java.util.List):java.util.List
 - update(com.intellij.openapi.actionSystem.AnActionEvent):V
 f:com.intellij.openapi.actionSystem.ActionInGroup
 - getGroup():com.intellij.openapi.actionSystem.ActionGroup
@@ -1759,10 +1753,6 @@ c:com.intellij.openapi.actionSystem.DefaultCompactActionGroup
 - <init>():V
 - <init>(java.lang.String,Z):V
 - <init>(com.intellij.openapi.actionSystem.AnAction[]):V
-f:com.intellij.openapi.actionSystem.DefaultPresentationIconUpdater
-- com.intellij.openapi.actionSystem.PresentationIconUpdater
-- <init>():V
-- performUpdate(com.intellij.openapi.actionSystem.Presentation,java.util.function.Function):V
 f:com.intellij.openapi.actionSystem.EmptyAction
 - com.intellij.openapi.actionSystem.AnAction
 - <init>():V
@@ -1850,13 +1840,6 @@ c:com.intellij.openapi.actionSystem.PlatformDataKeys
 - sf:UI_DISPOSABLE:com.intellij.openapi.actionSystem.DataKey
 - <init>():V
 com.intellij.openapi.actionSystem.PopupAction
-com.intellij.openapi.actionSystem.PresentationIconUpdater
-- sf:DEFAULT:com.intellij.openapi.actionSystem.PresentationIconUpdater
-- sf:UPDATER_KEY:com.intellij.openapi.util.Key
-- andThen(com.intellij.openapi.actionSystem.PresentationIconUpdater):com.intellij.openapi.actionSystem.PresentationIconUpdater
-- a:performUpdate(com.intellij.openapi.actionSystem.Presentation,java.util.function.Function):V
-- registerToPresentation(com.intellij.openapi.actionSystem.Presentation):V
-- s:updateIcons(com.intellij.openapi.actionSystem.Presentation,java.util.function.Function):V
 c:com.intellij.openapi.actionSystem.PressureShortcut
 - com.intellij.openapi.actionSystem.MouseShortcut
 - <init>(D):V
@@ -2773,16 +2756,9 @@ f:com.intellij.openapi.observable.operation.OperationExecutionStatus$Failure
 f:com.intellij.openapi.observable.operation.OperationExecutionStatus$Success
 - com.intellij.openapi.observable.operation.OperationExecutionStatus
 - sf:INSTANCE:com.intellij.openapi.observable.operation.OperationExecutionStatus$Success
-*a:com.intellij.openapi.observable.operation.core.AbstractObservableOperationTrace
+*Fa:com.intellij.openapi.observable.operation.core.AbstractObservableOperationTrace
 - com.intellij.openapi.observable.operation.core.ObservableTaskOperationTrace
 - <init>():V
-- pf:fireOperationFinished():V
-- pf:fireOperationScheduled():V
-- pf:fireOperationStarted():V
-- pf:fireTaskDetached(com.intellij.openapi.observable.operation.OperationExecutionId):V
-- pf:fireTaskFinished(com.intellij.openapi.observable.operation.OperationExecutionId,com.intellij.openapi.observable.operation.OperationExecutionStatus):V
-- pf:fireTaskScheduled(com.intellij.openapi.observable.operation.OperationExecutionId):V
-- pf:fireTaskStarted(com.intellij.openapi.observable.operation.OperationExecutionId):V
 - getDetachTaskObservable():com.intellij.openapi.observable.dispatcher.SingleEventDispatcher
 - getFinishObservable():com.intellij.openapi.observable.dispatcher.SingleEventDispatcher0
 - getFinishTaskObservable():com.intellij.openapi.observable.dispatcher.SingleEventDispatcher2
@@ -2889,13 +2865,12 @@ f:com.intellij.openapi.observable.operation.core.PromiseUtilKt
 - sf:waitForOperationCompletion-HG0u8IE(com.intellij.openapi.observable.operation.core.ObservableOperationTrace,J):V
 f:com.intellij.openapi.observable.operation.core.ResultUtilKt
 - sf:onFailureCatching(java.lang.Object,kotlin.jvm.functions.Function1):java.lang.Object
-a:com.intellij.openapi.observable.properties.AbstractObservableBooleanProperty
+Fa:com.intellij.openapi.observable.properties.AbstractObservableBooleanProperty
 - com.intellij.openapi.observable.properties.AbstractObservableProperty
 - com.intellij.openapi.observable.properties.ObservableBooleanProperty
 - <init>():V
 - afterReset(com.intellij.openapi.Disposable,kotlin.jvm.functions.Function0):V
 - afterSet(com.intellij.openapi.Disposable,kotlin.jvm.functions.Function0):V
-- pf:fireChangeEvents(Z,Z):V
 a:com.intellij.openapi.observable.properties.AbstractObservableClearableProperty
 - com.intellij.openapi.observable.properties.AbstractObservableProperty
 - com.intellij.openapi.observable.properties.ObservableClearableProperty
@@ -2903,11 +2878,10 @@ a:com.intellij.openapi.observable.properties.AbstractObservableClearableProperty
 - afterReset(kotlin.jvm.functions.Function0):V
 - afterReset(kotlin.jvm.functions.Function0,com.intellij.openapi.Disposable):V
 - pf:fireResetEvent():V
-a:com.intellij.openapi.observable.properties.AbstractObservableProperty
+Fa:com.intellij.openapi.observable.properties.AbstractObservableProperty
 - com.intellij.openapi.observable.properties.ObservableProperty
 - <init>():V
 - afterChange(com.intellij.openapi.Disposable,kotlin.jvm.functions.Function1):V
-- pf:fireChangeEvent(java.lang.Object):V
 f:com.intellij.openapi.observable.properties.AtomicBooleanProperty
 - com.intellij.openapi.observable.properties.AbstractObservableBooleanProperty
 - com.intellij.openapi.observable.properties.AtomicMutableBooleanProperty
@@ -2924,7 +2898,7 @@ f:com.intellij.openapi.observable.properties.AtomicBooleanProperty
 - set():V
 - set(Z):V
 - updateAndGet(kotlin.jvm.functions.Function1):java.lang.Boolean
-c:com.intellij.openapi.observable.properties.AtomicLazyProperty
+Fc:com.intellij.openapi.observable.properties.AtomicLazyProperty
 - com.intellij.openapi.observable.properties.AbstractObservableClearableProperty
 - com.intellij.openapi.observable.properties.ObservableMutableProperty
 - sf:Companion:com.intellij.openapi.observable.properties.AtomicLazyProperty$Companion
@@ -4434,7 +4408,7 @@ f:com.intellij.openapi.ui.MessageUtil
 - bs:showOkNoDialog$default(java.lang.String,java.lang.String,com.intellij.openapi.project.Project,java.lang.String,java.lang.String,javax.swing.Icon,I,java.lang.Object):Z
 - sf:showYesNoDialog(java.lang.String,java.lang.String,com.intellij.openapi.project.Project,java.lang.String,java.lang.String,javax.swing.Icon):Z
 - bs:showYesNoDialog$default(java.lang.String,java.lang.String,com.intellij.openapi.project.Project,java.lang.String,java.lang.String,javax.swing.Icon,I,java.lang.Object):Z
-c:com.intellij.openapi.ui.Messages
+Fc:com.intellij.openapi.ui.Messages
 - sf:CANCEL:I
 - sf:CANCEL_BUTTON:java.lang.String
 - sf:NO:I
@@ -9887,7 +9861,6 @@ c:com.intellij.ui.jcef.JBCefJSQuery$Response
 com.intellij.ui.jcef.JBCefOSRHandlerFactory
 - createCefRenderHandler(javax.swing.JComponent):org.cef.handler.CefRenderHandler
 - createComponent(Z):javax.swing.JComponent
-- createScreenBoundsProvider():com.intellij.util.Function
 - s:getInstance():com.intellij.ui.jcef.JBCefOSRHandlerFactory
 a:com.intellij.ui.jcef.JBCefOsrHandlerBrowser
 - com.intellij.ui.jcef.JBCefBrowserBase
@@ -11303,6 +11276,7 @@ c:com.intellij.ui.treeStructure.Tree
 - p:getComponentGraphics(java.awt.Graphics):java.awt.Graphics
 - getDeepestRendererComponentAt(I,I):java.awt.Component
 - p:getDescendantToggledPaths(javax.swing.tree.TreePath):java.util.Enumeration
+- getDragEnabled():Z
 - getEffectiveAdditionalRowsCount():I
 - getEmptyText():com.intellij.util.ui.StatusText
 - getExpandableItemsHandler():com.intellij.ui.ExpandableItemsHandler

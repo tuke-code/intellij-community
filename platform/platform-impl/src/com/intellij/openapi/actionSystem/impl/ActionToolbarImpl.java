@@ -1,4 +1,4 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.openapi.actionSystem.impl;
 
 import com.intellij.accessibility.AccessibilityUtils;
@@ -71,6 +71,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
+@ApiStatus.Internal
 public class ActionToolbarImpl extends JPanel implements ActionToolbar, QuickActionProvider, AlphaAnimated {
   private static final Logger LOG = Logger.getInstance(ActionToolbarImpl.class);
 
@@ -138,7 +139,8 @@ public class ActionToolbarImpl extends JPanel implements ActionToolbar, QuickAct
   private final ActionGroup myActionGroup;
   private final @NotNull String myPlace;
   private List<? extends AnAction> myVisibleActions;
-  private final PresentationFactory myPresentationFactory = new ActionToolbarPresentationFactory();
+  private final PresentationFactory myPresentationFactory = createPresentationFactory();
+
   private final boolean myDecorateButtons;
 
   private final ToolbarUpdater myUpdater;
@@ -248,6 +250,10 @@ public class ActionToolbarImpl extends JPanel implements ActionToolbar, QuickAct
     installPopupHandler(customizable, null, null);
     UiInspectorUtil.registerProvider(this, () -> UiInspectorUtil.collectActionGroupInfo(
       "Toolbar", myActionGroup, myPlace, myPresentationFactory));
+  }
+
+  protected @NotNull PresentationFactory createPresentationFactory() {
+    return new ActionToolbarPresentationFactory();
   }
 
   protected void installPopupHandler(boolean customizable,
@@ -403,6 +409,7 @@ public class ActionToolbarImpl extends JPanel implements ActionToolbar, QuickAct
   }
 
   @Override
+  @ApiStatus.Internal
   public @NotNull AlphaAnimationContext getAlphaContext() {
     return myAlphaContext;
   }

@@ -61,6 +61,9 @@ object DebuggerDiagnosticsUtil {
     val problems = mutableListOf<String>()
 
     for (threadProxy in allThreads) {
+      if (threadProxy.isIgnoreModelSuspendCount) {
+        continue
+      }
       val suspendingContexts = SuspendManagerUtil.getSuspendingContexts(suspendManager, threadProxy)
       val resumedByWatching = if (invocationWatching != null && suspendingContexts.contains(invocationWatching.mySuspendAllContext)) 1
       else 0
@@ -231,7 +234,7 @@ object DebuggerDiagnosticsUtil {
     val currentSuspendContext = (currentCommand as? SuspendContextCommandImpl)?.suspendContext
     val currentSuspendContextText = "Current Command Suspend context = $currentSuspendContext\n"
     val registryInfo = Registry.getAll()
-      .filter { it.key.startsWith("debugger.") && it.isChangedFromDefault }
+      .filter { it.key.startsWith("debugger.") && it.isChangedFromDefault() }
       .joinToString(separator = "") { "${it.key} = ${it.asString()}\n" }
     val content = registryInfo +
                   currentCommandText +

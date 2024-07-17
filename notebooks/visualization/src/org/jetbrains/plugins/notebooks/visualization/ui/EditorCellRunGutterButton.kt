@@ -14,7 +14,6 @@ class EditorCellRunGutterButton(private val editor: EditorEx, private val cell: 
 
   var visible: Boolean = false
     set(value) {
-      if (value == field) return
       if (value) {
         showRunButton()
       } else {
@@ -49,8 +48,6 @@ class EditorCellRunGutterButton(private val editor: EditorEx, private val cell: 
   }
 
   inner class DummyEmptyAction: AnAction(AllIcons.Empty) { override fun actionPerformed(e: AnActionEvent) { } }
-
-  fun dispose() = hideRunButton()
 
   companion object {
     private val runCellAction = ActionManager.getInstance().getAction("NotebookRunCellAction")

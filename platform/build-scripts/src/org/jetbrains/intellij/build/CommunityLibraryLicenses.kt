@@ -379,10 +379,10 @@ object CommunityLibraryLicenses {
                    version = LibraryLicense.CUSTOM_REVISION)
       .mit("https://github.com/fb55/htmlparser2/blob/master/LICENSE"),
     LibraryLicense(name = "HttpComponents HttpClient", libraryName = "http-client",
-                   url = "https://hc.apache.org/httpcomponents-client-ga/index.html").apache()
+                   url = "https://hc.apache.org/httpcomponents-client-ga/").apache()
       .suppliedByOrganizations("The Apache Software Foundation"),
     LibraryLicense(name = "HttpComponents HttpClient Fluent API", libraryName = "fluent-hc",
-                   url = "https://hc.apache.org/httpcomponents-client-ga/index.html").apache()
+                   url = "https://hc.apache.org/httpcomponents-client-ga/").apache()
       .suppliedByOrganizations("The Apache Software Foundation"),
     LibraryLicense(name = "ICU4J", libraryName = "icu4j", license = "Unicode",
                    url = "https://icu.unicode.org/", licenseUrl = "https://www.unicode.org/copyright.html"),
@@ -702,8 +702,10 @@ object CommunityLibraryLicenses {
                    url = "https://github.com/ktorio/ktor")
       .apache("https://github.com/ktorio/ktor/blob/main/LICENSE")
       .suppliedByOrganizations(Suppliers.JETBRAINS),
-    LibraryLicense(libraryName = "ktor-client-cio",
-                   url = "https://github.com/ktorio/ktor")
+    LibraryLicense(libraryName = "ktor-client-cio", url = "https://github.com/ktorio/ktor")
+      .apache("https://github.com/ktorio/ktor/blob/main/LICENSE")
+      .suppliedByOrganizations(Suppliers.JETBRAINS),
+    LibraryLicense(libraryName = "ktor-client-cio-internal", url = "https://github.com/ktorio/ktor")
       .apache("https://github.com/ktorio/ktor/blob/main/LICENSE")
       .suppliedByOrganizations(Suppliers.JETBRAINS),
     LibraryLicense(libraryName = "ktor-client-content-negotiation",
@@ -714,7 +716,7 @@ object CommunityLibraryLicenses {
                    url = "https://github.com/ktorio/ktor")
       .apache("https://github.com/ktorio/ktor/blob/main/LICENSE")
       .suppliedByOrganizations(Suppliers.JETBRAINS),
-    LibraryLicense(libraryName = "ktor-client-java-engine",
+    LibraryLicense(libraryName = "ktor-client-java",
                    url = "https://github.com/ktorio/ktor")
       .apache("https://github.com/ktorio/ktor/blob/main/LICENSE")
       .suppliedByOrganizations(Suppliers.JETBRAINS),
@@ -756,7 +758,11 @@ object CommunityLibraryLicenses {
                    licenseUrl = "https://github.com/mathjax/MathJax/blob/master/LICENSE").apache(),
 
 
-    LibraryLicense(name = "Maven archetype common", libraryName = "apache.maven.archetype.common:3.2.1",
+    LibraryLicense(name = "Maven archetype catalog", libraryName = "apache.maven.archetype.catalog-no-trans:321",
+                   url = "https://maven.apache.org/archetype/archetype-common/index.html")
+      .apache("https://github.com/apache/maven-archetype"),
+
+    LibraryLicense(name = "Maven archetype common", libraryName = "apache.maven.archetype.common-no-trans:3.2.1",
                    url = "https://maven.apache.org/archetype/archetype-common/index.html")
       .apache("https://github.com/apache/maven-archetype"),
 
@@ -801,7 +807,8 @@ object CommunityLibraryLicenses {
                    licenseUrl = "https://microba.sourceforge.net/license.txt").newBsd()
       .suppliedByPersons("Michael Baranov"),
     LibraryLicense(name = "MigLayout", libraryName = "miglayout-swing",
-                   url = "https://www.miglayout.com/", licenseUrl = "https://github.com/mikaelgrev/miglayout/blob/master/src/site/resources/docs/license.txt").newBsd()
+                   url = "https://github.com/mikaelgrev/miglayout/",
+                   licenseUrl = "https://github.com/mikaelgrev/miglayout/blob/master/src/site/resources/docs/license.txt").newBsd()
       .suppliedByOrganizations("MiG InfoCom AB"),
     LibraryLicense(name = "morfologik-fsa", libraryName = "org.carrot2:morfologik-fsa",
                    url = "https://github.com/morfologik/morfologik-stemming").simplifiedBsd()
@@ -864,9 +871,9 @@ object CommunityLibraryLicenses {
     LibraryLicense(name = "OverlayScrollbars", attachedTo = "intellij.idea.community.main",
                    url = "https://kingsora.github.io/OverlayScrollbars", version = "2.1.1")
       .mit("https://github.com/KingSora/OverlayScrollbars/blob/master/LICENSE"),
-    LibraryLicense(name = "Package Search API Models", libraryName = "package-search-api-models",
-                   url = "https://github.com/JetBrains/package-search-api-models").apache(),
-
+    LibraryLicense(name = "Package Search API-Client", libraryName = "package-search-api-client", url = "https://github.com/JetBrains/package-search-api-models")
+      .apache("https://github.com/JetBrains/package-search-api-models/blob/master/LICENSE")
+      .suppliedByOrganizations("JetBrains Team"),
     LibraryLicense(name = "pip", attachedTo = "intellij.python", version = "20.3.4",
                    url = "https://pip.pypa.io/")
       .mit("https://github.com/pypa/pip/blob/main/LICENSE.txt"),
@@ -975,7 +982,7 @@ object CommunityLibraryLicenses {
     LibraryLicense(name = "Sonatype Nexus: Indexer", attachedTo = "intellij.maven.server.m3.common", version = "3.0.4",
                    additionalLibraryNames = listOf("org.sonatype.nexus:nexus-indexer:3.0.4",
                                                    "org.sonatype.nexus:nexus-indexer-artifact:1.0.1"),
-                   url = "https://nexus.sonatype.org/").eplV1(),
+                   url = "https://maven.apache.org/maven-indexer/").eplV1(),
     LibraryLicense(name = "SourceCodePro", attachedTo = "intellij.platform.resources", version = "2.010", license = "OFL",
                    url = "https://github.com/adobe-fonts/source-code-pro",
                    licenseUrl = "https://github.com/adobe-fonts/source-code-pro/blob/master/LICENSE.md"),
@@ -1003,7 +1010,7 @@ object CommunityLibraryLicenses {
                    url = "https://central.sonatype.com/artifact/org.swinglabs/swingx-core/1.6.2-2",
                    licenseUrl = "https://www.opensource.org/licenses/lgpl-2.1.php")
       .suppliedByOrganizations("Sun Microsystems, Inc."),
-    LibraryLicense(libraryName = "TestNG", url = "https://testng.org/doc/")
+    LibraryLicense(libraryName = "TestNG", url = "https://testng.org/")
       .apache("https://github.com/cbeust/testng/blob/master/LICENSE.txt"),
     LibraryLicense(name = "The Erlang LS extension for VSCode", attachedTo = "intellij.textmate", version = "0.0.43",
                    url = "https://github.com/mblode/vscode-twig-language-2")
@@ -1056,8 +1063,9 @@ object CommunityLibraryLicenses {
                    url = "https://github.com/mblode/vscode-twig-language-2")
       .mit("https://github.com/mblode/vscode-twig-language-2/blob/master/LICENSE.md"),
     LibraryLicense(name = "weberknecht", libraryName = "weberknecht-0.1.5.jar", version = "0.1.5",
-                   url = "https://github.com/pelotoncycle/weberknecht")
-      .apache("https://github.com/pelotoncycle/weberknecht/blob/master/src/de/roderick/weberknecht/WebSocket.java"),
+                   // originally https://github.com/pelotoncycle/weberknecht
+                   url = "https://github.com/pusher-community/titanium_pusher_android/blob/master/src/de/roderick/weberknecht/")
+      .apache("https://github.com/pusher-community/titanium_pusher_android/blob/master/src/de/roderick/weberknecht/WebSocket.java"),
     LibraryLicense(libraryName = "winp", url = "https://github.com/jenkinsci/winp")
       .mit("https://github.com/jenkinsci/winp/blob/master/LICENSE.txt")
       .suppliedByPersons("Kohsuke Kawaguchi"),
@@ -1175,6 +1183,7 @@ object CommunityLibraryLicenses {
     jetbrainsLibrary("kotlinc.analysis-api-platform-interface"),
     jetbrainsLibrary("kotlinc.android-extensions-compiler-plugin"),
     jetbrainsLibrary("kotlinc.assignment-compiler-plugin"),
+    jetbrainsLibrary("kotlinc.compose-compiler-plugin"),
     jetbrainsLibrary("kotlinc.incremental-compilation-impl-tests"),
     jetbrainsLibrary("kotlinc.kotlin-build-common-tests"),
     jetbrainsLibrary("kotlinc.kotlin-compiler-cli"),

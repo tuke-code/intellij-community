@@ -1500,6 +1500,11 @@ public abstract class K1IntentionTestGenerated extends AbstractK1IntentionTest {
             runTest("testData/intentions/addNameToArgument/notResolved.kt");
         }
 
+        @TestMetadata("onSwappedOrder.kt")
+        public void testOnSwappedOrder() throws Exception {
+            runTest("testData/intentions/addNameToArgument/onSwappedOrder.kt");
+        }
+
         @TestMetadata("rangeForLambda1.kt")
         public void testRangeForLambda1() throws Exception {
             runTest("testData/intentions/addNameToArgument/rangeForLambda1.kt");
@@ -2262,6 +2267,16 @@ public abstract class K1IntentionTestGenerated extends AbstractK1IntentionTest {
         @TestMetadata("hasThrowsWithDifferentClassArgument5.kt")
         public void testHasThrowsWithDifferentClassArgument5() throws Exception {
             runTest("testData/intentions/addThrowsAnnotation/hasThrowsWithDifferentClassArgument5.kt");
+        }
+
+        @TestMetadata("hasThrowsWithDifferentClassArgument6.kt")
+        public void testHasThrowsWithDifferentClassArgument6() throws Exception {
+            runTest("testData/intentions/addThrowsAnnotation/hasThrowsWithDifferentClassArgument6.kt");
+        }
+
+        @TestMetadata("hasThrowsWithDifferentClassArgument7.kt")
+        public void testHasThrowsWithDifferentClassArgument7() throws Exception {
+            runTest("testData/intentions/addThrowsAnnotation/hasThrowsWithDifferentClassArgument7.kt");
         }
 
         @TestMetadata("hasThrowsWithEmptyArgument.kt")
@@ -17188,6 +17203,16 @@ public abstract class K1IntentionTestGenerated extends AbstractK1IntentionTest {
         @TestMetadata("applicable_nestedLiteralsNoUseInside.kt")
         public void testApplicable_nestedLiteralsNoUseInside() throws Exception {
             runTest("testData/intentions/replaceExplicitFunctionLiteralParamWithIt/applicable_nestedLiteralsNoUseInside.kt");
+        }
+
+        @TestMetadata("applicable_overloadResolutionUnambiguity.kt")
+        public void testApplicable_overloadResolutionUnambiguity() throws Exception {
+            runTest("testData/intentions/replaceExplicitFunctionLiteralParamWithIt/applicable_overloadResolutionUnambiguity.kt");
+        }
+
+        @TestMetadata("applicable_overloadResolutionUnambiguity2.kt")
+        public void testApplicable_overloadResolutionUnambiguity2() throws Exception {
+            runTest("testData/intentions/replaceExplicitFunctionLiteralParamWithIt/applicable_overloadResolutionUnambiguity2.kt");
         }
 
         @TestMetadata("applicable_qualifiedExpression.kt")

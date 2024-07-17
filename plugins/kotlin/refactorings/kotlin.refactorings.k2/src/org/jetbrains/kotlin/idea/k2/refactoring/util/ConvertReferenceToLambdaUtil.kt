@@ -41,7 +41,7 @@ object ConvertReferenceToLambdaUtil {
         val matchingParameterIsExtension = matchingParameterType is KaFunctionType && matchingParameterType.receiverType != null
 
         val receiverExpression = element.receiverExpression
-        val receiverType = element.getReceiverKtType()
+        val receiverType = element.receiverType
 
         val symbol = element.callableReference.mainReference.resolveToSymbol() ?: return null
 
@@ -53,7 +53,7 @@ object ConvertReferenceToLambdaUtil {
         val acceptsReceiverAsParameter = receiverSymbol is KaClassSymbol &&
                 !matchingParameterIsExtension &&
                 (callableSymbol as? KaNamedFunctionSymbol)?.isStatic != true && !receiverSymbol.classKind.isObject &&
-                (callableSymbol?.containingSymbol != null || callableSymbol?.isExtension == true || symbol is KaNamedClassOrObjectSymbol && symbol.isInner)
+                (callableSymbol?.containingDeclaration != null || callableSymbol?.isExtension == true || symbol is KaNamedClassSymbol && symbol.isInner)
 
         val parameterNamesAndTypes =
             if (callableSymbol is KaFunctionSymbol) {

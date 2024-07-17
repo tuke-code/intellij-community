@@ -43,7 +43,7 @@
     <orderEntry type="module" module-name="intellij.python.markdown" scope="RUNTIME" />
     <orderEntry type="module" module-name="intellij.notebooks.visualization" scope="RUNTIME" />
     <orderEntry type="module" module-name="intellij.python.featuresTrainer" scope="RUNTIME" />
-    <orderEntry type="module" module-name="intellij.jupyter.core" scope="RUNTIME" />
+    <orderEntry type="module" module-name="intellij.notebooks.jupyter.core" scope="RUNTIME" />
     <orderEntry type="module" module-name="intellij.grazie.tests" scope="TEST" />
     <orderEntry type="module" module-name="intellij.python.grazie" />
     <orderEntry type="module" module-name="intellij.platform.util.jdom" scope="TEST" />
@@ -56,5 +56,9 @@
     <orderEntry type="module" module-name="intellij.tools.ide.metrics.benchmark" scope="TEST" />
     <orderEntry type="module" module-name="intellij.commandInterface" scope="TEST" />
     <orderEntry type="module" module-name="intellij.python.community.plugin" scope="TEST" />
+    <orderEntry type="library" scope="TEST" name="JUnit5" level="project" />
+    <orderEntry type="library" scope="TEST" name="JUnit5Jupiter" level="project" />
+    <orderEntry type="library" scope="TEST" name="JUnit5Params" level="project" />
+    <orderEntry type="module" module-name="intellij.platform.testFramework.junit5" scope="TEST" />
   </component>
 </module>

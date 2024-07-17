@@ -11,7 +11,6 @@ import com.intellij.psi.PsiElementVisitor
 import com.intellij.psi.util.findParentOfType
 import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.analyze
-import org.jetbrains.kotlin.analysis.api.annotations.hasAnnotation
 import org.jetbrains.kotlin.analysis.api.resolution.KaCallableMemberCall
 import org.jetbrains.kotlin.analysis.api.resolution.successfulCallOrNull
 import org.jetbrains.kotlin.analysis.api.resolution.successfulFunctionCallOrNull
@@ -49,7 +48,7 @@ abstract class EnumValuesSoftDeprecateInspectionBase : DeprecationCollectingInsp
                 analyze(callExpression) {
                     val resolvedCall = callExpression.resolveToCall()?.successfulFunctionCallOrNull() ?: return
                     val resolvedCallSymbol = resolvedCall.partiallyAppliedSymbol.symbol
-                    val enumClassSymbol = (resolvedCallSymbol.containingSymbol as? KaClassSymbol) ?: return
+                    val enumClassSymbol = (resolvedCallSymbol.containingDeclaration as? KaClassSymbol) ?: return
 
                     if (!isSoftDeprecatedEnumValuesMethod(resolvedCallSymbol, enumClassSymbol)) {
                         return
@@ -78,11 +77,11 @@ abstract class EnumValuesSoftDeprecateInspectionBase : DeprecationCollectingInsp
     ): Boolean? {
         val enumEntriesClass = enumEntriesPropertySymbol.returnType.expandedSymbol
             ?: return null
-        if (enumEntriesClass.hasAnnotation(EXPERIMENTAL_ANNOTATION_CLASS_ID)) {
+        if (EXPERIMENTAL_ANNOTATION_CLASS_ID in enumEntriesClass.annotations) {
             return true
         }
         val necessaryOptIns = WasExperimentalOptInsNecessityChecker.getNecessaryOptInsFromWasExperimental(
-            enumEntriesClass.annotationsList, moduleApiVersion,
+            enumEntriesClass.annotations, moduleApiVersion,
         )
         return EXPERIMENTAL_ANNOTATION_CLASS_ID in necessaryOptIns
     }
@@ -92,7 +91,7 @@ abstract class EnumValuesSoftDeprecateInspectionBase : DeprecationCollectingInsp
 
     context(KaSession)
     private fun createQuickFix(callExpression: KtCallExpression, symbol: KaFunctionSymbol): LocalQuickFix? {
-        val enumClassSymbol = symbol.containingSymbol as? KaClassSymbol
+        val enumClassSymbol = symbol.containingDeclaration as? KaClassSymbol
         val enumClassQualifiedName = enumClassSymbol?.classId?.asFqNameString() ?: return null
         return createQuickFix(getReplaceFixType(callExpression), enumClassQualifiedName)
     }

@@ -8,13 +8,14 @@ import org.jetbrains.kotlin.analysis.api.permissions.KaAllowAnalysisFromWriteAct
 import org.jetbrains.kotlin.analysis.api.permissions.KaAllowAnalysisOnEdt
 import org.jetbrains.kotlin.analysis.api.permissions.allowAnalysisFromWriteAction
 import org.jetbrains.kotlin.analysis.api.permissions.allowAnalysisOnEdt
+import org.jetbrains.kotlin.analysis.api.resolution.KaCallableMemberCall
 import org.jetbrains.kotlin.analysis.api.resolution.KaImplicitReceiverValue
+import org.jetbrains.kotlin.analysis.api.resolution.singleCallOrNull
 import org.jetbrains.kotlin.analysis.api.resolution.singleFunctionCallOrNull
 import org.jetbrains.kotlin.analysis.api.resolution.singleVariableAccessCall
 import org.jetbrains.kotlin.analysis.api.resolution.symbol
 import org.jetbrains.kotlin.analysis.api.symbols.*
 import org.jetbrains.kotlin.analysis.api.symbols.markers.KaDeclarationContainerSymbol
-import org.jetbrains.kotlin.analysis.api.symbols.markers.KaSymbolWithMembers
 import org.jetbrains.kotlin.analysis.api.types.KaFunctionType
 import org.jetbrains.kotlin.idea.codeinsight.utils.addTypeArguments
 import org.jetbrains.kotlin.idea.codeinsight.utils.getRenderedTypeArguments
@@ -208,7 +209,7 @@ internal fun encodeInternalReferences(codeToInline: MutableCodeToInline, origina
         fun isImportable(t: KtNamedDeclaration): Boolean {
             analyze(t) {
                 val resolvedSymbol = t.symbol
-                val containingSymbol = resolvedSymbol.containingSymbol ?: return true
+                val containingSymbol = resolvedSymbol.containingDeclaration ?: return true
                 if (containingSymbol is KaDeclarationContainerSymbol) {
                     val staticScope = containingSymbol.staticMemberScope
                     return resolvedSymbol in staticScope.declarations
@@ -246,25 +247,24 @@ internal fun encodeInternalReferences(codeToInline: MutableCodeToInline, origina
         if (receiverExpression == null) {
             val (receiverValue, isSameReceiverType) = analyze(expression) {
                 val resolveCall = expression.resolveToCall()
-                val partiallyAppliedSymbol =
-                    (resolveCall?.singleFunctionCallOrNull() ?: resolveCall?.singleVariableAccessCall())?.partiallyAppliedSymbol
+                val partiallyAppliedSymbol = resolveCall?.singleCallOrNull<KaCallableMemberCall<*, *>>()?.partiallyAppliedSymbol
 
                 val value =
                     (partiallyAppliedSymbol?.extensionReceiver ?: partiallyAppliedSymbol?.dispatchReceiver) as? KaImplicitReceiverValue
                 val originalSymbol = originalDeclaration.symbol as? KaCallableSymbol
                 val originalSymbolReceiverType = originalSymbol?.receiverType
                 val originalSymbolDispatchType = originalSymbol?.dispatchReceiverType
-                if (value != null) {
-                    getThisQualifier(value) to (originalSymbolReceiverType != null && value.type.isEqualTo(originalSymbolReceiverType) ||
-                                                originalSymbolDispatchType != null && value.type.isEqualTo(originalSymbolDispatchType))
+                if (value != null && !(resolve is KtParameter && resolve.ownerFunction == originalDeclaration)) {
+                    getThisQualifier(value) to (originalSymbolReceiverType != null && value.type.semanticallyEquals(originalSymbolReceiverType) ||
+                                                originalSymbolDispatchType != null && value.type.semanticallyEquals(originalSymbolDispatchType))
                 } else {
                     val functionalType = (partiallyAppliedSymbol?.symbol as? KaVariableSymbol)?.returnType as? KaFunctionType
                     val receiverType = functionalType?.receiverType
                     if (receiverType == null) {
                         null to true
                     } else {
-                        val isSame = originalSymbolReceiverType != null && receiverType.isEqualTo(originalSymbolReceiverType) ||
-                                originalSymbolDispatchType != null && receiverType.isEqualTo(originalSymbolDispatchType)
+                        val isSame = originalSymbolReceiverType != null && receiverType.semanticallyEquals(originalSymbolReceiverType) ||
+                                originalSymbolDispatchType != null && receiverType.semanticallyEquals(originalSymbolDispatchType)
                         "this".takeIf { isSame } to isSame
                     }
                 }

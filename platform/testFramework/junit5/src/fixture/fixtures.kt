@@ -2,11 +2,20 @@
 package com.intellij.testFramework.junit5.fixture
 
 import com.intellij.ide.impl.OpenProjectTask
+import com.intellij.openapi.Disposable
+import com.intellij.openapi.application.readAction
 import com.intellij.openapi.application.writeAction
 import com.intellij.openapi.module.Module
 import com.intellij.openapi.module.ModuleManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.ex.ProjectManagerEx
+import com.intellij.openapi.roots.ModuleRootModificationUtil
+import com.intellij.openapi.util.Disposer
+import com.intellij.openapi.util.io.toCanonicalPath
+import com.intellij.openapi.vfs.VfsUtil
+import com.intellij.psi.PsiDirectory
+import com.intellij.psi.PsiFile
+import com.intellij.psi.PsiManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.jetbrains.annotations.TestOnly
@@ -71,6 +80,51 @@ fun TestFixture<Project>.moduleFixture(
   initialized(module) {
     writeAction {
       manager.disposeModule(module)
+    }
+  }
+}
+
+@TestOnly
+fun disposableFixture(): TestFixture<Disposable> = testFixture { debugString ->
+  val disposable = Disposer.newCheckedDisposable(debugString)
+  initialized(disposable) {
+    Disposer.dispose(disposable)
+  }
+}
+
+@TestOnly
+fun TestFixture<Module>.sourceRootFixture(isTestSource: Boolean = false, pathFixture: TestFixture<Path> = tempPathFixture()): TestFixture<PsiDirectory> =
+  testFixture { _ ->
+    val module = this@sourceRootFixture.init()
+    val directoryPath: Path = pathFixture.init()
+    val directoryVfs = VfsUtil.createDirectories(directoryPath.toCanonicalPath())
+    ModuleRootModificationUtil.updateModel(module) { model ->
+      model.addContentEntry(directoryVfs).addSourceFolder(directoryVfs, isTestSource)
+    }
+    val directory = readAction {
+      PsiManager.getInstance(module.project).findDirectory(directoryVfs) ?: error("Fail to find directory $directoryVfs")
+    }
+    initialized(directory) {
+      writeAction {
+        directory.delete()
+      }
+    }
+  }
+
+@TestOnly
+fun TestFixture<PsiDirectory>.psiFileFixture(
+  name: String,
+  content: String,
+): TestFixture<PsiFile> = testFixture { _ ->
+  val sor = this@psiFileFixture.init()
+  val file = writeAction {
+    sor.createFile(name).also {
+      it.virtualFile.setBinaryContent(content.toByteArray())
+    }
+  }
+  initialized(file) {
+    writeAction {
+      file.delete()
     }
   }
 }

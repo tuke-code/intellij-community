@@ -1,27 +1,32 @@
 // Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.ui.jcef;
 
+import com.intellij.ide.ui.UISettings;
+import com.intellij.ide.ui.UISettingsListener;
 import com.intellij.openapi.Disposable;
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.util.SystemInfoRt;
 import com.intellij.openapi.util.registry.RegistryManager;
+import com.intellij.ui.AncestorListenerAdapter;
 import com.intellij.ui.JBColor;
 import com.intellij.ui.JreHiDpiUtil;
 import com.intellij.ui.scroll.TouchScrollUtil;
 import com.intellij.util.Alarm;
+import com.jetbrains.cef.JCefAppConfig;
 import org.cef.browser.CefBrowser;
 import org.cef.input.CefTouchEvent;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
+import javax.swing.event.AncestorEvent;
 import java.awt.*;
 import java.awt.event.*;
 import java.awt.geom.Point2D;
 import java.awt.im.InputMethodRequests;
 import java.util.concurrent.atomic.AtomicLong;
 
-import static com.intellij.ui.paint.PaintUtil.RoundingMode.CEIL;
 import static com.intellij.ui.paint.PaintUtil.RoundingMode.ROUND;
 
 /**
@@ -37,7 +42,8 @@ class JBCefOsrComponent extends JPanel {
   private volatile @NotNull JBCefOsrHandler myRenderHandler;
   private volatile @NotNull CefBrowser myBrowser;
   private final @NotNull JBCefInputMethodAdapter myInputMethodAdapter = new JBCefInputMethodAdapter(this);
-  private final @NotNull MyScale myScale = new MyScale();
+
+  private double myScale = 1.0;
 
   private final @NotNull AtomicLong myScheduleResizeMs = new AtomicLong(-1);
   private @Nullable Alarm myAlarm;
@@ -49,7 +55,10 @@ class JBCefOsrComponent extends JPanel {
     setBackground(JBColor.background());
     addPropertyChangeListener("graphicsConfiguration",
                               e -> {
-                                myRenderHandler.updateScale(myScale.update(myRenderHandler.getDeviceScaleFactor(myBrowser)));
+                                double pixelDensity = JreHiDpiUtil.isJreHiDPIEnabled() ? JCefAppConfig.getDeviceScaleFactor(this) : 1.0;
+                                myScale = (JreHiDpiUtil.isJreHiDPIEnabled() ? 1.0 : JCefAppConfig.getDeviceScaleFactor(this)) *
+                                          UISettings.getInstance().getIdeScale();
+                                myRenderHandler.setScreenInfo(pixelDensity, myScale);
                                 myBrowser.notifyScreenInfoChanged();
                               });
 
@@ -62,7 +71,6 @@ class JBCefOsrComponent extends JPanel {
 
     setFocusable(true);
     setRequestFocusEnabled(true);
-    // [tav] todo: so far the browser component can not be traversed out
     setFocusTraversalKeysEnabled(false);
     addFocusListener(new FocusListener() {
       @Override
@@ -85,7 +93,29 @@ class JBCefOsrComponent extends JPanel {
 
   public void setRenderHandler(@NotNull JBCefOsrHandler renderHandler) {
     myRenderHandler = renderHandler;
+
     myRenderHandler.addCaretListener(myInputMethodAdapter);
+
+    addAncestorListener(new AncestorListenerAdapter() {
+      @Override
+      public void ancestorAdded(AncestorEvent event) { myRenderHandler.setLocationOnScreen(getLocationOnScreen()); }
+
+      @Override
+      public void ancestorMoved(AncestorEvent event) { myRenderHandler.setLocationOnScreen(getLocationOnScreen()); }
+    });
+
+    try {
+      myRenderHandler.setLocationOnScreen(getLocationOnScreen());
+    } catch (IllegalComponentStateException t) {
+      // The component isn't shown
+    }
+
+    addMouseListener(new MouseAdapter() {
+      @Override
+      public void mousePressed(MouseEvent e) {
+        myRenderHandler.setLocationOnScreen(getLocationOnScreen());
+      }
+    });
   }
 
   @Override
@@ -94,6 +124,14 @@ class JBCefOsrComponent extends JPanel {
     myDisposable = Disposer.newDisposable();
     myAlarm = new Alarm(Alarm.ThreadToUse.POOLED_THREAD, myDisposable);
     myWheelEventsAccumulator = new MouseWheelEventsAccumulator(myDisposable);
+
+    ApplicationManager.getApplication().getMessageBus().connect(myDisposable).subscribe(UISettingsListener.TOPIC, uiSettings -> {
+      double pixelDensity = JreHiDpiUtil.isJreHiDPIEnabled() ? JCefAppConfig.getDeviceScaleFactor(this) : 1.0;
+      myScale = (JreHiDpiUtil.isJreHiDPIEnabled() ? 1.0 : JCefAppConfig.getDeviceScaleFactor(this)) *
+                uiSettings.getIdeScale();
+      myRenderHandler.setScreenInfo(pixelDensity, myScale);
+      myBrowser.notifyScreenInfoChanged();
+    });
 
     if (!JBCefBrowserBase.isCefBrowserCreationStarted(myBrowser)) {
       myBrowser.createImmediately();
@@ -121,14 +159,12 @@ class JBCefOsrComponent extends JPanel {
       if (myAlarm.isEmpty())
         myScheduleResizeMs.set(timeMs);
       myAlarm.cancelAllRequests();
-      final double scale = myScale.getInverted();
-      final int scaledW = CEIL.round(w * scale);
-      final int scaledH = CEIL.round(h * scale);
       if (timeMs - myScheduleResizeMs.get() > RESIZE_DELAY_MS)
-        myBrowser.wasResized(scaledW, scaledH);
+        myBrowser.wasResized(0, 0);
       else
         myAlarm.addRequest(() -> {
-          myBrowser.wasResized(scaledW, scaledH);
+          // In OSR width and height are ignored. The view size will be requested from CefRenderHandler.
+          myBrowser.wasResized(0, 0);
         }, RESIZE_DELAY_MS);
     }
   }
@@ -146,16 +182,15 @@ class JBCefOsrComponent extends JPanel {
       return;
     }
 
-    double scale = myScale.getIdeBiased();
     myBrowser.sendMouseEvent(new MouseEvent(
       e.getComponent(),
       e.getID(),
       e.getWhen(),
       e.getModifiersEx(),
-      ROUND.round(e.getX() / scale),
-      ROUND.round(e.getY() / scale),
-      ROUND.round(e.getXOnScreen() / scale),
-      ROUND.round(e.getYOnScreen() / scale),
+      ROUND.round(e.getX() / myScale),
+      ROUND.round(e.getY() / myScale),
+      ROUND.round(e.getXOnScreen() / myScale),
+      ROUND.round(e.getYOnScreen() / myScale),
       e.getClickCount(),
       e.isPopupTrigger(),
       e.getButton()));
@@ -201,16 +236,15 @@ class JBCefOsrComponent extends JPanel {
   protected void processMouseMotionEvent(MouseEvent e) {
     super.processMouseMotionEvent(e);
 
-    double scale = myScale.getIdeBiased();
     myBrowser.sendMouseEvent(new MouseEvent(
       e.getComponent(),
       e.getID(),
       e.getWhen(),
       e.getModifiersEx(),
-      ROUND.round(e.getX() / scale),
-      ROUND.round(e.getY() / scale),
-      ROUND.round(e.getXOnScreen() / scale),
-      ROUND.round(e.getYOnScreen() / scale),
+      ROUND.round(e.getX() / myScale),
+      ROUND.round(e.getY() / myScale),
+      ROUND.round(e.getXOnScreen() / myScale),
+      ROUND.round(e.getYOnScreen() / myScale),
       e.getClickCount(),
       e.isPopupTrigger(),
       e.getButton()));
@@ -222,49 +256,14 @@ class JBCefOsrComponent extends JPanel {
     myBrowser.sendKeyEvent(e);
   }
 
-  static class MyScale {
-    private volatile double myScale = 1;
-    private volatile double myInvertedScale = 1;
-
-    public MyScale update(double scale) {
-      myScale = scale;
-      if (!JreHiDpiUtil.isJreHiDPIEnabled()) myInvertedScale = 1 / myScale;
-      return this;
-    }
-
-    public MyScale update(MyScale scale) {
-      myScale = scale.myScale;
-      myInvertedScale = scale.myInvertedScale;
-      return this;
-    }
-
-    public double get() {
-      return myScale;
-    }
-
-    public double getInverted() {
-      return JreHiDpiUtil.isJreHiDPIEnabled() ? myScale : myInvertedScale;
-    }
-
-    public double getIdeBiased() {
-      // IDE-managed HiDPI
-      return JreHiDpiUtil.isJreHiDPIEnabled() ? 1 : myScale;
-    }
-
-    public double getJreBiased() {
-      // JRE-managed HiDPI
-      return JreHiDpiUtil.isJreHiDPIEnabled() ? myScale : 1;
-    }
-  }
-
   /**
    * This class is an adapter between Java and CEF mouse wheel API.
    * CEF scrolling performance in some applications(e.g. PDF viewer) might be not enough to handle every java screen in time.
-   * The purpose of this adapter is to reduce amount of events to handle by CEF.
-   * MouseWheelEventsAccumulator accumulate wheel events(by X and Y axis independent) during the time defined by TIMEOUT_MS and sends
-   * composed events to the browser on timeout or on reaching wheel rotation tolerance(defined by TOLERANCE).
+   * The purpose of this adapter is to reduce the number of events to handle by CEF.
+   * MouseWheelEventsAccumulator accumulates wheel events (by X and Y axis independent) during the time defined by TIMEOUT_MS and sends
+   * composed events to the browser on timeout or on reaching wheel rotation tolerance (defined by TOLERANCE).
    * <p>
-   * In practice, this reduces the number of events by about 2 times
+   * In practice, this reduces the number of events by about two times
    */
   private class MouseWheelEventsAccumulator {
     private final Composition myCompositionX, myCompositionY;
@@ -298,8 +297,7 @@ class JBCefOsrComponent extends JPanel {
       composition.pendingClickCount += event.getClickCount();
       composition.lastEvent = event;
 
-      double scale = myScale.getIdeBiased();
-      if (Math.abs(composition.pendingPreciseWheelRotation * wheelFactor) > TOLERANCE * scale) {
+      if (Math.abs(composition.pendingPreciseWheelRotation * wheelFactor) > TOLERANCE * myScale) {
         commit(composition);
       }
     }
@@ -311,16 +309,15 @@ class JBCefOsrComponent extends JPanel {
       if (SystemInfoRt.isLinux || SystemInfoRt.isMac) {
         val *= -1;
       }
-      double scale = myScale.getIdeBiased();
       myBrowser.sendMouseWheelEvent(new MouseWheelEvent(
         composition.lastEvent.getComponent(),
         composition.lastEvent.getID(),
         composition.lastEvent.getWhen(),
         composition.lastEvent.getModifiersEx(),
-        ROUND.round(composition.lastEvent.getX() / scale),
-        ROUND.round(composition.lastEvent.getY() / scale),
-        ROUND.round(composition.lastEvent.getXOnScreen() / scale),
-        ROUND.round(composition.lastEvent.getYOnScreen() / scale),
+        ROUND.round(composition.lastEvent.getX() / myScale),
+        ROUND.round(composition.lastEvent.getY() / myScale),
+        ROUND.round(composition.lastEvent.getXOnScreen() / myScale),
+        ROUND.round(composition.lastEvent.getYOnScreen() / myScale),
         composition.pendingClickCount,
         composition.lastEvent.isPopupTrigger(),
         composition.lastEvent.getScrollType(),

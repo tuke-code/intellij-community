@@ -34,7 +34,7 @@ class MavenPropertyCompletionAndResolutionTest : MavenDomTestCase() {
 
   @Test
   fun testResolutionToProject() = runBlocking {
-    createProjectPom("""
+    updateProjectPom("""
                        <groupId>test</groupId>
                        <artifactId>project</artifactId>
                        <version>1</version>
@@ -48,7 +48,7 @@ class MavenPropertyCompletionAndResolutionTest : MavenDomTestCase() {
 
   @Test
   fun testResolutionToProjectAt() = runBlocking {
-    createProjectPom("""
+    updateProjectPom("""
                        <groupId>test</groupId>
                        <artifactId>project</artifactId>
                        <version>1</version>
@@ -62,7 +62,7 @@ class MavenPropertyCompletionAndResolutionTest : MavenDomTestCase() {
 
   @Test
   fun testCorrectlyCalculatingTextRangeWithLeadingWhitespaces() = runBlocking {
-    createProjectPom("""
+    updateProjectPom("""
                        <groupId>test</groupId>
                        <artifactId>project</artifactId>
                        <version>1</version>
@@ -76,7 +76,7 @@ class MavenPropertyCompletionAndResolutionTest : MavenDomTestCase() {
 
   @Test
   fun testBuiltInBasedirProperty() = runBlocking {
-    createProjectPom("""
+    updateProjectPom("""
                        <groupId>test</groupId<artifactId>project</artifactId>
                        <version>1</version>
                        <name>${'$'}{<caret>basedir}</name>
@@ -87,7 +87,7 @@ class MavenPropertyCompletionAndResolutionTest : MavenDomTestCase() {
       assertResolved(projectPom, baseDir)
     }
 
-    createProjectPom("""
+    updateProjectPom("""
                        <groupId>test</groupId<artifactId>project</artifactId>
                        <version>1</version>
                        <name>${'$'}{<caret>project.basedir}</name>
@@ -98,7 +98,7 @@ class MavenPropertyCompletionAndResolutionTest : MavenDomTestCase() {
       assertResolved(projectPom, baseDir)
     }
 
-    createProjectPom("""
+    updateProjectPom("""
                        <groupId>test</groupId<artifactId>project</artifactId>
                        <version>1</version>
                        <name>${'$'}{<caret>pom.basedir}</name>
@@ -111,7 +111,7 @@ class MavenPropertyCompletionAndResolutionTest : MavenDomTestCase() {
 
   @Test
   fun testBuiltInMavenMultimoduleDirProperty() = runBlocking {
-    createProjectPom("""
+    updateProjectPom("""
                        <groupId>test</groupId<artifactId>project</artifactId>
                        <version>1</version>
                        <properties>
@@ -136,7 +136,7 @@ class MavenPropertyCompletionAndResolutionTest : MavenDomTestCase() {
                                        </parent>
                                        <artifactId>m1</artifactId>
                                        """.trimIndent())
-    importProjectAsync("""
+    updateProjectPom("""
                     <groupId>test</groupId>
                     <artifactId>project</artifactId>
                     <version>1</version>
@@ -145,8 +145,9 @@ class MavenPropertyCompletionAndResolutionTest : MavenDomTestCase() {
                       <module>m1</module>
                     </modules>
                     """.trimIndent())
+    updateAllProjects()
 
-    val m1 = createModulePom("m1",
+    val m1 = updateModulePom("m1",
                              """
                                        <parent>
                                           <groupId>test</groupId>
@@ -166,7 +167,7 @@ class MavenPropertyCompletionAndResolutionTest : MavenDomTestCase() {
 
   @Test
   fun testResolutionWithSeveralProperties() = runBlocking {
-    createProjectPom("""
+    updateProjectPom("""
                        <groupId>test</groupId>
                        <artifactId>project</artifactId>
                        <version>1</version>
@@ -177,7 +178,7 @@ class MavenPropertyCompletionAndResolutionTest : MavenDomTestCase() {
       assertResolved(projectPom, findTag("project.artifactId"))
     }
 
-    createProjectPom("""
+    updateProjectPom("""
                        <groupId>test</groupId>
                        <artifactId>project</artifactId>
                        <version>1</version>
@@ -191,7 +192,7 @@ class MavenPropertyCompletionAndResolutionTest : MavenDomTestCase() {
 
   @Test
   fun testResolvingFromPropertiesSection() = runBlocking {
-    createProjectPom("""
+    updateProjectPom("""
                        <groupId>test</groupId>
                        <artifactId>project</artifactId>
                        <version>1</version>
@@ -207,7 +208,7 @@ class MavenPropertyCompletionAndResolutionTest : MavenDomTestCase() {
 
   @Test
   fun testResolvingFromPropertiesSectionAt() = runBlocking {
-    createProjectPom("""
+    updateProjectPom("""
                        <groupId>test</groupId>
                        <artifactId>project</artifactId>
                        <version>1</version>
@@ -223,7 +224,7 @@ class MavenPropertyCompletionAndResolutionTest : MavenDomTestCase() {
 
   @Test
   fun testResolutionToUnknownProjectProperty() = runBlocking {
-    createProjectPom("""
+    updateProjectPom("""
                        <groupId>test</groupId>
                        <artifactId>project</artifactId>
                        <version>1</version>
@@ -237,7 +238,7 @@ class MavenPropertyCompletionAndResolutionTest : MavenDomTestCase() {
 
   @Test
   fun testResolutionToAbsentProjectProperty() = runBlocking {
-    createProjectPom("""
+    updateProjectPom("""
                        <groupId>test</groupId>
                        <artifactId>project</artifactId>
                        <version>1</version>
@@ -251,7 +252,7 @@ class MavenPropertyCompletionAndResolutionTest : MavenDomTestCase() {
 
   @Test
   fun testResolutionToAbsentPomProperty() = runBlocking {
-    createProjectPom("""
+    updateProjectPom("""
                        <groupId>test</groupId>
                        <artifactId>project</artifactId>
                        <version>1</version>
@@ -265,7 +266,7 @@ class MavenPropertyCompletionAndResolutionTest : MavenDomTestCase() {
 
   @Test
   fun testResolutionToAbsentUnclassifiedProperty() = runBlocking {
-    createProjectPom("""
+    updateProjectPom("""
                        <groupId>test</groupId>
                        <artifactId>project</artifactId>
                        <version>1</version>
@@ -279,7 +280,7 @@ class MavenPropertyCompletionAndResolutionTest : MavenDomTestCase() {
 
   @Test
   fun testResolutionToPomProperty() = runBlocking {
-    createProjectPom("""
+    updateProjectPom("""
                        <groupId>test</groupId>
                        <artifactId>project</artifactId>
                        <version>1</version>
@@ -293,7 +294,7 @@ class MavenPropertyCompletionAndResolutionTest : MavenDomTestCase() {
 
   @Test
   fun testResolutionToUnclassifiedProperty() = runBlocking {
-    createProjectPom("""
+    updateProjectPom("""
                        <groupId>test</groupId<artifactId>project</artifactId>
                        <version>1</version>
                        <name>${'$'}{<caret>version}</name>
@@ -306,7 +307,7 @@ class MavenPropertyCompletionAndResolutionTest : MavenDomTestCase() {
 
   @Test
   fun testResolutionToDerivedCoordinatesFromProjectParent() = runBlocking {
-    createProjectPom("""
+    updateProjectPom("""
                        <artifactId>project</artifactId>
                        <parent>
                          <groupId>test</groupId  <artifactId>parent</artifactId>
@@ -322,7 +323,7 @@ class MavenPropertyCompletionAndResolutionTest : MavenDomTestCase() {
 
   @Test
   fun testResolutionToProjectParent() = runBlocking {
-    createProjectPom("""
+    updateProjectPom("""
                        <groupId>test</groupId<artifactId>project</artifactId>
                        <version>1</version>
                        <parent>
@@ -339,7 +340,7 @@ class MavenPropertyCompletionAndResolutionTest : MavenDomTestCase() {
 
   @Test
   fun testResolutionToInheritedModelPropertiesForManagedParent() = runBlocking {
-    createProjectPom("""
+    updateProjectPom("""
                        <groupId>test</groupId>
                        <artifactId>project</artifactId>
                        <version>1</version>
@@ -384,7 +385,7 @@ class MavenPropertyCompletionAndResolutionTest : MavenDomTestCase() {
   @Test
   fun testResolutionToInheritedModelPropertiesForRelativeParent() = runBlocking {
     withContext(Dispatchers.EDT) {
-      createProjectPom("""
+      updateProjectPom("""
                        <groupId>test</groupId>
                        <artifactId>project</artifactId>
                        <version>1</version>
@@ -414,7 +415,7 @@ class MavenPropertyCompletionAndResolutionTest : MavenDomTestCase() {
   @Test
   fun testResolutionToInheritedPropertiesForNonManagedParent() = runBlocking {
     withContext(Dispatchers.EDT) {
-      createProjectPom("""
+      updateProjectPom("""
                        <groupId>test</groupId>
                        <artifactId>project</artifactId>
                        <version>1</version>
@@ -443,14 +444,14 @@ class MavenPropertyCompletionAndResolutionTest : MavenDomTestCase() {
 
   @Test
   fun testResolutionToInheritedSuperPomProjectProperty() = runBlocking {
-    createProjectPom("""
+    updateProjectPom("""
                        <groupId>test</groupId>
                        <artifactId>project</artifactId>
                        <version>1</version>
                        <name>${'$'}{<caret>project.build.finalName}</name>
                        """.trimIndent())
 
-    val effectiveSuperPom = MavenUtil.getEffectiveSuperPom(project, projectRoot.toNioPath().toString())
+    val effectiveSuperPom = MavenUtil.resolveSuperPomFile(project, projectPom)
     assertNotNull(effectiveSuperPom)
     withContext(Dispatchers.EDT) {
       assertResolved(projectPom, findTag(effectiveSuperPom, "project.build.finalName"))
@@ -459,7 +460,7 @@ class MavenPropertyCompletionAndResolutionTest : MavenDomTestCase() {
 
   @Test
   fun testHandleResolutionRecursion() = runBlocking {
-    createProjectPom("""
+    updateProjectPom("""
                        <groupId>test</groupId>
                        <artifactId>project</artifactId>
                        <version>1</version>
@@ -492,7 +493,7 @@ class MavenPropertyCompletionAndResolutionTest : MavenDomTestCase() {
 
   @Test
   fun testResolutionFromProperties() = runBlocking {
-    createProjectPom("""
+    updateProjectPom("""
                        <groupId>test</groupId>
                        <artifactId>project</artifactId>
                        <version>1</version>
@@ -509,7 +510,7 @@ class MavenPropertyCompletionAndResolutionTest : MavenDomTestCase() {
 
   @Test
   fun testResolutionWithProfiles() = runBlocking {
-    createProjectPom("""
+    updateProjectPom("""
                        <groupId>test</groupId>
                        <artifactId>project</artifactId>
                        <version>1</version>
@@ -539,7 +540,7 @@ class MavenPropertyCompletionAndResolutionTest : MavenDomTestCase() {
 
   @Test
   fun testResolutionToPropertyDefinedWithinProfiles() = runBlocking {
-    createProjectPom("""
+    updateProjectPom("""
                        <groupId>test</groupId>
                        <artifactId>project</artifactId>
                        <version>1</version>
@@ -573,7 +574,7 @@ class MavenPropertyCompletionAndResolutionTest : MavenDomTestCase() {
 
   @Test
   fun testResolutionToPropertyDefinedOutsideProfiles() = runBlocking {
-    createProjectPom("""
+    updateProjectPom("""
                        <groupId>test</groupId>
                        <artifactId>project</artifactId>
                        <version>1</version>
@@ -598,7 +599,7 @@ class MavenPropertyCompletionAndResolutionTest : MavenDomTestCase() {
 
   @Test
   fun testResolutionWithDefaultProfiles() = runBlocking {
-    createProjectPom("""
+    updateProjectPom("""
                        <groupId>test</groupId>
                        <artifactId>project</artifactId>
                        <version>1</version>
@@ -631,7 +632,7 @@ class MavenPropertyCompletionAndResolutionTest : MavenDomTestCase() {
 
   @Test
   fun testResolutionWithTriggeredProfiles() = runBlocking {
-    createProjectPom("""
+    updateProjectPom("""
                        <groupId>test</groupId>
                        <artifactId>project</artifactId>
                        <version>1</version>
@@ -664,7 +665,7 @@ class MavenPropertyCompletionAndResolutionTest : MavenDomTestCase() {
 
   @Test
   fun testResolvingToProfilesBeforeModelsProperties() = runBlocking {
-    createProjectPom("""
+    updateProjectPom("""
                        <groupId>test</groupId>
                        <artifactId>project</artifactId>
                        <version>1</version>
@@ -713,7 +714,7 @@ class MavenPropertyCompletionAndResolutionTest : MavenDomTestCase() {
                        </profiles>
                        """.trimIndent())
 
-    setPomContentAsync(projectPom, """
+    setPomContent(projectPom, """
                        <groupId>test</groupId>
                        <artifactId>project</artifactId>
                        <version>1</version>
@@ -735,7 +736,7 @@ class MavenPropertyCompletionAndResolutionTest : MavenDomTestCase() {
   ${repositoryPath}</localRepository>
   """.trimIndent())
 
-    createProjectPom("""
+    updateProjectPom("""
                        <groupId>test</groupId>
                        <artifactId>project</artifactId>
                        <version>1</version>
@@ -762,7 +763,9 @@ class MavenPropertyCompletionAndResolutionTest : MavenDomTestCase() {
                                                </profiles>
                                                """.trimIndent())
 
+    refreshFiles(listOf(profiles))
     fixture.configureFromExistingVirtualFile(profiles)
+
     fixture.complete(CompletionType.BASIC)
     val strings = fixture.getLookupElementStrings()!!
 
@@ -784,7 +787,9 @@ class MavenPropertyCompletionAndResolutionTest : MavenDomTestCase() {
                                                </profiles>
                                                """.trimIndent())
 
+    refreshFiles(listOf(profiles))
     fixture.configureFromExistingVirtualFile(profiles)
+
     readAction {
       val elementAtCaret = fixture.getElementAtCaret()
       assert(elementAtCaret is XmlTag)
@@ -794,7 +799,7 @@ class MavenPropertyCompletionAndResolutionTest : MavenDomTestCase() {
 
   @Test
   fun testResolvingAbsentSettingsModelProperties() = runBlocking {
-    createProjectPom("""
+    updateProjectPom("""
                        <groupId>test</groupId>
                        <artifactId>project</artifactId>
                        <version>1</version>
@@ -808,7 +813,7 @@ class MavenPropertyCompletionAndResolutionTest : MavenDomTestCase() {
 
   @Test
   fun testResolvingUnknownSettingsModelProperties() = runBlocking {
-    createProjectPom("""
+    updateProjectPom("""
                        <groupId>test</groupId>
                        <artifactId>project</artifactId>
                        <version>1</version>
@@ -837,7 +842,7 @@ class MavenPropertyCompletionAndResolutionTest : MavenDomTestCase() {
                                                        </profile>
                                                        """.trimIndent())
 
-    createProjectPom("""
+    updateProjectPom("""
                        <groupId>test</groupId>
                        <artifactId>project</artifactId>
                        <version>1</version>
@@ -854,7 +859,7 @@ class MavenPropertyCompletionAndResolutionTest : MavenDomTestCase() {
   @Test
   fun testResolvingInheritedProperties() = runBlocking {
     withContext(Dispatchers.EDT) {
-      createProjectPom("""
+      updateProjectPom("""
                        <groupId>test</groupId>
                        <artifactId>project</artifactId>
                        <version>1</version>
@@ -882,7 +887,7 @@ class MavenPropertyCompletionAndResolutionTest : MavenDomTestCase() {
 
   @Test
   fun testSystemProperties() = runBlocking {
-    createProjectPom("""
+    updateProjectPom("""
                        <groupId>test</groupId>
                        <artifactId>project</artifactId>
                        <version>1</version>
@@ -897,7 +902,7 @@ class MavenPropertyCompletionAndResolutionTest : MavenDomTestCase() {
 
   @Test
   fun testEnvProperties() = runBlocking {
-    createProjectPom("""
+    updateProjectPom("""
   <groupId>test</groupId>
   <artifactId>project</artifactId>
   <version>1</version>
@@ -913,7 +918,7 @@ class MavenPropertyCompletionAndResolutionTest : MavenDomTestCase() {
   fun testUpperCaseEnvPropertiesOnWindows() = runBlocking {
     if (!SystemInfo.isWindows) return@runBlocking
 
-    createProjectPom("""
+    updateProjectPom("""
                        <groupId>test</groupId>
                        <artifactId>project</artifactId>
                        <version>1</version>
@@ -934,7 +939,7 @@ class MavenPropertyCompletionAndResolutionTest : MavenDomTestCase() {
   fun testCaseInsencitiveOnWindows() = runBlocking {
     if (!SystemInfo.isWindows) return@runBlocking
 
-    createProjectPom("""
+    updateProjectPom("""
                        <groupId>test</groupId>
                        <artifactId>project</artifactId>
                        <version>1</version>
@@ -950,7 +955,7 @@ class MavenPropertyCompletionAndResolutionTest : MavenDomTestCase() {
   fun testNotUpperCaseEnvPropertiesOnWindows() = runBlocking {
     if (!SystemInfo.isWindows) return@runBlocking
 
-    createProjectPom("""
+    updateProjectPom("""
                        <groupId>test</groupId>
                        <artifactId>project</artifactId>
                        <version>1</version>
@@ -965,7 +970,7 @@ class MavenPropertyCompletionAndResolutionTest : MavenDomTestCase() {
 
   @Test
   fun testHighlightUnresolvedProperties() = runBlocking {
-    createProjectPom("""
+    updateProjectPom("""
                        <groupId>test</groupId>
                        <artifactId>child</artifactId>
                        <version>1</version>
@@ -1005,7 +1010,7 @@ class MavenPropertyCompletionAndResolutionTest : MavenDomTestCase() {
 
   @Test
   fun testCompletion() = runBlocking {
-    createProjectPom("""
+    updateProjectPom("""
                        <groupId>test</groupId>
                        <artifactId>project</artifactId>
                        <version>1</version>
@@ -1104,7 +1109,7 @@ class MavenPropertyCompletionAndResolutionTest : MavenDomTestCase() {
 
   @Test
   fun testDoNotIncludeCollectionPropertiesInCompletion() = runBlocking {
-    createProjectPom("""
+    updateProjectPom("""
                        <groupId>test</groupId>
                        <artifactId>project</artifactId>
                        <version>1</version>
@@ -1115,7 +1120,7 @@ class MavenPropertyCompletionAndResolutionTest : MavenDomTestCase() {
 
   @Test
   fun testCompletingAfterOpenBrace() = runBlocking {
-    createProjectPom("""
+    updateProjectPom("""
                        <groupId>test</groupId>
                        <artifactId>project</artifactId>
                        <version>1</version>
@@ -1129,7 +1134,7 @@ class MavenPropertyCompletionAndResolutionTest : MavenDomTestCase() {
   fun testCompletingAfterOpenBraceInOpenTag() = runBlocking {
     if (ignore()) return@runBlocking
 
-    createProjectPom("""
+    updateProjectPom("""
                        <groupId>test</groupId>
                        <artifactId>project</artifactId>
                        <version>1</version>
@@ -1141,7 +1146,7 @@ class MavenPropertyCompletionAndResolutionTest : MavenDomTestCase() {
 
   @Test
   fun testCompletingAfterOpenBraceAndSomeText() = runBlocking {
-    createProjectPom("""
+    updateProjectPom("""
                        <groupId>test</groupId>
                        <artifactId>project</artifactId>
                        <version>1</version>
@@ -1155,7 +1160,7 @@ class MavenPropertyCompletionAndResolutionTest : MavenDomTestCase() {
 
   @Test
   fun testCompletingAfterOpenBraceAndSomeTextWithDot() = runBlocking {
-    createProjectPom("""
+    updateProjectPom("""
                        <groupId>test</groupId>
                        <artifactId>project</artifactId>
                        <version>1</version>
@@ -1169,7 +1174,7 @@ class MavenPropertyCompletionAndResolutionTest : MavenDomTestCase() {
 
   @Test
   fun testDoNotCompleteAfterNonWordCharacter() = runBlocking {
-    createProjectPom("""
+    updateProjectPom("""
                        <groupId>test</groupId>
                        <artifactId>project</artifactId>
                        <version>1</version>

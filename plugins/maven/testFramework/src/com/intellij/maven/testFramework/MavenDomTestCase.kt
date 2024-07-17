@@ -15,7 +15,6 @@ import com.intellij.find.findUsages.PsiElement2UsageTargetAdapter
 import com.intellij.lang.annotation.HighlightSeverity
 import com.intellij.openapi.actionSystem.CommonDataKeys
 import com.intellij.openapi.application.EDT
-import com.intellij.openapi.application.readAction
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.util.Comparing
@@ -108,6 +107,7 @@ abstract class MavenDomTestCase : MavenMultiVersionImportingTestCase() {
       MavenLog.LOG.warn("MavenDomTestCase configTest skipped")
       return
     }
+    refreshFiles(listOf(f))
     fixture.configureFromExistingVirtualFile(f)
     myConfigTimestamps[f] = f.timeStamp
     MavenLog.LOG.warn("MavenDomTestCase configTest performed")
@@ -567,6 +567,9 @@ abstract class MavenDomTestCase : MavenMultiVersionImportingTestCase() {
 
   protected suspend fun checkHighlighting(file: VirtualFile, vararg expectedHighlights: Highlight) {
     withContext(Dispatchers.EDT) {
+      refreshFiles(listOf(file))
+      val content = String(file.contentsToByteArray())
+      MavenLog.LOG.warn("Checking highlighting in file $file:\n$content")
       fixture.openFileInEditor(file)
       val highlightingInfos = fixture.doHighlighting();
       assertHighlighting(highlightingInfos, *expectedHighlights)

@@ -34,7 +34,6 @@ import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBPanel
 import com.intellij.ui.components.panels.NonOpaquePanel
 import com.intellij.ui.components.panels.VerticalLayout
-import com.intellij.util.Alarm
 import com.intellij.util.SingleAlarm
 import com.intellij.util.ui.HtmlPanel
 import com.intellij.util.ui.JBDimension
@@ -242,7 +241,11 @@ open class CommitProgressPanel : CommitProgressUi, InclusionListener, DocumentLi
           // it may get interrupted to read the newly focused component.
           if (announceCommitErrorAlarm == null) {
             announceCommitErrorAlarm =
-              SingleAlarm({ AccessibleAnnouncerUtil.announce(label, label.text, false) }, 500, this, Alarm.ThreadToUse.SWING_THREAD)
+              SingleAlarm.singleEdtAlarm(
+                task = { AccessibleAnnouncerUtil.announce(label, label.text, false) },
+                delay = 500,
+                parentDisposable = this,
+              )
           }
           announceCommitErrorAlarm?.cancelAndRequest()
         }
@@ -310,9 +313,9 @@ open class CommitProgressPanel : CommitProgressUi, InclusionListener, DocumentLi
 sealed class CommitCheckFailure {
   object Unknown : CommitCheckFailure()
 
-  open class WithDescription(val text: @NlsContexts.NotificationContent String) : CommitCheckFailure()
+  open class WithDescription(val text: @NlsContexts.NotificationContent HtmlChunk) : CommitCheckFailure()
 
-  class WithDetails(text: @NlsContexts.NotificationContent String,
+  class WithDetails(text: @NlsContexts.NotificationContent HtmlChunk,
                     val viewDetailsLinkText: @NlsContexts.NotificationContent String?,
                     val viewDetailsActionText: @NlsContexts.NotificationContent String,
                     val viewDetails: (place: CommitProblemPlace) -> Unit) : WithDescription(text)
@@ -388,14 +391,14 @@ private class FailuresDescriptionPanel : HtmlPanel() {
       when (val failure = it.value) {
         is CommitCheckFailure.WithDetails -> {
           if (failure.viewDetailsLinkText != null) {
-            HtmlChunk.text(failure.text).plus(HtmlChunk.nbsp())
+            failure.text.plus(HtmlChunk.nbsp())
               .plus(HtmlChunk.link(it.key.toString(), failure.viewDetailsLinkText))
           }
           else {
             HtmlChunk.link(it.key.toString(), failure.text)
           }
         }
-        is CommitCheckFailure.WithDescription -> HtmlChunk.text(failure.text)
+        is CommitCheckFailure.WithDescription -> failure.text
         else -> null
       }
     }

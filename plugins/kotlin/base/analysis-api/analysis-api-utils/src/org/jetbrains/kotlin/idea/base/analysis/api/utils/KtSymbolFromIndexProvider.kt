@@ -53,7 +53,7 @@ class KtSymbolFromIndexProvider private constructor(
         return getClassLikeSymbols(
             classDeclarations = KotlinClassShortNameIndex.getAllElements(name.asString(), project, scope, valueFilter),
             typeAliasDeclarations = KotlinTypeAliasShortNameIndex.getAllElements(name.asString(), project, scope, valueFilter),
-            declarationsFromExtension = resolveExtensionScope.getClassifierSymbols(name).filterIsInstance<KaClassLikeSymbol>(),
+            declarationsFromExtension = resolveExtensionScope.classifiers(name).filterIsInstance<KaClassLikeSymbol>(),
         )
     }
 
@@ -69,7 +69,7 @@ class KtSymbolFromIndexProvider private constructor(
         return getClassLikeSymbols(
             classDeclarations = KotlinFullClassNameIndex.getAllElements(project, scope, keyFilter, valueFilter),
             typeAliasDeclarations = KotlinTypeAliasShortNameIndex.getAllElements(project, scope, keyFilter, valueFilter),
-            declarationsFromExtension = resolveExtensionScope.getClassifierSymbols(nameFilter).filterIsInstance<KaClassLikeSymbol>(),
+            declarationsFromExtension = resolveExtensionScope.classifiers(nameFilter).filterIsInstance<KaClassLikeSymbol>(),
         )
     }
 
@@ -80,10 +80,10 @@ class KtSymbolFromIndexProvider private constructor(
         declarationsFromExtension: Sequence<KaClassLikeSymbol>
     ): Sequence<KaClassLikeSymbol> = sequence {
         for (ktClassOrObject in classDeclarations) {
-            yieldIfNotNull(ktClassOrObject.getNamedClassOrObjectSymbol())
+            yieldIfNotNull(ktClassOrObject.namedClassSymbol)
         }
         for (typeAlias in typeAliasDeclarations) {
-            yield(typeAlias.getTypeAliasSymbol())
+            yield(typeAlias.symbol)
         }
         yieldAll(declarationsFromExtension)
     }
@@ -92,7 +92,7 @@ class KtSymbolFromIndexProvider private constructor(
     fun getJavaClassesByNameFilter(
         nameFilter: (Name) -> Boolean,
         psiFilter: (PsiClass) -> Boolean = { true }
-    ): Sequence<KaNamedClassOrObjectSymbol> {
+    ): Sequence<KaNamedClassSymbol> {
         val names = buildSet {
             forEachNonKotlinCache { cache ->
                 cache.processAllClassNames({ nameString ->
@@ -116,7 +116,7 @@ class KtSymbolFromIndexProvider private constructor(
     fun getJavaClassesByName(
         name: Name,
         psiFilter: (PsiClass) -> Boolean = { true }
-    ): Sequence<KaNamedClassOrObjectSymbol> {
+    ): Sequence<KaNamedClassSymbol> {
         val nameString = name.asString()
 
         return sequence {
@@ -147,7 +147,7 @@ class KtSymbolFromIndexProvider private constructor(
                 yieldIfNotNull(callableDeclaration.symbol as? KaCallableSymbol)
             }
             yieldAll(
-                resolveExtensionScopeWithTopLevelDeclarations.getCallableSymbols(name)
+                resolveExtensionScopeWithTopLevelDeclarations.callables(name)
             )
         }
     }
@@ -191,7 +191,7 @@ class KtSymbolFromIndexProvider private constructor(
                 yieldIfNotNull(callableDeclaration.symbol as? KaCallableSymbol)
             }
             yieldAll(
-                resolveExtensionScopeWithTopLevelDeclarations.getCallableSymbols(nameFilter).filter { !it.isExtension }
+                resolveExtensionScopeWithTopLevelDeclarations.callables(nameFilter).filter { !it.isExtension }
             )
         }
     }
@@ -231,7 +231,7 @@ class KtSymbolFromIndexProvider private constructor(
                 yieldIfNotNull(extension.symbol as? KaCallableSymbol)
             }
             val resolveExtensionScope = resolveExtensionScopeWithTopLevelDeclarations
-            yieldAll(resolveExtensionScope.getCallableSymbols(name).filterExtensionsByReceiverTypes(receiverTypes))
+            yieldAll(resolveExtensionScope.callables(name).filterExtensionsByReceiverTypes(receiverTypes))
         }
     }
 
@@ -257,7 +257,7 @@ class KtSymbolFromIndexProvider private constructor(
                 yieldIfNotNull(extension.symbol as? KaCallableSymbol)
             }
             val resolveExtensionScope = resolveExtensionScopeWithTopLevelDeclarations
-            yieldAll(resolveExtensionScope.getCallableSymbols(nameFilter).filterExtensionsByReceiverTypes(receiverTypes))
+            yieldAll(resolveExtensionScope.callables(nameFilter).filterExtensionsByReceiverTypes(receiverTypes))
         }
     }
 

@@ -4,6 +4,7 @@ package org.jetbrains.kotlin.idea.debugger.stepping.smartStepInto
 import com.intellij.debugger.PositionManager
 import com.intellij.debugger.engine.DebugProcessImpl
 import com.intellij.debugger.engine.NamedMethodFilter
+import com.intellij.debugger.impl.DebuggerUtilsEx
 import com.intellij.debugger.jdi.StackFrameProxyImpl
 import com.intellij.openapi.application.ReadAction
 import com.intellij.psi.PsiElement
@@ -16,6 +17,7 @@ import org.jetbrains.kotlin.analysis.api.analyze
 import org.jetbrains.kotlin.analysis.api.symbols.KaCallableSymbol
 import org.jetbrains.kotlin.analysis.api.symbols.KaClassSymbol
 import org.jetbrains.kotlin.codegen.inline.dropInlineScopeInfo
+import org.jetbrains.kotlin.idea.base.psi.getLineNumber
 import org.jetbrains.kotlin.idea.debugger.base.util.safeLocation
 import org.jetbrains.kotlin.idea.debugger.base.util.safeMethod
 import org.jetbrains.kotlin.idea.debugger.core.DebuggerUtils.isGeneratedIrBackendLambdaMethodName
@@ -108,19 +110,45 @@ open class KotlinMethodFilter(
                 method.getInlineFunctionAndArgumentVariablesToBordersMap()
                     .filter { location in it.value }
                     .any { it.key.isInlinedFromFunction(targetMethodName, isNameMangledInBytecode, methodInfo.isInternalMethod) } ||
-                !isGeneratedLambda && methodInfo.isInternalMethod && internalNameMatches(actualMethodName, targetMethodName)
+                !isGeneratedLambda && methodNameMatches(methodInfo, actualMethodName)
     }
 }
 
 private fun getCurrentDeclaration(positionManager: PositionManager, location: Location): KtDeclaration? {
     val elementAt = positionManager.getSourcePosition(location)?.elementAt
-    return elementAt?.getParentOfTypesAndPredicate(false, KtDeclaration::class.java) {
+    val declaration = elementAt?.getParentOfTypesAndPredicate(false, KtDeclaration::class.java) {
         it !is KtProperty || !it.isLocal
+    } ?: return null
+    if (declaration is KtProperty) {
+        // Smart step into visitor provides accessor element as a declaration
+        val currentLine = DebuggerUtilsEx.getLineNumber(location, true)
+        val accessorsOnLine = declaration.accessors.filter { it.getLineNumber() == currentLine }
+        if (accessorsOnLine.isNotEmpty()) {
+            if (accessorsOnLine.size == 1) return accessorsOnLine.single()
+            val methodName = location.safeMethod()?.name()
+            if (methodName != null) {
+                return if (JvmAbi.isSetterName(methodName)) {
+                    accessorsOnLine.firstOrNull { it.isSetter }
+                } else {
+                    accessorsOnLine.firstOrNull { it.isGetter }
+                }
+            }
+        }
     }
+    return declaration
 }
 
-// Internal methods has a '$<MODULE_NAME>' suffix
-internal fun internalNameMatches(methodName: String, targetMethodName: String): Boolean {
+internal fun methodNameMatches(methodInfo: CallableMemberInfo, name: String): Boolean {
+    if (methodInfo.name == name) return true
+    if (methodInfo.isInternalMethod || methodInfo.isLocal) {
+        return nameMatchesUpToDollar(name, methodInfo.name)
+    }
+    return false
+}
+
+// Internal functions have a '$<MODULE_NAME>' suffix
+// Local functions can be '$1' suffixed
+private fun nameMatchesUpToDollar(methodName: String, targetMethodName: String): Boolean {
     return methodName.startsWith("$targetMethodName\$")
 }
 
@@ -129,7 +157,7 @@ private fun LocalVariable.isInlinedFromFunction(methodName: String, isNameMangle
     if (!variableName.startsWith(JvmAbi.LOCAL_VARIABLE_NAME_PREFIX_INLINE_FUNCTION)) return false
     val inlineMethodName = variableName.substringAfter(JvmAbi.LOCAL_VARIABLE_NAME_PREFIX_INLINE_FUNCTION)
     return inlineMethodName == methodName ||
-            isInternalMethod && internalNameMatches(inlineMethodName, methodName)
+            isInternalMethod && nameMatchesUpToDollar(inlineMethodName, methodName)
 }
 
 private fun getMethodNameInCallerFrame(frameProxy: StackFrameProxyImpl?): String? {

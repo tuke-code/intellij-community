@@ -7,8 +7,9 @@ import com.intellij.psi.PsiErrorElement
 import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.psi.util.PsiUtilCore
 import org.jetbrains.kotlin.analysis.api.KaSession
+import org.jetbrains.kotlin.analysis.api.base.KaConstantValue
 import org.jetbrains.kotlin.analysis.api.symbols.KaCallableSymbol
-import org.jetbrains.kotlin.analysis.api.symbols.KaNamedClassOrObjectSymbol
+import org.jetbrains.kotlin.analysis.api.symbols.KaNamedClassSymbol
 import org.jetbrains.kotlin.builtins.StandardNames
 import org.jetbrains.kotlin.idea.base.psi.replaced
 import org.jetbrains.kotlin.idea.codeinsight.utils.isToString
@@ -46,9 +47,9 @@ fun isStringPlusExpressionWithoutNewLineInOperands(expression: KtBinaryExpressio
 
     if (!expression.containNoNewLine()) return false
 
-    if (expression.expressionType?.isString != true) return false
+    if (expression.expressionType?.isStringType != true) return false
     val plusOperation = expression.operationReference.mainReference.resolveToSymbol() as? KaCallableSymbol
-    val classContainingPlus = plusOperation?.containingSymbol as? KaNamedClassOrObjectSymbol
+    val classContainingPlus = plusOperation?.containingDeclaration as? KaNamedClassSymbol
     return if (classContainingPlus != null) {
         classContainingPlus.classId?.asSingleFqName() == StandardNames.FqNames.string.toSafe()
     } else {
@@ -129,7 +130,7 @@ private fun buildStringTemplateForExpression(expr: KtExpression?, forceBraces: B
 context(KaSession)
 private fun KtConstantExpression.buildStringTemplateForExpression(forceBraces: Boolean): String? {
     val constantValue = evaluate() ?: return "\${${text}}"
-    val isChar = constantValue.constantValueKind == ConstantValueKind.Char
+    val isChar = constantValue is KaConstantValue.CharValue
   val stringValue = if (isChar) "${constantValue.value}" else constantValue.render()
     if (isChar || stringValue == text) {
         return StringUtil.escapeStringCharacters(

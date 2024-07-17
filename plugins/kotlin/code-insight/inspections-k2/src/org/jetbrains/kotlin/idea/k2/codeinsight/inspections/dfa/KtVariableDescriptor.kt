@@ -10,7 +10,6 @@ import com.intellij.psi.util.CachedValuesManager
 import com.intellij.psi.util.PsiTreeUtil
 import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.analyze
-import org.jetbrains.kotlin.analysis.api.annotations.hasAnnotation
 import org.jetbrains.kotlin.analysis.api.projectStructure.KaModule
 import org.jetbrains.kotlin.analysis.api.resolution.KaImplicitReceiverValue
 import org.jetbrains.kotlin.analysis.api.resolution.singleVariableAccessCall
@@ -75,7 +74,7 @@ class KtVariableDescriptor(
     companion object {
         context(KaSession)
         fun getSingleLambdaParameter(factory: DfaValueFactory, lambda: KtLambdaExpression): DfaVariableValue? {
-            val parameterSymbol = lambda.functionLiteral.getAnonymousFunctionSymbol().valueParameters.singleOrNull() ?: return null
+            val parameterSymbol = lambda.functionLiteral.symbol.valueParameters.singleOrNull() ?: return null
             if ((parameterSymbol.psi as? KtParameter)?.destructuringDeclaration != null) return null
             return factory.varFactory.createVariableValue(parameterSymbol.variableDescriptor())
         }
@@ -124,7 +123,7 @@ class KtVariableDescriptor(
                             break
                         }
                         if (parentScope != null && PsiTreeUtil.isAncestor(scope, parentScope, true)) {
-                            result.add(target.getVariableSymbol().variableDescriptor())
+                            result.add(target.symbol.variableDescriptor())
                         }
                         return@processElements true
                     }
@@ -143,7 +142,7 @@ class KtVariableDescriptor(
             if (!isTrackableProperty(symbol)) return null
             val parent = expr.parent
             var qualifier: DfaVariableValue? = null
-            if ((symbol.containingSymbol as? KaClassSymbol)?.classKind == KaClassKind.OBJECT) {
+            if ((symbol.containingDeclaration as? KaClassSymbol)?.classKind == KaClassKind.OBJECT) {
                 // property in an object: singleton, can track
                 return varFactory.createVariableValue(symbol.variableDescriptor(), null)
             }
@@ -163,7 +162,7 @@ class KtVariableDescriptor(
                 if (functionLiteral != null && type != null) {
                     qualifier = varFactory.createVariableValue(KtLambdaThisVariableDescriptor(functionLiteral, type.toDfType()))
                 } else {
-                    val classOrObject = symbol.containingSymbol as? KaClassSymbol
+                    val classOrObject = symbol.containingDeclaration as? KaClassSymbol
                     if (classOrObject != null) {
                         val dfType = TypeConstraints.exactClass(classOrObject.classDef()).instanceOf().asDfType()
                         qualifier = varFactory.createVariableValue(KtThisDescriptor(dfType))
@@ -179,7 +178,8 @@ class KtVariableDescriptor(
         private fun isTrackableProperty(target: KaVariableSymbol?) =
             target is KaPropertySymbol && target.getter?.isDefault != false && target.setter?.isDefault != false
                     && !target.isDelegatedProperty && target.modality == KaSymbolModality.FINAL
-                    && !target.isExtension && target.backingFieldSymbol?.hasAnnotation(JvmStandardClassIds.VOLATILE_ANNOTATION_CLASS_ID) == false
+                    && !target.isExtension
+                    && target.backingFieldSymbol?.annotations?.contains(JvmStandardClassIds.VOLATILE_ANNOTATION_CLASS_ID) == false
     }
 }
 

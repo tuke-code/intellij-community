@@ -1,8 +1,3 @@
-f:com.intellij.openapi.externalSystem.ExternalProjectSystemRegistryImpl
-- com.intellij.openapi.roots.ExternalProjectSystemRegistry
-- <init>():V
-- getExternalSource(com.intellij.openapi.module.Module):com.intellij.openapi.roots.ProjectModelExternalSource
-- getSourceById(java.lang.String):com.intellij.openapi.roots.ProjectModelExternalSource
 com.intellij.openapi.externalSystem.ExternalSystemAutoImportAware
 - getAffectedExternalProjectFiles(java.lang.String,com.intellij.openapi.project.Project):java.util.List
 - a:getAffectedExternalProjectPath(java.lang.String,com.intellij.openapi.project.Project):java.lang.String
@@ -176,6 +171,8 @@ com.intellij.openapi.externalSystem.autolink.ExternalSystemUnlinkedProjectAware
 - linkAndLoadProjectAsync(com.intellij.openapi.project.Project,java.lang.String,kotlin.coroutines.Continuation):java.lang.Object
 - bs:linkAndLoadProjectAsync$suspendImpl(com.intellij.openapi.externalSystem.autolink.ExternalSystemUnlinkedProjectAware,com.intellij.openapi.project.Project,java.lang.String,kotlin.coroutines.Continuation):java.lang.Object
 - a:subscribe(com.intellij.openapi.project.Project,com.intellij.openapi.externalSystem.autolink.ExternalSystemProjectLinkListener,com.intellij.openapi.Disposable):V
+- unlinkProject(com.intellij.openapi.project.Project,java.lang.String,kotlin.coroutines.Continuation):java.lang.Object
+- bs:unlinkProject$suspendImpl(com.intellij.openapi.externalSystem.autolink.ExternalSystemUnlinkedProjectAware,com.intellij.openapi.project.Project,java.lang.String,kotlin.coroutines.Continuation):java.lang.Object
 f:com.intellij.openapi.externalSystem.autolink.ExternalSystemUnlinkedProjectAware$Companion
 - f:getEP_NAME():com.intellij.openapi.extensions.ExtensionPointName
 - f:getInstance(com.intellij.openapi.externalSystem.model.ProjectSystemId):com.intellij.openapi.externalSystem.autolink.ExternalSystemUnlinkedProjectAware
@@ -306,13 +303,6 @@ com.intellij.openapi.externalSystem.dependency.analyzer.DependencyAnalyzerProjec
 - com.intellij.openapi.util.UserDataHolder
 - a:getModule():com.intellij.openapi.module.Module
 - a:getTitle():java.lang.String
-f:com.intellij.openapi.externalSystem.dependency.analyzer.DependencyAnalyzerUtilKt
-- sf:setSelectedDependency(com.intellij.openapi.externalSystem.dependency.analyzer.DependencyAnalyzerView,com.intellij.openapi.module.Module,com.intellij.buildsystem.model.unified.UnifiedCoordinates,java.lang.String):V
-- sf:setSelectedDependency(com.intellij.openapi.externalSystem.dependency.analyzer.DependencyAnalyzerView,com.intellij.openapi.module.Module,com.intellij.buildsystem.model.unified.UnifiedDependency):V
-- sf:setSelectedDependency(com.intellij.openapi.externalSystem.dependency.analyzer.DependencyAnalyzerView,com.intellij.openapi.module.Module,com.intellij.buildsystem.model.unified.UnifiedDependency,java.util.List):V
-- sf:setSelectedDependency(com.intellij.openapi.externalSystem.dependency.analyzer.DependencyAnalyzerView,com.intellij.openapi.module.Module,java.util.List,java.lang.String):V
-- bs:setSelectedDependency$default(com.intellij.openapi.externalSystem.dependency.analyzer.DependencyAnalyzerView,com.intellij.openapi.module.Module,com.intellij.buildsystem.model.unified.UnifiedCoordinates,java.lang.String,I,java.lang.Object):V
-- bs:setSelectedDependency$default(com.intellij.openapi.externalSystem.dependency.analyzer.DependencyAnalyzerView,com.intellij.openapi.module.Module,java.util.List,java.lang.String,I,java.lang.Object):V
 com.intellij.openapi.externalSystem.dependency.analyzer.DependencyAnalyzerView
 - com.intellij.openapi.actionSystem.DataProvider
 - sf:ACTION_PLACE:java.lang.String
@@ -1347,8 +1337,6 @@ com.intellij.openapi.externalSystem.settings.ExternalSystemSettingsListenerEx
 - onProjectsLoaded(com.intellij.openapi.project.Project,com.intellij.openapi.externalSystem.ExternalSystemManager,java.util.Collection):V
 - onProjectsUnlinked(com.intellij.openapi.project.Project,com.intellij.openapi.externalSystem.ExternalSystemManager,java.util.Set):V
 f:com.intellij.openapi.externalSystem.settings.ExternalSystemSettingsListenerEx$Companion
-f:com.intellij.openapi.externalSystem.settings.workspaceModel.EntitiesKt
-- sf:modifyExternalProjectsBuildClasspathEntity(com.intellij.platform.workspace.storage.MutableEntityStorage,com.intellij.openapi.externalSystem.settings.workspaceModel.ExternalProjectsBuildClasspathEntity,kotlin.jvm.functions.Function1):com.intellij.openapi.externalSystem.settings.workspaceModel.ExternalProjectsBuildClasspathEntity
 f:com.intellij.openapi.externalSystem.settings.workspaceModel.ExternalModuleBuildClasspathEntity
 - <init>(java.lang.String,java.util.List):V
 - f:component1():java.lang.String
@@ -1546,12 +1534,6 @@ f:com.intellij.openapi.externalSystem.util.ExternalSystemInProgressService
 - f:externalSystemActivityStarted():V
 - f:isInProgress():Z
 - f:unlinkedActivityStarted():V
-f:com.intellij.openapi.externalSystem.util.ExternalSystemTracker
-- com.intellij.platform.backend.observation.ActivityTracker
-- <init>():V
-- awaitConfiguration(com.intellij.openapi.project.Project,kotlin.coroutines.Continuation):java.lang.Object
-- getPresentableName():java.lang.String
-- isInProgress(com.intellij.openapi.project.Project,kotlin.coroutines.Continuation):java.lang.Object
 c:com.intellij.openapi.externalSystem.util.IntegrationKey
 - <init>(com.intellij.openapi.project.Project,com.intellij.openapi.externalSystem.model.ProjectSystemId,java.lang.String):V
 - <init>(java.lang.String,java.lang.String,com.intellij.openapi.externalSystem.model.ProjectSystemId,java.lang.String):V

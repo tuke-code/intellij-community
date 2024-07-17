@@ -1254,6 +1254,38 @@ e:com.intellij.codeInsight.hints.declarative.HintColorKind
 - f:hasBackground():Z
 - s:valueOf(java.lang.String):com.intellij.codeInsight.hints.declarative.HintColorKind
 - s:values():com.intellij.codeInsight.hints.declarative.HintColorKind[]
+e:com.intellij.codeInsight.hints.declarative.HintFontSize
+- java.lang.Enum
+- sf:ABitSmallerThanInEditor:com.intellij.codeInsight.hints.declarative.HintFontSize
+- sf:AsInEditor:com.intellij.codeInsight.hints.declarative.HintFontSize
+- s:getEntries():kotlin.enums.EnumEntries
+- s:valueOf(java.lang.String):com.intellij.codeInsight.hints.declarative.HintFontSize
+- s:values():com.intellij.codeInsight.hints.declarative.HintFontSize[]
+f:com.intellij.codeInsight.hints.declarative.HintFormat
+- sf:Companion:com.intellij.codeInsight.hints.declarative.HintFormat$Companion
+- <init>(com.intellij.codeInsight.hints.declarative.HintColorKind,com.intellij.codeInsight.hints.declarative.HintFontSize,com.intellij.codeInsight.hints.declarative.HintMarginPadding):V
+- f:component1():com.intellij.codeInsight.hints.declarative.HintColorKind
+- f:component2():com.intellij.codeInsight.hints.declarative.HintFontSize
+- f:component3():com.intellij.codeInsight.hints.declarative.HintMarginPadding
+- f:copy(com.intellij.codeInsight.hints.declarative.HintColorKind,com.intellij.codeInsight.hints.declarative.HintFontSize,com.intellij.codeInsight.hints.declarative.HintMarginPadding):com.intellij.codeInsight.hints.declarative.HintFormat
+- bs:copy$default(com.intellij.codeInsight.hints.declarative.HintFormat,com.intellij.codeInsight.hints.declarative.HintColorKind,com.intellij.codeInsight.hints.declarative.HintFontSize,com.intellij.codeInsight.hints.declarative.HintMarginPadding,I,java.lang.Object):com.intellij.codeInsight.hints.declarative.HintFormat
+- equals(java.lang.Object):Z
+- f:getColorKind():com.intellij.codeInsight.hints.declarative.HintColorKind
+- f:getFontSize():com.intellij.codeInsight.hints.declarative.HintFontSize
+- f:getHorizontalMarginPadding():com.intellij.codeInsight.hints.declarative.HintMarginPadding
+- hashCode():I
+- f:withColorKind(com.intellij.codeInsight.hints.declarative.HintColorKind):com.intellij.codeInsight.hints.declarative.HintFormat
+- f:withFontSize(com.intellij.codeInsight.hints.declarative.HintFontSize):com.intellij.codeInsight.hints.declarative.HintFormat
+- f:withHorizontalMargin(com.intellij.codeInsight.hints.declarative.HintMarginPadding):com.intellij.codeInsight.hints.declarative.HintFormat
+f:com.intellij.codeInsight.hints.declarative.HintFormat$Companion
+- f:getDefault():com.intellij.codeInsight.hints.declarative.HintFormat
+e:com.intellij.codeInsight.hints.declarative.HintMarginPadding
+- java.lang.Enum
+- sf:MarginAndSmallerPadding:com.intellij.codeInsight.hints.declarative.HintMarginPadding
+- sf:OnlyPadding:com.intellij.codeInsight.hints.declarative.HintMarginPadding
+- s:getEntries():kotlin.enums.EnumEntries
+- s:valueOf(java.lang.String):com.intellij.codeInsight.hints.declarative.HintMarginPadding
+- s:values():com.intellij.codeInsight.hints.declarative.HintMarginPadding[]
 f:com.intellij.codeInsight.hints.declarative.InlayActionData
 - <init>(com.intellij.codeInsight.hints.declarative.InlayActionPayload,java.lang.String):V
 - equals(java.lang.Object):Z
@@ -1387,9 +1419,9 @@ f:com.intellij.codeInsight.hints.declarative.InlayProviderPassInfo
 - f:getProvider():com.intellij.codeInsight.hints.declarative.InlayHintsProvider
 - f:getProviderId():java.lang.String
 com.intellij.codeInsight.hints.declarative.InlayTreeSink
-- a:addPresentation(com.intellij.codeInsight.hints.declarative.InlayPosition,java.util.List,java.lang.String,com.intellij.codeInsight.hints.declarative.HintColorKind,kotlin.jvm.functions.Function1):V
+- a:addPresentation(com.intellij.codeInsight.hints.declarative.InlayPosition,java.util.List,java.lang.String,com.intellij.codeInsight.hints.declarative.HintFormat,kotlin.jvm.functions.Function1):V
 - addPresentation(com.intellij.codeInsight.hints.declarative.InlayPosition,java.util.List,java.lang.String,Z,kotlin.jvm.functions.Function1):V
-- bs:addPresentation$default(com.intellij.codeInsight.hints.declarative.InlayTreeSink,com.intellij.codeInsight.hints.declarative.InlayPosition,java.util.List,java.lang.String,com.intellij.codeInsight.hints.declarative.HintColorKind,kotlin.jvm.functions.Function1,I,java.lang.Object):V
+- bs:addPresentation$default(com.intellij.codeInsight.hints.declarative.InlayTreeSink,com.intellij.codeInsight.hints.declarative.InlayPosition,java.util.List,java.lang.String,com.intellij.codeInsight.hints.declarative.HintFormat,kotlin.jvm.functions.Function1,I,java.lang.Object):V
 - bs:addPresentation$default(com.intellij.codeInsight.hints.declarative.InlayTreeSink,com.intellij.codeInsight.hints.declarative.InlayPosition,java.util.List,java.lang.String,Z,kotlin.jvm.functions.Function1,I,java.lang.Object):V
 - a:whenOptionEnabled(java.lang.String,kotlin.jvm.functions.Function0):V
 f:com.intellij.codeInsight.hints.declarative.InlineInlayPosition
@@ -2451,7 +2483,7 @@ f:com.intellij.execution.util.PathMappingsComponent
 c:com.intellij.execution.util.StringWithNewLinesCellEditor
 - javax.swing.DefaultCellEditor
 - <init>():V
-a:com.intellij.facet.FacetFinder
+Fa:com.intellij.facet.FacetFinder
 - <init>():V
 - a:findFacet(com.intellij.openapi.vfs.VirtualFile,com.intellij.facet.FacetTypeId):com.intellij.facet.Facet
 - a:findFacets(com.intellij.openapi.vfs.VirtualFile,com.intellij.facet.FacetTypeId):java.util.Collection
@@ -2460,7 +2492,7 @@ a:com.intellij.facet.FacetFinder
 a:com.intellij.facet.FacetManagerAdapter
 - com.intellij.facet.FacetManagerListener
 - <init>():V
-a:com.intellij.facet.FacetModificationTrackingService
+Fa:com.intellij.facet.FacetModificationTrackingService
 - <init>():V
 - a:getFacetModificationTracker(com.intellij.facet.Facet):com.intellij.openapi.util.ModificationTracker
 - s:getInstance(com.intellij.openapi.project.Project):com.intellij.facet.FacetModificationTrackingService
@@ -2483,7 +2515,7 @@ com.intellij.facet.ProjectFacetListener
 - facetConfigurationChanged(com.intellij.facet.Facet):V
 - facetRemoved(com.intellij.facet.Facet,com.intellij.openapi.project.Project):V
 - firstFacetAdded(com.intellij.openapi.project.Project):V
-a:com.intellij.facet.ProjectFacetManager
+Fa:com.intellij.facet.ProjectFacetManager
 - <init>():V
 - a:createDefaultConfiguration(com.intellij.facet.FacetType):com.intellij.facet.FacetConfiguration
 - a:getFacets(com.intellij.facet.FacetTypeId):java.util.List
@@ -2509,7 +2541,7 @@ com.intellij.facet.ProjectWideFacetListener
 - a:facetConfigurationChanged(com.intellij.facet.Facet):V
 - a:facetRemoved(com.intellij.facet.Facet):V
 - a:firstFacetAdded():V
-a:com.intellij.facet.ProjectWideFacetListenersRegistry
+Fa:com.intellij.facet.ProjectWideFacetListenersRegistry
 - <init>():V
 - s:getInstance(com.intellij.openapi.project.Project):com.intellij.facet.ProjectWideFacetListenersRegistry
 - a:registerListener(com.intellij.facet.FacetTypeId,com.intellij.facet.ProjectWideFacetListener):V
@@ -2532,7 +2564,7 @@ com.intellij.facet.pointers.FacetPointer
 com.intellij.facet.pointers.FacetPointerListener
 - java.util.EventListener
 - a:pointerIdChanged(com.intellij.facet.pointers.FacetPointer,java.lang.String):V
-a:com.intellij.facet.pointers.FacetPointersManager
+Fa:com.intellij.facet.pointers.FacetPointersManager
 - <init>():V
 - a:addListener(com.intellij.facet.pointers.FacetPointerListener):V
 - a:addListener(com.intellij.facet.pointers.FacetPointerListener,com.intellij.openapi.Disposable):V
@@ -3859,6 +3891,7 @@ e:com.intellij.psi.codeStyle.CodeStyleSettingsCustomizable$CommenterOption
 - sf:BLOCK_COMMENT_ADD_SPACE:com.intellij.psi.codeStyle.CodeStyleSettingsCustomizable$CommenterOption
 - sf:BLOCK_COMMENT_AT_FIRST_COLUMN:com.intellij.psi.codeStyle.CodeStyleSettingsCustomizable$CommenterOption
 - sf:LINE_COMMENT_ADD_SPACE:com.intellij.psi.codeStyle.CodeStyleSettingsCustomizable$CommenterOption
+- sf:LINE_COMMENT_ADD_SPACE_IN_SUPPRESSION:com.intellij.psi.codeStyle.CodeStyleSettingsCustomizable$CommenterOption
 - sf:LINE_COMMENT_ADD_SPACE_ON_REFORMAT:com.intellij.psi.codeStyle.CodeStyleSettingsCustomizable$CommenterOption
 - sf:LINE_COMMENT_AT_FIRST_COLUMN:com.intellij.psi.codeStyle.CodeStyleSettingsCustomizable$CommenterOption
 - s:valueOf(java.lang.String):com.intellij.psi.codeStyle.CodeStyleSettingsCustomizable$CommenterOption
@@ -5050,9 +5083,8 @@ com.intellij.task.ProjectTaskListener
 - sf:TOPIC:com.intellij.util.messages.Topic
 - finished(com.intellij.task.ProjectTaskManager$Result):V
 - started(com.intellij.task.ProjectTaskContext):V
-a:com.intellij.task.ProjectTaskManager
+Fa:com.intellij.task.ProjectTaskManager
 - sf:EMPTY_TASKS_ARRAY:com.intellij.task.ProjectTask[]
-- pf:myProject:com.intellij.openapi.project.Project
 - <init>(com.intellij.openapi.project.Project):V
 - a:build(com.intellij.openapi.module.Module[]):org.jetbrains.concurrency.Promise
 - a:build(com.intellij.openapi.roots.ProjectModelBuildableElement[]):org.jetbrains.concurrency.Promise

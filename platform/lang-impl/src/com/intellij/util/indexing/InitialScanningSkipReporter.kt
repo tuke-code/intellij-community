@@ -14,13 +14,25 @@ import org.jetbrains.annotations.ApiStatus.Internal
 @Internal
 internal object InitialScanningSkipReporter {
 
-  val GROUP = EventLogGroup("indexing.initial.scanning.skip", 1)
+  val GROUP = EventLogGroup("indexing.initial.scanning.skip", 2)
 
   internal enum class SourceOfScanning { OnProjectOpen, IndexTumblerOn }
 
   private val sourceOfScanningField = EventFields.Enum("source", SourceOfScanning::class.java)
+  private val projectDirtyFilesCountField = EventFields.Int("project_dirty_files_count",
+                                                            "Number of dirty files from project queue (files that were changed before project " +
+                                                            "was closed but there was no time to index them). " +
+                                                            "On project startup it's checked if these files need to be indexed")
+  private val orphanDirtyFilesCountField = EventFields.Int("orphan_dirty_files_count",
+                                                           "Number of dirty files from orphan queue (queue for files which were changed when " +
+                                                           "corresponding projects were closed). " +
+                                                           "On project startup it's checked if these files belong to project and if they need " +
+                                                           "to be indexed.")
 
-  private val initialScanningSkipped = GROUP.registerEvent("initial_scanning_skipped", sourceOfScanningField)
+  private val partialInitialScanningScheduled = GROUP.registerEvent("partial.initial.scanning.scheduled",
+                                                                    sourceOfScanningField,
+                                                                    projectDirtyFilesCountField,
+                                                                    orphanDirtyFilesCountField)
 
   internal enum class FullScanningReason(fieldName: String) {
     CodeCallerForbadeSkipping("code_caller_forbade_skipping"),
@@ -46,37 +58,45 @@ internal object InitialScanningSkipReporter {
 
   private val registeredIndexesWereCorruptedField = EventFields.Boolean("registered_indexes_corrupted")
 
-  private val initialScanningScheduled: VarargEventId
+  private val fullInitialScanningScheduled: VarargEventId
 
   init {
     val fields: MutableList<EventField<*>> = FullScanningReason.entries.map { it.field }.toMutableList()
     fields.add(notSeenIdsBasedFullScanningDecisionField)
     fields.add(sourceOfScanningField)
     fields.add(registeredIndexesWereCorruptedField)
-    initialScanningScheduled = GROUP.registerVarargEvent("initial_scanning_scheduled", *fields.toTypedArray())
+    fields.add(projectDirtyFilesCountField)
+    fields.add(orphanDirtyFilesCountField)
+    fullInitialScanningScheduled = GROUP.registerVarargEvent("full.initial.scanning.scheduled", *fields.toTypedArray())
   }
 
-  fun reportInitialScanningSkipped(
+  fun reportPartialInitialScanningScheduled(
     project: Project,
     sourceOfScanning: SourceOfScanning,
+    projectDirtyFilesQueue: ProjectDirtyFilesQueue,
+    orphanDirtyFilesCount: Int,
   ) {
-    initialScanningSkipped.log(project, sourceOfScanning)
+    partialInitialScanningScheduled.log(project, sourceOfScanning, projectDirtyFilesQueue.fileIds.size, orphanDirtyFilesCount)
   }
 
-  fun reportInitialScanningScheduled(
+  fun reportFullInitialScanningScheduled(
     project: Project,
     sourceOfScanning: SourceOfScanning,
     registeredIndexesWereCorrupted: Boolean,
     reasons: List<FullScanningReason>,
     notSeenIdsBasedFullScanningDecision: NotSeenIdsBasedFullScanningDecision,
+    projectDirtyFilesQueue: ProjectDirtyFilesQueue,
+    orphanDirtyFilesCount: Int,
   ) {
-    initialScanningScheduled.log(project) {
+    fullInitialScanningScheduled.log(project) {
       for (reason in FullScanningReason.entries) {
         add(EventPair(reason.field, reasons.contains(reason)))
       }
       add(EventPair(notSeenIdsBasedFullScanningDecisionField, notSeenIdsBasedFullScanningDecision))
       add(EventPair(sourceOfScanningField, sourceOfScanning))
       add(EventPair(registeredIndexesWereCorruptedField, registeredIndexesWereCorrupted))
+      add(EventPair(projectDirtyFilesCountField, projectDirtyFilesQueue.fileIds.size))
+      add(EventPair(orphanDirtyFilesCountField, orphanDirtyFilesCount))
     }
   }
 }

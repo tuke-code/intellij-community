@@ -22,7 +22,7 @@ import com.intellij.ide.lightEdit.LightEditUtil
 import com.intellij.ide.plugins.PluginManagerCore
 import com.intellij.ide.startup.impl.StartupManagerImpl
 import com.intellij.ide.trustedProjects.TrustedProjects
-import com.intellij.ide.trustedProjects.TrustedProjectsDialog.confirmOpeningOrLinkingUntrustedProjectAsync
+import com.intellij.ide.trustedProjects.TrustedProjectsDialog.confirmOpeningOrLinkingUntrustedProject
 import com.intellij.ide.trustedProjects.TrustedProjectsLocator
 import com.intellij.notification.Notification
 import com.intellij.notification.NotificationType
@@ -80,6 +80,7 @@ import com.intellij.util.ArrayUtil
 import com.intellij.util.PathUtilRt
 import com.intellij.util.PlatformUtils.isDataSpell
 import com.intellij.util.concurrency.ThreadingAssertions
+import com.intellij.util.concurrency.annotations.RequiresBackgroundThread
 import com.intellij.util.concurrency.annotations.RequiresEdt
 import com.intellij.util.containers.ContainerUtil
 import com.intellij.util.io.delete
@@ -187,8 +188,7 @@ open class ProjectManagerImpl : ProjectManagerEx(), Disposable {
 
   override val allExcludedUrls: List<String>
     get() {
-      val callback = getAllExcludedUrlsCallback
-      callback?.run()
+      getAllExcludedUrlsCallback?.run()
       return excludeRootsCache.excludedUrls
     }
 
@@ -199,13 +199,13 @@ open class ProjectManagerImpl : ProjectManagerEx(), Disposable {
   }
 
   override fun loadProject(path: Path): Project {
-    return loadProject(path, true, true)
+    return loadProject(path = path, refreshNeeded = true, preloadServices = true)
   }
 
+  @RequiresBackgroundThread
   fun loadProject(path: Path, refreshNeeded: Boolean, preloadServices: Boolean): ProjectImpl {
-    ThreadingAssertions.assertBackgroundThread()
-
     val project = ProjectImpl(filePath = path, projectName = null, parent = ApplicationManager.getApplication() as ComponentManagerImpl)
+    @Suppress("DEPRECATION")
     val modalityState = CoreProgressManager.getCurrentThreadProgressModality()
     runBlockingCancellable {
       withContext(modalityState.asContextElement()) {
@@ -501,7 +501,7 @@ open class ProjectManagerImpl : ProjectManagerEx(), Disposable {
         @Suppress("DEPRECATION", "removal")
         val canClose = if (listener is VetoableProjectManagerListener) listener.canClose(project) else listener.canCloseProject(project)
         if (!canClose) {
-          LOG.debug("close canceled by $listener")
+          LOG.debug { "close canceled by $listener" }
           return false
         }
       }
@@ -883,13 +883,15 @@ open class ProjectManagerImpl : ProjectManagerEx(), Disposable {
     val project = instantiateProject(projectStoreBaseDir, options)
 
     // template as null here because it is not a new project
-    initProject(file = projectStoreBaseDir,
-                project = project,
-                isRefreshVfsNeeded = options.isRefreshVfsNeeded,
-                preloadServices = options.preloadServices,
-                template = null,
-                projectInitObserver = projectInitObserver,
-                isTrustCheckNeeded = true)
+    initProject(
+      file = projectStoreBaseDir,
+      project = project,
+      isRefreshVfsNeeded = options.isRefreshVfsNeeded,
+      preloadServices = options.preloadServices,
+      template = null,
+      projectInitObserver = projectInitObserver,
+      isTrustCheckNeeded = true,
+    )
 
     if (conversionResult != null && !conversionResult.conversionNotNeeded()) {
       StartupManager.getInstance(project).runAfterOpened {
@@ -1197,19 +1199,22 @@ private fun removeProjectConfigurationAndCaches(projectFile: Path) {
  */
 private suspend fun checkOldTrustedStateAndMigrate(project: Project, projectStoreBaseDir: Path): Boolean {
   // The trusted state will be migrated inside TrustedProjects.isTrustedProject, because now we have project instance.
-  return confirmOpeningOrLinkingUntrustedProjectAsync(
-    projectStoreBaseDir,
-    project,
-    IdeBundle.message("untrusted.project.open.dialog.title", project.name))
+  return confirmOpeningOrLinkingUntrustedProject(
+    projectRoot = projectStoreBaseDir,
+    project = project,
+    title = IdeBundle.message("untrusted.project.open.dialog.title", project.name),
+  )
 }
 
-private suspend fun initProject(file: Path,
-                                project: ProjectImpl,
-                                isRefreshVfsNeeded: Boolean,
-                                preloadServices: Boolean,
-                                template: Project?,
-                                isTrustCheckNeeded: Boolean,
-                                projectInitObserver: ProjectInitObserver? = null) {
+private suspend fun initProject(
+  file: Path,
+  project: ProjectImpl,
+  isRefreshVfsNeeded: Boolean,
+  preloadServices: Boolean,
+  template: Project?,
+  isTrustCheckNeeded: Boolean,
+  projectInitObserver: ProjectInitObserver? = null,
+) {
   LOG.assertTrue(!project.isDefault)
 
   try {
@@ -1399,10 +1404,10 @@ private suspend fun checkTrustedState(projectStoreBaseDir: Path): Boolean {
     return true
   }
 
-  return confirmOpeningOrLinkingUntrustedProjectAsync(
-    projectStoreBaseDir,
-    null,
-    IdeBundle.message("untrusted.project.open.dialog.title", projectStoreBaseDir.fileName)
+  return confirmOpeningOrLinkingUntrustedProject(
+    projectRoot = projectStoreBaseDir,
+    project = null,
+    title = IdeBundle.message("untrusted.project.open.dialog.title", projectStoreBaseDir.fileName)
   )
 }
 

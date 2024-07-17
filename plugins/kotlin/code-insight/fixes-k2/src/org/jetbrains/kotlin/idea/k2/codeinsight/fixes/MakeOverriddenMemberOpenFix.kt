@@ -9,14 +9,10 @@ import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.fir.diagnostics.KaFirDiagnostic
 import org.jetbrains.kotlin.analysis.api.symbols.KaCallableSymbol
 import org.jetbrains.kotlin.analysis.api.symbols.KaClassKind
-import org.jetbrains.kotlin.analysis.api.symbols.KaNamedClassOrObjectSymbol
+import org.jetbrains.kotlin.analysis.api.symbols.KaNamedClassSymbol
 import org.jetbrains.kotlin.analysis.api.symbols.KaSymbolModality
 import org.jetbrains.kotlin.analysis.api.symbols.KaSymbolVisibility
 import org.jetbrains.kotlin.analysis.api.symbols.markers.KaNamedSymbol
-import org.jetbrains.kotlin.analysis.api.symbols.markers.KaSymbolWithModality
-import org.jetbrains.kotlin.analysis.api.symbols.markers.KaSymbolWithVisibility
-import org.jetbrains.kotlin.descriptors.Modality
-import org.jetbrains.kotlin.descriptors.Visibilities
 import org.jetbrains.kotlin.idea.base.analysis.api.utils.getSymbolContainingMemberDeclarations
 import org.jetbrains.kotlin.idea.base.resources.KotlinBundle
 import org.jetbrains.kotlin.idea.codeinsight.api.applicable.intentions.KotlinPsiUpdateModCommandAction
@@ -76,7 +72,7 @@ private fun computeElementContext(element: KtNamedDeclaration): ElementContext? 
     val allOverriddenSymbols = symbol.allOverriddenSymbols.toList()
     for (overriddenSymbol in retainNonOverridableMembers(allOverriddenSymbols)) {
         val overriddenMember = overriddenSymbol.psi
-        val containingSymbol = overriddenSymbol.containingSymbol
+        val containingSymbol = overriddenSymbol.containingDeclaration
         if (overriddenMember == null || overriddenMember !is KtCallableDeclaration || !overriddenMember.canRefactorElement() ||
             containingSymbol !is KaNamedSymbol || overriddenMember.modifierList?.hasModifier(KtTokens.OPEN_KEYWORD) == true
         ) {
@@ -102,9 +98,9 @@ private fun retainNonOverridableMembers(
 }
 
 private val KaCallableSymbol.isOverridable: Boolean
-    get() = (this as? KaSymbolWithModality)?.modality != KaSymbolModality.FINAL &&
-            (this as? KaSymbolWithVisibility)?.visibility !=  KaSymbolVisibility.PRIVATE &&
-            (this.getSymbolContainingMemberDeclarations() as? KaNamedClassOrObjectSymbol)?.isFinalClass != true
+    get() = modality != KaSymbolModality.FINAL &&
+            visibility != KaSymbolVisibility.PRIVATE &&
+            (this.getSymbolContainingMemberDeclarations() as? KaNamedClassSymbol)?.isFinalClass != true
 
-private val KaNamedClassOrObjectSymbol.isFinalClass: Boolean
+private val KaNamedClassSymbol.isFinalClass: Boolean
     get() = modality == KaSymbolModality.FINAL && classKind != KaClassKind.ENUM_CLASS

@@ -89,7 +89,7 @@ object K2CreateFunctionFromUsageUtil {
                     val ktType = variable.returnType
                     val symbol = variable.symbol as? KaCallableSymbol
                     val parameterType = symbol?.receiverType ?: (variable.symbol
-                        .containingSymbol as? KaNamedClassOrObjectSymbol)?.defaultType ?: builtinTypes.nullableAny
+                        .containingDeclaration as? KaNamedClassSymbol)?.defaultType ?: builtinTypes.nullableAny
                     buildClassType(ClassId.fromString("kotlin/properties/$delegateClassName")) {
                         argument(parameterType)
                         argument(ktType)
@@ -124,7 +124,7 @@ object K2CreateFunctionFromUsageUtil {
             e = parent
         }
         if (e is KtStringTemplateEntry) {
-            return withValidityAssertion { analysisSession.builtinTypes.string }
+            return withValidityAssertion { useSiteSession.builtinTypes.string }
         }
         return null
     }
@@ -138,7 +138,7 @@ object K2CreateFunctionFromUsageUtil {
             e=e.parent
         }
         if (e is KtFunction && e.bodyBlockExpression == null && e.bodyExpression?.isAncestor(expression) == true) {
-            return e.expectedType ?: withValidityAssertion { analysisSession.builtinTypes.any }
+            return e.expectedType ?: withValidityAssertion { useSiteSession.builtinTypes.any }
         }
         return null
     }

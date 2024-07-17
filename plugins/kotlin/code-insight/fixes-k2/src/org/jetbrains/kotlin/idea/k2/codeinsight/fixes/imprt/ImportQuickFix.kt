@@ -267,10 +267,10 @@ class ImportQuickFix(
         @OptIn(KaExperimentalApi::class)
         private fun renderSymbol(symbol: KaDeclarationSymbol): String = prettyPrint {
             val fqName = symbol.getFqName()
-            if (symbol is KaNamedClassOrObjectSymbol) {
+            if (symbol is KaNamedClassSymbol) {
                 append("class $fqName")
             } else {
-                renderer.renderDeclaration(analysisSession, symbol, printer = this)
+                renderer.renderDeclaration(useSiteSession, symbol, printer = this)
             }
 
             when (symbol) {
@@ -337,13 +337,13 @@ class ImportQuickFix(
         context(KaSession)
         private fun KaDeclarationSymbol.doNotImportOnTheFly(doNotImportCallablesOnFly: Boolean): Boolean = when (this) {
             // don't import nested class on the fly because it will probably add qualification and confuse the user
-            is KaNamedClassOrObjectSymbol -> isNested()
+            is KaNamedClassSymbol -> isNested()
             is KaCallableSymbol -> doNotImportCallablesOnFly
             else -> false
         }
 
         context(KaSession)
-        private fun KaNamedClassOrObjectSymbol.isNested(): Boolean = containingSymbol is KaNamedClassOrObjectSymbol
+        private fun KaNamedClassSymbol.isNested(): Boolean = containingDeclaration is KaNamedClassSymbol
 
         context(KaSession)
         private fun KaDeclarationSymbol.getImportKind(): ImportFixHelper.ImportKind? = when {
@@ -355,8 +355,8 @@ class ImportQuickFix(
             this is KaNamedFunctionSymbol && isExtension -> ImportFixHelper.ImportKind.EXTENSION_FUNCTION
             this is KaNamedFunctionSymbol -> ImportFixHelper.ImportKind.FUNCTION
 
-            this is KaNamedClassOrObjectSymbol && classKind.isObject -> ImportFixHelper.ImportKind.OBJECT
-            this is KaNamedClassOrObjectSymbol -> ImportFixHelper.ImportKind.CLASS
+            this is KaNamedClassSymbol && classKind.isObject -> ImportFixHelper.ImportKind.OBJECT
+            this is KaNamedClassSymbol -> ImportFixHelper.ImportKind.CLASS
             this is KaTypeAliasSymbol -> ImportFixHelper.ImportKind.TYPE_ALIAS
 
             else -> null
@@ -367,7 +367,10 @@ class ImportQuickFix(
             if (this@getImportName !is KaNamedSymbol) error("Unexpected anonymous declaration")
 
             if (this@getImportName is KaCallableSymbol) {
-                val classSymbol = if (receiverType != null) receiverType?.expandedSymbol else originalContainingClassForOverride
+                val classSymbol = when {
+                  receiverType != null -> receiverType?.expandedSymbol
+                  else -> fakeOverrideOriginal.containingSymbol as? KaClassSymbol
+                }
                 classSymbol?.name?.let { append(it.asString()) }
             }
 

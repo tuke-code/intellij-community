@@ -518,6 +518,7 @@ class MavenFilteredPropertiesCompletionAndResolutionTest : MavenDomWithIndicesTe
   @Test
   fun testRenamingFilteredProperty() = runBlocking {
     val filter = createProjectSubFile("filters/filter.properties", "xxx=1")
+    refreshFiles(listOf(filter))
     createProjectSubDir("res")
 
     importProjectAsync("""
@@ -539,10 +540,13 @@ class MavenFilteredPropertiesCompletionAndResolutionTest : MavenDomWithIndicesTe
 
     val f = createProjectSubFile("res/foo.properties",
                                  "foo=abc\${x<caret>xx}abc")
+    refreshFiles(listOf(f))
 
     withContext(Dispatchers.EDT) {
       assertResolved(f, findPropertyPsiElement(filter, "xxx")!!)
+
       fixture.configureFromExistingVirtualFile(filter)
+
       doInlineRename(f, "bar")
 
       assertEquals("foo=abc\${bar}abc", findPsiFile(f).getText())
@@ -708,6 +712,7 @@ class MavenFilteredPropertiesCompletionAndResolutionTest : MavenDomWithIndicesTe
                                            </root>
                                            """.trimIndent())
 
+    refreshFiles(listOf(f))
     fixture.configureFromExistingVirtualFile(f)
 
     val added = AtomicReference(false)

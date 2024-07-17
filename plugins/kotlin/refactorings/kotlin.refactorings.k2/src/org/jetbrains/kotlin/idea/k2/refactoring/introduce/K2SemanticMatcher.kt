@@ -220,7 +220,7 @@ object K2SemanticMatcher {
                 val patternElement = patternSymbol.psi as? PsiNamedElement
                 if (patternElement != null && parameterSubstitution.containsKey(patternElement)) {
                     if (patternSymbol is KaCallableSymbol && targetSymbol is KaCallableSymbol) {
-                        if (!targetSymbol.returnType.isSubTypeOf(patternSymbol.returnType)) return false
+                        if (!targetSymbol.returnType.isSubtypeOf(patternSymbol.returnType)) return false
                     }
                     val expression =
                         KtPsiFactory(patternElement.project).createExpression((targetSymbol as KaNamedSymbol).name.asString())
@@ -241,7 +241,7 @@ object K2SemanticMatcher {
         fun areTypesEqualOrAssociated(targetType: KaType?, patternType: KaType?): Boolean {
             if (targetType == null || patternType == null) return targetType == null && patternType == null
 
-            return targetType.isEqualTo(patternType) ||
+            return targetType.semanticallyEquals(patternType) ||
                     targetType is KaTypeParameterType &&
                     patternType is KaTypeParameterType &&
                     symbols[targetType.symbol] == patternType.symbol
@@ -293,8 +293,8 @@ object K2SemanticMatcher {
         context(KaSession)
         private fun getSingleParameterSymbolForAnonymousFunctionOrNull(function: KtFunction): KaValueParameterSymbol? {
             val anonymousFunction = when (function) {
-                is KtNamedFunction -> function.getAnonymousFunctionSymbol()
-                is KtFunctionLiteral -> function.getAnonymousFunctionSymbol()
+                is KtNamedFunction -> function.anonymousSymbol
+                is KtFunctionLiteral -> function.symbol
                 else -> unexpectedElementError<KtFunction>(function)
             }
             return anonymousFunction.valueParameters.singleOrNull()
@@ -876,8 +876,8 @@ object K2SemanticMatcher {
         patternParameter: KtTypeParameter,
         context: MatchingContext,
     ): Boolean {
-        val targetSymbol = targetParameter.getTypeParameterSymbol()
-        val patternSymbol = patternParameter.getTypeParameterSymbol()
+        val targetSymbol = targetParameter.symbol
+        val patternSymbol = patternParameter.symbol
 
         // TODO: should we check variance and reified modifier?
         if (targetSymbol.upperBounds.size != patternSymbol.upperBounds.size) return false
@@ -895,10 +895,10 @@ object K2SemanticMatcher {
     ): Boolean = context.areTypesEqualOrAssociated(targetTypeReference.type, patternTypeReference.type)
 
     context(KaSession)
-    private fun KtFunction.getFunctionLikeSymbol(): KaFunctionSymbol = getSymbolOfType<KaFunctionSymbol>()
+    private fun KtFunction.getFunctionLikeSymbol(): KaFunctionSymbol = symbol as KaFunctionSymbol
 
     context(KaSession)
-    private fun KtCallableDeclaration.getCallableSymbol(): KaCallableSymbol = getSymbolOfType<KaCallableSymbol>()
+    private fun KtCallableDeclaration.getCallableSymbol(): KaCallableSymbol = symbol as KaCallableSymbol
 
     private val KtInstanceExpressionWithLabel.mainReference: KtReference get() = instanceReference.mainReference
 

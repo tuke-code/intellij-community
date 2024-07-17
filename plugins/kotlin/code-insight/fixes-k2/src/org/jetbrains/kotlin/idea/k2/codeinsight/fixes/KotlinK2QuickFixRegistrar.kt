@@ -110,6 +110,7 @@ class KotlinK2QuickFixRegistrar : KotlinQuickFixRegistrar() {
         registerFactory(ChangeObjectToClassFixFactory.changeObjectToClassFixFactory)
         registerFactory(RemoveDefaultParameterValueFixFactory.removeDefaultParameterValueFixFactory)
         registerFactory(AddIsToWhenConditionFixFactory.addIsToWhenConditionFixFactory)
+        registerFactory(MissingConstructorKeywordFixFactory.missingConstructorFix)
         registerFactory(MoveTypeAliasToTopLevelFixFactory.moveTypeAliasToTopLevelFixFactory)
         registerPsiQuickFixes(KaFirDiagnostic.InvalidIfAsExpression::class, AddIfElseBranchFix)
         registerFactory(RemoveSupertypeFixFactory.removeSupertypeFixFactory)
@@ -119,6 +120,10 @@ class KotlinK2QuickFixRegistrar : KotlinQuickFixRegistrar() {
         registerFactory(ChangeAccessorTypeFixFactory.wrongGetterReturnTypeFactory)
         registerFactory(ChangeAccessorTypeFixFactory.wrongSetterParameterTypeFactory)
         registerFactory(LiftAssignmentOutOfTryFixFactory.liftAssignmentOutOfTryFix)
+        registerFactory(RenameModToRemFixFactory.deprecatedBinaryModFactory)
+        registerFactory(RenameModToRemFixFactory.forbiddenBinaryModFactory)
+        registerFactory(AddEmptyArgumentListFixFactory.addEmptyArgumentListFixFactory)
+        registerFactory(KaFirDiagnostic.UnresolvedLabel::class, CreateLabelFixFactory.createLabelFixFactory)
     }
 
     private val addAbstract = KtQuickFixesListBuilder.registerPsiQuickFix {
@@ -148,6 +153,10 @@ class KotlinK2QuickFixRegistrar : KotlinQuickFixRegistrar() {
         registerFactory(AddValVarToConstructorParameterFixFactory.dataClassNotPropertyParameterFactory)
         registerFactory(AddValVarToConstructorParameterFixFactory.missingValOnAnnotationParameterFactory)
         registerFactory(AddValVarToConstructorParameterFixFactory.valueClassConstructorNotFinalReadOnlyParameterFactory)
+    }
+
+    private val changeToMutableCollection = KtQuickFixesListBuilder.registerPsiQuickFix {
+        registerFactory(ChangeToMutableCollectionFixFactories.noSetMethod)
     }
 
     private val changeToLabeledReturn = KtQuickFixesListBuilder.registerPsiQuickFix {
@@ -252,6 +261,9 @@ class KotlinK2QuickFixRegistrar : KotlinQuickFixRegistrar() {
         registerFactory(ReplaceCallFixFactories.unsafeInfixCallFactory)
         registerFactory(ReplaceCallFixFactories.unsafeOperatorCallFactory)
         registerFactory(ReplaceCallFixFactories.unsafeImplicitInvokeCallFactory)
+        registerFactory(UnresolvedInvocationQuickFixFactories.changeToPropertyAccessQuickFixFactory)
+        registerFactory(UnresolvedInvocationQuickFixFactories.removeParentInvocationQuickFixFactory)
+        registerFactory(UnresolvedInvocationQuickFixFactories.removeInvocationQuickFixFactory)
         registerFactory(AddExclExclCallFixFactories.unsafeCallFactory)
         registerFactory(AddExclExclCallFixFactories.unsafeInfixCallFactory)
         registerFactory(AddExclExclCallFixFactories.unsafeOperatorCallFactory)
@@ -364,6 +376,21 @@ class KotlinK2QuickFixRegistrar : KotlinQuickFixRegistrar() {
         registerFactory(ChangeVisibilityFixFactories.noExplicitVisibilityInApiModeWarning)
         registerFactory(UseInheritedVisibilityFixFactories.cannotChangeAccessPrivilege)
         registerFactory(UseInheritedVisibilityFixFactories.cannotWeakenAccessPrivilege)
+        registerFactory(ChangeVisibilityFixFactories.exposedTypealiasExpandedType)
+        registerFactory(ChangeVisibilityFixFactories.exposedFunctionReturnType)
+        registerFactory(ChangeVisibilityFixFactories.exposedReceiverType)
+        registerFactory(ChangeVisibilityFixFactories.exposedPropertyType)
+        registerFactory(ChangeVisibilityFixFactories.exposedPropertyTypeInConstructorError)
+        registerFactory(ChangeVisibilityFixFactories.exposedPropertyTypeInConstructorWarning)
+        registerFactory(ChangeVisibilityFixFactories.exposedParameterType)
+        registerFactory(ChangeVisibilityFixFactories.exposedSuperInterface)
+        registerFactory(ChangeVisibilityFixFactories.exposedSuperClass)
+        registerFactory(ChangeVisibilityFixFactories.exposedTypeParameterBound)
+        registerFactory(ChangeVisibilityFixFactories.invisibleReference)
+        registerFactory(ChangeVisibilityFixFactories.invisibleSetter)
+        registerFactory(ChangeVisibilityFixFactories.superCallFromPublicInline)
+        registerFactory(ChangeVisibilityFixFactories.protectedCallFromPublicInlineError)
+        registerFactory(ChangeVisibilityFixFactories.nonPublicCallFromPublicInline)
     }
 
     private val other = KtQuickFixesListBuilder.registerPsiQuickFix {
@@ -392,6 +419,9 @@ class KotlinK2QuickFixRegistrar : KotlinQuickFixRegistrar() {
         registerFactory(DeprecationFixFactory.deprecatedError)
         registerFactory(DeprecationFixFactory.deprecatedWarning)
 
+        registerFactory(DeprecationFixFactory.deprecatedAliasError)
+        registerFactory(DeprecationFixFactory.deprecatedAliasWarning)
+
         registerFactory(ChangeMemberFunctionSignatureFixFactory.nothingToOverrideFixFactory)
     }
 
@@ -414,6 +444,7 @@ class KotlinK2QuickFixRegistrar : KotlinQuickFixRegistrar() {
         )
 
         registerFactory(OptInAnnotationWrongTargetFixFactory.optInAnnotationWrongTargetFixFactory)
+        registerFactory(OptInModuleLevelFixFactories.optInIsNotEnabledFactory)
         registerFactory(OptInFileLevelFixFactories.optInUsageFactory)
         registerFactory(OptInFileLevelFixFactories.optInUsageErrorFactory)
         registerFactory(OptInFileLevelFixFactories.optInOverrideFactory)
@@ -454,6 +485,7 @@ class KotlinK2QuickFixRegistrar : KotlinQuickFixRegistrar() {
         addFinal,
         addInline,
         addValVarToConstructorParameter,
+        changeToMutableCollection,
         changeToLabeledReturn,
         convertStringToCharLiteral,
         insertDelegationCall,

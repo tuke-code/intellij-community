@@ -19,7 +19,7 @@ import org.jetbrains.kotlin.idea.refactoring.KotlinCommonRefactoringSettings
 import org.jetbrains.kotlin.psi.KtNamedDeclaration
 import javax.swing.JComponent
 
-internal class K2MoveDialog(project: Project, private val model: K2MoveModel) : RefactoringDialog(project, true) {
+class K2MoveDialog(project: Project, private val model: K2MoveModel) : RefactoringDialog(project, true) {
     private lateinit var mainPanel: DialogPanel
 
     init {
@@ -38,6 +38,7 @@ internal class K2MoveDialog(project: Project, private val model: K2MoveModel) : 
                 }.align(AlignY.TOP + AlignX.LEFT)
                 panel {
                     model.searchInComments.createComboBox(this)
+                    model.mppDeclarations.createComboBox(this)
                 }.align(AlignY.TOP + AlignX.RIGHT)
             }
         }
@@ -55,7 +56,7 @@ internal class K2MoveDialog(project: Project, private val model: K2MoveModel) : 
     override fun doAction() {
         saveSettings()
         val descriptor = model.toDescriptor()
-        val allDeclarations = descriptor.source.elements.flatMap { it.descendantsOfType<KtNamedDeclaration>() }
+        val allDeclarations = descriptor.sourceElements.flatMap { it.descendantsOfType<KtNamedDeclaration>() }
         if (allDeclarations.any { it.isExpectDeclaration() || it.isEffectivelyActual() }) {
             val response = Messages.showDialog(
                 KotlinBundle.message("kmp.move.not.supported.message"),

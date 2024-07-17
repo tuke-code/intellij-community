@@ -477,12 +477,13 @@ class MavenProjectsManagerTest : MavenMultiVersionImportingTestCase() {
     UsefulTestCase.assertSize(1, projectsManager.getRootProjects())
     UsefulTestCase.assertEmpty(projectsManager.getIgnoredFilesPaths())
 
-    importProjectAsync("""
+    updateProjectPom("""
                     <groupId>test</groupId>
                     <artifactId>project</artifactId>
                     <version>1</version>
                     <packaging>pom</packaging>
                     """.trimIndent())
+    updateAllProjects()
     assertModules("project")
     UsefulTestCase.assertSize(1, projectsManager.getRootProjects())
     UsefulTestCase.assertEmpty(projectsManager.getIgnoredFilesPaths())
@@ -511,11 +512,12 @@ class MavenProjectsManagerTest : MavenMultiVersionImportingTestCase() {
     assertModules("project", "project.main", "project.test")
     UsefulTestCase.assertSize(1, projectsManager.getRootProjects())
     UsefulTestCase.assertEmpty(projectsManager.getIgnoredFilesPaths())
-    importProjectAsync("""
+    updateProjectPom("""
                     <groupId>test</groupId>
                     <artifactId>project</artifactId>
                     <version>1</version>
                     """.trimIndent())
+    updateAllProjects()
     assertModules("project")
     UsefulTestCase.assertSize(1, projectsManager.getRootProjects())
     UsefulTestCase.assertEmpty(projectsManager.getIgnoredFilesPaths())
@@ -564,7 +566,7 @@ class MavenProjectsManagerTest : MavenMultiVersionImportingTestCase() {
           </modules>
       </project>""".trimIndent())
 
-    createProjectSubFile("maven-parent/child1/pom.xml", """
+    val child1Pom = createProjectSubFile("maven-parent/child1/pom.xml", """
       <?xml version="1.0" encoding="UTF-8"?>
       <project xmlns="http://maven.apache.org/POM/4.0.0"
                xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -578,6 +580,7 @@ class MavenProjectsManagerTest : MavenMultiVersionImportingTestCase() {
           <artifactId>child1</artifactId>
       </project>
       """.trimIndent())
+    refreshFiles(listOf(mavenParentPom, child1Pom))
     writeAction { ModuleManager.getInstance(project).newModule("non-maven", JAVA_MODULE_ENTITY_TYPE_ID_NAME) }
     importProjectAsync(mavenParentPom)
     assertEquals(3, ModuleManager.getInstance(project).modules.size)

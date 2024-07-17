@@ -31,20 +31,20 @@ class SpanExtractionFromUnitPerfTest {
 
       if (withWarmup) {
         // warmup metrics
-        Assertions.assertTrue(extractedMetrics.single { it.id.name == "warmup.attempt.mean.ms" }.value != 0L,
+        Assertions.assertTrue(extractedMetrics.single { it.id.name == "warmup.attempt.mean.ms" }.value != 0,
                               "Attempt metric should have non 0 value")
-        Assertions.assertTrue(extractedMetrics.single { it.id.name == "warmup.total.test.duration.ms" }.value != 0L,
+        Assertions.assertTrue(extractedMetrics.single { it.id.name == "warmup.total.test.duration.ms" }.value != 0,
                               "Total test duration metric should have non 0 value")
       }
 
       // measured metrics
-      Assertions.assertTrue(extractedMetrics.single { it.id.name == "attempt.mean.ms" }.value != 0L,
+      Assertions.assertTrue(extractedMetrics.single { it.id.name == "attempt.mean.ms" }.value != 0,
                             "Attempt metric should have non 0 value")
-      Assertions.assertTrue(extractedMetrics.single { it.id.name == "total.test.duration.ms" }.value != 0L,
+      Assertions.assertTrue(extractedMetrics.single { it.id.name == "total.test.duration.ms" }.value != 0,
                             "Total test duration metric should have non 0 value")
 
       customSpanNames.forEach { customName ->
-        Assertions.assertTrue(extractedMetrics.single { it.id.name == customName }.value != 0L,
+        Assertions.assertTrue(extractedMetrics.single { it.id.name == customName }.value != 0,
                               "$customName metric should have non 0 value")
       }
     }
@@ -107,7 +107,8 @@ class SpanExtractionFromUnitPerfTest {
     jacksonObjectMapper().writerWithDefaultPrettyPrinter().writeValue(reportFile.toFile(), metricsDto)
   }
 
-  fun unitPerfTestsMetricsExtraction(testInfo: TestInfo) = runBlocking {
+  @Test
+  fun `unit perf test metrics extraction - nanosecond precision`(testInfo: TestInfo) = runBlocking {
     val mainMetricName = "simple perf test"
 
     val extractedMetrics = BenchmarksSpanMetricsCollector(spanName = mainMetricName,

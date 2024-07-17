@@ -11,6 +11,7 @@ import com.intellij.debugger.impl.DebuggerUtilsEx;
 import com.intellij.debugger.impl.PrioritizedTask;
 import com.intellij.debugger.jdi.StackFrameProxyImpl;
 import com.intellij.debugger.jdi.ThreadReferenceProxyImpl;
+import com.intellij.debugger.jdi.VirtualMachineProxyImpl;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.diagnostic.Attachment;
 import com.intellij.openapi.diagnostic.Logger;
@@ -41,6 +42,7 @@ public abstract class SuspendContextImpl extends XSuspendContext implements Susp
 
   private final DebugProcessImpl myDebugProcess;
   private final int mySuspendPolicy;
+  private final VirtualMachineProxyImpl myVirtualMachine;
 
   private ThreadReferenceProxyImpl myThread;
   boolean myIsVotedForResume = true;
@@ -87,9 +89,15 @@ public abstract class SuspendContextImpl extends XSuspendContext implements Susp
                      long debugId) {
     myDebugProcess = debugProcess;
     mySuspendPolicy = suspendPolicy;
+    // Save the VM related to this suspend context, as a VM may be changed due to reattach
+    myVirtualMachine = debugProcess.getVirtualMachineProxy();
     myVotesToVote = eventVotes;
     myEventSet = set;
     myDebugId = debugId;
+  }
+
+  public VirtualMachineProxyImpl getVirtualMachine() {
+    return myVirtualMachine;
   }
 
   protected void setEventSet(EventSet eventSet) {
@@ -100,7 +108,7 @@ public abstract class SuspendContextImpl extends XSuspendContext implements Susp
 
   public void setThread(@Nullable ThreadReference thread) {
     assertCanBeUsed();
-    ThreadReferenceProxyImpl threadProxy = myDebugProcess.getVirtualMachineProxy().getThreadReferenceProxy(thread);
+    ThreadReferenceProxyImpl threadProxy = myVirtualMachine.getThreadReferenceProxy(thread);
     assertInLog(myThread == null || myThread == threadProxy,
                 () -> "Invalid thread setting in " + this + ": myThread = " + myThread + ", thread = " + thread);
     setThread(threadProxy);
@@ -456,7 +464,7 @@ public abstract class SuspendContextImpl extends XSuspendContext implements Susp
         CompletableFuture.completedFuture(pausedThreads)
           .thenCompose(tds -> addThreads(tds, THREAD_NAME_COMPARATOR, false))
           .thenCompose(res -> res
-                              ? getDebugProcess().getVirtualMachineProxy().allThreadsAsync()
+                              ? suspendContext.getVirtualMachine().allThreadsAsync()
                               : CompletableFuture.completedFuture(Collections.emptyList()))
           .thenAccept(tds -> addThreads(tds, THREADS_SUSPEND_AND_NAME_COMPARATOR, true))
           .exceptionally(throwable -> DebuggerUtilsAsync.logError(throwable));

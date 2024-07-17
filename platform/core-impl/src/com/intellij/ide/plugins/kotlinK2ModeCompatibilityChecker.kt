@@ -18,16 +18,16 @@ internal fun isKotlinPluginK2Mode(): Boolean {
 
 
 @ApiStatus.Internal
-fun isPluginWhichDependsOnKotlinPluginInK2ModeAndItDoesNotSupportK2Mode(plugin: IdeaPluginDescriptorImpl): Boolean {
+fun isPluginWhichDependsOnKotlinPluginInK2ModeAndItDoesNotSupportK2Mode(plugin: IdeaPluginDescriptorImpl, shouldCheckIfK2modeIsOn: Boolean = true): Boolean {
   fun nonOptionallyDependsOnKotlinPlugin(): Boolean {
     return plugin.pluginDependencies.any { (isKotlinPlugin(it.pluginId)) && !it.isOptional } ||
            plugin.dependencies.plugins.any { isKotlinPlugin(it.id) }
   }
 
-  if (isKotlinPluginK2Mode()) {
+  if (!shouldCheckIfK2modeIsOn || isKotlinPluginK2Mode()) {
     if (!isKotlinPlugin(plugin.pluginId) && nonOptionallyDependsOnKotlinPlugin()) {
       if (!pluginCanWorkInK2Mode(plugin)) {
-       return true
+        return true
       }
     }
   }

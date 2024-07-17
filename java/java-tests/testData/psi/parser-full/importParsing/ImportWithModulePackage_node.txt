@@ -7,4 +7,6 @@ java.FILE
         IDENTIFIER
         REFERENCE_PARAMETER_LIST
           <empty list>
+      DOT
+      ASTERISK
       SEMICOLON

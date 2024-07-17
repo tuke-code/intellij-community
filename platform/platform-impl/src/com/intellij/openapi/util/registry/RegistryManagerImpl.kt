@@ -1,9 +1,8 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.openapi.util.registry
 
 import com.intellij.diagnostic.runActivity
 import com.intellij.ide.AppLifecycleListener
-import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.PersistentStateComponent
 import com.intellij.openapi.components.SettingsCategory
@@ -13,7 +12,8 @@ import com.intellij.openapi.diagnostic.getOrLogException
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.util.NlsSafe
 import com.intellij.util.ArrayUtilRt
-import kotlinx.coroutines.future.await
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.job
 import org.jdom.Element
 import org.jetbrains.annotations.ApiStatus
 import java.util.*
@@ -25,7 +25,7 @@ import java.util.*
   category = SettingsCategory.SYSTEM,
 )
 @ApiStatus.Internal
-internal class RegistryManagerImpl : PersistentStateComponent<Element>, RegistryManager, Disposable {
+internal class RegistryManagerImpl(coroutineScope: CoroutineScope) : PersistentStateComponent<Element>, RegistryManager {
   private val defaultValueChangeListener = object : RegistryValueListener {
     override fun afterValueChanged(value: RegistryValue) {
       ApplicationManager.getApplication().messageBus.syncPublisher(RegistryManager.TOPIC).afterValueChanged(value)
@@ -46,10 +46,10 @@ internal class RegistryManagerImpl : PersistentStateComponent<Element>, Registry
         }.getOrLogException(logger<RegistryManagerImpl>())
       }
     })
-  }
 
-  override fun dispose() {
-    Registry.setValueChangeListener(null)
+    coroutineScope.coroutineContext.job.invokeOnCompletion {
+      Registry.setValueChangeListener(null)
+    }
   }
 
   override fun `is`(key: String): Boolean = Registry._getWithoutStateCheck(key).asBoolean()
@@ -73,7 +73,7 @@ internal class RegistryManagerImpl : PersistentStateComponent<Element>, Registry
     Registry.setValueChangeListener(defaultValueChangeListener)
   }
 
-  override fun getState(): Element = Registry.getInstance().state
+  override fun getState(): Element = Registry.getInstance().getState()
 
   override fun noStateLoaded() {
     Registry.loadState(/* state = */ null, /* earlyAccess = */ EarlyAccessRegistryManager.getOrLoadMap())
@@ -100,11 +100,9 @@ internal class RegistryManagerImpl : PersistentStateComponent<Element>, Registry
     logger<RegistryManager>().info(builder.substring(0, builder.length - 2))
   }
 
-  fun getAll(): List<RegistryValue> {
-    return Registry.getAll()
-  }
+  fun getAll(): List<RegistryValue> = Registry.getAll()
 
   override suspend fun awaitRegistryLoad() {
-    Registry.awaitLoad().await()
+    Registry.awaitLoad()
   }
 }

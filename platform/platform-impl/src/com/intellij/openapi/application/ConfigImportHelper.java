@@ -15,7 +15,6 @@ import com.intellij.ide.startup.StartupActionScriptManager.ActionCommand;
 import com.intellij.ide.ui.laf.LookAndFeelThemeAdapterKt;
 import com.intellij.openapi.application.migrations.AIAssistant241;
 import com.intellij.openapi.application.migrations.PythonProMigration242;
-import com.intellij.openapi.application.migrations.RustUltimate241;
 import com.intellij.openapi.components.StoragePathMacros;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.extensions.PluginId;
@@ -280,19 +279,8 @@ public final class ConfigImportHelper {
     // TODO If so, we need to patch restarter.
     if (vmOptionFileChanged && !ProjectManagerEx.IS_PER_PROJECT_INSTANCE_ENABLED) {
       log.info("The vmoptions file has changed, restarting...");
-      List<String> properties = new ArrayList<>();
-      properties.add(FIRST_SESSION_KEY);
-      if (isConfigImported()) {
-        properties.add(CONFIG_IMPORTED_IN_CURRENT_SESSION_KEY);
-      }
-
       if (settings == null || settings.shouldRestartAfterVmOptionsChange()) {
-        try {
-          new CustomConfigMigrationOption.SetProperties(properties).writeConfigMarkerFile(newConfigDir);
-        }
-        catch (IOException e) {
-          log.error("cannot write config migration marker file to " + newConfigDir, e);
-        }
+        writeOptionsForRestart(newConfigDir, log);
         restart(args);
       }
     }
@@ -353,6 +341,27 @@ public final class ConfigImportHelper {
 
   private static boolean doesVmOptionsFileExist(Path configDir) {
     return Files.isRegularFile(configDir.resolve(VMOptions.getFileName()));
+  }
+
+  public static void writeOptionsForRestartIfNeeded(@NotNull Logger log) {
+    if (isFirstSession() && isConfigImported()) {
+      writeOptionsForRestart(PathManager.getConfigDir(), log);
+    }
+  }
+
+  private static void writeOptionsForRestart(@NotNull Path newConfigDir, @NotNull Logger log) {
+    List<String> properties = new ArrayList<>();
+    properties.add(FIRST_SESSION_KEY);
+    if (isConfigImported()) {
+      properties.add(CONFIG_IMPORTED_IN_CURRENT_SESSION_KEY);
+    }
+
+    try {
+      new CustomConfigMigrationOption.SetProperties(properties).writeConfigMarkerFile(newConfigDir);
+    }
+    catch (IOException e) {
+      log.error("cannot write config migration marker file to " + newConfigDir, e);
+    }
   }
 
   private static void restart(List<String> args) {
@@ -1053,7 +1062,6 @@ public final class ConfigImportHelper {
   private static void performMigrations(PluginMigrationOptions options) {
     // WRITE IN MIGRATIONS HERE
 
-    new RustUltimate241().migratePlugins(options);
     new AIAssistant241().migratePlugins(options);
     new PythonProMigration242().migratePlugins(options);
   }

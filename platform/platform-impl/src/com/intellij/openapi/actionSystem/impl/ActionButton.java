@@ -1,9 +1,10 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.openapi.actionSystem.impl;
 
 import com.intellij.diagnostic.PluginException;
 import com.intellij.icons.AllIcons;
 import com.intellij.ide.HelpTooltip;
+import com.intellij.ide.ui.UISettings;
 import com.intellij.internal.statistic.collectors.fus.ui.persistence.ToolbarClicksCollector;
 import com.intellij.openapi.actionSystem.*;
 import com.intellij.openapi.actionSystem.ex.*;
@@ -17,7 +18,6 @@ import com.intellij.openapi.util.IconLoader;
 import com.intellij.openapi.util.Key;
 import com.intellij.openapi.util.NlsContexts;
 import com.intellij.openapi.util.NlsSafe;
-import com.intellij.openapi.util.registry.Registry;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.openapi.util.text.Strings;
 import com.intellij.ui.ExperimentalUI;
@@ -253,8 +253,8 @@ public class ActionButton extends JComponent implements ActionButtonComponent, A
   private @NotNull MenuItemPresentationFactory createPresentationFactory() {
     return new MenuItemPresentationFactory() {
       @Override
-      protected void processPresentation(@NotNull Presentation presentation) {
-        super.processPresentation(presentation);
+      protected void processPresentation(@NotNull AnAction action, @NotNull Presentation presentation) {
+        super.processPresentation(action, presentation);
         if (myNoIconsInPopup) {
           presentation.setIcon(null);
           presentation.setHoveredIcon(null);
@@ -323,7 +323,7 @@ public class ActionButton extends JComponent implements ActionButtonComponent, A
 
   @Override
   public void setToolTipText(@NlsContexts.Tooltip String toolTipText) {
-    if (!Registry.is("ide.helptooltip.enabled")) {
+    if (!UISettings.isIdeHelpTooltipEnabled()) {
       while (StringUtil.endsWithChar(toolTipText, '.')) {
         toolTipText = toolTipText.substring(0, toolTipText.length() - 1);
       }
@@ -419,7 +419,7 @@ public class ActionButton extends JComponent implements ActionButtonComponent, A
   protected void updateToolTipText() {
     String text = myPresentation.getText();
     String description = myPresentation.getDescription();
-    if (Registry.is("ide.helptooltip.enabled")) {
+    if (UISettings.isIdeHelpTooltipEnabled()) {
       HelpTooltip ht = myPresentation.getClientProperty(CUSTOM_HELP_TOOLTIP);
       if ((Strings.isNotEmpty(text) || Strings.isNotEmpty(description)) && ht == null) {
         ht = new HelpTooltip().setTitle(text).setShortcut(getShortcutText());

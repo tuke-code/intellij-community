@@ -285,6 +285,11 @@ public abstract class IrKotlinSteppingTestGenerated extends AbstractIrKotlinStep
             runTest("testData/stepping/stepInto/interfaces.kt");
         }
 
+        @TestMetadata("localFun.kt")
+        public void testLocalFun() throws Exception {
+            runTest("testData/stepping/stepInto/localFun.kt");
+        }
+
         @TestMetadata("oneLineSuspendFunWithInline.kt")
         public void testOneLineSuspendFunWithInline() throws Exception {
             runTest("testData/stepping/stepInto/oneLineSuspendFunWithInline.kt");
@@ -1303,6 +1308,11 @@ public abstract class IrKotlinSteppingTestGenerated extends AbstractIrKotlinStep
             runTest("testData/stepping/custom/breakpointsInOneLineLambdas.kt");
         }
 
+        @TestMetadata("breakpointsLambdaProperties.kt")
+        public void testBreakpointsLambdaProperties() throws Exception {
+            runTest("testData/stepping/custom/breakpointsLambdaProperties.kt");
+        }
+
         @TestMetadata("constantConditions.kt")
         public void testConstantConditions() throws Exception {
             runTest("testData/stepping/custom/constantConditions.kt");
@@ -1456,6 +1466,11 @@ public abstract class IrKotlinSteppingTestGenerated extends AbstractIrKotlinStep
         @TestMetadata("idea300605.kt")
         public void testIdea300605() throws Exception {
             runTest("testData/stepping/custom/idea300605.kt");
+        }
+
+        @TestMetadata("idea326580.kt")
+        public void testIdea326580() throws Exception {
+            runTest("testData/stepping/custom/idea326580.kt");
         }
 
         @TestMetadata("idea334404.kt")
@@ -1648,6 +1663,11 @@ public abstract class IrKotlinSteppingTestGenerated extends AbstractIrKotlinStep
             runTest("testData/stepping/custom/simpleConditionalBreakpoint.kt");
         }
 
+        @TestMetadata("skipSimpleGetters.kt")
+        public void testSkipSimpleGetters() throws Exception {
+            runTest("testData/stepping/custom/skipSimpleGetters.kt");
+        }
+
         @TestMetadata("smartStepIntoAsyncLambda.kt")
         public void testSmartStepIntoAsyncLambda() throws Exception {
             runTest("testData/stepping/custom/smartStepIntoAsyncLambda.kt");
@@ -1773,6 +1793,11 @@ public abstract class IrKotlinSteppingTestGenerated extends AbstractIrKotlinStep
             runTest("testData/stepping/custom/smartStepIntoLibraryOverridenCall.kt");
         }
 
+        @TestMetadata("smartStepIntoLocalFun.kt")
+        public void testSmartStepIntoLocalFun() throws Exception {
+            runTest("testData/stepping/custom/smartStepIntoLocalFun.kt");
+        }
+
         @TestMetadata("smartStepIntoMethodReference.kt")
         public void testSmartStepIntoMethodReference() throws Exception {
             runTest("testData/stepping/custom/smartStepIntoMethodReference.kt");
@@ -1801,6 +1826,11 @@ public abstract class IrKotlinSteppingTestGenerated extends AbstractIrKotlinStep
         @TestMetadata("smartStepIntoOnLambdaBreakpoint.kt")
         public void testSmartStepIntoOnLambdaBreakpoint() throws Exception {
             runTest("testData/stepping/custom/smartStepIntoOnLambdaBreakpoint.kt");
+        }
+
+        @TestMetadata("smartStepIntoPropertyGetter.kt")
+        public void testSmartStepIntoPropertyGetter() throws Exception {
+            runTest("testData/stepping/custom/smartStepIntoPropertyGetter.kt");
         }
 
         @TestMetadata("smartStepIntoPropertyGetterReference.kt")
@@ -1903,6 +1933,11 @@ public abstract class IrKotlinSteppingTestGenerated extends AbstractIrKotlinStep
             runTest("testData/stepping/custom/stepIntoStdlibInlineFun2step.kt");
         }
 
+        @TestMetadata("stepOutDefaultArgs.kt")
+        public void testStepOutDefaultArgs() throws Exception {
+            runTest("testData/stepping/custom/stepOutDefaultArgs.kt");
+        }
+
         @TestMetadata("stepOutInlineFunctionStdlib.kt")
         public void testStepOutInlineFunctionStdlib() throws Exception {
             runTest("testData/stepping/custom/stepOutInlineFunctionStdlib.kt");
@@ -1926,6 +1961,11 @@ public abstract class IrKotlinSteppingTestGenerated extends AbstractIrKotlinStep
         @TestMetadata("stepOverNonLocalReturnInLambda.kt")
         public void testStepOverNonLocalReturnInLambda() throws Exception {
             runTest("testData/stepping/custom/stepOverNonLocalReturnInLambda.kt");
+        }
+
+        @TestMetadata("stepThroughDefaultArgs.kt")
+        public void testStepThroughDefaultArgs() throws Exception {
+            runTest("testData/stepping/custom/stepThroughDefaultArgs.kt");
         }
 
         @TestMetadata("syntheticProvider.kt")

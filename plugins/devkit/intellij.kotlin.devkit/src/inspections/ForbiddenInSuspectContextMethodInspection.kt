@@ -10,7 +10,6 @@ import org.jetbrains.idea.devkit.kotlin.DevKitKotlinBundle
 import org.jetbrains.idea.devkit.util.isInspectionForBlockingContextAvailable
 import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.analyze
-import org.jetbrains.kotlin.analysis.api.annotations.hasAnnotation
 import org.jetbrains.kotlin.analysis.api.resolution.singleFunctionCallOrNull
 import org.jetbrains.kotlin.analysis.api.resolution.symbol
 import org.jetbrains.kotlin.analysis.api.symbols.KaClassSymbol
@@ -110,7 +109,7 @@ internal class ForbiddenInSuspectContextMethodInspection : LocalInspectionTool()
         val calledSymbol = functionCall?.partiallyAppliedSymbol?.symbol
 
         if (calledSymbol !is KaNamedSymbol) return
-        val hasAnnotation = calledSymbol.hasAnnotation(RequiresBlockingContextAnnotationId)
+        val hasAnnotation = RequiresBlockingContextAnnotationId in calledSymbol.annotations
 
         if (!hasAnnotation) {
           if (calledSymbol is KaNamedFunctionSymbol) {
@@ -199,13 +198,13 @@ internal class ForbiddenInSuspectContextMethodInspection : LocalInspectionTool()
       return buildList<LocalQuickFix> {
         add(ReplaceInvokeLaterWithWithContextQuickFix(callExpression))
 
-        val implicitReceiverTypesAtPosition = getImplicitReceiverTypesAtPosition(callExpression)
+        val implicitReceiverTypesAtPosition = collectImplicitReceiverTypes(callExpression)
         val coroutineScopeClass = ClassId.topLevel(FqName(COROUTINE_SCOPE))
         val hasCoroutineScope = implicitReceiverTypesAtPosition.any { type ->
           type is KaUsualClassType &&
           (
             type.classId == coroutineScopeClass ||
-            type.getAllSuperTypes().any { superType -> superType is KaUsualClassType && superType.classId == coroutineScopeClass }
+            type.allSupertypes.any { superType -> superType is KaUsualClassType && superType.classId == coroutineScopeClass }
           )
         }
         if (hasCoroutineScope) {
@@ -348,7 +347,7 @@ private fun isImported(name: FqName, file: KtFile): Boolean {
 private fun isSuspensionRestricted(function: KtNamedFunction): Boolean {
   analyze(function) {
     val declaringClass = function.containingClass()
-    val declaringClassSymbol = declaringClass?.getClassOrObjectSymbol()
+    val declaringClassSymbol = declaringClass?.classSymbol
     if (declaringClassSymbol != null && restrictsSuspension(declaringClassSymbol)) {
       return true
     }
@@ -367,4 +366,4 @@ private fun KaSession.isSuspensionRestricted(lambdaType: KaType): Boolean {
 }
 
 private fun restrictsSuspension(symbol: KaClassSymbol): Boolean =
-  symbol.hasAnnotation(ClassId.topLevel(restrictsSuspensionName))
+  ClassId.topLevel(restrictsSuspensionName) in symbol.annotations

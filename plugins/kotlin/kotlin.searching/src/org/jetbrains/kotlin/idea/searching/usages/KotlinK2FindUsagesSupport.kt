@@ -112,8 +112,8 @@ internal class KotlinK2FindUsagesSupport : KotlinFindUsagesSupport {
                 is KaFunctionCall<*> -> {
                     val constructorSymbol = call.symbol as? KaConstructorSymbol ?: return@withResolvedCall false
                     val constructedClassSymbol =
-                        constructorSymbol.containingSymbol as? KaClassLikeSymbol ?: return@withResolvedCall false
-                    val classOrObjectSymbol = ktClassOrObject.getClassOrObjectSymbol()
+                        constructorSymbol.containingDeclaration as? KaClassLikeSymbol ?: return@withResolvedCall false
+                    val classOrObjectSymbol = ktClassOrObject.classSymbol
 
                     fun KaClassLikeSymbol.getExpectsOrSelf(): List<KaDeclarationSymbol> = (listOf(this).takeIf { isExpect } ?: getExpectsForActual())
 

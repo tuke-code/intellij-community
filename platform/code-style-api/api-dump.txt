@@ -750,6 +750,7 @@ c:com.intellij.psi.codeStyle.CommonCodeStyleSettings
 - KEEP_SIMPLE_METHODS_IN_ONE_LINE:Z
 - LAMBDA_BRACE_STYLE:I
 - LINE_COMMENT_ADD_SPACE:Z
+- LINE_COMMENT_ADD_SPACE_IN_SUPPRESSION:Z
 - LINE_COMMENT_ADD_SPACE_ON_REFORMAT:Z
 - LINE_COMMENT_AT_FIRST_COLUMN:Z
 - METHOD_ANNOTATION_WRAP:I
@@ -944,6 +945,10 @@ a:com.intellij.psi.codeStyle.CustomCodeStyleSettings
 - p:importLegacySettings(com.intellij.psi.codeStyle.CodeStyleSettings):V
 - readExternal(org.jdom.Element):V
 - writeExternal(org.jdom.Element,com.intellij.psi.codeStyle.CustomCodeStyleSettings):V
+f:com.intellij.psi.codeStyle.CustomCodeStyleSettingsUtils
+- sf:INSTANCE:com.intellij.psi.codeStyle.CustomCodeStyleSettingsUtils
+- sf:readVersion(org.jdom.Element):I
+- sf:writeVersion(org.jdom.Element,I):org.jdom.Element
 c:com.intellij.psi.codeStyle.ExcludedFiles
 - <init>():V
 - addDescriptor(com.intellij.formatting.fileSet.FileSetDescriptor):V

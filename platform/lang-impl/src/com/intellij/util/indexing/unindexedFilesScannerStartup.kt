@@ -73,19 +73,22 @@ internal fun scanAndIndexProjectAfterOpen(project: Project,
   val skippingScanningUnsatisfiedConditions = SkippingFullScanningCondition.entries.filter { !it.canSkipFullScanning(scanningCheckState) }
   return if (skippingScanningUnsatisfiedConditions.isEmpty()) {
     LOG.info("Full scanning on startup will be skipped for project ${project.name}")
-    InitialScanningSkipReporter.reportInitialScanningSkipped(project, sourceOfScanning)
-    scheduleDirtyFilesScanning(project, notSeenIds as AllNotSeenDirtyFileIds, additionalOrphanDirtyFiles, projectDirtyFilesQueue,
-                               coroutineScope, indexingReason, partialScanningType)
+    val allNotSeenIds = (notSeenIds as AllNotSeenDirtyFileIds).result.plus(additionalOrphanDirtyFiles)
+    InitialScanningSkipReporter.reportPartialInitialScanningScheduled(project, sourceOfScanning, projectDirtyFilesQueue, allNotSeenIds.size)
+    scheduleDirtyFilesScanning(project, allNotSeenIds, projectDirtyFilesQueue, coroutineScope, indexingReason, partialScanningType)
   }
   else {
     LOG.info("Full scanning on startup will NOT be skipped for project ${project.name} because of following unsatisfied conditions:\n" +
              skippingScanningUnsatisfiedConditions.joinToString("\n") { "${it.name}: ${it.explain(scanningCheckState)}" })
     val reasonsForFullScanning = skippingScanningUnsatisfiedConditions.flatMap { it.getFullScanningReasons(scanningCheckState) }
-    InitialScanningSkipReporter.reportInitialScanningScheduled(project,
-                                                               sourceOfScanning,
-                                                               registeredIndexesWereCorrupted,
-                                                               reasonsForFullScanning,
-                                                               scanningCheckState.notSeenIds.getFullScanningDecision())
+    val allNotSeenIds = if (notSeenIds is AllNotSeenDirtyFileIds) notSeenIds.result.plus(additionalOrphanDirtyFiles) else additionalOrphanDirtyFiles
+    InitialScanningSkipReporter.reportFullInitialScanningScheduled(project,
+                                                                   sourceOfScanning,
+                                                                   registeredIndexesWereCorrupted,
+                                                                   reasonsForFullScanning,
+                                                                   scanningCheckState.notSeenIds.getFullScanningDecision(),
+                                                                   projectDirtyFilesQueue,
+                                                                   allNotSeenIds.size)
     scheduleFullScanning(project, notSeenIds, additionalOrphanDirtyFiles, projectDirtyFilesQueue,
                          filterUpToDateUnsatisfiedConditions.isEmpty(), coroutineScope, indexingReason, fullScanningType)
   }
@@ -154,15 +157,14 @@ private fun isShutdownPerformedForFileBasedIndex(fileBasedIndex: FileBasedIndexI
 
 private fun scheduleDirtyFilesScanning(
   project: Project,
-  notSeenIds: AllNotSeenDirtyFileIds,
-  additionalOrphanDirtyFiles: Collection<Int>,
+  allNotSeenIds: List<Int>,
   projectDirtyFilesQueue: ProjectDirtyFilesQueue,
   coroutineScope: CoroutineScope,
   indexingReason: String,
   partialScanningType: ScanningType
 ): Job {
   val projectDirtyFiles = coroutineScope.async(Dispatchers.IO) {
-    clearIndexesForDirtyFiles(project, notSeenIds.result.plus(additionalOrphanDirtyFiles), projectDirtyFilesQueue, true)
+    clearIndexesForDirtyFiles(project, allNotSeenIds, projectDirtyFilesQueue, true)
   }
   val projectDirtyFilesFromProjectQueue = coroutineScope.async { projectDirtyFiles.await()?.projectDirtyFilesFromProjectQueue ?: emptyList() }
   val projectDirtyFilesFromOrphanQueue = coroutineScope.async { projectDirtyFiles.await()?.projectDirtyFilesFromOrphanQueue ?: emptyList() }

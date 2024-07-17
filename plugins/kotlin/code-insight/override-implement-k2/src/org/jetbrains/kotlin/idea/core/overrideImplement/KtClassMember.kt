@@ -15,7 +15,6 @@ import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
 import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.annotations.KaAnnotation
-import org.jetbrains.kotlin.analysis.api.annotations.annotations
 import org.jetbrains.kotlin.analysis.api.renderer.base.annotations.KaRendererAnnotationsFilter
 import org.jetbrains.kotlin.analysis.api.renderer.declarations.KaDeclarationRenderer
 import org.jetbrains.kotlin.analysis.api.renderer.declarations.impl.KaDeclarationRendererForSource
@@ -23,7 +22,6 @@ import org.jetbrains.kotlin.analysis.api.renderer.declarations.modifiers.rendere
 import org.jetbrains.kotlin.analysis.api.renderer.declarations.modifiers.renderers.KaRendererOtherModifiersProvider
 import org.jetbrains.kotlin.analysis.api.symbols.*
 import org.jetbrains.kotlin.analysis.api.symbols.markers.KaNamedSymbol
-import org.jetbrains.kotlin.analysis.api.symbols.markers.KaPossibleMultiplatformSymbol
 import org.jetbrains.kotlin.analysis.api.symbols.pointers.KaSymbolPointer
 import org.jetbrains.kotlin.idea.base.util.names.FqNames.OptInFqNames.isRequiresOptInFqName
 import org.jetbrains.kotlin.idea.core.TemplateKind
@@ -141,7 +139,7 @@ fun generateMember(
                     analysisSession: KaSession,
                     s: KaDeclarationSymbol
                 ): List<KtModifierKeywordToken> = buildList {
-                    if (mode == MemberGenerateMode.OVERRIDE && s is KaPossibleMultiplatformSymbol && containingSymbol?.isActual == true) {
+                    if (mode == MemberGenerateMode.OVERRIDE && containingSymbol?.isActual == true) {
                         //include actual modifier explicitly when containing class has modifier
                         if (s.isActual) add(KtTokens.ACTUAL_KEYWORD)
                     }
@@ -170,7 +168,7 @@ fun generateMember(
                         if (s.isLateInit) add(KtTokens.LATEINIT_KEYWORD)
                     }
 
-                    if (s is KaNamedClassOrObjectSymbol) {
+                    if (s is KaNamedClassSymbol) {
                         if (s.isExternal) add(KtTokens.EXTERNAL_KEYWORD)
                         if (s.isInline) add(KtTokens.INLINE_KEYWORD)
                         if (s.isData) add(KtTokens.DATA_KEYWORD)
@@ -243,7 +241,7 @@ fun generateMember(
 context(KaSession)
 private fun keepAnnotation(annotation: KaAnnotation, file: KtFile?): Boolean {
     val classId = annotation.classId ?: return false
-    val symbol = getClassOrObjectSymbolByClassId(classId)
+    val symbol = findClass(classId)
 
     if (symbol != null && symbol.hasRequiresOptInAnnotation()) return true
 
@@ -274,7 +272,7 @@ private fun generateFunction(
     bodyType: BodyType,
 ): KtCallableDeclaration {
     val returnType = symbol.returnType
-    val returnsUnit = returnType.isUnit
+    val returnsUnit = returnType.isUnitType
 
     val body = if (bodyType != BodyType.NoBody) {
         val delegation = generateUnsupportedOrSuperCall(project, symbol, bodyType, returnsUnit)
@@ -297,7 +295,7 @@ private fun generateProperty(
     bodyType: BodyType,
 ): KtCallableDeclaration {
     val returnType = symbol.returnType
-    val returnsNotUnit = !returnType.isUnit
+    val returnsNotUnit = !returnType.isUnitType
 
     val body = if (bodyType != BodyType.NoBody) {
         buildString {
@@ -335,7 +333,7 @@ private fun <T> KaSession.generateUnsupportedOrSuperCall(
             } else {
                 append("super")
                 if (bodyType == BodyType.QualifiedSuper) {
-                    val superClassFqName = symbol.originalContainingClassForOverride?.name?.render()
+                    val superClassFqName = (symbol.fakeOverrideOriginal.containingSymbol as? KaClassSymbol)?.name?.render()
                     superClassFqName?.let {
                         append("<").append(superClassFqName).append(">")
                     }

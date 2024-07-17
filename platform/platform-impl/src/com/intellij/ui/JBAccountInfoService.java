@@ -2,9 +2,7 @@
 package com.intellij.ui;
 
 import com.intellij.idea.AppMode;
-import com.intellij.openapi.client.ClientAppSession;
-import com.intellij.openapi.client.ClientKind;
-import com.intellij.openapi.client.ClientSessionsManager;
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.util.NlsSafe;
 import com.intellij.util.messages.Topic;
@@ -19,6 +17,13 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Future;
 import java.util.function.Consumer;
 
+/**
+ * Provides essential APIs for working with the JetBrains Account:
+ * authenticating the user, fetching information about JBA licenses.
+ * <p>
+ * When working in the remote dev mode, the real work is always performed on the client side
+ * of the controller app session, and the calls from the host are routed to the controlling client.
+ */
 @ApiStatus.Internal
 public interface JBAccountInfoService {
   final class JBAData {
@@ -74,26 +79,29 @@ public interface JBAccountInfoService {
   /**
    * Starts the auth flow by opening the browser and waiting for the user to proceed with logging in.
    */
-  @SuppressWarnings("unused")
   @NotNull LoginSession startLoginSession(@NotNull LoginMode loginMode);
 
-  @SuppressWarnings("unused")
+  /**
+   * Returns the list of licenses available in the current user's account matching the specified productCode.
+   * <p>
+   * The returned future never completes exceptionally, other than in case of cancellation that
+   * may happen in case of remote dev when the controlling client handling the request is disconnected.
+   */
   @NotNull CompletableFuture<@NotNull LicenseListResult> getAvailableLicenses(@NotNull String productCode);
 
-  @SuppressWarnings("unused")
+  /**
+   * Attempts to start a new trial for the specified productCode on the current user's behalf,
+   * or returns the existing trial license on repeated invocations when called during an ongoing trial (until it expires).
+   * <p>
+   * The returned future never completes exceptionally, other than in case of cancellation that
+   * may happen in case of remote dev when the controlling client handling the request is disconnected.
+   */
   @NotNull CompletableFuture<@NotNull LicenseListResult> issueTrialLicense(@NotNull String productCode, @NotNull List<String> consentOptions);
 
   static @Nullable JBAccountInfoService getInstance() {
-    // see BackendJbaInfoServiceImpl
     if (AppMode.isRemoteDevHost()) {
-      List<ClientAppSession> controllerSessions = ClientSessionsManager.getAppSessions(ClientKind.CONTROLLER);
-      if (controllerSessions.size() != 1) {
-        Logger log = Logger.getInstance(JBAccountInfoService.class);
-        log.warn("No controller session");
-        return null;
-      }
-      ClientAppSession controllerSession = controllerSessions.get(0);
-      return controllerSession.getService(JBAccountInfoService.class);
+      // see BackendJbaInfoServiceImpl
+      return ApplicationManager.getApplication().getService(JBAccountInfoService.class);
     }
     return JBAccountInfoServiceHolder.INSTANCE;
   }
@@ -113,11 +121,19 @@ public interface JBAccountInfoService {
 
   interface LoginSession extends AutoCloseable {
     /**
-     * The returned CompletableFuture can be used to await the completion of the auth flow,
-     * either successful or erroneous. The future never completes exceptionally,
+     * The returned CompletableFuture can be used to await the completion of the auth flow, either successful or erroneous.
+     * The future never completes exceptionally, other than in case of cancellation,
      * instead, {@link LoginResult.LoginFailed} is used to signal that something went wrong.
-     * {@linkplain CompletableFuture#cancel(boolean) Cancelling} the future does not affect the login session,
-     * or the other futures returned by separate invocations of this method.
+     * <p>
+     * Cancellation:<ul>
+     *  <li> The returned future is canceled if the login session is closed before completing with a result.
+     *  <li> {@linkplain CompletableFuture#cancel(boolean) Cancelling} the future itself does not affect the login session,
+     *       or any other future returned by separate invocations of this method.
+     *  <li> The future may get cancelled as a result of user actions like closing the {@linkplain LoginMode#MANUAL manual}
+     *       login dialog.
+     *  <li> In case of remote dev, the future returned to the caller on the host side is cancelled
+     *       when the controlling client handling the login session is disconnected.
+     * </ul>
      */
     @NotNull CompletableFuture<@NotNull LoginResult> onCompleted();
 
@@ -130,15 +146,15 @@ public interface JBAccountInfoService {
 
   sealed interface LoginResult permits LoginResult.LoginFailed, LoginResult.LoginSuccessful {
     record LoginSuccessful(@NotNull JBAData jbaUser) implements LoginResult { }
-    record LoginFailed(@NotNull String errorMessage) implements LoginResult { }
+    record LoginFailed(@NlsSafe @NotNull String errorMessage) implements LoginResult { }
   }
 
   record JbaLicense(
-    @NotNull String licenseId,
+    @NlsSafe @NotNull String licenseId,
     @NotNull JBAData jbaUser,
     @NotNull LicenseKind licenseKind,
     @NotNull LicenseeType licenseeType,
-    @NotNull String licensedTo,
+    @NlsSafe @NotNull String licensedTo,
     @NotNull Instant expiresOn
   ) { }
 
@@ -163,18 +179,22 @@ public interface JBAccountInfoService {
                                              LicenseListResult.TrialRejected {
     record LicenseList(@NotNull List<@NotNull JbaLicense> licenses) implements LicenseListResult { }
 
+    /**
+     * Returned when the method returning the LicenseListResult is called while unauthenticated,
+     * or when the current auth credentials need to be revalidated by {@link #startLoginSession signing in} again.
+     */
     enum LoginRequired implements LicenseListResult {
       INSTANCE
     }
 
-    record TrialRejected(@NotNull Reason reason, @Nullable String url, @NotNull String message) implements LicenseListResult {
+    record TrialRejected(@NotNull Reason reason, @Nullable String url, @NlsSafe @NotNull String message) implements LicenseListResult {
       public enum Reason {
         TRIAL_NOT_ALLOWED,
         PAYMENT_PROOF_REQUIRED,
       }
     }
 
-    record FetchFailure(@NotNull String errorMessage) implements LicenseListResult { }
+    record FetchFailure(@NlsSafe @NotNull String errorMessage) implements LicenseListResult { }
   }
 
   interface AuthStateListener extends EventListener {

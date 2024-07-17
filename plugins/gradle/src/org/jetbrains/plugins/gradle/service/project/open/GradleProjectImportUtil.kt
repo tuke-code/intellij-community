@@ -2,26 +2,28 @@
 @file:JvmName("GradleProjectImportUtil")
 package org.jetbrains.plugins.gradle.service.project.open
 
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.invokeAndWaitIfNeeded
 import com.intellij.openapi.externalSystem.util.ExternalSystemApiUtil
 import com.intellij.openapi.externalSystem.util.ExternalSystemBundle
-import com.intellij.openapi.util.io.toCanonicalPath
+import com.intellij.openapi.progress.runBlockingCancellable
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.ui.ValidationInfo
 import com.intellij.openapi.ui.getPresentablePath
+import com.intellij.openapi.util.io.toCanonicalPath
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.platform.ide.progress.runWithModalProgressBlocking
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.ApiStatus.Obsolete
 import org.jetbrains.plugins.gradle.service.GradleInstallationManager
 import org.jetbrains.plugins.gradle.settings.GradleDefaultProjectSettings
 import org.jetbrains.plugins.gradle.settings.GradleProjectSettings
 import org.jetbrains.plugins.gradle.settings.GradleSettings
-import org.jetbrains.plugins.gradle.util.GradleConstants
-import org.jetbrains.plugins.gradle.util.GradleEnvironment
-import org.jetbrains.plugins.gradle.util.GradleUtil
-import org.jetbrains.plugins.gradle.util.setupGradleJvm
+import org.jetbrains.plugins.gradle.util.*
 import java.nio.file.Path
 
 fun canOpenGradleProject(file: VirtualFile): Boolean = GradleOpenProjectProvider().canOpenProject(file)
@@ -48,8 +50,18 @@ fun canLinkAndRefreshGradleProject(projectFilePath: String, project: Project, sh
 
 @Obsolete
 fun linkAndRefreshGradleProject(projectFilePath: String, project: Project) {
-  @Suppress("DEPRECATION")
-  GradleOpenProjectProvider().linkToExistingProject(projectFilePath, project)
+  if (ApplicationManager.getApplication().isDispatchThread) {
+    runWithModalProgressBlocking(project, GradleBundle.message("gradle.linking.project")) {
+      withContext(Dispatchers.Default) {
+        GradleOpenProjectProvider().linkToExistingProjectAsync(projectFilePath, project)
+      }
+    }
+  }
+  else {
+    runBlockingCancellable {
+      GradleOpenProjectProvider().linkToExistingProjectAsync(projectFilePath, project)
+    }
+  }
 }
 
 suspend fun linkAndSyncGradleProject(project: Project, projectFilePath: String) {

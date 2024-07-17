@@ -4,7 +4,6 @@ package org.jetbrains.kotlin.idea.completion.contributors.helpers
 
 import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.symbols.KaClassifierSymbol
-import org.jetbrains.kotlin.analysis.api.symbols.markers.KaSymbolWithVisibility
 import org.jetbrains.kotlin.idea.base.analysis.api.utils.KtSymbolFromIndexProvider
 import org.jetbrains.kotlin.idea.completion.checkers.CompletionVisibilityChecker
 import org.jetbrains.kotlin.name.Name
@@ -21,7 +20,7 @@ internal object FirClassifierProvider {
         visibilityChecker: CompletionVisibilityChecker
     ): Sequence<KaClassifierSymbolWithContainingScopeKind> =
         originalKtFile.scopeContext(position).scopes.asSequence().flatMap { scopeWithKind ->
-            val classifiers = scopeWithKind.scope.getClassifierSymbols(scopeNameFilter)
+            val classifiers = scopeWithKind.scope.classifiers(scopeNameFilter)
                 .filter { visibilityChecker.isVisible(it) }
                 .map { KaClassifierSymbolWithContainingScopeKind(it, scopeWithKind.kind) }
             classifiers
@@ -39,6 +38,6 @@ internal object FirClassifierProvider {
         )
         val javaDeclarations = symbolProvider.getJavaClassesByNameFilter(scopeNameFilter)
         return (kotlinDeclarations + javaDeclarations)
-            .filter { visibilityChecker.isVisible(it as KaSymbolWithVisibility) }
+            .filter { visibilityChecker.isVisible(it) }
     }
 }

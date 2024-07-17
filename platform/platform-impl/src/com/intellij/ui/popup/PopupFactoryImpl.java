@@ -145,7 +145,7 @@ public class PopupFactoryImpl extends JBPopupFactory {
     BaseListPopupStep<String> step = new BaseListPopupStep<>(title, yesText, noText) {
       boolean myRunYes;
       @Override
-      public PopupStep onChosen(String selectedValue, final boolean finalChoice) {
+      public PopupStep<?> onChosen(String selectedValue, final boolean finalChoice) {
         myRunYes = selectedValue.equals(yesText);
         return FINAL_CHOICE;
       }
@@ -946,8 +946,14 @@ public class PopupFactoryImpl extends JBPopupFactory {
   }
 
   private static @Nullable Icon scaleIconToSize(@Nullable Icon icon, int maxIconWidth, int maxIconHeight) {
-    if (icon == null || icon instanceof EmptyIcon) {
+    if (icon == null) {
       return icon;
+    }
+
+    if (icon instanceof EmptyIcon) {
+      return icon.getIconWidth() == maxIconWidth && icon.getIconHeight() == maxIconHeight
+             ? icon
+             : EmptyIcon.create(maxIconWidth, maxIconHeight);
     }
 
     float scale = (float)Math.min(maxIconWidth, maxIconHeight) / Math.min(icon.getIconWidth(), icon.getIconHeight());

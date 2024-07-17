@@ -149,6 +149,11 @@ public abstract class MoveTestGenerated extends AbstractMoveTest {
             runTest("testData/refactoring/moveFile/kotlin/callableReferences/callableReferences.test");
         }
 
+        @TestMetadata("kotlin/externalDestructuringUsage/externalDestructuringUsage.test")
+        public void testKotlin_externalDestructuringUsage_ExternalDestructuringUsage() throws Exception {
+            runTest("testData/refactoring/moveFile/kotlin/externalDestructuringUsage/externalDestructuringUsage.test");
+        }
+
         @TestMetadata("kotlin/internalReferences/internalReferences.test")
         public void testKotlin_internalReferences_InternalReferences() throws Exception {
             runTest("testData/refactoring/moveFile/kotlin/internalReferences/internalReferences.test");
@@ -244,6 +249,11 @@ public abstract class MoveTestGenerated extends AbstractMoveTest {
             runTest("testData/refactoring/moveFile/kotlin/typeRefWithArguments/typeRefWithArguments.test");
         }
 
+        @TestMetadata("kotlin/unresolvedUsageUpdate/unresolvedUsageUpdate.test")
+        public void testKotlin_unresolvedUsageUpdate_UnresolvedUsageUpdate() throws Exception {
+            runTest("testData/refactoring/moveFile/kotlin/unresolvedUsageUpdate/unresolvedUsageUpdate.test");
+        }
+
         @TestMetadata("kotlin/withoutUsages/withoutUsages.test")
         public void testKotlin_withoutUsages_WithoutUsages() throws Exception {
             runTest("testData/refactoring/moveFile/kotlin/withoutUsages/withoutUsages.test");
@@ -331,6 +341,11 @@ public abstract class MoveTestGenerated extends AbstractMoveTest {
         @TestMetadata("kotlin/classWithInitializer/classWithInitializer.test")
         public void testKotlin_classWithInitializer_ClassWithInitializer() throws Exception {
             runTest("testData/refactoring/moveTopLevel/kotlin/classWithInitializer/classWithInitializer.test");
+        }
+
+        @TestMetadata("kotlin/classWithPrimaryConstructor/classWithPrimaryConstructor.test")
+        public void testKotlin_classWithPrimaryConstructor_ClassWithPrimaryConstructor() throws Exception {
+            runTest("testData/refactoring/moveTopLevel/kotlin/classWithPrimaryConstructor/classWithPrimaryConstructor.test");
         }
 
         @TestMetadata("kotlin/companionExtensionMemberRef/companionExtensionMemberRef.test")

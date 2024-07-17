@@ -47,7 +47,7 @@ data class ExtractableCodeDescriptor(
 
     override val duplicates: List<DuplicateInfo<KaType>> by lazy { findDuplicates() }
 
-    private val isUnitReturn: Boolean = analyze(context) { returnType.isUnit }
+    private val isUnitReturn: Boolean = analyze(context) { returnType.isUnitType }
 
     override fun isUnitReturnType(): Boolean = isUnitReturn
 
@@ -70,7 +70,7 @@ data class ExtractableCodeDescriptor(
 
                 }
                 val printer = PrettyPrinter()
-                filteredRenderer.renderAnnotations(analysisSession, container.symbol, printer)
+                filteredRenderer.renderAnnotations(useSiteSession, container.symbol, printer)
                 printer.toString() + "\n"
             }
         }

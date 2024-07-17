@@ -4,7 +4,6 @@ package org.jetbrains.kotlin.idea.k2.refactoring.changeSignature
 import com.intellij.psi.*
 import com.intellij.psi.util.MethodSignatureUtil
 import com.intellij.psi.util.TypeConversionUtil
-import org.jetbrains.kotlin.analysis.api.KaAnalysisNonPublicApi
 import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
 import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.analyze
@@ -33,7 +32,6 @@ data class KotlinTypeInfo(var text: String?, val context: KtElement) {
 }
 
 @KaExperimentalApi
-@OptIn(KaAnalysisNonPublicApi::class)
 private val errorIgnoringRenderer: KaTypeRenderer = KaTypeRendererForSource.WITH_QUALIFIED_NAMES.with {
     errorTypeRenderer = object : KaErrorTypeRenderer {
         override fun renderType(
@@ -102,8 +100,8 @@ private fun createSubstitutor(inheritorDeclaration: KtDeclaration, baseFunction:
     val inheritorCallable = inheritorDeclaration.symbol
     val baseCallable = (baseFunction as? KtCallableDeclaration)?.symbol
         ?: (baseFunction as? PsiMember)?.callableSymbol ?: return null
-    val inheritor = inheritorCallable.containingSymbol
-    val base = baseCallable.containingSymbol
+    val inheritor = inheritorCallable.containingDeclaration
+    val base = baseCallable.containingDeclaration
     return if (inheritor is KaClassSymbol && base is KaClassSymbol) {
         createInheritanceTypeSubstitutor(inheritor, base)?.let { iSubstitutor ->
             buildSubstitutor {

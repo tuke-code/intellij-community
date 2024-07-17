@@ -2,7 +2,6 @@ package com.intellij.settingsSync
 
 import com.intellij.codeInsight.template.impl.TemplateSettings
 import com.intellij.configurationStore.saveSettings
-import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.progress.runBlockingCancellable
@@ -13,10 +12,11 @@ import com.intellij.util.containers.ContainerUtil
 import kotlinx.coroutines.*
 import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.TestOnly
-import org.jetbrains.annotations.VisibleForTesting
 import java.nio.file.Path
 import java.time.Instant
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.locks.ReentrantLock
 
 /**
@@ -26,7 +26,6 @@ import java.util.concurrent.locks.ReentrantLock
 @ApiStatus.Internal
 class SettingsSyncBridge(
   private val coroutineScope: CoroutineScope,
-  parentDisposable: Disposable,
   private val appConfigPath: Path,
   private val settingsLog: SettingsLog,
   private val ideMediator: SettingsSyncIdeMediator,
@@ -39,6 +38,16 @@ class SettingsSyncBridge(
 
   @Volatile
   private var queueJob: Job? = null
+
+  @TestOnly
+  internal val eventsProcessed = AtomicLong()
+
+  // used in tests only
+  private val eventProcessingFlag = AtomicBoolean()
+
+  // used in tests only
+  internal val queueSize: Int
+    get() = pendingEvents.size + pendingExclusiveEvents.size + (if (eventProcessingFlag.get()) 1 else 0)
 
   val isInitialized
     get() = queueJob != null
@@ -70,6 +79,7 @@ class SettingsSyncBridge(
             if (locked) {
               eventsLock.unlock()
             }
+            pendingExclusiveEvents.remove(event)
           }
         }
       }
@@ -83,6 +93,9 @@ class SettingsSyncBridge(
     coroutineScope.launch {
       withProgressText(SettingsSyncBundle.message(initMode.messageKey)) {
         try {
+          if (initMode == InitMode.PushToServer) {
+            saveIdeSettings()
+          }
           settingsLog.initialize()
 
           // the queue is not activated initially => events will be collected but not processed until we perform all initialization tasks
@@ -103,7 +116,7 @@ class SettingsSyncBridge(
   private fun startQueue() {
     LOG.info("Starting settings sync queue")
     queueJob = coroutineScope.launch {
-      while (true) {
+      while (SettingsSyncSettings.getInstance().syncEnabled) {
         processPendingEvents()
         try {
           delay(1000)
@@ -114,13 +127,12 @@ class SettingsSyncBridge(
           break;
         }
       }
+      LOG.info("Queue processing stopped")
     }
   }
 
-  private fun saveIdeSettings() {
-    runBlockingCancellable {
-      saveSettings(ApplicationManager.getApplication(), forceSavingAllSettings = true)
-    }
+  private suspend fun saveIdeSettings() {
+    saveSettings(ApplicationManager.getApplication())
   }
 
   private suspend fun applyInitialChanges(initMode: InitMode) {
@@ -244,49 +256,65 @@ class SettingsSyncBridge(
     }
   }
 
-  private suspend fun processPendingEvents() {
-    val locked = eventsLock.tryLock()
+  private suspend fun processPendingEvents(force: Boolean = false) {
+    var locked = eventsLock.tryLock()
     try {
-      if (locked) {
+      while (!locked) {
+        if (force) {
+          locked = eventsLock.tryLock()
+        }
+        else {
+          LOG.debug("Couldn't obtain event lock. Will retry later")
+          return
+        }
+      }
+      if (pendingEvents.isEmpty()) {
+        LOG.debug("Pending events is empty")
+        return
+      }
+      while (pendingEvents.isNotEmpty()) {
+        var pushRequestMode: PushRequestMode = PUSH_IF_NEEDED
+        var mergeAndPushAfterProcessingEvents = true
         val previousState = collectCurrentState()
         try {
-          var pushRequestMode: PushRequestMode = PUSH_IF_NEEDED
-          var mergeAndPushAfterProcessingEvents = true
-          while (pendingEvents.isNotEmpty()) {
-            val event = pendingEvents.removeAt(0)
-            LOG.info("Processing event $event")
-            when (event) {
-              is SyncSettingsEvent.IdeChange -> {
-                settingsLog.applyIdeState(event.snapshot, "Local changes made in the IDE")
-              }
-              is SyncSettingsEvent.CloudChange -> {
-                settingsLog.applyCloudState(event.snapshot, "Remote changes")
-                SettingsSyncLocalSettings.getInstance().knownAndAppliedServerId = event.serverVersionId
-              }
-              is SyncSettingsEvent.LogCurrentSettings -> {
-                settingsLog.logExistingSettings()
-              }
-              is SyncSettingsEvent.MustPushRequest -> {
-                pushRequestMode = MUST_PUSH
-              }
-              is SyncSettingsEvent.DeleteServerData -> {
-                mergeAndPushAfterProcessingEvents = false
-                stopSyncingAndRollback(previousState)
-                deleteServerData(event.afterDeleting)
-              }
-              SyncSettingsEvent.DeletedOnCloud -> {
-                mergeAndPushAfterProcessingEvents = false
-                stopSyncingAndRollback(previousState)
-              }
+          val event = pendingEvents.removeAt(0)
+          eventProcessingFlag.set(true)
+          LOG.info("Processing event $event")
+          when (event) {
+            is SyncSettingsEvent.IdeChange -> {
+              settingsLog.applyIdeState(event.snapshot, "Local changes made in the IDE")
+            }
+            is SyncSettingsEvent.CloudChange -> {
+              settingsLog.applyCloudState(event.snapshot, "Remote changes")
+              SettingsSyncLocalSettings.getInstance().knownAndAppliedServerId = event.serverVersionId
+            }
+            is SyncSettingsEvent.LogCurrentSettings -> {
+              settingsLog.logExistingSettings()
+            }
+            is SyncSettingsEvent.MustPushRequest -> {
+              pushRequestMode = MUST_PUSH
+            }
+            is SyncSettingsEvent.DeleteServerData -> {
+              mergeAndPushAfterProcessingEvents = false
+              stopSyncingAndRollback(previousState)
+              deleteServerData(event.afterDeleting)
+            }
+            SyncSettingsEvent.DeletedOnCloud -> {
+              mergeAndPushAfterProcessingEvents = false
+              stopSyncingAndRollback(previousState)
             }
           }
 
           if (mergeAndPushAfterProcessingEvents) {
             mergeAndPush(previousState.idePosition, previousState.cloudPosition, pushRequestMode)
           }
+          eventsProcessed.incrementAndGet()
         }
         catch (exception: Throwable) {
           stopSyncingAndRollback(previousState, exception)
+        }
+        finally {
+          eventProcessingFlag.set(false)
         }
       }
     }
@@ -486,8 +514,13 @@ class SettingsSyncBridge(
   @TestOnly
   fun waitForAllExecuted() {
     runBlocking {
-      processPendingEvents()
+      processPendingEvents(force = true)
     }
+  }
+
+  @TestOnly
+  internal fun stop() {
+    stopSyncingAndRollback(null, null)
   }
 
   companion object {

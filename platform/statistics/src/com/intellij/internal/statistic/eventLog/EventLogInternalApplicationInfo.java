@@ -10,6 +10,7 @@ import com.intellij.openapi.application.ex.ApplicationInfoEx;
 import com.intellij.openapi.diagnostic.Logger;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
+import static com.intellij.internal.statistic.eventLog.StatisticsEventLogProviderUtil.getEventLogProvider;
 
 @ApiStatus.Internal
 public class EventLogInternalApplicationInfo implements EventLogApplicationInfo {
@@ -28,8 +29,10 @@ public class EventLogInternalApplicationInfo implements EventLogApplicationInfo 
     myConnectionSettings = new EventLogAppConnectionSettings();
     myEventLogger = new DataCollectorSystemEventLogger() {
       @Override
-      public void logErrorEvent(@NotNull String recorderId, @NotNull String eventId, @NotNull Throwable exception) {
-        EventLogSystemLogger.logSystemError(recorderId, eventId, exception.getClass().getName(), -1);
+      public void logLoadingConfigFailed(@NotNull String recorderId, @NotNull Throwable exception) {
+        EventLogSystemCollector eventLogSystemCollector =
+          getEventLogProvider(recorderId).getEventLogSystemLogger$intellij_platform_statistics();
+        eventLogSystemCollector.logLoadingConfigFailed(exception.getClass().getName(), -1);
       }
     };
   }

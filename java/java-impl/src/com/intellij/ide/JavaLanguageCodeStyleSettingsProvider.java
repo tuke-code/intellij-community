@@ -307,6 +307,10 @@ public final class JavaLanguageCodeStyleSettingsProvider extends LanguageCodeSty
                                 getInstance().BLANK_LINES);
 
       consumer.renameStandardOption(
+        "BLANK_LINES_AROUND_FIELD_IN_INTERFACE",
+        JavaBundle.message("editbox.blank.lines.field.in.interface"));
+
+      consumer.renameStandardOption(
         "BLANK_LINES_AROUND_FIELD",
         JavaBundle.message("editbox.blank.lines.field.without.annotations"));
 
@@ -318,7 +322,13 @@ public final class JavaLanguageCodeStyleSettingsProvider extends LanguageCodeSty
                                 "BLANK_LINES_AROUND_FIELD");
     }
     else if (settingsType == SettingsType.COMMENTER_SETTINGS) {
-      consumer.showAllStandardOptions();
+      consumer.showStandardOptions(
+        "LINE_COMMENT_ADD_SPACE",
+        "LINE_COMMENT_ADD_SPACE_ON_REFORMAT",
+        "LINE_COMMENT_AT_FIRST_COLUMN",
+        "BLOCK_COMMENT_AT_FIRST_COLUMN",
+        "BLOCK_COMMENT_ADD_SPACE"
+      );
     }
     else if (settingsType == SettingsType.LANGUAGE_SPECIFIC) {
       consumer.showCustomOption(JavaCodeStyleSettings.class, "JD_ALIGN_PARAM_COMMENTS",
@@ -557,6 +567,8 @@ public final class JavaLanguageCodeStyleSettingsProvider extends LanguageCodeSty
 
       import javax.swing.*;
       import java.util.Vector;
+      import org.jetbrains.annotations.NotNull;
+      import org.jetbrains.annotations.Nullable;
 
       public class Foo {
         private int field1;
@@ -578,6 +590,21 @@ public final class JavaLanguageCodeStyleSettingsProvider extends LanguageCodeSty
       }
       class AnotherClass {
       }
+      
+      public class ClassWithAnnotatedFields {
+          @Nullable
+          public static Boolean PUBLIC_STATIC_ANNOTATED_FIELD = null;
+          public static Boolean PUBLIC_STATIC_NON_ANNOTATED_FIELD = false;
+          public Boolean publicNonAnnotatedField = true;
+          @NotNull
+          public Boolean publicAnnotatedField = true;
+          @NotNull Boolean typeAnnotatedField = false;
+          @NotNull
+          private Boolean firstPrivateAnnotatedField = true;
+          @NotNull
+          private Boolean secondPrivateAnnotatedField = true;
+      }
+      
       interface TestInterface {
           int MAX = 10;
           int MIN = 1;

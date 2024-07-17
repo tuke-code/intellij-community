@@ -442,6 +442,7 @@ class ResourceCopyingTest : MavenCompilingTestCase() {
                          </resources>
                        </build>
                        """.trimIndent())
+    refreshFiles(listOf(projectPom))
     importProjectAsync()
 
     compileModules("project")

@@ -77,6 +77,7 @@ private const val DEBUG: String = ToolWindowId.DEBUG
 private val recentLimit: Int get() = AdvancedSettings.getInt("max.recent.run.configurations")
 
 @ApiStatus.Internal
+@JvmField
 val RUN_CONFIGURATION_KEY = DataKey.create<RunnerAndConfigurationSettings>("sub.popup.parent.action")
 
 private const val TAG_PINNED = "pinned"
@@ -210,6 +211,16 @@ private fun createRunConfigurationActionGroup(folderMaps: Collection<Map<String?
   }
 }
 
+@ApiStatus.Internal
+class RunPopupVoidExecutionListener(private val project: Project) : ExecutionListener by createExecutionListener(
+  { _, _, _ -> project.messageBus.syncPublisher(VOID_EXECUTION_TOPIC).run() }
+) {
+  companion object {
+    @Topic.ProjectLevel
+    val VOID_EXECUTION_TOPIC = Topic("any execution event", Runnable::class.java)
+  }
+}
+
 internal class RunConfigurationsActionGroupPopup(actionGroup: ActionGroup,
                                                  dataContext: DataContext,
                                                  disposeCallback: (() -> Unit)?) :
@@ -243,13 +254,13 @@ internal class RunConfigurationsActionGroupPopup(actionGroup: ActionGroup,
     }
     listModel.syncModel()
 
-    project.messageBus.connect(this).subscribe(ExecutionManager.EXECUTION_TOPIC, createExecutionListener { executorId, env, reason ->
+    project.messageBus.connect(this).subscribe(RunPopupVoidExecutionListener.VOID_EXECUTION_TOPIC, Runnable {
       ApplicationManager.getApplication().invokeLater {
         if (list.isShowing) {
           (myStep as ActionPopupStep).updateStepItems(list)
           val focused = StackingPopupDispatcher.getInstance().focusedPopup
           if (focused != this@RunConfigurationsActionGroupPopup &&
-            focused is ListPopupImpl) {
+              focused is ListPopupImpl) {
             (focused.step as ActionPopupStep).updateStepItems(focused.list)
           }
         }
@@ -427,7 +438,7 @@ private fun createRunConfigurationWithInlines(project: Project,
     override fun update(e: AnActionEvent) {
       super.update(e)
       val filtered = filterOutRunIfDebugResumeIsPresent(
-        ActionGroupUtil.getVisibleActions(inlineActionGroup, e).toList())
+        e, ActionGroupUtil.getVisibleActions(inlineActionGroup, e).toList())
       e.presentation.putClientProperty(ActionUtil.INLINE_ACTIONS, filtered)
       if (Registry.`is`("run.popup.show.inlines.for.active.configurations", false)) {
         val isRunning = getActiveExecutor(project, conf) != null

@@ -86,6 +86,7 @@ object CommunityRepositoryModules {
       spec.withModuleLibrary("RMI Stubs", "intellij.xslt.debugger.rt", "rmi-stubs.jar")
     },
     plugin("intellij.maven") { spec ->
+      spec.withModule("intellij.idea.community.build.dependencies")
       spec.withModule("intellij.maven.jps")
       spec.withModule("intellij.maven.server.m3.common", "maven3-server-common.jar")
       spec.withModule("intellij.maven.server.m3.impl", "maven3-server.jar")
@@ -98,7 +99,9 @@ object CommunityRepositoryModules {
                              relativeOutputPath = "intellij.maven.server.indexer/lib")
       spec.withModuleLibrary(libraryName = "apache.maven.wagon.provider.api:3.5.2", moduleName = "intellij.maven.server.indexer",
                              relativeOutputPath = "intellij.maven.server.indexer/lib")
-      spec.withModuleLibrary(libraryName = "apache.maven.archetype.common:3.2.1", moduleName = "intellij.maven.server.indexer",
+      spec.withModuleLibrary(libraryName = "apache.maven.archetype.common-no-trans:3.2.1", moduleName = "intellij.maven.server.indexer",
+                             relativeOutputPath = "intellij.maven.server.indexer/lib")
+      spec.withModuleLibrary(libraryName = "apache.maven.archetype.catalog-no-trans:321", moduleName = "intellij.maven.server.indexer",
                              relativeOutputPath = "intellij.maven.server.indexer/lib")
 
       spec.withModule("intellij.maven.artifactResolver.m31", "artifact-resolver-m31.jar")
@@ -208,7 +211,8 @@ object CommunityRepositoryModules {
         "intellij.driver.client"
       )
     ),
-    pluginAuto(listOf("intellij.performanceTesting.ui"))
+    pluginAuto(listOf("intellij.performanceTesting.ui")),
+    githubPlugin("intellij.vcs.github.community", kind = "community"),
   )
 
   val CONTRIB_REPOSITORY_PLUGINS: List<PluginLayout> = java.util.List.of(
@@ -640,13 +644,16 @@ object CommunityRepositoryModules {
     }
   }
 
-  fun githubPlugin(mainModuleName: String): PluginLayout {
+  fun githubPlugin(mainModuleName: String, kind: String): PluginLayout {
     return plugin(mainModuleName) { spec ->
-      spec.directoryName = "vcs-github"
+      spec.directoryName = "vcs-github-$kind"
       spec.mainJarName = "vcs-github.jar"
       spec.withModules(listOf(
         "intellij.vcs.github"
       ))
+      spec.withCustomVersion { _, version, _ ->
+        PluginVersionEvaluatorResult(pluginVersion = "$version-$kind")
+      }
     }
   }
 

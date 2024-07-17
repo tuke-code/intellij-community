@@ -51,8 +51,8 @@ private fun getDefaultArgumentSymbol(argument: KtExpression): Pair<KaFunctionSym
     val lambdaExpression = argument.parent as? KtLambdaExpression ?: return null
     if (parameter.defaultValue != lambdaExpression) return null
     val function = parameter.parentOfType<KtNamedFunction>() ?: return null
-    val symbol = function.getFunctionLikeSymbol()
-    val argumentSymbol = parameter.getParameterSymbol() as? KaValueParameterSymbol ?: return null
+    val symbol = function.symbol
+    val argumentSymbol = parameter.symbol as? KaValueParameterSymbol ?: return null
     return symbol to argumentSymbol
 }
 
@@ -72,7 +72,7 @@ context(KaSession)
 private fun isArrayGeneratorConstructorCall(symbol: KaFunctionSymbol): Boolean {
     fun checkParameters(symbol: KaFunctionSymbol): Boolean {
         return symbol.valueParameters.size == 2
-                && symbol.valueParameters[0].returnType.isInt
+                && symbol.valueParameters[0].returnType.isIntType
                 && symbol.valueParameters[1].returnType.isFunctionType
     }
 

@@ -130,7 +130,7 @@ open class RecentProjectsManagerBase(coroutineScope: CoroutineScope) :
 
   final override fun getState(): RecentProjectManagerState = state
 
-  fun getProjectMetaInfo(projectStoreBaseDir: Path): RecentProjectMetaInfo? {
+  internal fun getProjectMetaInfo(projectStoreBaseDir: Path): RecentProjectMetaInfo? {
     val path = getProjectPath(projectStoreBaseDir) ?: return null
     synchronized(stateLock) {
       return state.additionalInfo.get(path)
@@ -327,7 +327,7 @@ open class RecentProjectsManagerBase(coroutineScope: CoroutineScope) :
       projectManager.openProjects.firstOrNull { isSameProject(projectFile = projectFile, project = it) }?.let { project ->
         FUSProjectHotStartUpMeasurer.reportAlreadyOpenedProject()
         withContext(Dispatchers.EDT) {
-          project.service<ProjectUtilService>().focusProjectWindow()
+          ProjectUtilService.getInstance(project).focusProjectWindow()
         }
         return project
       }

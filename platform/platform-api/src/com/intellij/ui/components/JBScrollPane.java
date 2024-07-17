@@ -1,4 +1,4 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.ui.components;
 
 import com.intellij.ide.ui.UISettings;
@@ -37,7 +37,6 @@ import java.lang.reflect.Field;
 import java.util.function.Supplier;
 
 public class JBScrollPane extends JScrollPane {
-
   /**
    * Supposed to be used as a client property key for scrollbar and indicates if this scrollbar should be ignored
    * when insets for {@code JScrollPane's} content are being calculated.
@@ -112,7 +111,7 @@ public class JBScrollPane extends JScrollPane {
   @Override
   public Color getBackground() {
     Color color = super.getBackground();
-    if (!myBackgroundRequested && EventQueue.isDispatchThread() && ScrollSettings.isBackgroundFromView()) {
+    if (!myBackgroundRequested && EventQueue.isDispatchThread() && ScrollSettings.isBackgroundFromView.invoke()) {
       if (!isBackgroundSet() || color instanceof UIResource) {
         Component child = getViewport();
         if (child != null) {
@@ -390,7 +389,7 @@ public class JBScrollPane extends JScrollPane {
 
   @Override
   protected void processMouseWheelEvent(MouseWheelEvent e) {
-    boolean hasAbsoluteDelta = ScrollSettings.isPixelPerfectEnabled();
+    boolean hasAbsoluteDelta = ScrollSettings.isPixelPerfectEnabled.invoke();
     myScrollSource = hasAbsoluteDelta ? ScrollSource.TOUCHPAD : ScrollSource.MOUSE_WHEEL;
     myWheelRotation = e.getPreciseWheelRotation();
     super.processMouseWheelEvent(e);
@@ -1007,7 +1006,7 @@ public class JBScrollPane extends JScrollPane {
     if (event.isConsumed()) return false;
     // any rotation expected (forward or backward)
     boolean ignore = event.getWheelRotation() == 0;
-    if (ignore && (ScrollSettings.isPixelPerfectEnabled() || ScrollSettings.isHighPrecisionEnabled())) {
+    if (ignore && (ScrollSettings.isPixelPerfectEnabled.invoke() || ScrollSettings.isHighPrecisionEnabled.invoke())) {
       double rotation = event.getPreciseWheelRotation();
       ignore = rotation == 0.0D || !Double.isFinite(rotation);
     }

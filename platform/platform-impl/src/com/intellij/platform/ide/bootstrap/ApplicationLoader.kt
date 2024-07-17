@@ -52,6 +52,7 @@ import com.intellij.platform.ide.ideFingerprint
 import com.intellij.platform.settings.SettingsController
 import com.intellij.ui.AppIcon
 import com.intellij.ui.ExperimentalUI
+import com.intellij.util.ArrayUtilRt
 import com.intellij.util.PlatformUtils
 import com.intellij.util.io.URLUtil
 import com.intellij.util.io.createDirectories
@@ -91,7 +92,7 @@ internal suspend fun loadApp(
   logDeferred: Deferred<Logger>,
   appRegisteredJob: CompletableDeferred<Unit>,
   args: List<String>,
-  initAwtToolkitAndEventQueueJob: Job
+  initAwtToolkitAndEventQueueJob: Job,
 ): ApplicationStarter {
   return span("app initialization") {
     val initServiceContainerJob = launch {
@@ -115,12 +116,12 @@ internal suspend fun loadApp(
       }
     }
 
-    val languageAndRegionTaskDeferred: Deferred<(suspend () -> Boolean)?>? = if (AppMode.isHeadless() || euaDocumentDeferred.await() == null) {
+    val languageAndRegionTaskDeferred: Deferred<(suspend () -> Boolean)?>? = if (AppMode.isHeadless()) {
       null
     }
     else {
       async(CoroutineName("language and region")) {
-        getLanguageAndRegionDialogIfNeeded()
+        getLanguageAndRegionDialogIfNeeded(euaDocumentDeferred.await())
       }
     }
 
@@ -194,19 +195,19 @@ internal suspend fun loadApp(
       )
 
       if (!app.isHeadlessEnvironment) {
-        languageAndRegionTaskDeferred?.await()?.let {
-          cssInit?.join()
-          val languageOkPressed = it()
-          euaTaskDeferred?.await()?.let { 
-            it()
-          if (languageOkPressed) {
-            val localizationStateService = LocalizationStateService.getInstance() ?: return@let
+        cssInit?.join()
+        val languageOkPressed = languageAndRegionTaskDeferred?.await()?.invoke()
+        euaTaskDeferred?.await()?.let {
+          it()
+          if (languageOkPressed == true) {
+            val localizationStateService = LocalizationStateService.getInstance() ?: return@launch
             if (localizationStateService.getLastSelectedLocale() != localizationStateService.getSelectedLocale()) {
               preloadJob.cancel()
               applicationStarter.cancel()
-              ApplicationManager.getApplication().restart()
+              ConfigImportHelper.writeOptionsForRestartIfNeeded(logDeferred.await())
+              logDeferred.await().info("Running application restart")
+              app.restart(ApplicationEx.FORCE_EXIT or ApplicationEx.EXIT_CONFIRMED or ApplicationEx.SAVE, ArrayUtilRt.EMPTY_STRING_ARRAY)
             }
-          }
           }
         }
       }
@@ -265,7 +266,8 @@ internal suspend fun loadApp(
 
 private suspend fun preloadNonHeadlessServices(app: ApplicationImpl, initLafJob: Job) {
   coroutineScope {
-    launch { // https://youtrack.jetbrains.com/issue/IDEA-321138/Large-font-size-in-2023.2
+    launch {
+      // https://youtrack.jetbrains.com/issue/IDEA-321138/Large-font-size-in-2023.2
       initLafJob.join()
 
       launch(CoroutineName("CustomActionsSchema preloading")) {
@@ -279,7 +281,10 @@ private suspend fun preloadNonHeadlessServices(app: ApplicationImpl, initLafJob:
     }
 
     launch(CoroutineName("actionConfigurationCustomizer preloading")) {
-      ActionConfigurationCustomizer.EP.lazySequence().forEach { /* just preload */ }
+      @Suppress("ControlFlowWithEmptyBody")
+      for (ignored in ActionConfigurationCustomizer.EP.lazySequence()) {
+        // just preload
+      }
     }
 
     // https://youtrack.jetbrains.com/issue/IDEA-341318

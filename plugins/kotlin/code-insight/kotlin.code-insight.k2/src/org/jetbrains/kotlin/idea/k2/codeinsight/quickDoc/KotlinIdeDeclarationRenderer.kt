@@ -39,7 +39,6 @@ import org.jetbrains.kotlin.analysis.api.renderer.types.KaTypeRenderer
 import org.jetbrains.kotlin.analysis.api.renderer.types.renderers.*
 import org.jetbrains.kotlin.analysis.api.symbols.*
 import org.jetbrains.kotlin.analysis.api.symbols.markers.KaNamedSymbol
-import org.jetbrains.kotlin.analysis.api.symbols.markers.KaSymbolWithVisibility
 import org.jetbrains.kotlin.analysis.api.types.*
 import org.jetbrains.kotlin.analysis.utils.printer.PrettyPrinter
 import org.jetbrains.kotlin.analysis.utils.printer.prettyPrint
@@ -67,7 +66,7 @@ internal class KotlinIdeDeclarationRenderer(
     internal fun renderFunctionTypeParameter(parameter: KtParameter): String? = prettyPrint {
         parameter.nameAsName?.let { name -> withSuffix(highlight(": ") { asColon }) { append(highlight(name.renderName()) { asParameter }) } }
         parameter.typeReference?.type?.let { type ->
-            renderer.typeRenderer.renderType(analysisSession, type, this)
+            renderer.typeRenderer.renderType(useSiteSession, type, this)
         }
 
     }
@@ -243,14 +242,14 @@ internal class KotlinIdeDeclarationRenderer(
                 symbol is KaClassSymbol -> !(symbol.classKind == KaClassKind.INTERFACE && symbol.modality == KaSymbolModality.ABSTRACT || symbol.classKind.isObject && symbol.modality == KaSymbolModality.FINAL)
 
                 symbol is KaCallableSymbol -> {
-                    symbol.modality == KaSymbolModality.OPEN || symbol.containingSymbol != null && symbol.modality == KaSymbolModality.FINAL || symbol.modality == KaSymbolModality.ABSTRACT
+                    symbol.modality == KaSymbolModality.OPEN || symbol.containingDeclaration != null && symbol.modality == KaSymbolModality.FINAL || symbol.modality == KaSymbolModality.ABSTRACT
                 }
 
                 else -> false
             }
         }
 
-        fun KaDeclarationSymbol.isInlineClassOrObject(): Boolean = this is KaNamedClassOrObjectSymbol && isInline
+        fun KaDeclarationSymbol.isInlineClassOrObject(): Boolean = this is KaNamedClassSymbol && isInline
 
         val valueModifierRenderer = object : KaRendererOtherModifiersProvider {
             override fun getOtherModifiers(analysisSession: KaSession, symbol: KaDeclarationSymbol): List<KtModifierKeywordToken> {
@@ -420,7 +419,7 @@ internal class KotlinIdeDeclarationRenderer(
                 }
                 val qName = when (owner) {
                     is KaClassType -> owner.classId.asSingleFqName()
-                    is KaTypeParameterType -> owner.symbol.containingSymbol?.getFqNameIfPackageOrNonLocal()?.child(name)
+                    is KaTypeParameterType -> owner.symbol.containingDeclaration?.getFqNameIfPackageOrNonLocal()?.child(name)
                         ?: FqName.topLevel(name)
 
                     else -> FqName.topLevel(name)
@@ -455,7 +454,7 @@ internal class KotlinIdeDeclarationRenderer(
                             }
                         },
                         {
-                            if (callableSymbol is KaSymbolWithVisibility && callableSymbol.visibility == KaSymbolVisibility.LOCAL) {
+                            if (callableSymbol.visibility == KaSymbolVisibility.LOCAL) {
                                 printer.append(highlight("local") { asKeyword })
                             }
                         },
@@ -493,7 +492,7 @@ internal class KotlinIdeDeclarationRenderer(
                             if (callableSymbol is KaNamedSymbol) {
                                 declarationRenderer.nameRenderer.renderName(analysisSession, callableSymbol, declarationRenderer, printer)
                             } else if (callableSymbol is KaConstructorSymbol) {
-                                (callableSymbol.containingSymbol as? KaNamedSymbol)?.let {
+                                (callableSymbol.containingDeclaration as? KaNamedSymbol)?.let {
                                     printer.append(highlight(it.name.renderName()) {
                                         asClassName
                                     })
@@ -659,7 +658,7 @@ internal class KotlinIdeDeclarationRenderer(
                 printer: PrettyPrinter
             ): Unit = with(analysisSession) {
                 if (symbol is KaClassSymbol && symbol.classKind == KaClassKind.COMPANION_OBJECT && symbol.name == SpecialNames.DEFAULT_NAME_FOR_COMPANION_OBJECT) {
-                    val className = (symbol.containingSymbol as? KaClassSymbol)?.name
+                    val className = (symbol.containingDeclaration as? KaClassSymbol)?.name
                     if (className != null) {
                         printer.append(highlight("of ") { asInfo } )
                         printer.append(highlight(className.renderName()) { asClassName } )
@@ -691,7 +690,7 @@ internal class KotlinIdeDeclarationRenderer(
                     }
                 })
 
-                if (symbol is KaNamedClassOrObjectSymbol && symbol.isData) {
+                if (symbol is KaNamedClassSymbol && symbol.isData) {
                     val primaryConstructor = symbol.declaredMemberScope.constructors.firstOrNull { it.isPrimary }
                     if (primaryConstructor != null) {
                         declarationRenderer.valueParametersRenderer.renderValueParameters(
@@ -808,7 +807,7 @@ internal class KotlinIdeDeclarationRenderer(
     }
 
     private fun PrettyPrinter.renderAnnotationConstantValue(application: KaAnnotationValue.NestedAnnotationValue) {
-        renderAnnotationApplication(application.annotationValue)
+        renderAnnotationApplication(application.annotation)
     }
 
     private fun PrettyPrinter.renderAnnotationApplication(value: KaAnnotation) {

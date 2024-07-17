@@ -9,9 +9,9 @@ import com.intellij.psi.util.findParentOfType
 import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.analyze
 import org.jetbrains.kotlin.analysis.api.symbols.KaClassKind
-import org.jetbrains.kotlin.analysis.api.symbols.KaClassOrObjectSymbol
+import org.jetbrains.kotlin.analysis.api.symbols.KaClassSymbol
 import org.jetbrains.kotlin.analysis.api.symbols.KaPackageSymbol
-import org.jetbrains.kotlin.analysis.api.symbols.KtSymbol
+import org.jetbrains.kotlin.analysis.api.symbols.KaSymbol
 import org.jetbrains.kotlin.analysis.api.types.*
 import org.jetbrains.kotlin.idea.codeinsight.utils.isEnum
 import org.jetbrains.kotlin.idea.codeinsight.utils.isInheritable
@@ -205,14 +205,14 @@ object K2CreateClassFromUsageBuilder {
     private fun getTargetParentsByQualifier(
         element: KtElement,
         isQualified: Boolean,
-        qualifierDescriptor: KtSymbol?
+        qualifierDescriptor: KaSymbol?
     ): List<PsiElement> {
         val file = element.containingKtFile
         val project = file.project
         val targetParents: List<PsiElement> = when {
             !isQualified ->
                 element.parents.filterIsInstance<KtClassOrObject>().toList() + file
-            qualifierDescriptor is KaClassOrObjectSymbol ->
+            qualifierDescriptor is KaClassSymbol ->
                 listOfNotNull(qualifierDescriptor.psi)
             qualifierDescriptor is KaPackageSymbol ->
                 if (qualifierDescriptor.fqName != file.packageFqName) {
@@ -225,13 +225,13 @@ object K2CreateClassFromUsageBuilder {
     }
 
     context (KaSession)
-    private fun getClassKindFilter(expectedType: KtType, containingDeclaration: PsiElement): (ClassKind) -> Boolean {
-        if (expectedType.isAny) {
+    private fun getClassKindFilter(expectedType: KaType, containingDeclaration: PsiElement): (ClassKind) -> Boolean {
+        if (expectedType.isAnyType) {
             return { _ -> true }
         }
 
-        val canHaveSubtypes = isInheritable(expectedType) || !(expectedType.containsStarProjections()) || expectedType.isUnit
-        val isEnum = expectedType is KaNonErrorClassType && expectedType.isEnum()
+        val canHaveSubtypes = isInheritable(expectedType) || !(expectedType.containsStarProjections()) || expectedType.isUnitType
+        val isEnum = expectedType is KaClassType && expectedType.isEnum()
 
         if (!(canHaveSubtypes || isEnum) || expectedType is KaTypeParameterType) return { _ -> false }
 
@@ -239,23 +239,23 @@ object K2CreateClassFromUsageBuilder {
             when (classKind) {
                 ClassKind.ENUM_ENTRY -> isEnum && containingDeclaration == expectedType.convertToClass()
                 ClassKind.INTERFACE -> containingDeclaration !is PsiClass
-                        || (expectedType is KtNonErrorClassType && expectedType.isInterface())
+                        || (expectedType is KaClassType && expectedType.isInterface())
                 else -> canHaveSubtypes
             }
         }
     }
 
     context(KaSession)
-    private fun KtType.isInterface(): Boolean {
-        if (this !is KtNonErrorClassType) return false
-        val classSymbol = classSymbol
-        return classSymbol is KaClassOrObjectSymbol && classSymbol.classKind == KaClassKind.INTERFACE
+    private fun KaType.isInterface(): Boolean {
+        if (this !is KaClassType) return false
+        val classSymbol = symbol
+        return classSymbol is KaClassSymbol && classSymbol.classKind == KaClassKind.INTERFACE
     }
 
     context(KaSession)
-    private fun isInheritable(type: KtType): Boolean {
+    private fun isInheritable(type: KaType): Boolean {
         return type.convertToClass()?.isInheritable() == true
     }
 
-    private fun KtType.containsStarProjections(): Boolean = this is KaNonErrorClassType && ownTypeArguments.any { it is KaStarTypeProjection || it.type?.containsStarProjections() == true}
+    private fun KaType.containsStarProjections(): Boolean = this is KaClassType && typeArguments.any { it is KaStarTypeProjection || it.type?.containsStarProjections() == true}
 }

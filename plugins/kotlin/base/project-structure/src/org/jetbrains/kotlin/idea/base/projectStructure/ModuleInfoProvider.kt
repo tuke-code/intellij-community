@@ -20,7 +20,7 @@ import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
 import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.jps.model.module.JpsModuleSourceRootType
-import org.jetbrains.kotlin.analysis.api.KaAnalysisApiInternals
+import org.jetbrains.kotlin.analysis.api.KaImplementationDetail
 import org.jetbrains.kotlin.analysis.api.projectStructure.analysisExtensionFileContextModule
 import org.jetbrains.kotlin.analysis.decompiled.light.classes.KtLightClassForDecompiledDeclaration
 import org.jetbrains.kotlin.asJava.classes.KtLightClassForFacade
@@ -147,7 +147,7 @@ class ModuleInfoProvider(private val project: Project) {
 
         val containingKtFile = containingFile as? KtFile
         if (containingKtFile != null) {
-            @OptIn(KaAnalysisApiInternals::class, Frontend10ApiUsage::class)
+            @OptIn(KaImplementationDetail::class, Frontend10ApiUsage::class)
             containingFile.virtualFile?.analysisExtensionFileContextModule?.let { module ->
                 register(module.moduleInfo)
             }
@@ -360,6 +360,11 @@ class ModuleInfoProvider(private val project: Project) {
         if (orderEntry is JdkOrderEntry) {
             val sdk = orderEntry.jdk
             if (sdk != null) {
+                val contextSdk = config.contextualModuleInfo?.sdk()
+                if (contextSdk != null && contextSdk != sdk) {
+                    // don't yield sdk which is absent in the dependencies
+                    return null
+                }
                 return collectBySdk(sdk, visited)
             }
         }
@@ -416,13 +421,14 @@ class ModuleInfoProvider(private val project: Project) {
 
     private fun SeqScope<Result<IdeaModuleInfo>>.collectByUserData(container: UserDataModuleContainer) {
         register {
-            val module = container.module
             val sourceRootType = container.customSourceRootType
+            if (sourceRootType == null) return@register null
 
-            if (module != null && sourceRootType != null) {
-                module.asSourceInfo(sourceRootType.sourceRootType)?.let {moduleInfo ->
-                    return@register moduleInfo
-                }
+            // Compute `module` last. `ModuleUtilCore.findModuleForPsiElement` is costly to compute as it iterates through all libraries of
+            // a module to find the virtual file possibly in a module-only library. At the same time, `customSourceRootType` only applies to
+            // Android light classes, which are an edge case, so we can assume that it'll be `null` most of the time.
+            container.module?.asSourceInfo(sourceRootType.sourceRootType)?.let { moduleInfo ->
+                return@register moduleInfo
             }
             null
         }

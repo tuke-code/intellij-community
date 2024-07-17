@@ -40,7 +40,6 @@ import com.intellij.openapi.wm.WindowManager
 import com.intellij.openapi.wm.impl.IdeRootPane
 import com.intellij.openapi.wm.impl.WindowManagerImpl
 import com.intellij.openapi.wm.impl.customFrameDecorations.header.toolbar.HeaderToolbarButtonLook
-import com.intellij.openapi.wm.impl.headertoolbar.adjustIconForHeader
 import com.intellij.ui.*
 import com.intellij.ui.icons.IconReplacer
 import com.intellij.ui.icons.TextHoledIcon
@@ -87,8 +86,8 @@ private fun createRunActionToolbar(): ActionToolbar {
       return arrayOf(e.actionManager.getAction("RunToolbarMainActionGroup"))
     }
 
-    override fun postProcessVisibleChildren(visibleChildren: List<AnAction>, updateSession: UpdateSession): List<AnAction?> {
-      return filterOutRunIfDebugResumeIsPresent(visibleChildren)
+    override fun postProcessVisibleChildren(e: AnActionEvent, visibleChildren: List<AnAction>): List<AnAction> {
+      return filterOutRunIfDebugResumeIsPresent(e, visibleChildren)
     }
   }
   val toolbar = ActionManager.getInstance().createActionToolbar(ActionPlaces.NEW_UI_RUN_TOOLBAR, group, true)
@@ -404,10 +403,18 @@ private class MoreRunToolbarActions : TogglePopupAction(
   override fun getActionUpdateThread() = ActionUpdateThread.BGT
 }
 
-internal fun filterOutRunIfDebugResumeIsPresent(actions: List<AnAction>): List<AnAction> {
-  val hasPause = actions.find { it.javaClass.name.endsWith("XDebuggerResumeAction") } != null
+internal fun filterOutRunIfDebugResumeIsPresent(e: AnActionEvent, actions: List<AnAction>): List<AnAction> {
+  val hasPause = actions.find {
+    it.javaClass.simpleName.let {
+      it == "InlineXDebuggerResumeAction" ||
+      it == "ConfigurationXDebuggerResumeAction"
+    } ||
+    e.actionManager.getId(it)?.contains("XDebuggerResumeAction") == true
+  } != null
   if (!hasPause) return actions
-  return actions.filter { (it as? ExecutorAction)?.id != ToolWindowId.RUN }
+  return actions.filter {
+    ((it as? ExecutorAction)?.id ?: e.actionManager.getId(it)) != "Run"
+  }
 }
 
 internal fun executorFilterByParentGroupFactory(parentGroup: ActionGroup?): (AnActionEvent?) -> Predicate<Executor>? {
@@ -450,9 +457,6 @@ open class RedesignedRunConfigurationSelector : TogglePopupAction(), CustomCompo
 
     val delegate = e.actionManager.getAction("RunConfiguration") as? RunConfigurationsComboBoxAction ?: return
     delegate.update(e)
-    e.presentation.icon?.let {
-      e.presentation.icon = adjustIconForHeader(it)
-    }
     val configurationName = e.project?.let { RunManager.getInstanceIfCreated(it) }?.selectedConfiguration?.name
     if (configurationName?.length?.let { it > CONFIGURATION_NAME_NON_TRIM_MAX_LENGTH } == true) {
       e.presentation.setDescription(ExecutionBundle.messagePointer("choose.run.configuration.action.new.ui.button.description.long",
