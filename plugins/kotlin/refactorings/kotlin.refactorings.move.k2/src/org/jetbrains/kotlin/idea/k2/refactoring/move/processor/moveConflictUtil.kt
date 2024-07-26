@@ -22,6 +22,7 @@ import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.analyze
 import org.jetbrains.kotlin.analysis.api.analyzeCopy
 import org.jetbrains.kotlin.analysis.api.projectStructure.KaDanglingFileResolutionMode
+import org.jetbrains.kotlin.analysis.api.symbols.KaDeclarationSymbol
 import org.jetbrains.kotlin.analysis.api.symbols.KaSymbolVisibility
 import org.jetbrains.kotlin.asJava.toLightElements
 import org.jetbrains.kotlin.descriptors.Visibilities
@@ -33,11 +34,7 @@ import org.jetbrains.kotlin.idea.refactoring.getContainer
 import org.jetbrains.kotlin.idea.references.mainReference
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.psi.*
-import org.jetbrains.kotlin.psi.psiUtil.collectDescendantsOfType
-import org.jetbrains.kotlin.psi.psiUtil.containingClass
-import org.jetbrains.kotlin.psi.psiUtil.isAncestor
-import org.jetbrains.kotlin.psi.psiUtil.visibilityModifierTypeOrDefault
-import org.jetbrains.kotlin.resolve.calls.util.getCalleeExpressionIfAny
+import org.jetbrains.kotlin.psi.psiUtil.*
 import org.jetbrains.kotlin.util.capitalizeDecapitalize.capitalizeAsciiOnly
 
 /**
@@ -131,7 +128,7 @@ fun createCopyTarget(
 
         // Retarget all references to make sure all references are resolvable after moving
         val retargetResult = copyUsageInfo.retarget(copyUsageInfo.referencedElement as PsiNamedElement) as? KtElement ?: return@forEach
-        val retargetReference = retargetResult.getCalleeExpressionIfAny() as? KtSimpleNameExpression ?: return@forEach
+        val retargetReference = retargetResult.getQualifiedElementSelector() as? KtReferenceExpression ?: return@forEach
         // Attach physical usage info to the copied reference.
         // This will make it possible for the conflict checker to check whether a conflict exists before even calling the refactoring.
         retargetReference.internalUsageInfo = originalUsageInfo
@@ -187,7 +184,7 @@ private fun MoveRenameUsageInfo.isVisibleBeforeMove(): Boolean {
 }
 
 private fun PsiNamedElement.isVisibleTo(usage: PsiElement): Boolean {
-    return if (this is KtNamedDeclaration && usage is KtElement) {
+    return if (usage is KtElement) {
         kotlinIsVisibleTo(usage)
     } else {
         lightIsVisibleTo(usage)
@@ -196,16 +193,21 @@ private fun PsiNamedElement.isVisibleTo(usage: PsiElement): Boolean {
 
 context(KaSession)
 @OptIn(KaExperimentalApi::class)
-private fun KtNamedDeclaration.isVisibleTo(usage: PsiElement): Boolean {
+private fun PsiNamedElement.isVisibleTo(usage: KtElement): Boolean {
     val file = (usage.containingFile as? KtFile)?.symbol ?: return false
-    val symbol = symbol
+    val symbol = if (this is KtNamedDeclaration) {
+        symbol
+    } else {
+        if (this !is PsiMember) return false // get Java symbol through resolve because it is not possible through getSymbol
+        usage.mainReference?.resolveToSymbol() as? KaDeclarationSymbol ?: return false
+    }
     return isVisible(symbol, file, position = usage)
 }
 
-private fun KtNamedDeclaration.kotlinIsVisibleTo(usage: KtElement) = when {
-    !isPhysical -> analyzeCopy(this, KaDanglingFileResolutionMode.PREFER_SELF) { isVisibleTo(usage) }
+private fun PsiNamedElement.kotlinIsVisibleTo(usage: KtElement) = when {
+    !isPhysical && this is KtNamedDeclaration -> analyzeCopy(this, KaDanglingFileResolutionMode.PREFER_SELF) { isVisibleTo(usage) }
     !usage.isPhysical -> analyzeCopy(usage, KaDanglingFileResolutionMode.PREFER_SELF) { isVisibleTo(usage) }
-    else -> analyze(this) { isVisibleTo(usage) }
+    else -> analyze(usage) { isVisibleTo(usage) }
 }
 
 private fun PsiNamedElement.lightIsVisibleTo(usage: PsiElement): Boolean {

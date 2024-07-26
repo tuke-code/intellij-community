@@ -266,8 +266,8 @@ class QuickFixRegistrar : QuickFixContributor {
         UNUSED_VARIABLE.registerFactory(RenameToUnderscoreFix.Factory)
 
         NO_RETURN_IN_FUNCTION_WITH_BLOCK_BODY.registerFactory(AddReturnExpressionFixFactory)
-        NO_RETURN_IN_FUNCTION_WITH_BLOCK_BODY.registerFactory(AddReturnToLastExpressionInFunctionFix)
-        UNUSED_EXPRESSION.registerFactory(AddReturnToUnusedLastExpressionInFunctionFix)
+        NO_RETURN_IN_FUNCTION_WITH_BLOCK_BODY.registerFactory(AddReturnToLastExpressionInFunctionFixFactory)
+        UNUSED_EXPRESSION.registerFactory(AddReturnToUnusedLastExpressionInFunctionFixFactory)
 
         UNUSED_DESTRUCTURED_PARAMETER_ENTRY.registerFactory(RenameToUnderscoreFix.Factory)
 
@@ -316,7 +316,7 @@ class QuickFixRegistrar : QuickFixContributor {
         PROPERTY_WITH_NO_TYPE_NO_INITIALIZER.registerActions(SpecifyTypeExplicitlyFix())
         MUST_BE_INITIALIZED.registerActions(SpecifyTypeExplicitlyFix())
 
-        ELSE_MISPLACED_IN_WHEN.registerFactory(MoveWhenElseBranchFix)
+        ELSE_MISPLACED_IN_WHEN.registerFactory(MoveWhenElseBranchFixFactory)
         REDUNDANT_ELSE_IN_WHEN.registerFactory(RemoveWhenBranchFix)
         SENSELESS_NULL_IN_WHEN.registerFactory(RemoveWhenBranchFix, RemoveWhenConditionFix)
         BREAK_OR_CONTINUE_IN_WHEN.registerFactory(AddLoopLabelFixFactory)
@@ -581,7 +581,7 @@ class QuickFixRegistrar : QuickFixContributor {
 
         UNUSED_LAMBDA_EXPRESSION.registerFactory(AddRunToLambdaFix)
 
-        WRONG_LONG_SUFFIX.registerFactory(WrongLongSuffixFix)
+        WRONG_LONG_SUFFIX.registerFactory(WrongLongSuffixFixFactory)
 
         REIFIED_TYPE_PARAMETER_NO_INLINE.registerFactory(AddInlineToFunctionWithReifiedFix)
 
@@ -591,7 +591,7 @@ class QuickFixRegistrar : QuickFixContributor {
         WRONG_NUMBER_OF_TYPE_ARGUMENTS.registerFactory(CreateTypeParameterUnmatchedTypeArgumentActionFactory)
 
         FINAL_UPPER_BOUND.registerFactory(InlineTypeParameterFix)
-        FINAL_UPPER_BOUND.registerFactory(RemoveFinalUpperBoundFix)
+        FINAL_UPPER_BOUND.registerFactory(RemoveFinalUpperBoundFixFactory)
 
         TYPE_PARAMETER_AS_REIFIED.registerFactory(AddReifiedToTypeParameterOfFunctionFixFactory)
 
@@ -658,10 +658,10 @@ class QuickFixRegistrar : QuickFixContributor {
         NULL_FOR_NONNULL_TYPE.registerFactory(ChangeToLabeledReturnFixFactory)
 
         WRONG_ANNOTATION_TARGET.registerFactory(AddAnnotationTargetFix, AddAnnotationUseSiteTargetFix)
-        WRONG_ANNOTATION_TARGET_WITH_USE_SITE_TARGET.registerFactory(MoveReceiverAnnotationFix, AddAnnotationTargetFix)
+        WRONG_ANNOTATION_TARGET_WITH_USE_SITE_TARGET.registerFactory(MoveReceiverAnnotationFixFactory, AddAnnotationTargetFix)
 
         NO_CONSTRUCTOR.registerFactory(RemoveNoConstructorFixFactory)
-        NO_CONSTRUCTOR.registerFactory(AddDefaultConstructorFix)
+        NO_CONSTRUCTOR.registerFactory(AddDefaultConstructorFixFactory)
         NO_CONSTRUCTOR_WARNING.registerFactory(RemoveNoConstructorFixFactory)
 
         ANNOTATION_USED_AS_ANNOTATION_ARGUMENT.registerFactory(RemoveAtFromAnnotationArgument)
@@ -691,7 +691,7 @@ class QuickFixRegistrar : QuickFixContributor {
         OPT_IN_MARKER_ON_OVERRIDE_WARNING.registerFactory(RemoveAnnotationFix)
         OPT_IN_WITHOUT_ARGUMENTS.registerFactory(RemoveAnnotationFix)
 
-        TYPE_VARIANCE_CONFLICT.registerFactory(RemoveTypeVarianceFix, AddAnnotationFix.TypeVarianceConflictFactory)
+        TYPE_VARIANCE_CONFLICT.registerFactory(RemoveTypeVarianceFixFactory, AddAnnotationFix.TypeVarianceConflictFactory)
 
         CONST_VAL_NOT_TOP_LEVEL_OR_OBJECT.registerFactory(
             MoveMemberToCompanionObjectIntention.Factory,
@@ -722,7 +722,7 @@ class QuickFixRegistrar : QuickFixContributor {
 
         RESTRICTED_RETENTION_FOR_EXPRESSION_ANNOTATION.registerFactory(RestrictedRetentionForExpressionAnnotationFactory)
 
-        NO_VALUE_FOR_PARAMETER.registerFactory(AddConstructorParameterFromSuperTypeCallFix)
+        NO_VALUE_FOR_PARAMETER.registerFactory(AddConstructorParameterFromSuperTypeCallFixFactory)
         NO_VALUE_FOR_PARAMETER.registerFactory(SpecifyRemainingArgumentsByNameFixFactory)
 
         UNEXPECTED_TRAILING_LAMBDA_ON_A_NEW_LINE.registerFactory(AddSemicolonBeforeLambdaExpressionFix.Factory)
@@ -767,7 +767,7 @@ class QuickFixRegistrar : QuickFixContributor {
 
         JAVA_CLASS_ON_COMPANION.registerFactory(JavaClassOnCompanionFixes)
 
-        ILLEGAL_ESCAPE.registerFactory(ConvertIllegalEscapeToUnicodeEscapeFix)
+        ILLEGAL_ESCAPE.registerFactory(ConvertIllegalEscapeToUnicodeEscapeFixFactory)
 
         MODIFIER_FORM_FOR_NON_BUILT_IN_SUSPEND.registerFactory(AddEmptyArgumentListFixFactory)
 

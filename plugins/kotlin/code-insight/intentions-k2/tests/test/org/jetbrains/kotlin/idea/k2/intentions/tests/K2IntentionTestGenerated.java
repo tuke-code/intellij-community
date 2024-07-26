@@ -3985,6 +3985,16 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
             runTest("../../../idea/tests/testData/intentions/removeExplicitType/propertyTypeForExtFunctionCall.kt");
         }
 
+        @TestMetadata("propertyTypeForIfBranches.kt")
+        public void testPropertyTypeForIfBranches() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/removeExplicitType/propertyTypeForIfBranches.kt");
+        }
+
+        @TestMetadata("propertyTypeForWhenBranches.kt")
+        public void testPropertyTypeForWhenBranches() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/removeExplicitType/propertyTypeForWhenBranches.kt");
+        }
+
         @TestMetadata("propertyTypeFromGetter.kt")
         public void testPropertyTypeFromGetter() throws Exception {
             runTest("../../../idea/tests/testData/intentions/removeExplicitType/propertyTypeFromGetter.kt");
@@ -9163,6 +9173,11 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
 
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+        }
+
+        @TestMetadata("caretAfterParameterName.kt")
+        public void testCaretAfterParameterName() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/convertParameterToReceiver/caretAfterParameterName.kt");
         }
 
         @TestMetadata("classParameter.kt")

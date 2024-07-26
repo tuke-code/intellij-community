@@ -2,27 +2,37 @@
 package com.intellij.psi.impl.source;
 
 import com.intellij.lang.ASTNode;
+import com.intellij.openapi.project.DumbService;
+import com.intellij.openapi.project.Project;
+import com.intellij.openapi.roots.ProjectRootModificationTracker;
 import com.intellij.psi.*;
+import com.intellij.psi.impl.PsiJavaModuleModificationTracker;
 import com.intellij.psi.impl.java.stubs.JavaStubElementTypes;
-import com.intellij.psi.impl.java.stubs.PsiImportModuleStatementStub;
+import com.intellij.psi.impl.java.stubs.PsiImportStatementStub;
+import com.intellij.psi.impl.source.resolve.JavaResolveUtil;
+import com.intellij.psi.util.CachedValueProvider;
+import com.intellij.psi.util.CachedValuesManager;
 import com.intellij.psi.util.PsiTreeUtil;
 import com.intellij.util.ArrayFactory;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.lang.ref.SoftReference;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 import static com.intellij.openapi.util.text.StringUtil.nullize;
 import static com.intellij.reference.SoftReference.dereference;
 
-public class PsiImportModuleStatementImpl extends JavaStubPsiElement<PsiImportModuleStatementStub> implements PsiImportModuleStatement {
+public class PsiImportModuleStatementImpl extends PsiImportStatementBaseImpl implements PsiImportModuleStatement {
   public static final PsiImportModuleStatementImpl[] EMPTY_ARRAY = new PsiImportModuleStatementImpl[0];
   public static final ArrayFactory<PsiImportModuleStatementImpl> ARRAY_FACTORY =
     count -> count == 0 ? EMPTY_ARRAY : new PsiImportModuleStatementImpl[count];
 
-  private SoftReference<PsiJavaModuleReference> myReference;
+  private SoftReference<PsiJavaModuleReferenceElement> myRefElement;
 
-  public PsiImportModuleStatementImpl(PsiImportModuleStatementStub stub) {
+  public PsiImportModuleStatementImpl(PsiImportStatementStub stub) {
     super(stub, JavaStubElementTypes.IMPORT_MODULE_STATEMENT);
   }
 
@@ -32,36 +42,64 @@ public class PsiImportModuleStatementImpl extends JavaStubPsiElement<PsiImportMo
 
   @Override
   public @Nullable PsiJavaModule resolveTargetModule() {
-    PsiJavaModuleReference moduleReference = getModuleReference();
-    if (moduleReference == null) return null;
-    return moduleReference.resolve();
+    PsiJavaModuleReferenceElement refElement = getModuleReference();
+    if (refElement == null) return null;
+    PsiJavaModuleReference ref = refElement.getReference();
+    if (ref == null) return null;
+    return ref.resolve();
   }
 
   @Override
   public String getReferenceName() {
-    PsiJavaModuleReference moduleReference = getModuleReference();
-    if (moduleReference == null) return null;
-    return moduleReference.getCanonicalText();
+    PsiJavaModuleReferenceElement refElement = getModuleReference();
+    if (refElement == null) return null;
+    PsiJavaModuleReference ref = refElement.getReference();
+    if (ref == null) return null;
+    return ref.getCanonicalText();
   }
 
   @Override
-  public @Nullable PsiJavaModuleReference getModuleReference() {
-    PsiImportModuleStatementStub stub = getStub();
+  public @Nullable PsiJavaModuleReferenceElement getModuleReference() {
+    PsiImportStatementStub stub = getStub();
     if (stub != null) {
       String refText = nullize(stub.getImportReferenceText());
       if (refText == null) return null;
-      PsiJavaModuleReference ref = dereference(myReference);
-      if (ref == null) {
-        ref = JavaPsiFacade.getInstance(getProject()).getParserFacade().createModuleReferenceFromText(refText, this).getReference();
-        myReference = new SoftReference<>(ref);
+      PsiJavaModuleReferenceElement refElement = dereference(myRefElement);
+      if (refElement == null) {
+        refElement = JavaPsiFacade.getInstance(getProject()).getParserFacade().createModuleReferenceFromText(refText, this);
+        myRefElement = new SoftReference<>(refElement);
       }
-      return ref;
+      return refElement;
     }
     else {
-      myReference = null;
-      PsiJavaModuleReferenceElement refElement = PsiTreeUtil.getChildOfType(this, PsiJavaModuleReferenceElement.class);
-      return refElement != null ? refElement.getReference() : null;
+      myRefElement = null;
+      return PsiTreeUtil.getChildOfType(this, PsiJavaModuleReferenceElement.class);
     }
+  }
+
+  @Override
+  public @Nullable PsiPackageAccessibilityStatement findImportedPackage(@NotNull String packageName) {
+    PsiImportModuleStatementImpl moduleStatement = this;
+    if (DumbService.isDumb(moduleStatement.getProject())) return null;
+    return CachedValuesManager.getCachedValue(moduleStatement, () -> {
+      Project project = moduleStatement.getProject();
+      Map<String, PsiPackageAccessibilityStatement> packagesByName = new HashMap<>();
+      PsiJavaModule module = resolveTargetModule();
+      if (module == null) {
+        return CachedValueProvider.Result.create(packagesByName,
+                                                 PsiJavaModuleModificationTracker.getInstance(project),
+                                                 ProjectRootModificationTracker.getInstance(project));
+      }
+      List<PsiPackageAccessibilityStatement> packages = JavaResolveUtil.getExportedPackages(module, module);
+      for (PsiPackageAccessibilityStatement aPackage : packages) {
+        String currentPackageName = aPackage.getPackageName();
+        if (currentPackageName == null) continue;
+        packagesByName.put(currentPackageName, aPackage);
+      }
+      return CachedValueProvider.Result.create(packagesByName,
+                                               PsiJavaModuleModificationTracker.getInstance(project),
+                                               ProjectRootModificationTracker.getInstance(project));
+    }).get(packageName);
   }
 
   @Override
@@ -76,7 +114,9 @@ public class PsiImportModuleStatementImpl extends JavaStubPsiElement<PsiImportMo
 
   @Override
   public PsiElement resolve() {
-    PsiJavaModuleReference ref = getModuleReference();
+    PsiJavaModuleReferenceElement refElement = getModuleReference();
+    if (refElement == null) return null;
+    PsiJavaModuleReference ref = refElement.getReference();
     return ref != null ? ref.resolve() : null;
   }
 

@@ -17,31 +17,26 @@ import kotlin.io.path.nameWithoutExtension
 import kotlin.io.path.pathString
 
 object LocalizationUtil {
-  @Volatile
-  private var isL10nInitialized: Boolean = false
   private const val LOCALIZATION_FOLDER_NAME: String = "localization"
   @Internal
   const val LOCALIZATION_KEY: String = "i18n.locale"
 
-  @Internal
-  fun getForcedLocale(): String? {
-    val languageTag = System.getProperty(LOCALIZATION_KEY)
-    if (languageTag.isNullOrEmpty()) {
-      return null
+  @JvmOverloads
+  fun getLocale(ignoreRestartRequired: Boolean = false): Locale {
+    val localizationStateService = LocalizationStateService.getInstance()
+    val languageTag = if (localizationStateService == null) {
+      return Locale.ENGLISH
     }
-    return languageTag
-  }
-
-  fun getLocale(): Locale {
-    val forcedLocale = getForcedLocale()
-    val languageTag = forcedLocale ?: LocalizationStateService.getInstance()?.getSelectedLocale() ?: return Locale.ENGLISH
+    else if (!ignoreRestartRequired && localizationStateService.isRestartRequired) {
+      localizationStateService.lastSelectedLocale
+    }
+    else {
+      localizationStateService.selectedLocale
+    }
+    
     val locale = Locale.forLanguageTag(languageTag)
-
-    if (forcedLocale == null) {
-      val englishTag = Locale.ENGLISH.toLanguageTag()
-      if (languageTag != englishTag && findLanguageBundle(locale) == null) {
-        return Locale.ENGLISH
-      }
+    if (locale.language != Locale.ENGLISH.language && findLanguageBundle(locale) == null) {
+      return Locale.ENGLISH
     }
 
     return locale
@@ -98,8 +93,9 @@ object LocalizationUtil {
       val pathString = FileUtil.toSystemIndependentName(localizedPath.pathString)
       defaultLoader?.getResourceAsStream(pathString)?.let { return it }
     }
-    return getPluginClassLoader()?.getResourceAsStream(path.pathString) ?:
-    defaultLoader?.getResourceAsStream(path.pathString)
+    val pureResourcePath = FileUtil.toSystemIndependentName(path.pathString)
+    return getPluginClassLoader()?.getResourceAsStream(pureResourcePath)
+           ?: defaultLoader?.getResourceAsStream(pureResourcePath)
   }
 
   @Internal
@@ -166,17 +162,6 @@ object LocalizationUtil {
       path.convertPathToLocaleSuffixUsage(locale, false))
       .map { FileUtil.toSystemIndependentName(it.toString()) }
   }
-
-  @Internal
-  fun setLocalizationInitialized() {
-    isL10nInitialized = true
-  }
-
-  @Internal
-  fun isLocalizationInitialized(): Boolean {
-    return isL10nInitialized
-  }
-
 
   @Internal
   @JvmOverloads

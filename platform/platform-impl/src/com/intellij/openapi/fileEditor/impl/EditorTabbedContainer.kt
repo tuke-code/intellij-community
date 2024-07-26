@@ -39,6 +39,7 @@ import com.intellij.openapi.util.NlsContexts
 import com.intellij.openapi.util.SystemInfoRt
 import com.intellij.openapi.util.registry.Registry
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.toolWindow.ToolWindowHeader
 import com.intellij.ui.*
 import com.intellij.ui.docking.DockContainer
 import com.intellij.ui.docking.DockManager
@@ -57,13 +58,14 @@ import com.intellij.ui.tabs.impl.multiRow.CompressibleMultiRowLayout
 import com.intellij.ui.tabs.impl.multiRow.ScrollableMultiRowLayout
 import com.intellij.ui.tabs.impl.multiRow.WrapMultiRowLayout
 import com.intellij.ui.tabs.impl.singleRow.ScrollableSingleRowLayout
-import com.intellij.util.concurrency.EdtScheduledExecutorService
+import com.intellij.util.concurrency.EdtScheduler
 import com.intellij.util.ui.JBInsets
 import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.TimedDeadzone
 import com.intellij.util.ui.UIUtil
 import kotlinx.coroutines.*
 import org.jetbrains.annotations.ApiStatus
+import org.jetbrains.annotations.ApiStatus.Internal
 import java.awt.*
 import java.awt.datatransfer.DataFlavor
 import java.awt.datatransfer.Transferable
@@ -267,7 +269,7 @@ class EditorTabbedContainer internal constructor(
     get() = editorTabs
 }
 
-@ApiStatus.Internal
+@Internal
 class DockableEditor(
   @JvmField internal val img: Image?,
   @JvmField internal val file: VirtualFile,
@@ -342,18 +344,18 @@ private fun doProcessDoubleClick(e: MouseEvent, editorTabs: JBTabsImpl, window: 
 
 private fun createKeepMousePositionRunnable(event: MouseEvent): () -> Unit {
   return {
-    EdtScheduledExecutorService.getInstance().schedule({
-                                                         val component = event.component
-                                                         if (component != null && component.isShowing) {
-                                                           val p = component.locationOnScreen
-                                                           p.translate(event.x, event.y)
-                                                           try {
-                                                             Robot().mouseMove(p.x, p.y)
-                                                           }
-                                                           catch (ignored: AWTException) {
-                                                           }
-                                                         }
-                                                       }, 50, TimeUnit.MILLISECONDS)
+    EdtScheduler.getInstance().schedule(50) {
+      val component = event.component
+      if (component != null && component.isShowing) {
+        val p = component.locationOnScreen
+        p.translate(event.x, event.y)
+        try {
+          Robot().mouseMove(p.x, p.y)
+        }
+        catch (ignored: AWTException) {
+        }
+      }
+    }
   }
 }
 
@@ -591,6 +593,9 @@ private class EditorTabs(
   }
 
   override fun getEditorWindow(): EditorWindow = window
+
+  @Internal
+  override fun minHeaderHeight(): Int = ToolWindowHeader.getUnscaledHeight()
 
   override fun createRowLayout(): TabLayout {
     if (!isSingleRow || (isHorizontalTabs && (TabLayout.showPinnedTabsSeparately() || !UISettings.getInstance().hideTabsIfNeeded))) {

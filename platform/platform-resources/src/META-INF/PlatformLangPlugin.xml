@@ -111,8 +111,6 @@
     <applicationService serviceInterface="com.intellij.openapi.roots.ModifiableModelsProvider"
                         serviceImplementation="com.intellij.openapi.roots.PlatformModifiableModelsProvider"/>
 
-    <applicationInitializedListener implementation="com.intellij.ide.LanguageBundleListener"/>
-
     <refactoring.copyHandler implementation="com.intellij.refactoring.copy.CopyFilesOrDirectoriesHandler" id="copyFilesOrDirectories"/>
     <refactoring.moveHandler implementation="com.intellij.refactoring.move.moveFilesOrDirectories.MoveFilesOrDirectoriesHandler" id="moveFileOrDir"/>
 
@@ -139,6 +137,10 @@
   </extensions>
 
   <xi:include href="/META-INF/diff-impl.xml">
+    <xi:fallback/>
+  </xi:include>
+
+  <xi:include href="/META-INF/compose.xml">
     <xi:fallback/>
   </xi:include>
 

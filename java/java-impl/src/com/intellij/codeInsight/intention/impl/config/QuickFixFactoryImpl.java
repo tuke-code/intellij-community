@@ -803,7 +803,7 @@ public final class QuickFixFactoryImpl extends QuickFixFactory {
     //noinspection UnnecessaryLocalVariable
     boolean hasErrorsBesideUnresolvedImports = !DaemonCodeAnalyzerEx
       .processHighlights(document, file.getProject(), HighlightSeverity.ERROR, 0, document.getTextLength(), error -> {
-        if (error.type instanceof LocalInspectionsPass.InspectionHighlightInfoType) return true;
+        if (error.type.isInspectionHighlightInfoType()) return true;
         int infoStart = error.getActualStartOffset();
         int infoEnd = error.getActualEndOffset();
 
@@ -872,6 +872,13 @@ public final class QuickFixFactoryImpl extends QuickFixFactory {
                                                                          @NotNull Set<String> missingCases,
                                                                          @NotNull List<String> allNames) {
     return new CreateSealedClassMissingSwitchBranchesFix(switchBlock, missingCases, allNames).asIntention();
+  }
+
+  @Override
+  public @Nullable IntentionAction createAddMissingBooleanPrimitiveBranchesFix(@NotNull PsiSwitchBlock block) {
+    CreateMissingBooleanPrimitiveBranchesFix fix = CreateMissingBooleanPrimitiveBranchesFix.createFix(block);
+    if (fix == null) return null;
+    return fix.asIntention();
   }
 
   @Override

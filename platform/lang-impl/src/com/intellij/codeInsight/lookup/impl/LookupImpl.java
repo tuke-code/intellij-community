@@ -24,6 +24,8 @@ import com.intellij.openapi.actionSystem.*;
 import com.intellij.openapi.actionSystem.ex.ActionUtil;
 import com.intellij.openapi.application.AccessToken;
 import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.client.ClientProjectSession;
+import com.intellij.openapi.client.ClientSessionsManager;
 import com.intellij.openapi.command.CommandProcessor;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.editor.Editor;
@@ -32,6 +34,7 @@ import com.intellij.openapi.editor.ScrollType;
 import com.intellij.openapi.editor.colors.FontPreferences;
 import com.intellij.openapi.editor.colors.impl.FontPreferencesImpl;
 import com.intellij.openapi.editor.event.*;
+import com.intellij.openapi.editor.ex.EditorEx;
 import com.intellij.openapi.editor.impl.EditorImpl;
 import com.intellij.openapi.project.DumbAwareAction;
 import com.intellij.openapi.project.Project;
@@ -86,7 +89,6 @@ public class LookupImpl extends LightweightHint implements LookupEx, Disposable,
   private static final Logger LOG = Logger.getInstance(LookupImpl.class);
 
   private final LookupOffsets myOffsets;
-  private final Project project;
   private final Editor editor;
   private final Object uiLock = new Object();
   private final JBList<LookupElement> list = new LookupList();
@@ -99,6 +101,7 @@ public class LookupImpl extends LightweightHint implements LookupEx, Disposable,
   private final FontPreferences myFontPreferences = new FontPreferencesImpl();
 
   private final long myCreatedTimestamp;
+  private final ClientProjectSession mySession;
   private long myStampShown = 0;
   protected boolean myShown = false;
   private boolean myHidden = false;
@@ -115,26 +118,26 @@ public class LookupImpl extends LightweightHint implements LookupEx, Disposable,
   boolean myUpdating;
   private LookupUi myUi;
   private LookupPresentation myPresentation = new LookupPresentation.Builder().build();
-  private final ClientId myClientId = ClientId.getCurrent();
   private final AtomicInteger myDummyItemCount = new AtomicInteger();
   private final EmptyLookupItem myDummyItem = new EmptyLookupItem(CommonBundle.message("tree.node.loading"), true);
   private boolean myFirstElementAdded = false;
 
   final CoroutineScope coroutineScope = CoroutineScopeKt.CoroutineScope(SupervisorJob(null).plus(Dispatchers.getDefault()));
 
-  public LookupImpl(Project project, Editor editor, @NotNull LookupArranger arranger) {
+  @ApiStatus.Internal
+  public LookupImpl(ClientProjectSession session, Editor editor, @NotNull LookupArranger arranger) {
     super(new JPanel(new BorderLayout()));
     setForceShowAsPopup(true);
     setCancelOnClickOutside(false);
     setResizable(true);
 
-    this.project = project;
+    mySession = session;
     this.editor = InjectedLanguageEditorUtil.getTopLevelEditor(editor);
     myArranger = arranger;
     myPresentableArranger = arranger;
     this.editor.getColorsScheme().getFontPreferences().copyTo(myFontPreferences);
 
-    DaemonCodeAnalyzer.getInstance(this.project).disableUpdateByTimer(this);
+    DaemonCodeAnalyzer.getInstance(session.getProject()).disableUpdateByTimer(this);
 
     cellRenderer = new LookupCellRenderer(this, this.editor.getContentComponent());
     cellRenderer.itemAdded(myDummyItem, LookupElementPresentation.renderElement(myDummyItem));
@@ -185,6 +188,12 @@ public class LookupImpl extends LightweightHint implements LookupEx, Disposable,
 
   public void setArranger(LookupArranger arranger) {
     myArranger = arranger;
+  }
+
+  @ApiStatus.Internal
+  @NotNull
+  public ClientProjectSession getSession() {
+    return mySession;
   }
 
   @Override
@@ -578,7 +587,7 @@ public class LookupImpl extends LightweightHint implements LookupEx, Disposable,
       hideWithItemSelected(null, completionChar);
       return;
     }
-    CommandProcessor.getInstance().executeCommand(project, () -> {
+    CommandProcessor.getInstance().executeCommand(mySession.getProject(), () -> {
       try (AccessToken ignore = SlowOperations.knownIssue("IDEA-346621, EA-1083788")) {
         finishLookupInWritableFile(completionChar, item);
       }
@@ -638,7 +647,7 @@ public class LookupImpl extends LightweightHint implements LookupEx, Disposable,
   }
 
   protected void insertLookupString(LookupElement item, final int prefix) {
-    insertLookupString(project, getTopLevelEditor(), item, itemMatcher(item), itemPattern(item), prefix);
+    insertLookupString(mySession.getProject(), getTopLevelEditor(), item, itemMatcher(item), itemPattern(item), prefix);
   }
 
   public static void insertLookupString(final Project project,
@@ -705,7 +714,8 @@ public class LookupImpl extends LightweightHint implements LookupEx, Disposable,
 
   @Override
   public boolean vetoesHiding() {
-    return myGuardedChanges > 0;
+    // the second condition means that the Lookup belongs to another connected client
+    return myGuardedChanges > 0 || mySession != ClientSessionsManager.getProjectSession(mySession.getProject()) || LookupImplVetoPolicy.anyVetoesHiding(this);
   }
 
   public boolean isAvailableToUser() {
@@ -838,7 +848,7 @@ public class LookupImpl extends LightweightHint implements LookupEx, Disposable,
     editor.getDocument().addDocumentListener(new DocumentListener() {
       @Override
       public void documentChanged(@NotNull DocumentEvent e) {
-        if (canHide()) {
+        if (canHideOnChange()) {
           hideLookup(false);
         }
       }
@@ -855,7 +865,7 @@ public class LookupImpl extends LightweightHint implements LookupEx, Disposable,
     editor.getCaretModel().addCaretListener(new CaretListener() {
       @Override
       public void caretPositionChanged(@NotNull CaretEvent e) {
-        if (canHide()) {
+        if (canHideOnChange()) {
           hideLookup(false);
         }
       }
@@ -863,7 +873,7 @@ public class LookupImpl extends LightweightHint implements LookupEx, Disposable,
     editor.getSelectionModel().addSelectionListener(new SelectionListener() {
       @Override
       public void selectionChanged(final @NotNull SelectionEvent e) {
-        if (canHide()) {
+        if (canHideOnChange()) {
           hideLookup(false);
         }
       }
@@ -919,8 +929,18 @@ public class LookupImpl extends LightweightHint implements LookupEx, Disposable,
         }
 
         if (clickCount == 2) {
-          CommandProcessor.getInstance()
-            .executeCommand(project, () -> finishLookup(NORMAL_SELECT_CHAR), "", null, editor.getDocument());
+          // try to finish completion item using the action subsystem to avoid the difference between mouse and shortcut complete
+          AnAction completeAction = ActionManager.getInstance().getAction(IdeActions.ACTION_CHOOSE_LOOKUP_ITEM);
+          // the execution is wrapped into a command inside EditorAction
+          if (completeAction != null && editor instanceof EditorEx) {
+            AnActionEvent dataContext =
+              AnActionEvent.createFromDataContext(ActionPlaces.UNKNOWN, null, ((EditorEx)editor).getDataContext());
+            ActionUtil.performActionDumbAwareWithCallbacks(completeAction, dataContext);
+          }
+          else {
+            CommandProcessor.getInstance()
+              .executeCommand(mySession.getProject(), () -> finishLookup(NORMAL_SELECT_CHAR), "", null, editor.getDocument());
+          }
         }
         return true;
       }
@@ -934,12 +954,12 @@ public class LookupImpl extends LightweightHint implements LookupEx, Disposable,
     }, this);
   }
 
-  private boolean canHide() {
-    return myGuardedChanges == 0 && !myFinishing && !suppressHidingOnChange() && ClientId.isCurrentlyUnderLocalId();
+  private boolean canHideOnChange() {
+    return myGuardedChanges == 0 && !myFinishing && !vetoesHidingOnChange() && ClientId.isCurrentlyUnderLocalId();
   }
 
-  protected boolean suppressHidingOnChange() {
-    return false;
+  private boolean vetoesHidingOnChange() {
+    return LookupImplVetoPolicy.anyVetoesHidingOnChange(this);
   }
 
   @Override
@@ -1004,7 +1024,7 @@ public class LookupImpl extends LightweightHint implements LookupEx, Disposable,
 
   public void fireItemSelected(final @Nullable LookupElement item, char completionChar) {
     if (item != null && item.requiresCommittedDocuments()) {
-      PsiDocumentManager.getInstance(project).commitAllDocuments();
+      PsiDocumentManager.getInstance(mySession.getProject()).commitAllDocuments();
     }
     myArranger.itemSelected(item, completionChar);
     if (!myListeners.isEmpty()) {
@@ -1067,7 +1087,7 @@ public class LookupImpl extends LightweightHint implements LookupEx, Disposable,
 
   @Override
   public @Nullable PsiFile getPsiFile() {
-    return PsiDocumentManager.getInstance(project).getPsiFile(getEditor().getDocument());
+    return PsiDocumentManager.getInstance(mySession.getProject()).getPsiFile(getEditor().getDocument());
   }
 
   @Override
@@ -1107,9 +1127,9 @@ public class LookupImpl extends LightweightHint implements LookupEx, Disposable,
 
   @Override
   public @NotNull Editor getEditor() {
-    DocumentWindow documentWindow = getInjectedDocument(project, editor, editor.getCaretModel().getOffset());
+    DocumentWindow documentWindow = getInjectedDocument(mySession.getProject(), editor, editor.getCaretModel().getOffset());
     if (documentWindow != null) {
-      PsiFile injectedFile = PsiDocumentManager.getInstance(project).getPsiFile(documentWindow);
+      PsiFile injectedFile = PsiDocumentManager.getInstance(mySession.getProject()).getPsiFile(documentWindow);
       return InjectedLanguageUtil.getInjectedEditorForInjectedFile(editor, injectedFile);
     }
     return editor;
@@ -1122,7 +1142,7 @@ public class LookupImpl extends LightweightHint implements LookupEx, Disposable,
 
   @Override
   public @NotNull Project getProject() {
-    return project;
+    return mySession.getProject();
   }
 
   @Override
@@ -1179,8 +1199,8 @@ public class LookupImpl extends LightweightHint implements LookupEx, Disposable,
     if (isLookupDisposed()) {
       LOG.error(formatDisposeTrace());
     }
-    if (!myClientId.equals(ClientId.getCurrent())) {
-      LOG.error(ClientId.getCurrent() + " tries to hide lookup of " + myClientId);
+    if (!mySession.getClientId().equals(ClientId.getCurrent())) {
+      LOG.error(ClientId.getCurrent() + " tries to hide lookup of " + mySession.getClientId());
     }
     else {
       myHidden = true;
@@ -1284,7 +1304,7 @@ public class LookupImpl extends LightweightHint implements LookupEx, Disposable,
       return;
     }
 
-    UIEventLogger.LookupShowElementActions.log(project);
+    UIEventLogger.LookupShowElementActions.log(mySession.getProject());
 
     Rectangle itemBounds = getCurrentItemBounds();
     Rectangle visibleRect = SwingUtilities.convertRectangle(list, list.getVisibleRect(), getComponent());

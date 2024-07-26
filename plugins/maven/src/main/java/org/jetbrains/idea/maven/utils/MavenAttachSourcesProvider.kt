@@ -7,6 +7,7 @@ import com.intellij.notification.Notification
 import com.intellij.notification.NotificationType
 import com.intellij.notification.Notifications
 import com.intellij.openapi.application.EDT
+import com.intellij.openapi.application.readAction
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.roots.LibraryOrderEntry
 import com.intellij.openapi.roots.ProjectRootManager
@@ -44,7 +45,7 @@ internal class MavenAttachSourcesProvider : AttachSourcesProvider {
         val resultWrapper = ActionCallback()
         cs.launch {
           // may have been changed by this time...
-          val mavenProjects = getMavenProjects(psiFile)
+          val mavenProjects = readAction { getMavenProjects(psiFile) }
           if (mavenProjects.isEmpty()) {
             resultWrapper.setRejected()
             return@launch

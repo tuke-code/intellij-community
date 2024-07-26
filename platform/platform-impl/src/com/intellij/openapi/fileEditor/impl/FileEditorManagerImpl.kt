@@ -171,6 +171,10 @@ open class FileEditorManagerImpl(
         splitters.updateFileIcon(file)
         splitters.updateFileColor(file = file)
         splitters.updateFileBackgroundColor(file)
+        // https://youtrack.jetbrains.com/issue/IJPL-157805/Diff-the-window-title-doesnt-update-the-filename-on-selecting-navigating-to-another-file
+        if (splitters !== mainSplitters) {
+          splitters.updateFrameTitle()
+        }
       }
     }
   }
@@ -1267,6 +1271,8 @@ open class FileEditorManagerImpl(
       window.owner.afterFileOpen(file)
     }
 
+    selectionHistory.addRecord(file to window)
+
     // update frame and tab title
     scheduleUpdateFileName(file)
     return composite
@@ -2207,6 +2213,7 @@ open class FileEditorManagerImpl(
     for (tab in tabs) {
       val composite = tab.composite
       splitters.afterFileOpen(file = composite.file)
+      selectionHistory.addRecord(composite.file to window)
 
       composite.coroutineScope.launch {
         val color = readAction { EditorTabPresentationUtil.getEditorTabBackgroundColor(composite.project, composite.file) }
@@ -2216,6 +2223,10 @@ open class FileEditorManagerImpl(
       }
 
       window.watchForTabActions(composite = composite, tab = tab)
+    }
+
+    items.firstOrNull { it.fileEntry.currentInTab }?.let {
+      selectionHistory.addRecord(it.file to window)
     }
   }
 

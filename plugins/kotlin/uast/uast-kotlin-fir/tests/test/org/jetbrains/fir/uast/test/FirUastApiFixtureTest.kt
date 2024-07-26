@@ -94,6 +94,10 @@ class FirUastApiFixtureTest : KotlinLightCodeInsightFixtureTestCase(), UastApiFi
         checkSubstitutedReceiverType(myFixture)
     }
 
+    fun testJavaStaticMethodReceiverType() {
+        checkJavaStaticMethodReceiverType(myFixture)
+    }
+
     fun testUnderscoreOperatorForTypeArguments() {
         checkUnderscoreOperatorForTypeArguments(myFixture)
     }
@@ -130,6 +134,10 @@ class FirUastApiFixtureTest : KotlinLightCodeInsightFixtureTestCase(), UastApiFi
         checkLambdaBodyAsParentOfDestructuringDeclaration(myFixture)
     }
 
+    fun testUnclosedLazyValueBody() {
+        checkUnclosedLazyValueBody(myFixture)
+    }
+
     fun testIdentifierOfNullableExtensionReceiver() {
         checkIdentifierOfNullableExtensionReceiver(myFixture)
     }
@@ -148,5 +156,9 @@ class FirUastApiFixtureTest : KotlinLightCodeInsightFixtureTestCase(), UastApiFi
 
     fun testNullLiteral() {
         checkNullLiteral(myFixture)
+    }
+
+    fun testStringConcatInAnnotationValue() {
+        checkStringConcatInAnnotationValue(myFixture)
     }
 }

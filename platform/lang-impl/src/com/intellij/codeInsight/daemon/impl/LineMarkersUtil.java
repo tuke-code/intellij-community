@@ -39,16 +39,15 @@ final class LineMarkersUtil {
     ApplicationManager.getApplication().assertReadAccessAllowed();
 
     MarkupModelEx markupModel = (MarkupModelEx)DocumentMarkupModel.forDocument(document, project, true);
-    HighlightersRecycler toReuse = new HighlightersRecycler();
-    synchronized (LOCK) {
-      try {
+    HighlighterRecycler.runWithRecycler(highlightingSession, toReuse -> {
+      synchronized (LOCK) {
         markupModel.processRangeHighlightersOverlappingWith(bounds.getStartOffset(), bounds.getEndOffset(),
           highlighter -> {
             LineMarkerInfo<?> info = getLineMarkerInfo(highlighter);
 
             if (
               // (recycle) zombie line marker immediately because similar-looking line markers don't merge, unlike regular HighlightInfos
-              HighlightingMarkupGrave.Companion.isZombieMarkup(highlighter) && highlighter.getGutterIconRenderer() != null
+              HighlightingNecromancer.isZombieMarkup(highlighter) && highlighter.getGutterIconRenderer() != null
                 || group == -1 || info != null && info.updatePass == group) {
               toReuse.recycleHighlighter(highlighter);
             }
@@ -73,17 +72,14 @@ final class LineMarkersUtil {
           LOG.debug("LineMarkersUtil.setLineMarkersToEditor(" +bounds+
                     "; newMarkers: " + newMarkers + ", group: " + group + "); reused: " + toReuse.forAllInGarbageBin().size());
         }
-        UpdateHighlightersUtil.incinerateObsoleteHighlighters(toReuse, highlightingSession);
+        return true;
       }
-      finally {
-        toReuse.releaseHighlighters();
-      }
-    }
+    });
   }
 
   private static void createOrReuseLineMarker(@NotNull LineMarkerInfo<?> info,
                                               @NotNull MarkupModelEx markupModel,
-                                              @NotNull HighlightersRecycler toReuse) {
+                                              @NotNull HighlighterRecyclerPickup toReuse) {
     LineMarkerInfo.LineMarkerGutterIconRenderer<?> newRenderer = (LineMarkerInfo.LineMarkerGutterIconRenderer<?>)info.createGutterRenderer();
 
     RangeHighlighterEx highlighter = toReuse.pickupHighlighterFromGarbageBin(info.startOffset, info.endOffset, HighlighterLayer.ADDITIONAL_SYNTAX);
@@ -107,7 +103,7 @@ final class LineMarkersUtil {
       if (rendererChanged || lineSeparatorColorChanged || lineSeparatorPlacementChanged) {
         markupModel.changeAttributesInBatch(highlighter, changeAttributes(info, rendererChanged, newRenderer, lineSeparatorColorChanged, lineSeparatorPlacementChanged));
       }
-      HighlightingMarkupGrave.Companion.unmarkZombieMarkup(highlighter);
+      HighlightingNecromancer.unmarkZombieMarkup(highlighter);
     }
     highlighter.putUserData(LINE_MARKER_INFO, info);
     info.highlighter = highlighter;
@@ -132,19 +128,20 @@ final class LineMarkersUtil {
     };
   }
 
-  static void addLineMarkerToEditorIncrementally(@NotNull Project project, @NotNull Document document, @NotNull LineMarkerInfo<?> marker) {
+  static void addLineMarkerToEditorIncrementally(@NotNull Project project, @NotNull Document document, @NotNull LineMarkerInfo<?> marker,
+                                                 @NotNull HighlightingSession highlightingSession) {
     ApplicationManager.getApplication().assertIsNonDispatchThread();
     ApplicationManager.getApplication().assertReadAccessAllowed();
 
     MarkupModelEx markupModel = (MarkupModelEx)DocumentMarkupModel.forDocument(document, project, true);
     LineMarkerInfo<?>[] markerInTheWay = {null};
-    boolean allIsClear;
-    HighlightersRecycler toReuse = new HighlightersRecycler();
-    synchronized (LOCK) {
-      try {
+
+    HighlighterRecycler.runWithRecycler(highlightingSession, toReuse -> {
+      boolean allIsClear;
+      synchronized (LOCK) {
         allIsClear = markupModel.processRangeHighlightersOverlappingWith(marker.startOffset, marker.endOffset,
           highlighter -> {
-            if (HighlightingMarkupGrave.Companion.isZombieMarkup(highlighter)) {
+            if (HighlightingNecromancer.isZombieMarkup(highlighter)) {
               toReuse.recycleHighlighter(highlighter);
               return true;
             }
@@ -159,13 +156,11 @@ final class LineMarkersUtil {
           createOrReuseLineMarker(marker, markupModel, toReuse);
         }
       }
-      finally {
-        toReuse.releaseHighlighters();
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("addLineMarkerToEditorIncrementally: "+marker+" "+(allIsClear ? "created" : " (was not added because "+markerInTheWay[0] +" was in the way)"));
       }
-    }
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("addLineMarkerToEditorIncrementally: "+marker+" "+(allIsClear ? "created" : " (was not added because "+markerInTheWay[0] +" was in the way)"));
-    }
+      return true;
+    });
   }
 
   static @Nullable LineMarkerInfo<?> getLineMarkerInfo(@NotNull RangeHighlighter highlighter) {

@@ -169,13 +169,15 @@ public class JavaLineBreakpointType extends JavaLineBreakpointTypeBase<JavaLineB
         PsiElement firstElem = DebuggerUtilsEx.getFirstElementOnTheLine(lambda, document, position.getLine());
         XSourcePositionImpl elementPosition = XSourcePositionImpl.createByElement(firstElem);
         if (elementPosition != null) {
+          PsiElement body = lambda.getBody();
+          LOG.assertTrue(body != null, "if we got an element, there must be a body");
           if (startMethodIsOuterLambda && lambda == startMethod) {
-            res.add(0, new LineJavaBreakpointVariant(elementPosition, lambda, ordinal));
+            res.add(0, new LineJavaBreakpointVariant(elementPosition, body, ordinal));
             mainMethodAdded = true;
           }
           else if (lambda != outerMethod) {
             lambdaCount++;
-            res.add(new LambdaJavaBreakpointVariant(elementPosition, lambda, ordinal));
+            res.add(new LambdaJavaBreakpointVariant(elementPosition, body, ordinal));
           }
           ordinal++;
         }
@@ -523,6 +525,9 @@ public class JavaLineBreakpointType extends JavaLineBreakpointTypeBase<JavaLineB
         }
         else {
           highlightedElement = getContainingMethod(lineBreakpoint);
+          if (highlightedElement instanceof PsiLambdaExpression lambda) {
+            highlightedElement = lambda.getBody();
+          }
         }
       }
     }
@@ -626,12 +631,11 @@ public class JavaLineBreakpointType extends JavaLineBreakpointTypeBase<JavaLineB
   }
 
   public static TextRange getTextRangeWithoutTrailingComments(@NotNull PsiElement psiElement) {
-    PsiElement lastChild = psiElement.getLastChild();
-    if (lastChild == null || !isWhiteSpaceOrComment(lastChild)) {
-      return psiElement.getTextRange();
-    }
-    while (isWhiteSpaceOrComment(lastChild)) {
-      lastChild = lastChild.getPrevSibling();
+    @NotNull PsiElement lastChild = psiElement;
+    @Nullable PsiElement prevChild = psiElement.getLastChild();
+    while (prevChild != null && isWhiteSpaceOrComment(prevChild)) {
+      lastChild = prevChild;
+      prevChild = prevChild.getPrevSibling();
     }
     return new TextRange(psiElement.getTextRange().getStartOffset(), lastChild.getTextRange().getEndOffset());
   }

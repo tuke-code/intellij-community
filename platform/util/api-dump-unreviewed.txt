@@ -1087,12 +1087,6 @@ com.intellij.openapi.util.ScalableIcon
 - javax.swing.Icon
 - a:getScale():F
 - a:scale(F):javax.swing.Icon
-f:com.intellij.openapi.util.ShutDownTracker
-- s:getInstance():com.intellij.openapi.util.ShutDownTracker
-- s:isShutdownHookRunning():Z
-- registerShutdownTask(java.lang.Runnable):V
-- unregisterShutdownTask(java.lang.Runnable):V
-- waitFor(J,java.util.concurrent.TimeUnit):Z
 a:com.intellij.openapi.util.SimpleFieldCache
 - com.intellij.openapi.util.FieldCache
 - <init>():V
@@ -2556,7 +2550,6 @@ f:com.intellij.util.KotlinUtils
 - sf:alsoIfNull(java.lang.Object,kotlin.jvm.functions.Function0):java.lang.Object
 - sf:applyIf(java.lang.Object,Z,kotlin.jvm.functions.Function1):java.lang.Object
 - sf:getValue(java.util.concurrent.atomic.AtomicReference,java.lang.Object,kotlin.reflect.KProperty):java.lang.Object
-- *sf:multiple(kotlin.sequences.Sequence):Z
 - sf:runIf(Z,kotlin.jvm.functions.Function0):java.lang.Object
 - sf:setValue(java.util.concurrent.atomic.AtomicReference,java.lang.Object,kotlin.reflect.KProperty,java.lang.Object):V
 - sf:takeWhileInclusive(kotlin.sequences.Sequence,kotlin.jvm.functions.Function1):kotlin.sequences.Sequence
@@ -5047,6 +5040,7 @@ f:com.intellij.util.io.DataInputOutputUtil
 - s:readINT(java.io.DataInput):I
 - s:readINT(java.nio.ByteBuffer):I
 - s:readLONG(java.io.DataInput):J
+- s:readLONG(java.nio.ByteBuffer):J
 - s:readNullable(java.io.DataInput,com.intellij.openapi.util.ThrowableComputable):java.lang.Object
 - s:readSINT(java.io.DataInput):I
 - s:readSeq(java.io.DataInput,com.intellij.openapi.util.ThrowableComputable):java.util.List

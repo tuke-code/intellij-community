@@ -34,11 +34,10 @@ import org.jetbrains.kotlin.analysis.api.permissions.KaAllowAnalysisOnEdt
 import org.jetbrains.kotlin.analysis.api.permissions.allowAnalysisOnEdt
 import org.jetbrains.kotlin.idea.KotlinFileType
 import org.jetbrains.kotlin.idea.base.codeInsight.pathBeforeJavaToKotlinConversion
-import org.jetbrains.kotlin.idea.base.plugin.KotlinPluginModeProvider
+import org.jetbrains.kotlin.idea.base.plugin.KotlinPluginModeProvider.Companion.isK2Mode
 import org.jetbrains.kotlin.idea.base.resources.KotlinBundle
 import org.jetbrains.kotlin.idea.base.util.KotlinPlatformUtils
 import org.jetbrains.kotlin.idea.codeinsight.utils.commitAndUnblockDocument
-import org.jetbrains.kotlin.idea.configuration.ExperimentalFeatures.K2J2K
 import org.jetbrains.kotlin.idea.configuration.ExperimentalFeatures.NewJ2k
 import org.jetbrains.kotlin.idea.core.util.toPsiDirectory
 import org.jetbrains.kotlin.idea.core.util.toPsiFile
@@ -46,11 +45,8 @@ import org.jetbrains.kotlin.idea.statistics.ConversionType
 import org.jetbrains.kotlin.idea.statistics.J2KFusCollector
 import org.jetbrains.kotlin.idea.util.application.executeCommand
 import org.jetbrains.kotlin.idea.util.getAllFilesRecursively
-import org.jetbrains.kotlin.j2k.ConverterSettings
+import org.jetbrains.kotlin.j2k.*
 import org.jetbrains.kotlin.j2k.ConverterSettings.Companion.defaultSettings
-import org.jetbrains.kotlin.j2k.ExternalCodeProcessing
-import org.jetbrains.kotlin.j2k.FilesResult
-import org.jetbrains.kotlin.j2k.J2kConverterExtension
 import org.jetbrains.kotlin.j2k.J2kConverterExtension.Kind.*
 import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.psi.psiUtil.findDescendantOfType
@@ -82,7 +78,13 @@ class JavaToKotlinAction : AnAction() {
                 val progressIndicator = ProgressManager.getInstance().progressIndicator!!
 
                 val conversionTime = measureTimeMillis {
-                    converterResult = converter.filesToKotlin(javaFiles, postProcessor, progressIndicator)
+                    converterResult = converter.filesToKotlin(
+                        javaFiles,
+                        postProcessor,
+                        progressIndicator,
+                        preprocessorExtensions = J2kPreprocessorExtension.EP_NAME.extensionList,
+                        postprocessorExtensions = J2kPostprocessorExtension.EP_NAME.extensionList
+                    )
                 }
                 val linesCount = runReadAction {
                     javaFiles.sumOf { StringUtil.getLineBreakCount(it.text) }
@@ -303,8 +305,6 @@ class JavaToKotlinAction : AnAction() {
     }
 
     private fun isEnabled(e: AnActionEvent): Boolean {
-        if (KotlinPluginModeProvider.isK2Mode() && !K2J2K.isEnabled) return false
-
         if (KotlinPlatformUtils.isCidr) return false
         val files = e.getData(CommonDataKeys.VIRTUAL_FILE_ARRAY) ?: return false
         val project = e.project ?: return false
@@ -334,7 +334,7 @@ class JavaToKotlinAction : AnAction() {
 }
 
 private fun getJ2kKind(forceUsingOldJ2k: Boolean = false): J2kConverterExtension.Kind = when {
-    KotlinPluginModeProvider.isK2Mode() -> K2
+    isK2Mode() -> K2
     forceUsingOldJ2k || !NewJ2k.isEnabled -> K1_OLD
     else -> K1_NEW
 }

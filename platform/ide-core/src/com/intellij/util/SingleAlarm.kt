@@ -15,17 +15,19 @@ import com.intellij.openapi.components.service
 import com.intellij.openapi.components.serviceOrNull
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.diagnostic.logger
+import com.intellij.openapi.progress.Cancellation
 import com.intellij.openapi.util.Disposer
 import com.intellij.util.Alarm.ThreadToUse
+import com.intellij.util.ui.EDT
 import kotlinx.coroutines.*
 import org.jetbrains.annotations.ApiStatus.Internal
 import org.jetbrains.annotations.TestOnly
 import java.awt.EventQueue
-import java.util.concurrent.CancellationException
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.EmptyCoroutineContext
+import kotlin.time.Duration
 
 private val LOG: Logger = logger<SingleAlarm>()
 
@@ -34,8 +36,7 @@ private val LOG: Logger = logger<SingleAlarm>()
  * Alarm is deprecated.
  * Allows scheduling a single `Runnable` instance ([task]) to be executed after a specific time interval on a specific thread.
  * [request] adds a request if it's not scheduled yet, i.e., it does not delay execution of the request
- * [cancelAndRequest] cancels the current request and schedules a new one instead, i.e., it delays execution of the request
- *
+ * [cancelAndRequest] cancels the current request and schedules a new one instead, i.e., it delays execution of the request.
  */
 class SingleAlarm @Internal constructor(
   private val task: Runnable,
@@ -47,6 +48,7 @@ class SingleAlarm @Internal constructor(
 ) : Disposable {
   // it is a supervisor coroutine scope
   private val taskCoroutineScope: CoroutineScope
+
   private val taskContext: CoroutineContext
 
   private val LOCK = Any()
@@ -135,15 +137,14 @@ class SingleAlarm @Internal constructor(
   init {
     var context = ClientId.currentOrNull?.asContextElement() ?: EmptyCoroutineContext
     if (threadToUse == ThreadToUse.SWING_THREAD) {
-      if (modalityState == null) {
-        throw IllegalArgumentException("modalityState must be not null if threadToUse == ThreadToUse.SWING_THREAD")
-      }
-
       // maybe not defined in tests
-      context += getEdtDispatcher() + modalityState.asContextElement()
+      context += getEdtDispatcher()
+      if (modalityState != null) {
+        context += modalityState.asContextElement()
+      }
     }
-    // todo fix clients and remove NonCancellable
-    taskContext = context + NonCancellable
+
+    taskContext = context
 
     if (coroutineScope == null) {
       val app = ApplicationManager.getApplication()
@@ -242,21 +243,26 @@ class SingleAlarm @Internal constructor(
   }
 
   override fun dispose() {
+    isDisposed = true
     cancel()
   }
 
-  val isDisposed: Boolean
-    get() = !taskCoroutineScope.isActive
+  // SingleAlarm can be created without `parentDisposable`.
+  // So, we cannot create child scope. So, we cannot use `!taskCoroutineScope.isActive` to implement `isDisposed`.
+  @Volatile
+  var isDisposed: Boolean = false
+    get() = field || !taskCoroutineScope.isActive
+    private set
 
   val isEmpty: Boolean
     get() = synchronized(LOCK) { currentJob == null }
 
   @TestOnly
   fun waitForAllExecuted(timeout: Long, timeUnit: TimeUnit) {
-    assert(ApplicationManager.getApplication().isUnitTestMode)
+    require(ApplicationManager.getApplication().isUnitTestMode)
 
     val currentJob = currentJob ?: return
-    @Suppress("RAW_RUN_BLOCKING")
+    @Suppress("RAW_RUN_BLOCKING", "RedundantSuppression")
     runBlocking {
       try {
         withTimeout(timeUnit.toMillis(timeout)) {
@@ -270,19 +276,125 @@ class SingleAlarm @Internal constructor(
     }
   }
 
-  @JvmOverloads
-  fun request(forceRun: Boolean = false, delay: Int = this@SingleAlarm.delay) {
+  @TestOnly
+  internal fun waitForAllExecutedInEdt(timeout: Duration) {
+    require(ApplicationManager.getApplication().isUnitTestMode)
+
+    if (currentJob == null) {
+      return
+    }
+
+    @Suppress("RAW_RUN_BLOCKING", "RedundantSuppression")
+    runBlocking {
+      withTimeout(timeout) {
+        while (currentJob != null) {
+          EDT.dispatchAllInvocationEvents()
+        }
+      }
+    }
+  }
+
+  fun request() {
+    request(forceRun = false, delay = delay)
+  }
+
+  fun request(forceRun: Boolean) {
+    request(forceRun = forceRun, delay = delay)
+  }
+
+  fun requestWithCustomDelay(delay: Int) {
+    request(forceRun = false, delay = delay)
+  }
+
+  @Internal
+  fun cancelAndRequestWithCustomDelay(delay: Int) {
+    request(forceRun = false, delay = delay, cancelCurrent = true)
+  }
+
+  private fun request(forceRun: Boolean, delay: Int, cancelCurrent: Boolean = false) {
+    if (isDisposed) {
+      return
+    }
+
     val effectiveDelay = if (forceRun) 0 else delay.toLong()
     synchronized(LOCK) {
-      if (currentJob != null) {
-        return
+      var prevCurrentJob = currentJob
+      if (prevCurrentJob != null) {
+        if (cancelCurrent) {
+          prevCurrentJob.cancel()
+        }
+        else {
+          return
+        }
       }
 
       currentJob = taskCoroutineScope.launch {
+        prevCurrentJob?.join()
+        prevCurrentJob = null
+
         delay(effectiveDelay)
+
         withContext(taskContext) {
+          //todo fix clients and remove NonCancellable
           try {
-            task.run()
+            if (!isDisposed) {
+              Cancellation.withNonCancelableSection().use {
+                task.run()
+              }
+            }
+          }
+          catch (e: CancellationException) {
+            throw e
+          }
+          catch (e: Throwable) {
+            LOG.error(e)
+          }
+        }
+      }.also { job ->
+        job.invokeOnCompletion {
+          synchronized(LOCK) {
+            if (currentJob === job) {
+              currentJob = null
+            }
+          }
+        }
+      }
+    }
+  }
+
+  /**
+   * If [cancelCurrent] is true, it behaves as `debounce`.
+   * If [cancelCurrent] is false, it behaves as `throttle` (that's how SingleAlarm works, if you call [request] several times).
+   */
+  internal fun scheduleTask(
+    delay: Long,
+    customModality: CoroutineContext?,
+    cancelCurrent: Boolean = true,
+    task: suspend () -> Unit,
+  ) {
+    if (isDisposed) {
+      return
+    }
+
+    synchronized(LOCK) {
+      var prevCurrentJob = currentJob
+      if (prevCurrentJob != null) {
+        if (cancelCurrent) {
+          prevCurrentJob.cancel()
+        }
+        else {
+          return
+        }
+      }
+
+      currentJob = taskCoroutineScope.launch {
+        prevCurrentJob?.join()
+        prevCurrentJob = null
+
+        delay(delay)
+        withContext(if (customModality == null) taskContext else (taskContext + customModality)) {
+          try {
+            task()
           }
           catch (e: CancellationException) {
             throw e
@@ -319,8 +431,15 @@ class SingleAlarm @Internal constructor(
    */
   @JvmOverloads
   fun cancelAndRequest(forceRun: Boolean = false) {
-    cancel()
-    request(forceRun = forceRun)
+    request(forceRun = forceRun, delay = delay, cancelCurrent = true)
+  }
+
+  // required, if we need to call it from the task
+  @Internal
+  fun scheduleCancelAndRequest() {
+    taskCoroutineScope.launch {
+      cancelAndRequest()
+    }
   }
 
   @Deprecated("Use cancel")

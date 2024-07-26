@@ -1,5 +1,5 @@
 // Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
-@file:Suppress("ReplaceJavaStaticMethodWithKotlinAnalog")
+@file:Suppress("ReplaceJavaStaticMethodWithKotlinAnalog", "RedundantSuppression")
 package org.jetbrains.intellij.build.impl
 
 import com.intellij.openapi.util.JDOMUtil
@@ -86,6 +86,9 @@ private val PLATFORM_IMPLEMENTATION_MODULES = java.util.List.of(
 
   "intellij.platform.vcs.log",
 
+  "intellij.platform.compose",
+  "intellij.platform.compose.skikoRuntime",
+
   "intellij.platform.markdown.utils",
   "intellij.platform.util.commonsLangV2Shim",
 
@@ -145,6 +148,12 @@ internal suspend fun createPlatformLayout(projectLibrariesUsedByPlugins: SortedS
     "intellij.platform.util.troveCompileOnly",
   ), productLayout = productLayout, layout = layout)
   layout.withProjectLibrary(libraryName = "ion", jarName = UTIL_8_JAR)
+
+  layout.withModuleLibrary(
+    libraryName = "jetbrains.skiko.awt.runtime.all",
+    moduleName = "intellij.platform.compose.skikoRuntime",
+    relativeOutputPath = "skiko-runtime.jar"
+  )
 
   // maven uses JDOM in an external process
   addModule(UTIL_8_JAR, listOf(
@@ -295,7 +304,7 @@ internal suspend fun createPlatformLayout(projectLibrariesUsedByPlugins: SortedS
   )
 
   // sqlite - used by DB and "import settings" (temporarily)
-  layout.alwaysPackToPlugin(listOf("flexmark", "okhttp", "sqlite"))
+  layout.alwaysPackToPlugin(listOf("flexmark", "sqlite"))
   for (item in projectLibrariesUsedByPlugins) {
     if (!layout.isProjectLibraryExcluded(item.libraryName) && !layout.isLibraryAlwaysPackedIntoPlugin(item.libraryName)) {
       layout.includedProjectLibraries.add(item)

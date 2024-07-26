@@ -3,6 +3,7 @@ package org.jetbrains.uast.test.common.kotlin
 
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.platform.uast.testFramework.env.findElementByTextFromPsi
+import com.intellij.psi.PsiArrayInitializerMemberValue
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiModifier
 import com.intellij.psi.PsiModifierListOwner
@@ -16,6 +17,7 @@ import org.jetbrains.annotations.Nullable
 import org.jetbrains.kotlin.psi.KtConstructor
 import org.jetbrains.kotlin.psi.KtDestructuringDeclaration
 import org.jetbrains.kotlin.psi.KtNameReferenceExpression
+import org.jetbrains.kotlin.psi.KtNamedFunction
 import org.jetbrains.kotlin.psi.psiUtil.getParentOfType
 import org.jetbrains.kotlin.util.OperatorNameConventions
 import org.jetbrains.uast.*
@@ -700,6 +702,35 @@ interface UastApiFixtureTestBase {
         TestCase.assertEquals("java.lang.String", uCallExpression.receiverType?.canonicalText)
     }
 
+    fun checkJavaStaticMethodReceiverType(myFixture: JavaCodeInsightTestFixture) {
+        myFixture.addClass(
+            """
+                public class Controller {
+                }
+            """.trimIndent()
+        )
+        myFixture.addClass(
+            """
+                public class MyService {
+                    public static Controller getController() {
+                        return new Controller();
+                    }
+                }
+            """.trimIndent()
+        )
+        myFixture.configureByText(
+            "test.kt", """
+                fun test() {
+                  val controller = MyService.get<caret>Controller()
+                }
+            """.trimIndent()
+        )
+        val uCallExpression = myFixture.file.findElementAt(myFixture.caretOffset).toUElement().getUCallExpression()
+            .orFail("cant convert to UCallExpression")
+        TestCase.assertEquals("getController", uCallExpression.methodName)
+        TestCase.assertNull(uCallExpression.receiverType)
+    }
+
     fun checkUnderscoreOperatorForTypeArguments(myFixture: JavaCodeInsightTestFixture) {
         // example from https://kotlinlang.org/docs/generics.html#underscore-operator-for-type-arguments
         // modified to avoid using reflection (::class.java)
@@ -1116,6 +1147,28 @@ interface UastApiFixtureTestBase {
         TestCase.assertNotNull(uDestructuringDeclaration.uastParent)
     }
 
+    fun checkUnclosedLazyValueBody(myFixture: JavaCodeInsightTestFixture) {
+        // KTIJ-24092
+        myFixture.configureByText(
+            "main.kt", """
+                val lazyValue: String by lazy {
+                    println("Initializing lazy value")
+                //}
+                fun m<caret>ain() {
+                }
+            """.trimIndent()
+        )
+
+        val functionDeclaration =
+            myFixture.file.findElementAt(myFixture.caretOffset)
+                ?.getParentOfType<KtNamedFunction>(strict = false)
+                .orFail("Cannot find KtNamedFunction")
+
+        val uFunctionDeclaration = functionDeclaration.toUElement().orFail("Cannot convert to UElement")
+
+        TestCase.assertNotNull(uFunctionDeclaration.uastParent)
+    }
+
     fun checkIdentifierOfNullableExtensionReceiver(myFixture: JavaCodeInsightTestFixture) {
         myFixture.configureByText(
             "main.kt", """
@@ -1253,5 +1306,43 @@ interface UastApiFixtureTestBase {
             }
         )
         TestCase.assertEquals(1, count)
+    }
+
+    fun checkStringConcatInAnnotationValue(myFixture: JavaCodeInsightTestFixture) {
+        myFixture.addClass(
+            """
+                 import java.lang.annotation.ElementType;
+                 import java.lang.annotation.Retention;
+                 import java.lang.annotation.RetentionPolicy;
+                 import java.lang.annotation.Target;
+
+                 @Retention(RetentionPolicy.CLASS)
+                 @Target({ElementType.METHOD})
+                 public @interface MyAnnotation {
+                     String[] password() default {};
+                 }
+            """.trimIndent()
+        )
+        myFixture.configureByText(
+            "main.kt", """
+                @MyAnnotation(
+                  password = [
+                    "nananananana, " +
+                      "batman"
+                  ]
+                )
+                fun t<caret>est() {}
+            """.trimIndent()
+        )
+        val uMethod = myFixture.file.findElementAt(myFixture.caretOffset).toUElement()?.getParentOfType<UMethod>()
+            .orFail("cant convert to UMethod")
+        TestCase.assertNotNull(uMethod)
+        val anno = uMethod.annotations.single()
+        val attributeValue = anno.findAttributeValue("password")
+        TestCase.assertNotNull(attributeValue)
+        val initializer = (attributeValue as PsiArrayInitializerMemberValue).initializers.single()
+        val uExpression = initializer.toUElementOfType<UExpression>()
+        val uEval = uExpression?.evaluate()
+        TestCase.assertEquals("nananananana, batman", uEval)
     }
 }

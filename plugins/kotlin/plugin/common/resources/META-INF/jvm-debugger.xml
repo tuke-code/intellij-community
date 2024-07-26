@@ -18,6 +18,8 @@
 
   <projectListeners>
     <listener class="org.jetbrains.kotlin.idea.debugger.evaluate.DropCodeFragmentCacheOnRefreshListener" topic="com.intellij.debugger.impl.DebuggerManagerListener"/>
+    <listener class="org.jetbrains.kotlin.idea.debugger.coroutine.DisableCoroutineViewListener"
+              topic="com.intellij.debugger.impl.DebuggerManagerListener"/>
   </projectListeners>
 
   <extensionPoints>
@@ -57,6 +59,7 @@
     <debugger.javaBreakpointHandlerFactory implementation="org.jetbrains.kotlin.idea.debugger.core.breakpoints.KotlinFunctionBreakpointHandlerFactory"/>
     <debugger.jvmSteppingCommandProvider implementation="org.jetbrains.kotlin.idea.debugger.core.stepping.KotlinSteppingCommandProvider"/>
     <debugger.simplePropertyGetterProvider implementation="org.jetbrains.kotlin.idea.debugger.core.stepping.KotlinSimpleGetterProvider"/>
+    <debugger.jvmSmartStepIntoHandler implementation="org.jetbrains.kotlin.idea.debugger.stepping.smartStepInto.KotlinSmartStepIntoHandler"/>
 
     <debuggerEditorTextProvider
             language="kotlin"

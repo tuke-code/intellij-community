@@ -6,9 +6,6 @@
   </dependencies>
 
   <extensionPoints>
-    <extensionPoint qualifiedName="com.intellij.datavis.inlays.inlayDescriptorProvider"
-                    interface="org.jetbrains.plugins.notebooks.visualization.r.inlays.InlayDescriptorProvider"
-                    dynamic="true"/>
     <extensionPoint qualifiedName="com.intellij.datavis.r.inlays.components.graphicsManagerProvider"
                     interface="org.jetbrains.plugins.notebooks.visualization.r.inlays.components.GraphicsManagerProvider"
                     dynamic="true"/>
@@ -74,7 +71,6 @@
 
   <extensions defaultExtensionNs="com.intellij">
     <notificationGroup displayType="BALLOON" id="Notebook Table" bundle="messages.VisualizationBundle" key="inlay.output.table.notification.group.name"/>
-    <editorFactoryListener id="org.jetbrains.plugins.notebooks.visualization.r.inlays.InlaysManager" implementation="org.jetbrains.plugins.notebooks.visualization.r.inlays.InlaysManager"/>
 
     <getDataRule
       key="NOTEBOOK_CELL_LINES_INTERVAL"

@@ -11,10 +11,7 @@ import com.intellij.lang.injection.InjectedLanguageManager;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
-import com.intellij.openapi.editor.HighlighterColors;
 import com.intellij.openapi.editor.colors.*;
-import com.intellij.openapi.editor.ex.util.LayeredTextAttributes;
-import com.intellij.openapi.editor.markup.TextAttributes;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.progress.ProgressManager;
@@ -33,12 +30,10 @@ import com.intellij.util.Processor;
 import com.intellij.util.TriConsumer;
 import com.intellij.util.containers.ContainerUtil;
 import it.unimi.dsi.fastutil.longs.LongList;
-import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
-import java.util.function.BooleanSupplier;
 
 /**
  * Perform injections, run highlight visitors and annotators on discovered injected files
@@ -90,7 +85,7 @@ final class InjectedGeneralHighlightingPass extends ProgressableTextEditorHighli
     processInjectedPsiFiles(allInsideElements, allOutsideElements, progress, injected,
                             (injectedPsi, places) ->
       runAnnotatorsAndVisitorsOnInjectedPsi(injectedLanguageManager, injectedPsi, places, fragmentKey, (toolId, psiElement, infos) -> {
-        myHighlightInfoUpdater.psiElementVisited(toolId, psiElement, infos, getDocument(), injectedPsi, myProject, getHighlightingSession());
+        myHighlightInfoUpdater.psiElementVisited(toolId, psiElement, infos, getDocument(), injectedPsi, myProject, getHighlightingSession(), HighlighterRecyclerPickup.EMPTY);
         if (!infos.isEmpty()) {
           synchronized (myHighlights) {
             myHighlights.addAll(infos);
@@ -195,7 +190,7 @@ final class InjectedGeneralHighlightingPass extends ProgressableTextEditorHighli
     Divider.divideInsideAndOutsideAllRoots(injectedPsi, injectedPsi.getTextRange(), injectedPsi.getTextRange(), GeneralHighlightingPass.SHOULD_HIGHLIGHT_FILTER, dividedElements -> {
       List<? extends @NotNull PsiElement> inside = dividedElements.inside();
       LongList insideRanges = dividedElements.insideRanges();
-      BooleanSupplier runnable = () -> {
+      Runnable runnable = () -> {
         HighlightVisitorRunner highlightVisitorRunner = new HighlightVisitorRunner(injectedPsi, myGlobalScheme, myRunVisitors, myHighlightErrorElements);
 
         highlightVisitorRunner.createHighlightVisitorsFor(visitors -> {
@@ -213,10 +208,9 @@ final class InjectedGeneralHighlightingPass extends ProgressableTextEditorHighli
             });
         });
         highlightInjectedSyntax(injectedPsi, places, resultSink);
-        return true;
       };
       if (annotatorRunner == null) {
-        runnable.getAsBoolean();
+        runnable.run();
       }
       else {
         annotatorRunner.runAnnotatorsAsync(inside, List.of(), runnable, resultSink);
@@ -302,7 +296,7 @@ final class InjectedGeneralHighlightingPass extends ProgressableTextEditorHighli
                                        @NotNull TriConsumer<Object, ? super PsiElement, ? super List<? extends HighlightInfo>> resultSink) {
     List<HighlightInfo> result = new ArrayList<>(places.size()*2);
     InjectedLanguageUtil.processTokens(injectedPsi, places, (@NotNull TextRange hostRange, TextAttributesKey @NotNull [] keys) -> {
-      List<HighlightInfo> infos = addSyntaxInjectedFragmentInfo(myGlobalScheme, hostRange, keys);
+      List<HighlightInfo> infos = InjectedLanguageFragmentSyntaxUtil.addSyntaxInjectedFragmentInfo(myGlobalScheme, hostRange, keys);
       result.addAll(infos);
     });
     resultSink.accept(INJECTION_SYNTAX_ID, injectedPsi, result);
@@ -317,31 +311,5 @@ final class InjectedGeneralHighlightingPass extends ProgressableTextEditorHighli
 
   @Override
   protected void applyInformationWithProgress() {
-  }
-
-  @Contract(pure = true)
-  static List<HighlightInfo> addSyntaxInjectedFragmentInfo(@NotNull EditorColorsScheme scheme,
-                                                           @NotNull TextRange hostRange,
-                                                           TextAttributesKey @NotNull [] keys) {
-    if (hostRange.isEmpty()) {
-      return List.of();
-    }
-    // erase marker to override hosts colors
-    HighlightInfo eraseInfo = HighlightInfo.newHighlightInfo(HighlightInfoType.INJECTED_LANGUAGE_FRAGMENT)
-      .range(hostRange)
-      .textAttributes(TextAttributes.ERASE_MARKER)
-      .createUnconditionally();
-
-    LayeredTextAttributes injectedAttributes = LayeredTextAttributes.create(scheme, keys);
-    if (injectedAttributes.isEmpty() || keys.length == 1 && keys[0] == HighlighterColors.TEXT) {
-      // nothing to add
-      return List.of(eraseInfo);
-    }
-
-    HighlightInfo injectedInfo = HighlightInfo.newHighlightInfo(HighlightInfoType.INJECTED_LANGUAGE_FRAGMENT)
-      .range(hostRange)
-      .textAttributes(injectedAttributes)
-      .createUnconditionally();
-    return List.of(eraseInfo, injectedInfo);
   }
 }

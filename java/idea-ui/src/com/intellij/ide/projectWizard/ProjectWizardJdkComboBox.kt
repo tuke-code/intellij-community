@@ -4,7 +4,6 @@ package com.intellij.ide.projectWizard
 import com.intellij.execution.wsl.WslPath
 import com.intellij.icons.AllIcons
 import com.intellij.ide.JavaUiBundle
-import com.intellij.ide.actions.AddJdkService
 import com.intellij.ide.projectWizard.ProjectWizardJdkIntent.*
 import com.intellij.ide.util.PropertiesComponent
 import com.intellij.ide.wizard.NewProjectWizardBaseData
@@ -23,6 +22,7 @@ import com.intellij.openapi.observable.util.whenDisposed
 import com.intellij.openapi.progress.blockingContext
 import com.intellij.openapi.project.DefaultProjectFactory
 import com.intellij.openapi.projectRoots.*
+import com.intellij.openapi.projectRoots.impl.AddJdkService
 import com.intellij.openapi.projectRoots.impl.DependentSdkType
 import com.intellij.openapi.projectRoots.impl.SdkConfigurationUtil
 import com.intellij.openapi.projectRoots.impl.jdkDownloader.*
@@ -156,6 +156,7 @@ private fun ValidationInfoBuilder.validateJdkAndProjectCompatibility(intent: Any
   val path = when (intent) {
     is DownloadJdk -> intent.task.plannedHomeDir
     is ExistingJdk -> intent.jdk.homePath
+    is DetectedJdk -> intent.home
     else -> null
   }
 

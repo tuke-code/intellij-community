@@ -2997,8 +2997,7 @@ f:com.intellij.util.SingleAlarm
 - f:isEmpty():Z
 - f:request():V
 - f:request(Z):V
-- f:request(Z,I):V
-- bs:request$default(com.intellij.util.SingleAlarm,Z,I,I,java.lang.Object):V
+- f:requestWithCustomDelay(I):V
 - sf:singleAlarm(I,kotlinx.coroutines.CoroutineScope,java.lang.Runnable):com.intellij.util.SingleAlarm
 - f:waitForAllExecuted(J,java.util.concurrent.TimeUnit):V
 f:com.intellij.util.SingleAlarm$Companion
@@ -3197,13 +3196,14 @@ c:com.intellij.util.ui.update.MergingUpdateQueue
 - <init>(java.lang.String,I,Z,javax.swing.JComponent,com.intellij.openapi.Disposable):V
 - <init>(java.lang.String,I,Z,javax.swing.JComponent,com.intellij.openapi.Disposable,javax.swing.JComponent):V
 - <init>(java.lang.String,I,Z,javax.swing.JComponent,com.intellij.openapi.Disposable,javax.swing.JComponent,com.intellij.util.Alarm$ThreadToUse):V
+- <init>(java.lang.String,I,Z,javax.swing.JComponent,com.intellij.openapi.Disposable,javax.swing.JComponent,com.intellij.util.Alarm$ThreadToUse,kotlinx.coroutines.CoroutineScope):V
+- b:<init>(java.lang.String,I,Z,javax.swing.JComponent,com.intellij.openapi.Disposable,javax.swing.JComponent,com.intellij.util.Alarm$ThreadToUse,kotlinx.coroutines.CoroutineScope,I,kotlin.jvm.internal.DefaultConstructorMarker):V
 - <init>(java.lang.String,I,Z,javax.swing.JComponent,com.intellij.openapi.Disposable,javax.swing.JComponent,Z):V
 - b:<init>(java.lang.String,I,Z,javax.swing.JComponent,com.intellij.openapi.Disposable,javax.swing.JComponent,Z,I,kotlin.jvm.internal.DefaultConstructorMarker):V
 - f:activate():V
 - f:cancelAllUpdates():V
 - f:deactivate():V
 - dispose():V
-- p:execute(com.intellij.util.ui.update.Update[]):V
 - f:flush():V
 - f:getModalityState():com.intellij.openapi.application.ModalityState
 - hideNotify():V
@@ -3221,7 +3221,6 @@ c:com.intellij.util.ui.update.MergingUpdateQueue
 - f:setModalityStateComponent(javax.swing.JComponent):V
 - f:setPassThrough(Z):V
 - f:setRestartTimerOnAdd(Z):com.intellij.util.ui.update.MergingUpdateQueue
-- pf:setTrackUiActivity(Z):V
 - f:showNotify():V
 - suspend():V
 - f:waitForAllExecuted(J,java.util.concurrent.TimeUnit):V
@@ -3264,15 +3263,16 @@ f:com.intellij.util.ui.update.UiNotifyConnector$Once$Companion
 a:com.intellij.util.ui.update.Update
 - com.intellij.util.ui.update.ComparableObject$Impl
 - java.lang.Runnable
+- sf:Companion:com.intellij.util.ui.update.Update$Companion
 - sf:HIGH_PRIORITY:I
 - sf:LOW_PRIORITY:I
 - <init>(java.lang.Object):V
 - <init>(java.lang.Object,I):V
 - <init>(java.lang.Object,Z):V
 - <init>(java.lang.Object,Z,I):V
+- b:<init>(java.lang.Object,Z,I,I,kotlin.jvm.internal.DefaultConstructorMarker):V
 - canEat(com.intellij.util.ui.update.Update):Z
-- s:create(java.lang.Object,java.lang.Runnable):com.intellij.util.ui.update.Update
-- executeInWriteAction():Z
+- sf:create(java.lang.Object,java.lang.Runnable):com.intellij.util.ui.update.Update
 - f:getPriority():I
 - isDisposed():Z
 - isExpired():Z
@@ -3280,3 +3280,5 @@ a:com.intellij.util.ui.update.Update
 - setProcessed():V
 - setRejected():V
 - wasProcessed():Z
+f:com.intellij.util.ui.update.Update$Companion
+- f:create(java.lang.Object,java.lang.Runnable):com.intellij.util.ui.update.Update

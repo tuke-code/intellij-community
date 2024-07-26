@@ -646,7 +646,9 @@ f:com.intellij.ide.Prefs
 - sf:APAC:com.intellij.ide.Region
 - sf:CHINA:com.intellij.ide.Region
 - sf:EUROPE:com.intellij.ide.Region
+- sf:MIDDLE_EAST:com.intellij.ide.Region
 - sf:NOT_SET:com.intellij.ide.Region
+- sf:OCEANIA:com.intellij.ide.Region
 - externalName():java.lang.String
 - s:fromExternalName(java.lang.String):com.intellij.ide.Region
 - getDisplayKey():java.lang.String
@@ -6046,17 +6048,16 @@ a:com.intellij.ui.AutoScrollFromSourceHandler
 - pa:setAutoScrollEnabled(Z):V
 a:com.intellij.ui.AutoScrollToSourceHandler
 - <init>():V
-- cancelAllRequests():V
-- createToggleAction():com.intellij.openapi.actionSystem.ToggleAction
+- f:cancelAllRequests():V
+- f:createToggleAction():com.intellij.openapi.actionSystem.ToggleAction
 - p:getActionDescription():java.lang.String
 - p:getActionName():java.lang.String
-- install(javax.swing.JList):V
-- install(javax.swing.JTable):V
-- install(javax.swing.JTree):V
-- p:isAutoScrollEnabledFor(com.intellij.openapi.vfs.VirtualFile):Z
+- f:install(javax.swing.JList):V
+- f:install(javax.swing.JTable):V
+- f:install(javax.swing.JTree):V
 - pa:isAutoScrollMode():Z
 - p:needToCheckFocus():Z
-- onMouseClicked(java.awt.Component):V
+- f:onMouseClicked(java.awt.Component):V
 - p:scrollToSource(java.awt.Component):V
 - pa:setAutoScrollMode(Z):V
 *:com.intellij.ui.AutoScrollToSourceTaskManager
@@ -9185,6 +9186,7 @@ e:com.intellij.ui.dsl.builder.DslComponentProperty
 - sf:INTERACTIVE_COMPONENT:com.intellij.ui.dsl.builder.DslComponentProperty
 - sf:LABEL_FOR:com.intellij.ui.dsl.builder.DslComponentProperty
 - sf:ROW_LABEL:com.intellij.ui.dsl.builder.DslComponentProperty
+- sf:SKIP_LABEL_FOR_ASSIGNMENT:com.intellij.ui.dsl.builder.DslComponentProperty
 - sf:VERTICAL_COMPONENT_GAP:com.intellij.ui.dsl.builder.DslComponentProperty
 - sf:VISUAL_PADDINGS:com.intellij.ui.dsl.builder.DslComponentProperty
 - s:getEntries():kotlin.enums.EnumEntries
@@ -9708,6 +9710,7 @@ a:com.intellij.ui.jcef.JBCefBrowserBase
 - createImmediately():V
 - dispose():V
 - p:dispose(java.lang.Runnable):V
+- getBrowserComponent():java.awt.Component
 - f:getCefBrowser():org.cef.browser.CefBrowser
 - a:getComponent():javax.swing.JComponent
 - s:getFocusedBrowser():com.intellij.ui.jcef.JBCefBrowserBase
@@ -12576,11 +12579,6 @@ a:com.intellij.util.ui.OptionsMessageDialog
 f:com.intellij.util.ui.PresentableEnumUtil
 - s:fill(com.intellij.openapi.ui.ComboBox,java.lang.Class):com.intellij.openapi.ui.ComboBox
 - s:fill(javax.swing.JComboBox,java.lang.Class):javax.swing.JComboBox
-c:com.intellij.util.ui.RangeBlinker
-- <init>(com.intellij.openapi.editor.Editor,com.intellij.openapi.editor.markup.TextAttributes,I):V
-- resetMarkers(java.util.List):V
-- startBlinking():V
-- stopBlinking():V
 com.intellij.util.ui.SortableColumnModel
 - a:getColumnInfos():com.intellij.util.ui.ColumnInfo[]
 - a:getDefaultSortKey():javax.swing.RowSorter$SortKey

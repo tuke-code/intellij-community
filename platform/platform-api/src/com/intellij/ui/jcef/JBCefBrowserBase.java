@@ -51,6 +51,7 @@ import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.util.Base64;
 import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -302,8 +303,21 @@ public abstract class JBCefBrowserBase implements JBCefDisposable {
 
       @Override
       public void certificateRemoved(X509Certificate certificate) {
-        getCefBrowser().getRequestContext().ClearCertificateExceptions(null);
-        getCefBrowser().getRequestContext().CloseAllConnections(null);
+        CefRequestContext context = getCefBrowser().getRequestContext();
+        if (context != null) {
+          context.ClearCertificateExceptions(null);
+          context.CloseAllConnections(null);
+        }
+        else {
+          getCefBrowser().createImmediately();
+          // It's a trick to wait until the browser is ready. TODO: introduce CefBrowser#getRequestContextAsync
+          CompletableFuture<String> browserReadyFuture = getCefBrowser().getDevToolsClient().executeDevToolsMethod("");
+          browserReadyFuture.thenRun(() -> {
+            CefRequestContext context1 = Objects.requireNonNull(getCefBrowser().getRequestContext());
+            context1.ClearCertificateExceptions(null);
+            context1.CloseAllConnections(null);
+          });
+        }
       }
     };
 
@@ -312,7 +326,7 @@ public abstract class JBCefBrowserBase implements JBCefDisposable {
     myCefClient.addKeyboardHandler(myKeyboardHandler = new CefKeyboardHandlerAdapter() {
       @Override
       public boolean onKeyEvent(CefBrowser browser, CefKeyEvent cefKeyEvent) {
-        //if (isOffScreenRendering()) return false;
+        if (isOffScreenRendering()) return false;
 
         Component focusOwner = KeyboardFocusManager.getCurrentKeyboardFocusManager().getFocusOwner();
         boolean consume = focusOwner != browser.getUIComponent();
@@ -322,8 +336,13 @@ public abstract class JBCefBrowserBase implements JBCefDisposable {
         if (focusedWindow == null) {
           return true; // consume
         }
-        KeyEvent javaKeyEvent = convertCefKeyEvent(cefKeyEvent, focusedWindow);
-        Toolkit.getDefaultToolkit().getSystemEventQueue().postEvent(javaKeyEvent);
+        try {
+          KeyEvent javaKeyEvent = convertCefKeyEvent(cefKeyEvent, focusedWindow);
+          Toolkit.getDefaultToolkit().getSystemEventQueue().postEvent(javaKeyEvent);
+        } catch (IllegalArgumentException e) {
+          LOG.error("Failed to convert CEF key event: " + cefKeyEvent + "\nReason: " + e);
+        }
+
         return consume;
       }
     }, myCefBrowser);
@@ -531,9 +550,17 @@ public abstract class JBCefBrowserBase implements JBCefDisposable {
   }
 
   /**
-   * Returns the component representing the browser in the UI hierarchy.
+   * Returns the root browser component to be inserted into the UI.
+   * This component adapts the internal JCEF component to IJ.
    */
   public abstract @Nullable JComponent getComponent();
+
+  /**
+   * Returns the actual browser component. This component is the target for events.
+   */
+  public @Nullable Component getBrowserComponent() {
+    return myCefBrowser.getUIComponent();
+  }
 
   /**
    * Returns whether the browser is rendered off-screen.

@@ -268,16 +268,19 @@ public abstract class ImportClassFixBase<T extends PsiElement, R extends PsiRefe
   private static void filterAlreadyImportedButUnresolved(@NotNull Collection<PsiClass> list, @NotNull PsiFile containingFile) {
     if (!(containingFile instanceof PsiJavaFile javaFile)) return;
     PsiImportList importList = javaFile.getImportList();
-    PsiImportDeclaration[] importStatements = importList == null ? PsiImportStatementBase.EMPTY_ARRAY : importList.getAllImportDeclarations();
+    PsiImportStatementBase[] importStatements = importList == null ? PsiImportStatementBase.EMPTY_ARRAY : importList.getAllImportStatements();
     Set<String> unresolvedImports = new HashSet<>(importStatements.length);
-    for (PsiImportDeclaration statement : importStatements) {
-      if (statement instanceof PsiImportStatementBase importStatementBase) {
-        PsiJavaCodeReferenceElement ref = importStatementBase.getImportReference();
+    for (PsiImportStatementBase statement : importStatements) {
+      if (statement instanceof PsiImportModuleStatement importModuleStatement) {
+        PsiJavaModuleReferenceElement refElement = importModuleStatement.getModuleReference();
+        if (refElement != null) {
+          PsiJavaModuleReference ref = refElement.getReference();
+          if (ref != null && ref.resolve() == null) unresolvedImports.add(importModuleStatement.getReferenceName());
+        }
+      } else {
+        PsiJavaCodeReferenceElement ref = statement.getImportReference();
         String name = ref == null ? null : ref.getReferenceName();
         if (name != null && ref.resolve() == null) unresolvedImports.add(name);
-      } else if (statement instanceof PsiImportModuleStatement importModuleStatement) {
-        PsiJavaModuleReference ref = importModuleStatement.getModuleReference();
-        if (ref != null && ref.resolve() == null) unresolvedImports.add(importModuleStatement.getReferenceName());
       }
     }
     if (unresolvedImports.isEmpty()) return;

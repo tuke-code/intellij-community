@@ -94,6 +94,10 @@ class FE1UastApiFixtureTest : KotlinLightCodeInsightFixtureTestCase(), UastApiFi
         checkSubstitutedReceiverType(myFixture)
     }
 
+    fun testJavaStaticMethodReceiverType() {
+        checkJavaStaticMethodReceiverType(myFixture)
+    }
+
     fun testUnderscoreOperatorForTypeArguments() {
         checkUnderscoreOperatorForTypeArguments(myFixture)
     }
@@ -148,5 +152,9 @@ class FE1UastApiFixtureTest : KotlinLightCodeInsightFixtureTestCase(), UastApiFi
 
     fun testNullLiteral() {
         checkNullLiteral(myFixture)
+    }
+
+    fun testStringConcatInAnnotationValue() {
+        checkStringConcatInAnnotationValue(myFixture)
     }
 }

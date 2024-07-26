@@ -184,6 +184,9 @@ object CommunityLibraryLicenses {
     LibraryLicense(libraryName = "blockmap",
                    url = "https://github.com/JetBrains/plugin-blockmap-patches")
       .apache("https://github.com/JetBrains/plugin-blockmap-patches/blob/master/LICENSE"),
+    LibraryLicense(name = "Bodymovin", url = "https://github.com/airbnb/lottie-web",
+                   version = "5.5.10", attachedTo = "intellij.platform.ide.newUiOnboarding")
+      .mit("https://github.com/airbnb/lottie-web/blob/master/LICENSE.md"),
     LibraryLicense(libraryName = "bouncy-castle-pgp", url = "https://www.bouncycastle.org")
       .mit("https://www.bouncycastle.org/license.html")
       .suppliedByOrganizations("The Legion of the Bouncy Castle Inc."),
@@ -218,6 +221,14 @@ object CommunityLibraryLicenses {
     LibraryLicense(name = "Compose Animation Tooling", libraryName = "ui-animation-tooling-internal", version = "0.1.0-SNAPSHOT",
                    url = "https://source.android.com/").apache()
       .suppliedByOrganizations(Suppliers.GOOGLE),
+    LibraryLicense(name = "Compose Multiplatform", libraryName = "jetbrains.compose.foundation.desktop",
+                   url = "https://github.com/JetBrains/compose-multiplatform")
+      .apache("https://github.com/JetBrains/compose-multiplatform/blob/master/LICENSE.txt")
+      .suppliedByOrganizations(Suppliers.JETBRAINS),
+    LibraryLicense(name = "Compose Multiplatform Compiler", libraryName = "jetbrains.compose.compiler.hosted",
+                   url = "https://github.com/JetBrains/compose-multiplatform")
+      .apache("https://github.com/JetBrains/compose-multiplatform/blob/master/LICENSE.txt")
+      .suppliedByOrganizations(Suppliers.JETBRAINS),
     // For ADB wireless QR Code generation
     LibraryLicense(name = "Core barcode encoding/decoding library", url = "https://github.com/zxing/zxing/tree/master/core",
                    libraryName = "zxing-core").apache("https://github.com/zxing/zxing/blob/master/LICENSE")
@@ -579,6 +590,9 @@ object CommunityLibraryLicenses {
     LibraryLicense(name = "jetCheck", libraryName = "jetCheck", url = "https://github.com/JetBrains/jetCheck")
       .apache("https://github.com/JetBrains/jetCheck/blob/master/LICENSE")
       .suppliedByOrganizations(Suppliers.JETBRAINS),
+    LibraryLicense(name = "Jewel", libraryName = "jetbrains.jewel", url = "https://github.com/JetBrains/jewel")
+      .apache("https://github.com/JetBrains/jewel/blob/main/LICENSE")
+      .suppliedByOrganizations(Suppliers.JETBRAINS),
     LibraryLicense(name = "JGit (Settings Sync and SettingsRepo)", libraryName = "jetbrains.intellij.deps.eclipse.jgit",
                    license = "Eclipse Distribution License 1.0",
                    licenseUrl = "https://www.eclipse.org/org/documents/edl-v10.php", url = "https://www.eclipse.org/jgit/")
@@ -593,7 +607,7 @@ object CommunityLibraryLicenses {
       .suppliedByOrganizations("Thai Open Source Software Center Ltd"),
     LibraryLicense(name = "JNA", libraryName = "jna", license = "LGPL 2.1",
                    url = "https://github.com/java-native-access/jna",
-                   licenseUrl = "https://www.opensource.org/licenses/lgpl-2.1.php"),
+                   licenseUrl = "https://github.com/java-native-access/jna/blob/master/LICENSE"),
     LibraryLicense(name = "Joni", libraryName = "joni", url = "https://github.com/jruby/joni")
       .mit("https://github.com/jruby/joni/blob/master/LICENSE"),
     LibraryLicense(name = "jps-javac-extension", libraryName = "jps-javac-extension",
@@ -618,8 +632,8 @@ object CommunityLibraryLicenses {
     LibraryLicense(name = "JSON Schema (schema07.json)", attachedTo = "intellij.json", version = "draft-07",
                    url = "https://json-schema.org/draft-07/schema#").simplifiedBsd(),
     LibraryLicense(libraryName = "jsoup", url = "https://jsoup.org").mit("https://jsoup.org/license"),
-    LibraryLicense(libraryName = "jsr305", url = "https://code.google.com/p/jsr-305/")
-      .newBsd("https://opensource.org/license/bsd-3-clause/")
+    LibraryLicense(libraryName = "jsr305", url = "https://github.com/amaembo/jsr-305")
+      .newBsd("https://github.com/amaembo/jsr-305/blob/master/ri/LICENSE")
       .suppliedByOrganizations("JSR305 expert group"),
     LibraryLicense(libraryName = "jsvg", url = "https://github.com/weisJ/jsvg").mit("https://github.com/weisJ/jsvg/blob/master/LICENSE")
       .suppliedByPersons("Jannis Weis"),
@@ -698,6 +712,7 @@ object CommunityLibraryLicenses {
                    url = "https://github.com/EsotericSoftware/kryo")
       .newBsd("https://github.com/EsotericSoftware/kryo/blob/master/LICENSE.md")
       .suppliedByPersons("Nathan Sweet"),
+
     LibraryLicense(libraryName = "ktor-client-auth",
                    url = "https://github.com/ktorio/ktor")
       .apache("https://github.com/ktorio/ktor/blob/main/LICENSE")
@@ -732,10 +747,22 @@ object CommunityLibraryLicenses {
                    url = "https://github.com/ktorio/ktor")
       .apache("https://github.com/ktorio/ktor/blob/main/LICENSE")
       .suppliedByOrganizations(Suppliers.JETBRAINS),
+
     LibraryLicense(name = "ktor.io TLS", libraryName = "ktor-network-tls",
                    url = "https://github.com/ktorio/ktor")
       .apache("https://github.com/ktorio/ktor/blob/main/LICENSE")
       .suppliedByOrganizations(Suppliers.JETBRAINS),
+
+    LibraryLicense(name = "Ktor Client Core",
+                   libraryName = "ktor-client-core",
+                   url = "https://github.com/ktorio/ktor/tree/main/ktor-client/ktor-client-core")
+      .apache("https://github.com/ktorio/ktor/blob/main/LICENSE").suppliedByOrganizations(Suppliers.JETBRAINS),
+
+    LibraryLicense(name = "Ktor Client OkHttp",
+                   libraryName = "ktor-client-okhttp",
+                   url = "https://github.com/ktorio/ktor/tree/main/ktor-client/ktor-client-okhttp")
+      .apache("https://github.com/ktorio/ktor/blob/main/LICENSE").suppliedByOrganizations(Suppliers.JETBRAINS),
+
     LibraryLicense(name = "kXML2", libraryName = "kxml2", url = "https://sourceforge.net/projects/kxml/").simplifiedBsd(),
     LibraryLicense(name = "Language Tool", libraryName = "org.languagetool:languagetool-core",
                    url = "https://github.com/languagetool-org/languagetool",
@@ -965,6 +992,9 @@ object CommunityLibraryLicenses {
                    url = "https://six.readthedocs.io/",
                    licenseUrl = "https://github.com/benjaminp/six/blob/master/LICENSE")
       .mit("https://github.com/benjaminp/six/blob/master/LICENSE"),
+    LibraryLicense(name = "Skiko Runtime", libraryName = "jetbrains.skiko.awt.runtime.all",
+                   url = "https://github.com/JetBrains/skiko/")
+      .apache("https://github.com/JetBrains/skiko/blob/master/LICENSE"),
     LibraryLicense(libraryName = "slf4j-api", url = "https://slf4j.org/")
       .mit("https://www.slf4j.org/license.html")
       .suppliedByOrganizations("QOS.ch Sarl"),
@@ -1008,7 +1038,7 @@ object CommunityLibraryLicenses {
       .apache("https://github.com/amaembo/streamex/blob/master/LICENSE"),
     LibraryLicense(name = "swingx", libraryName = "swingx", license = "LGPL 2.1",
                    url = "https://central.sonatype.com/artifact/org.swinglabs/swingx-core/1.6.2-2",
-                   licenseUrl = "https://www.opensource.org/licenses/lgpl-2.1.php")
+                   licenseUrl = "https://www.gnu.org/licenses/old-licenses/lgpl-2.1.en.html")
       .suppliedByOrganizations("Sun Microsystems, Inc."),
     LibraryLicense(libraryName = "TestNG", url = "https://testng.org/")
       .apache("https://github.com/cbeust/testng/blob/master/LICENSE.txt"),
@@ -1088,10 +1118,10 @@ object CommunityLibraryLicenses {
       .suppliedByOrganizations("Xerial Project"),
 
     LibraryLicense(name = "xml-apis-ext", libraryName = "xml-apis-ext",
-                   url = "https://xerces.apache.org/xml-commons/components/external").apache()
+                   url = "https://xerces.apache.org/xml-commons/components/external/").apache()
       .suppliedByOrganizations("The Apache Software Foundation"),
     LibraryLicense(name = "xml-resolver", libraryName = "xml-resolver",
-                   url = "https://xml.apache.org/commons/components/resolver/").apache()
+                   url = "https://xerces.apache.org/xml-commons/components/resolver/").apache()
       .suppliedByOrganizations("The Apache Software Foundation"),
     LibraryLicense(name = "XMLBeans", libraryName = "XmlBeans",
                    url = "https://xmlbeans.apache.org/",

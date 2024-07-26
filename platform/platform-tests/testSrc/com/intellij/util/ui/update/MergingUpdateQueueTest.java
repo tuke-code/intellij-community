@@ -20,6 +20,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
+import static org.assertj.core.api.AssertionsForInterfaceTypes.assertThat;
+
 public class MergingUpdateQueueTest extends LightPlatformTestCase {
   public void testOnShowNotify() {
     final MyUpdate first = new MyUpdate("first");
@@ -288,7 +290,7 @@ public class MergingUpdateQueueTest extends LightPlatformTestCase {
   }
 
   private static final class MyQueue extends MergingUpdateQueue {
-    private boolean myExecuted;
+    private boolean isExecuted;
 
     private MyQueue() {
       this(400);
@@ -308,13 +310,13 @@ public class MergingUpdateQueueTest extends LightPlatformTestCase {
     }
 
     @Override
-    protected void execute(final Update @NotNull [] update) {
-      super.execute(update);
-      myExecuted = true;
+    protected void execute(@NotNull List<? extends Update> updates) {
+      super.execute(updates);
+      isExecuted = true;
     }
 
     boolean wasExecuted() {
-      return myExecuted;
+      return isExecuted;
     }
 
     @Override
@@ -458,8 +460,8 @@ public class MergingUpdateQueueTest extends LightPlatformTestCase {
       }
     };
     queue.queue(update);
-    assertFalse(update.isRejected());
+    assertThat(update.isRejected()).isFalse();
     Disposer.dispose(queue);
-    assertTrue(update.isRejected());
+    assertThat(update.isRejected()).isTrue();
   }
 }

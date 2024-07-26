@@ -7,7 +7,6 @@ import com.intellij.debugger.engine.events.SuspendContextCommandImpl;
 import com.intellij.debugger.settings.DebuggerSettings;
 import com.intellij.debugger.ui.breakpoints.FilteredRequestor;
 import com.intellij.openapi.diagnostic.Logger;
-import com.intellij.openapi.util.registry.Registry;
 import com.intellij.util.SingleAlarm;
 import com.sun.jdi.event.LocatableEvent;
 import com.sun.jdi.request.EventRequest;
@@ -17,10 +16,6 @@ import java.util.Objects;
 import java.util.function.Function;
 
 public class SuspendOtherThreadsRequestor implements FilteredRequestor {
-  private enum HowToSwitchToSuspendAll {
-    PAUSE_WAITING_EVALUATION, IMMEDIATE_PAUSE, METHOD_BREAKPOINT
-  }
-
   private final @NotNull DebugProcessImpl myProcess;
   private final @NotNull ParametersForSuspendAllReplacing myParameters;
 
@@ -57,8 +52,7 @@ public class SuspendOtherThreadsRequestor implements FilteredRequestor {
 
     process.myPreparingToSuspendAll = true;
 
-    String howToSwitchStr = Registry.get("debugger.how.to.switch.to.suspend.all").getSelectedOption();
-    HowToSwitchToSuspendAll how = HowToSwitchToSuspendAll.valueOf(howToSwitchStr);
+    DebuggerUtils.HowToSwitchToSuspendAll how = DebuggerUtils.howToSwitchToSuspendAll();
     switch (how) {
       case METHOD_BREAKPOINT -> {
         process.myParametersForSuspendAllReplacing = new ParametersForSuspendAllReplacing(suspendContext, performOnSuspendAll);
@@ -73,7 +67,7 @@ public class SuspendOtherThreadsRequestor implements FilteredRequestor {
         suspendWhenNoEvaluation(suspendContext, performOnSuspendAll);
 
       case IMMEDIATE_PAUSE -> {
-        suspendContext.getVirtualMachine().suspend();
+        suspendContext.getVirtualMachineProxy().suspend();
         switchToSuspendAll(suspendContext, performOnSuspendAll);
       }
     }
@@ -100,18 +94,18 @@ public class SuspendOtherThreadsRequestor implements FilteredRequestor {
             process.removeEvaluationListener(this);
           }
           else {
-            suspendContext.getVirtualMachine().resume();
+            suspendContext.getVirtualMachineProxy().resume();
           }
         }
       });
-      suspendContext.getVirtualMachine().resume();
+      suspendContext.getVirtualMachineProxy().resume();
     }
   }
 
   private static boolean switchContextWithSuspend(@NotNull DebugProcessImpl process,
                                                   @NotNull SuspendContextImpl suspendContext,
                                                   @NotNull Function<@NotNull SuspendContextImpl, Boolean> performOnSuspendAll) {
-    suspendContext.getVirtualMachine().suspend();
+    suspendContext.getVirtualMachineProxy().suspend();
     if (getNumberOfEvaluations(process) == 0) {
       switchToSuspendAll(suspendContext, performOnSuspendAll);
       return true;
@@ -220,12 +214,11 @@ public class SuspendOtherThreadsRequestor implements FilteredRequestor {
   private static boolean processSuspendAll(@NotNull SuspendContextImpl suspendContext,
                                            @NotNull SuspendContextImpl originalContext,
                                            @NotNull Function<@NotNull SuspendContextImpl, Boolean> performOnSuspendAll) {
-    // Need to 'replace' the myThreadSuspendContext (single-thread suspend context passed filtering) with this one.
+    // Need to 'replace' the originalContext (single-thread suspend context which passed filtering) with this one.
     suspendContext.resetThread(Objects.requireNonNull(originalContext.getEventThread()));
 
-    // Note, myThreadSuspendContext is resuming without SuspendManager#voteSuspend.
-    // Look at the end of DebugProcessEvents#processLocatableEvent for more details.
-    suspendContext.getDebugProcess().getSuspendManager().voteResume(originalContext);
+    // Resume originalContext as the new one is holding all threads now
+    ((SuspendManagerImpl)originalContext.getDebugProcess().getSuspendManager()).scheduleResume(originalContext);
 
     suspendContext.mySuspendAllSwitchedContext = true;
     DebugProcessImpl process = suspendContext.getDebugProcess();

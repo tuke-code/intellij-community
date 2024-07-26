@@ -182,6 +182,13 @@
     <projectService serviceInterface="com.intellij.codeInsight.lookup.LookupManager"
                     serviceImplementation="com.intellij.codeInsight.lookup.impl.LookupManagerImpl"/>
 
+    <projectService serviceInterface="com.intellij.codeInsight.lookup.impl.ClientLookupManager"
+                    serviceImplementation="com.intellij.codeInsight.lookup.impl.LocalClientLookupManager"
+                    client="local"/>
+    <projectService serviceInterface="com.intellij.codeInsight.lookup.impl.ClientLookupManager"
+                    serviceImplementation="com.intellij.codeInsight.lookup.impl.GuestLookupManager"
+                    client="remote"/>
+
     <applicationService serviceInterface="com.intellij.psi.meta.MetaDataRegistrar"
                         serviceImplementation="com.intellij.psi.impl.meta.MetaRegistry"/>
 
@@ -403,8 +410,6 @@
 
     <projectService serviceInterface="com.intellij.codeInsight.highlighting.HighlightManager"
                     serviceImplementation="com.intellij.codeInsight.highlighting.HighlightManagerImpl"/>
-
-    <projectService serviceImplementation="com.intellij.codeInsight.daemon.impl.HighlightingMarkupGrave" />
 
     <applicationService serviceImplementation="com.intellij.codeInsight.codeVision.settings.CodeVisionSettings"/>
     <projectService serviceImplementation="com.intellij.codeInsight.codeVision.CodeVisionInitializer"/>
@@ -1761,6 +1766,7 @@
     <documentation.linkHandler implementation="com.intellij.lang.documentation.psi.PsiDocumentationLinkHandler"/>
   </extensions>
   <applicationListeners>
+    <listener class="com.intellij.ide.LanguageBundleListener" topic="com.intellij.ide.AppLifecycleListener"/>
     <listener class="com.intellij.ui.ExperimentalUiAppLifecycleListener" topic="com.intellij.ide.AppLifecycleListener"/>
     <listener class="com.intellij.util.indexing.FileBasedIndexPluginListener" topic="com.intellij.ide.plugins.DynamicPluginListener"/>
     <listener topic="com.intellij.openapi.fileEditor.FileEditorManagerListener"

@@ -1,4 +1,4 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.codeInsight.intention.impl;
 
 import com.intellij.codeInsight.CodeInsightBundle;
@@ -27,6 +27,7 @@ import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ModalityState;
 import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.diagnostic.Logger;
+import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.editor.VisualPosition;
 import com.intellij.openapi.editor.actions.EditorActionUtil;
@@ -51,8 +52,8 @@ import com.intellij.ui.codeFloatingToolbar.CodeFloatingToolbar;
 import com.intellij.ui.icons.RowIcon;
 import com.intellij.ui.popup.WizardPopup;
 import com.intellij.ui.popup.list.ListPopupImpl;
-import com.intellij.util.Alarm;
 import com.intellij.util.ObjectUtils;
+import com.intellij.util.SingleEdtTaskScheduler;
 import com.intellij.util.ThreeState;
 import com.intellij.util.concurrency.AppExecutorUtil;
 import com.intellij.util.concurrency.ThreadingAssertions;
@@ -94,10 +95,9 @@ import java.util.function.Consumer;
  * @author Konstantin Bulenkov
  */
 public final class IntentionHintComponent implements Disposable, ScrollAwareHint {
-
   private static final Logger LOG = Logger.getInstance(IntentionHintComponent.class);
 
-  private static final Alarm ourAlarm = new Alarm();
+  private static final SingleEdtTaskScheduler alarm = SingleEdtTaskScheduler.createSingleEdtTaskScheduler();
 
   private final Editor myEditor;
   private boolean myDisposed; // accessed in EDT only
@@ -339,8 +339,7 @@ public final class IntentionHintComponent implements Disposable, ScrollAwareHint
     public void show(@NotNull JComponent parentComponent, int x, int y, JComponent focusBackComponent, @NotNull HintHint hintHint) {
       myVisible = true;
       if (myShouldDelay) {
-        ourAlarm.cancelAllRequests();
-        ourAlarm.addRequest(() -> showImpl(parentComponent, x, y, focusBackComponent), 500);
+        alarm.cancelAndRequest(500, () -> showImpl(parentComponent, x, y, focusBackComponent));
       }
       else {
         showImpl(parentComponent, x, y, focusBackComponent);
@@ -356,7 +355,7 @@ public final class IntentionHintComponent implements Disposable, ScrollAwareHint
     public void hide() {
       super.hide();
       myVisible = false;
-      ourAlarm.cancelAllRequests();
+      alarm.cancel();
     }
 
     @Override
@@ -761,10 +760,14 @@ public final class IntentionHintComponent implements Disposable, ScrollAwareHint
                                   @NotNull IntentionHintComponent.IntentionPopup popup) {
       IntentionAction action = IntentionActionDelegate.unwrap(actionWithCaching.getAction());
 
+      Document document = popup.myEditor.getDocument();
+      long oldTimeStamp = document.getModificationStamp();
+
       if (context.mayHaveHighlighting(action)) {
         ReadAction.nonBlocking(() -> context.computeHighlightsToApply(action))
           .coalesceBy(popup)
           .finishOnUiThread(ModalityState.any(), Runnable::run)
+          .expireWhen(() -> document.getModificationStamp() != oldTimeStamp)
           .submit(AppExecutorUtil.getAppExecutorService());
       }
       else {

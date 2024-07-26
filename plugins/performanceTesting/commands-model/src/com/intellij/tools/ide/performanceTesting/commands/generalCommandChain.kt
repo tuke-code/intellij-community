@@ -99,7 +99,7 @@ fun <T : CommandChain> T.openRandomFile(extension: String): T = apply {
 }
 
 fun <T : CommandChain> T.openProject(projectPath: Path, openInNewWindow: Boolean = true, detectProjectLeak: Boolean = false): T = apply {
-  if(detectProjectLeak && openInNewWindow) throw IllegalArgumentException("To analyze the project leak, we need to close the project")
+  if (detectProjectLeak && openInNewWindow) throw IllegalArgumentException("To analyze the project leak, we need to close the project")
   addCommand("${CMD_PREFIX}openProject", projectPath.toString(), (!openInNewWindow).toString(), detectProjectLeak.toString())
 }
 
@@ -162,6 +162,7 @@ fun <T : CommandChain> T.navigateAndFindUsages(
   position: String = "INTO",
   scope: String = "Project Files",
   warmup: Boolean = false,
+  runInBackground: Boolean = false,
 ): T = apply {
   val command = mutableListOf("${CMD_PREFIX}findUsages")
   if (expectedElementName.isNotEmpty()) {
@@ -174,9 +175,15 @@ fun <T : CommandChain> T.navigateAndFindUsages(
   if (scope.isNotEmpty()) {
     command.add("-scope $scope")
   }
+
+  if(runInBackground) {
+    command.add("-runInBackground")
+  }
+
   if (warmup) {
     command.add("WARMUP")
   }
+
   addCommandWithSeparator("|", *command.toTypedArray())
 }
 
@@ -368,10 +375,16 @@ fun <T : CommandChain> T.convertJavaToKotlin(moduleName: String, filePath: Strin
   addCommand("${CMD_PREFIX}convertJavaToKotlin $moduleName $filePath")
 }
 
+/**
+ * @see [com.jetbrains.performancePlugin.commands.IdeEditorKeyCommand]
+ */
 fun <T : CommandChain> T.pressKey(key: Keys): T = apply {
   addCommand("${CMD_PREFIX}pressKey", key.name)
 }
 
+/**
+ * @see [com.jetbrains.performancePlugin.commands.DelayTypeCommand]
+ */
 fun <T : CommandChain> T.delayType(
   delayMs: Int,
   text: String,
@@ -849,6 +862,12 @@ fun <T : CommandChain> T.goToDeclaration(expectedOpenedFile: String? = null, spa
   if (spanTag != null) action.append(" spanTag $spanTag")
   executeEditorAction(action.toString())
 }
+
+fun <T : CommandChain> T.goToImplementation(): T = apply {
+  val action = StringBuilder("GotoImplementation")
+  executeEditorAction(action.toString())
+}
+
 
 fun <T : CommandChain> T.collectAllFiles(extension: String, fromSources: Boolean = true): T = apply {
   addCommand("${CMD_PREFIX}collectAllFiles $extension $fromSources")

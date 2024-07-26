@@ -423,6 +423,8 @@ com.intellij.injected.editor.VirtualFileWindow
 f:com.intellij.l10n.LocalizationUtil
 - sf:INSTANCE:com.intellij.l10n.LocalizationUtil
 - f:getLocale():java.util.Locale
+- f:getLocale(Z):java.util.Locale
+- bs:getLocale$default(com.intellij.l10n.LocalizationUtil,Z,I,java.lang.Object):java.util.Locale
 - f:getLocaleOrNullForDefault():java.util.Locale
 com.intellij.lang.ASTNode
 - com.intellij.openapi.util.UserDataHolder
@@ -1404,7 +1406,6 @@ com.intellij.openapi.application.ApplicationListener
 - writeActionFinished(java.lang.Object):V
 - writeActionStarted(java.lang.Object):V
 c:com.intellij.openapi.application.ApplicationManager
-- ps:ourApplication:com.intellij.openapi.application.Application
 - <init>():V
 - s:getApplication():com.intellij.openapi.application.Application
 - s:setApplication(com.intellij.openapi.application.Application,com.intellij.openapi.Disposable):V

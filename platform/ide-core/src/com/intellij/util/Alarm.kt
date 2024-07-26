@@ -12,9 +12,9 @@ import com.intellij.openapi.application.*
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.diagnostic.logger
+import com.intellij.openapi.progress.Cancellation
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.wm.IdeFrame
-import com.intellij.platform.util.coroutines.childScope
 import com.intellij.util.concurrency.ThreadingAssertions
 import com.intellij.util.concurrency.annotations.RequiresEdt
 import com.intellij.util.ui.update.Activatable
@@ -26,7 +26,10 @@ import org.jetbrains.annotations.TestOnly
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
 import javax.swing.JComponent
+import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.EmptyCoroutineContext
+import kotlin.streams.asSequence
+import kotlin.time.Duration.Companion.nanoseconds
 
 private val LOG: Logger = logger<Alarm>()
 
@@ -47,7 +50,8 @@ open class Alarm @Internal constructor(
   coroutineScope: CoroutineScope? = null,
 ) : Disposable {
   // it is a supervisor coroutine scope
-  private val taskCoroutineScope: CoroutineScope
+  private val coroutineScope: CoroutineScope
+  private val taskContext: CoroutineContext
 
   // scheduled requests scheduled
   private val requests = SmartList<Request>() // guarded by LOCK
@@ -81,7 +85,11 @@ open class Alarm @Internal constructor(
 
   constructor(threadToUse: ThreadToUse) : this(threadToUse = threadToUse, parentDisposable = null, activationComponent = null)
 
-  constructor() : this(threadToUse = ThreadToUse.SWING_THREAD, parentDisposable = null, activationComponent = null)
+  @Deprecated("Please use flow or at least pass coroutineScope")
+  constructor() : this(threadToUse = ThreadToUse.SWING_THREAD, parentDisposable = null, activationComponent = null) {
+    val stackFrames = StackWalker.getInstance().walk { stream -> stream.asSequence().drop(1).firstOrNull()?.toString() }
+    LOG.warn("Do not create alarm without coroutineScope: $stackFrames")
+  }
 
   @Internal
   constructor(coroutineScope: CoroutineScope, threadToUse: ThreadToUse = ThreadToUse.POOLED_THREAD)
@@ -112,10 +120,23 @@ open class Alarm @Internal constructor(
     }
 
     @Suppress("OPT_IN_USAGE")
-    taskCoroutineScope = (coroutineScope
-                          ?: (ApplicationManager.getApplication()?.getService(AlarmSharedCoroutineScopeHolder::class.java)?.coroutineScope)
-                          ?: GlobalScope)
-      .childScope("Alarm", Dispatchers.Default.limitedParallelism(1))
+    this.coroutineScope = (coroutineScope
+                           ?: (ApplicationManager.getApplication()?.getService(AlarmSharedCoroutineScopeHolder::class.java)?.coroutineScope)
+                           ?: GlobalScope) + Dispatchers.Default.limitedParallelism(1)
+
+    @Suppress("IfThenToSafeAccess")
+    if (coroutineScope != null) {
+      coroutineScope.coroutineContext.job.invokeOnCompletion {
+        cancelAllRequests()
+      }
+    }
+
+    taskContext = if (threadToUse == ThreadToUse.SWING_THREAD) {
+      SingleAlarm.getEdtDispatcher()
+    }
+    else {
+      EmptyCoroutineContext
+    }
 
     if (parentDisposable == null) {
       if (threadToUse != ThreadToUse.SWING_THREAD && coroutineScope == null) {
@@ -129,10 +150,8 @@ open class Alarm @Internal constructor(
   }
 
   override fun dispose() {
-    if (taskCoroutineScope.isActive) {
-      taskCoroutineScope.cancel()
-      cancelAllRequests()
-    }
+    isDisposed = true
+    cancelAllRequests()
   }
 
   fun addRequest(request: Runnable, delayMillis: Int, runWithActiveFrameOnly: Boolean) {
@@ -186,6 +205,18 @@ open class Alarm @Internal constructor(
     doAddRequest(request = request, delayMillis = delayMillis.toLong(), modalityState = modalityState)
   }
 
+  // Allow clients to use modern APIs (e.g., readAction) without first migrating from Alarm,
+  // as this migration can cause concurrency issues and different behavior.
+  @Internal
+  fun schedule(task: suspend CoroutineScope.() -> Unit) {
+    check(activationComponent == null)
+    val requestToSchedule = Request(task = null, modalityState = null, delayMillis = 0)
+    synchronized(LOCK) {
+      requests.add(requestToSchedule)
+      requestToSchedule.schedule(owner = this, nonBlockingTask = task)
+    }
+  }
+
   fun addRequest(request: Runnable, delayMillis: Long, modalityState: ModalityState?) {
     LOG.assertTrue(threadToUse == ThreadToUse.SWING_THREAD)
     doAddRequest(request = request, delayMillis = delayMillis, modalityState = modalityState)
@@ -194,7 +225,10 @@ open class Alarm @Internal constructor(
   private fun doAddRequest(request: Runnable, delayMillis: Long, modalityState: ModalityState?) {
     val requestToSchedule = Request(task = request, modalityState = modalityState, delayMillis = delayMillis)
     synchronized(LOCK) {
-      LOG.assertTrue(!isDisposed, "Already disposed")
+      if (isDisposed) {
+        LOG.error("Already disposed")
+        return
+      }
 
       if (activationComponent == null || isActivationComponentShowing) {
         add(requestToSchedule)
@@ -288,21 +322,32 @@ open class Alarm @Internal constructor(
   fun waitForAllExecuted(timeout: Long, timeUnit: TimeUnit) {
     assert(ApplicationManager.getApplication().isUnitTestMode)
 
-    val jobs = taskCoroutineScope.coroutineContext.job.children.toList()
+    val jobs = synchronized(LOCK) {
+      requests.mapNotNull { it.job }
+    }
+
     if (jobs.isEmpty()) {
       return
     }
 
     @Suppress("RAW_RUN_BLOCKING")
     runBlocking {
-      try {
-        withTimeout(timeUnit.toMillis(timeout)) {
-          jobs.joinAll()
+      val deadline = System.nanoTime() + timeUnit.toNanos(timeout)
+      for (job in jobs) {
+        val toWait = deadline - System.nanoTime()
+        if (toWait < 0) {
+          throw TimeoutException()
         }
-      }
-      catch (e: TimeoutCancellationException) {
-        // compatibility - throw TimeoutException as before
-        throw TimeoutException(e.message)
+
+        try {
+          withTimeout(toWait.nanoseconds) {
+            job.join()
+          }
+        }
+        catch (e: TimeoutCancellationException) {
+          // compatibility - throw TimeoutException as before
+          throw TimeoutException(e.message)
+        }
       }
     }
   }
@@ -313,8 +358,9 @@ open class Alarm @Internal constructor(
   val isEmpty: Boolean
     get() = synchronized(LOCK) { requests.isEmpty() }
 
-  val isDisposed: Boolean
-    get() = !taskCoroutineScope.isActive
+  @Volatile
+  var isDisposed: Boolean = false
+    private set
 
   private class Request @Async.Schedule constructor(
     @JvmField var task: Runnable?,
@@ -328,28 +374,56 @@ open class Alarm @Internal constructor(
     fun schedule(owner: Alarm) {
       assert(job == null)
 
-      job = owner.taskCoroutineScope.launch(CoroutineName("${task.toString()} (Alarm)")) {
+      job = owner.coroutineScope.launch(CoroutineName("${task.toString()} (Alarm)")) {
         delay(delayMillis)
 
-        var taskContext = clientIdContext ?: EmptyCoroutineContext
-        if (owner.threadToUse == ThreadToUse.SWING_THREAD) {
-          taskContext += SingleAlarm.getEdtDispatcher() + (modalityState ?: ModalityState.nonModal()).asContextElement()
+        if (owner.isDisposed) {
+          return@launch
         }
-        // todo fix clients and remove NonCancellable
-        taskContext += NonCancellable
+
+        var taskContext = owner.taskContext + (clientIdContext ?: EmptyCoroutineContext)
+        if (owner.threadToUse == ThreadToUse.SWING_THREAD && modalityState != null && modalityState != ModalityState.nonModal()) {
+          taskContext += modalityState.asContextElement()
+        }
 
         withContext(taskContext) {
           val task = synchronized(owner.LOCK) {
             task?.also { task = null }
           } ?: return@withContext
 
-          runSafely(task)
+          ensureActive()
+
+          //todo fix clients and remove NonCancellable
+          try {
+            Cancellation.withNonCancelableSection().use {
+              task.run()
+            }
+          }
+          catch (e: CancellationException) {
+            throw e
+          }
+          catch (e: Throwable) {
+            LOG.error(e)
+          }
         }
       }.also {
         it.invokeOnCompletion {
           synchronized(owner.LOCK) {
             owner.requests.remove(this@Request)
             job = null
+          }
+        }
+      }
+    }
+
+    fun schedule(owner: Alarm, nonBlockingTask: suspend CoroutineScope.() -> Unit) {
+      assert(job == null)
+
+      job = owner.coroutineScope.launch(block = nonBlockingTask).also {
+        it.invokeOnCompletion {
+          synchronized(owner.LOCK) {
+            owner.requests.remove(this@Request)
+            this.job = null
           }
         }
       }
@@ -374,19 +448,6 @@ open class Alarm @Internal constructor(
     }
 
     override fun toString(): String = "${super.toString()} $task; delay=${delayMillis}ms"
-  }
-}
-
-@Async.Execute
-private fun runSafely(task: Runnable) {
-  try {
-    task.run()
-  }
-  catch (e: CancellationException) {
-    throw e
-  }
-  catch (e: Throwable) {
-    LOG.error(e)
   }
 }
 

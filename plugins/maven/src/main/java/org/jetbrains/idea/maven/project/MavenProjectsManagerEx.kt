@@ -105,7 +105,7 @@ interface MavenAsyncProjectsManager {
   }
 }
 
-open class MavenProjectsManagerEx(project: Project, private val cs: CoroutineScope) : MavenProjectsManager(project) {
+open class MavenProjectsManagerEx(project: Project, private val cs: CoroutineScope) : MavenProjectsManager(project, cs) {
   override suspend fun addManagedFilesWithProfiles(files: List<VirtualFile>,
                                                    profiles: MavenExplicitProfiles,
                                                    modelsProvider: IdeModifiableModelsProvider?,
@@ -546,7 +546,7 @@ open class MavenProjectsManagerEx(project: Project, private val cs: CoroutineSco
     }
     if (null == baseDir) return
     withContext(tracer.span("checkOrInstallForSync") + Dispatchers.IO) {
-      MavenWrapperDownloader.checkOrInstallForSync(project, baseDir.toString())
+      MavenWrapperDownloader.checkOrInstallForSync(project, baseDir.toString(), true)
     }
   }
 

@@ -5,7 +5,7 @@ import org.jetbrains.kotlin.idea.k2.codeinsight.fixes.AbstractHighLevelQuickFixM
 import org.jetbrains.kotlin.idea.k2.codeinsight.fixes.AbstractHighLevelQuickFixMultiModuleTest
 import org.jetbrains.kotlin.idea.k2.codeinsight.fixes.AbstractHighLevelQuickFixTest
 import org.jetbrains.kotlin.testGenerator.model.*
-import org.jetbrains.kotlin.testGenerator.model.GroupCategory.*
+import org.jetbrains.kotlin.testGenerator.model.GroupCategory.QUICKFIXES
 import org.jetbrains.kotlin.testGenerator.model.Patterns.DIRECTORY
 import org.jetbrains.kotlin.testGenerator.model.Patterns.KT_WITHOUT_DOTS
 
@@ -62,11 +62,11 @@ internal fun MutableTWorkspace.generateK2FixTests() {
             model("$idea/quickfix/addAnnotationTarget", pattern = pattern, isIgnored = true)
             model("$idea/quickfix/addAnnotationUseSiteTarget", pattern = pattern, isIgnored = true)
             model("$idea/quickfix/addConstructorParameter", pattern = pattern, isIgnored = true)
-            model("$idea/quickfix/addConstructorParameterFromSuperTypeCall", pattern = pattern, isIgnored = true)
+            model("$idea/quickfix/addConstructorParameterFromSuperTypeCall", pattern = pattern)
             model("$idea/quickfix/addConversionCall", pattern = pattern, isIgnored = true)
             model("$idea/quickfix/addCrossinline", pattern = pattern)
             model("$idea/quickfix/addDataModifier", pattern = pattern)
-            model("$idea/quickfix/addDefaultConstructor", pattern = pattern, isIgnored = true)
+            model("$idea/quickfix/addDefaultConstructor", pattern = pattern)
             model("$idea/quickfix/addElseBranchToIf", pattern = pattern)
             model("$idea/quickfix/addEmptyArgumentList", pattern = pattern)
             model("$idea/quickfix/addEqEqTrue", pattern = pattern)
@@ -81,7 +81,7 @@ internal fun MutableTWorkspace.generateK2FixTests() {
             model("$idea/quickfix/addNoinline", pattern = pattern)
             model("$idea/quickfix/addReifiedToTypeParameterOfFunctionFix", pattern = pattern)
             model("$idea/quickfix/addReturnExpression", pattern = pattern)
-            model("$idea/quickfix/addReturnToLastExpressionInFunction", pattern = pattern, isIgnored = true)
+            model("$idea/quickfix/addReturnToLastExpressionInFunction", pattern = pattern)
             model("$idea/quickfix/addReturnToUnusedLastExpressionInFunction", pattern = pattern, isIgnored = true)
             model("$idea/quickfix/addRunBeforeLambda", pattern = pattern, isIgnored = true)
             model("$idea/quickfix/addSemicolonBeforeLambdaExpression", pattern = pattern, isIgnored = true)
@@ -103,7 +103,7 @@ internal fun MutableTWorkspace.generateK2FixTests() {
             model("$idea/quickfix/changeToUseSpreadOperator", pattern = pattern)
             model("$idea/quickfix/compilerError", pattern = pattern, isIgnored = true)
             model("$idea/quickfix/convertCollectionLiteralToIntArrayOf", pattern = pattern)
-            model("$idea/quickfix/convertIllegalEscapeToUnicodeEscape", pattern = pattern, isIgnored = true)
+            model("$idea/quickfix/convertIllegalEscapeToUnicodeEscape", pattern = pattern)
             model("$idea/quickfix/convertJavaInterfaceToClass", pattern = pattern, isIgnored = true)
             model("$idea/quickfix/convertLateinitPropertyToNotNullDelegate", pattern = pattern)
             model("$idea/quickfix/convertPropertyInitializerToGetter", pattern = pattern, isIgnored = true)
@@ -127,7 +127,7 @@ internal fun MutableTWorkspace.generateK2FixTests() {
             model("$idea/quickfix/inlineClass", pattern = pattern, isIgnored = true)
             model("$idea/quickfix/inlineTypeParameterFix", pattern = pattern, isIgnored = true)
             model("$idea/quickfix/insertDelegationCall", pattern = pattern)
-            model("$idea/quickfix/isEnumEntry", pattern = pattern, isIgnored = true)
+            model("$idea/quickfix/isEnumEntry", pattern = pattern)
             model("$idea/quickfix/javaClassOnCompanion", pattern = pattern, isIgnored = true)
             model("$idea/quickfix/kdocMissingDocumentation", pattern = pattern, isIgnored = true)
             model("$idea/quickfix/leakingThis", pattern = pattern, isIgnored = true)
@@ -140,7 +140,7 @@ internal fun MutableTWorkspace.generateK2FixTests() {
             model("$idea/quickfix/migration/missingConstructorKeyword", pattern = pattern)
             model("$idea/quickfix/missingConstructorBrackets", pattern = pattern)
             model("$idea/quickfix/moveMemberToCompanionObject", pattern = pattern, isIgnored = true)
-            model("$idea/quickfix/moveReceiverAnnotation", pattern = pattern, isIgnored = true)
+            model("$idea/quickfix/moveReceiverAnnotation", pattern = pattern)
             model("$idea/quickfix/moveToConstructorParameters", pattern = pattern, isIgnored = true)
             model("$idea/quickfix/moveToSealedParent", pattern = pattern, isIgnored = true)
             model("$idea/quickfix/moveTypeAliasToTopLevel", pattern = pattern)
@@ -162,7 +162,7 @@ internal fun MutableTWorkspace.generateK2FixTests() {
             model("$idea/quickfix/removeArgument", pattern = pattern)
             model("$idea/quickfix/removeAtFromAnnotationArgument", pattern = pattern, isIgnored = true)
             model("$idea/quickfix/removeDefaultParameterValue", pattern = pattern)
-            model("$idea/quickfix/removeFinalUpperBound", pattern = pattern, isIgnored = true)
+            model("$idea/quickfix/removeFinalUpperBound", pattern = pattern)
             model("$idea/quickfix/removeNoConstructor", pattern = pattern)
             model("$idea/quickfix/removeRedundantAssignment", pattern = pattern, isIgnored = true)
             model("$idea/quickfix/removeRedundantInitializer", pattern = pattern, isIgnored = true)
@@ -170,7 +170,7 @@ internal fun MutableTWorkspace.generateK2FixTests() {
             model("$idea/quickfix/removeSingleLambdaParameter", pattern = pattern, isIgnored = true)
             model("$idea/quickfix/removeSuspend", pattern = pattern, isIgnored = true)
             model("$idea/quickfix/removeToStringInStringTemplate", pattern = pattern, isIgnored = true)
-            model("$idea/quickfix/removeTypeVariance", pattern = pattern, isIgnored = true)
+            model("$idea/quickfix/removeTypeVariance", pattern = pattern)
             model("$idea/quickfix/removeUnused", pattern = pattern)
             model("$idea/quickfix/removeUnusedParameter", pattern = pattern, isIgnored = true)
             model("$idea/quickfix/removeUnusedReceiver", pattern = pattern, isIgnored = true)
@@ -203,7 +203,7 @@ internal fun MutableTWorkspace.generateK2FixTests() {
             model("$idea/quickfix/variables/changeToFunctionInvocation", pattern = pattern, isRecursive = false)
             model("$idea/quickfix/wrapArgumentWithParentheses", pattern = pattern, isIgnored = true)
             model("$idea/quickfix/wrapWhenExpressionInParentheses", pattern = pattern, isIgnored = true)
-            model("$idea/quickfix/wrongLongSuffix", pattern = pattern, isIgnored = true)
+            model("$idea/quickfix/wrongLongSuffix", pattern = pattern)
             model("$idea/quickfix/yieldUnsupported", pattern = pattern, isIgnored = true)
         }
 

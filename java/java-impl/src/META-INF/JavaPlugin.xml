@@ -252,6 +252,9 @@
     <extensionPoint qualifiedName="com.intellij.configuration.ModuleStructureExtension" dynamic="true"
                     interface="com.intellij.openapi.roots.ui.configuration.projectRoot.ModuleStructureExtension"/>
 
+    <extensionPoint qualifiedName="com.intellij.configuration.moduleStructureFilterExtension" dynamic="true"
+                    interface="com.intellij.openapi.roots.ui.configuration.projectRoot.ModuleStructureFilterExtension"/>
+
     <extensionPoint qualifiedName="com.intellij.projectStructureValidator"
                     interface="com.intellij.openapi.roots.ui.configuration.projectRoot.daemon.ProjectStructureValidator" dynamic="true"/>
 
@@ -363,6 +366,9 @@
     <extensionPoint qualifiedName="com.intellij.execution.applicationRunLineMarkerHider"
                     interface="com.intellij.execution.ApplicationRunLineMarkerHider" dynamic="true"/>
     <extensionPoint qualifiedName="com.intellij.jvm.logging" interface="com.intellij.lang.logging.JvmLogger" dynamic="true"/>
+
+    <extensionPoint qualifiedName="com.intellij.openapi.projectRoots.externalJavaConfigurationProvider"
+                    interface="com.intellij.openapi.projectRoots.impl.ExternalJavaConfigurationProvider" dynamic="true"/>
   </extensionPoints>
 
   <extensions defaultExtensionNs="com.intellij">
@@ -456,6 +462,8 @@
                         serviceImplementation="com.intellij.psi.impl.file.PsiPackageImplementationHelperImpl"/>
     <applicationService serviceInterface="com.intellij.psi.codeStyle.JavaFileCodeStyleFacadeFactory"
                         serviceImplementation="com.intellij.psi.codeStyle.JavaFileCodeStyleFacadeImpl$Factory"/>
+    <applicationService serviceInterface="com.intellij.psi.JavaModuleGraphHelper"
+                        serviceImplementation="com.intellij.codeInsight.daemon.impl.analysis.JavaModuleGraphHelperImpl"/>
 
     <projectService serviceImplementation="com.intellij.jarRepository.RemoteRepositoriesConfiguration"/>
     <projectService serviceImplementation="com.intellij.jarRepository.services.MavenRepositoryServicesManager"/>
@@ -535,7 +543,10 @@
 
     <updateSettingsUIProvider implementation="com.intellij.openapi.projectRoots.impl.JdkUpdaterConfigurable"/>
     <postStartupActivity implementation="com.intellij.openapi.projectRoots.impl.ExistingJdkConfigurationActivity"/>
-    <postStartupActivity implementation="com.intellij.openapi.projectRoots.impl.SdkmanrcWatcher"/>
+    <openapi.projectRoots.externalJavaConfigurationProvider implementation="com.intellij.openapi.projectRoots.impl.SdkmanrcConfigurationProvider"/>
+    <openapi.projectRoots.externalJavaConfigurationProvider implementation="com.intellij.openapi.projectRoots.impl.ToolVersionsConfigurationProvider"/>
+    <postStartupActivity implementation="com.intellij.openapi.projectRoots.impl.ExternalJavaConfigurationActivity"/>
+
     <registryKey key="jdk.configure.existing" defaultValue="false" description="Attempt to add an existing SDK to the SDK table."/>
 
     <applicationService serviceInterface="com.intellij.execution.runners.ProcessProxyFactory"
@@ -2749,7 +2760,7 @@
                        key="notification.group.preview.features"/>
     <notificationGroup id="Remove redundant exports/opens" displayType="BALLOON" bundle="messages.JavaBundle"
                        key="notification.group.redundant.exports"/>
-    <notificationGroup id="Setup SDK" displayType="BALLOON" bundle="messages.JavaBundle" key="notification.group.setup.sdk"/>
+    <notificationGroup id="Setup JDK" displayType="BALLOON" bundle="messages.JavaBundle" key="notification.group.setup.jdk"/>
     <notificationGroup id="External annotations" displayType="BALLOON" bundle="messages.JavaBundle"
                        key="notification.group.setup.external.annotations"/>
     <notificationGroup id="Test integration" displayType="BALLOON" bundle="messages.JavaBundle" key="notification.group.testintegration"/>

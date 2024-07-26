@@ -26,7 +26,6 @@ import com.intellij.openapi.roots.CompilerProjectExtension;
 import com.intellij.openapi.roots.ModuleRootManager;
 import com.intellij.openapi.roots.ModuleRootModificationUtil;
 import com.intellij.openapi.util.Disposer;
-import com.intellij.openapi.util.io.FileUtil;
 import com.intellij.openapi.util.io.NioFiles;
 import com.intellij.openapi.vfs.VfsUtil;
 import com.intellij.openapi.vfs.VfsUtilCore;
@@ -271,25 +270,7 @@ public final class CompilerTester {
 
   public static void printBuildLog() {
     File logDirectory = BuildManager.getBuildLogDirectory();
-    File[] files = logDirectory.listFiles(file -> file.getName().endsWith(".log"));
-    if (files == null || files.length == 0) {
-      LOG.debug("No *.log files in " + logDirectory + " after build");
-      return;
-    }
-
-    Arrays.sort(files, Comparator.comparing(File::getName));
-    for (File file : files) {
-      LOG.debug(file.getName() + ":");
-      try {
-        List<String> lines = FileUtil.loadLines(file);
-        for (String line : lines) {
-          LOG.debug(line);
-        }
-      }
-      catch (IOException e) {
-        LOG.debug("Failed to load contents: " + e.getMessage());
-      }
-    }
+    TestLoggerFactory.publishArtifactIfTestFails(logDirectory.toPath(), "build-log");
   }
 
   public static void enableDebugLogging()  {
@@ -307,7 +288,7 @@ public final class CompilerTester {
         properties.load(config);
       }
 
-      properties.setProperty("log4j.rootLogger", "debug, file");
+      properties.setProperty(".level", "FINER");
       Path logFile = logDirectory.resolve(LogSetup.LOG_CONFIG_FILE_NAME);
       try (OutputStream output = new BufferedOutputStream(Files.newOutputStream(logFile))) {
         properties.store(output, null);

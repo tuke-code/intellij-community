@@ -107,7 +107,7 @@ open class PyAddNewCondaEnvPanel(
   override fun validateAll(): List<ValidationInfo> =
     emptyList() // Pre target validation is not supported
 
-  override fun getOrCreateSdk(): Sdk? {
+  override fun getOrCreateSdk(): Sdk {
     val condaPath = condaPathField.text
     val task = object : Task.WithResult<String, ExecutionException>(project, PyBundle.message("python.sdk.creating.conda.environment.title"), false) {
       override fun compute(indicator: ProgressIndicator): String {
@@ -117,10 +117,14 @@ open class PyAddNewCondaEnvPanel(
     }
     val shared = makeSharedField.isSelected
     val associatedPath = if (!shared) projectBasePath else null
-    val sdk = createSdkByGenerateTask(task, existingSdks, null, associatedPath, null) ?: return null
+    val sdk = createSdkByGenerateTask(task, existingSdks, null, associatedPath, null)
     if (!shared) {
-      sdk.associateWithModule(module, newProjectPath)
+      when {
+        newProjectPath != null -> sdk.setAssociationToPath(newProjectPath)
+        module != null -> sdk.setAssociationToModule(module)
+      }
     }
+
     PyCondaPackageService.onCondaEnvCreated(condaPath)
     project.excludeInnerVirtualEnv(sdk)
     // Old conda created, convert to new

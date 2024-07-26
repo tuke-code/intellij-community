@@ -7,7 +7,10 @@ import com.intellij.codeInsight.daemon.DaemonCodeAnalyzer
 import com.intellij.concurrency.ContextAwareRunnable
 import com.intellij.concurrency.captureThreadContext
 import com.intellij.concurrency.resetThreadContext
-import com.intellij.openapi.application.*
+import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.application.EDT
+import com.intellij.openapi.application.ModalityState
+import com.intellij.openapi.application.asContextElement
 import com.intellij.openapi.components.serviceAsync
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.diagnostic.logger
@@ -17,9 +20,7 @@ import com.intellij.openapi.editor.ex.EditorEx
 import com.intellij.openapi.fileEditor.FileEditorStateLevel
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Key
-import com.intellij.platform.diagnostic.telemetry.impl.span
 import com.intellij.platform.ide.progress.runWithModalProgressBlocking
-import com.intellij.psi.PsiManager
 import com.intellij.ui.EditorNotifications
 import com.intellij.util.ArrayUtil
 import com.intellij.util.awaitCancellationAndInvoke
@@ -142,18 +143,6 @@ class AsyncEditorLoader internal constructor(
       val delayedActions = delayedActions.getAndSet(null)
       textEditor.editor.putUserData(ASYNC_LOADER, null)
 
-      // make sure the highlighting is restarted when the editor is finally loaded, because otherwise some crazy things happen,
-      // for instance `FileEditor.getBackgroundHighlighter()` returning null, essentially stopping highlighting silently
-      launch {
-        val psiManager = project.serviceAsync<PsiManager>()
-        val daemonCodeAnalyzer = project.serviceAsync<DaemonCodeAnalyzer>()
-        span("DaemonCodeAnalyzer.restart") {
-          readAction { psiManager.findFile(textEditor.file) }?.let {
-            daemonCodeAnalyzer.restart()
-          }
-        }
-      }
-
       val scrollingModel = textEditor.editor.scrollingModel
       withContext(Dispatchers.EDT + CoroutineName("execute delayed actions")) {
         scrollingModel.disableAnimation()
@@ -169,6 +158,10 @@ class AsyncEditorLoader internal constructor(
       .invokeOnCompletion {
         // make sure that async loaded marked as completed
         delayedActions.set(null)
+
+        // make sure the highlighting is restarted when the editor is finally loaded, because otherwise some crazy things happen,
+        // for instance `FileEditor.getBackgroundHighlighter()` returning null, essentially stopping highlighting silently
+        DaemonCodeAnalyzer.getInstance(project).restart()
       }
   }
 
@@ -227,8 +220,8 @@ private fun restoreCaretPosition(editor: EditorEx, delayedScrollState: DelayedSc
   val viewport = editor.scrollPane.viewport
 
   fun isReady(): Boolean {
-    val extentSize = viewport.extentSize?.takeIf { it.width != 0 && it.height != 0 } ?: viewport.preferredSize
-    return extentSize.width != 0 && extentSize.height != 0
+    val extentSize = viewport.extentSize
+    return extentSize != null && extentSize.width != 0 && extentSize.height != 0
   }
 
   if (viewport.isShowing && isReady()) {

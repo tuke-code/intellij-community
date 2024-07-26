@@ -248,6 +248,7 @@ private fun toPsiMethodForDeserialized(
             source = null,
             context,
             TypeOwnerKind.DECLARATION,
+            isBoxed = false,
         )?.lookup()?.let { return it }
     }
     // Deserialized top-level function
@@ -344,7 +345,12 @@ internal fun receiverType(
     val ktType = ktCall.partiallyAppliedSymbol.signature.receiverType
         ?: ktCall.partiallyAppliedSymbol.extensionReceiver?.type
         ?: ktCall.partiallyAppliedSymbol.dispatchReceiver?.type
-    if (ktType == null || ktType is KaErrorType) return null
+    if (ktType == null ||
+        ktType is KaErrorType ||
+        ktType.isUnitType
+    ) {
+        return null
+    }
     return toPsiType(
         ktType,
         source,

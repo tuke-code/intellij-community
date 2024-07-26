@@ -17,7 +17,7 @@ import git4idea.branch.GitTagType
 import git4idea.branch.TagsNode
 import git4idea.repo.GitRepository
 import git4idea.ui.branch.GitBranchManager
-import git4idea.ui.branch.popup.GitBranchesTreePopup
+import git4idea.ui.branch.popup.GitBranchesTreePopupBase
 import git4idea.ui.branch.tree.GitBranchesTreeModel.*
 import javax.swing.tree.TreePath
 import kotlin.properties.Delegates.observable
@@ -28,7 +28,7 @@ open class GitBranchesTreeSingleRepoModel(
   private val topLevelActions: List<Any> = emptyList(),
 ) : AbstractTreeModel(), GitBranchesTreeModel {
 
-  private val actionsSeparator = GitBranchesTreePopup.createTreeSeparator()
+  private val actionsSeparator = GitBranchesTreePopupBase.createTreeSeparator()
 
   private val branchManager = project.service<GitBranchManager>()
 
@@ -53,9 +53,9 @@ open class GitBranchesTreeSingleRepoModel(
 
   protected open fun rebuild(matcher: MinusculeMatcher?) {
     branchesTreeCache.keys.clear()
-    val localBranches = repository.localBranchesOrCurrent
-    val remoteBranches = repository.branches.remoteBranches
-    val recentCheckoutBranches = repository.recentCheckoutBranches
+    val localBranches = getLocalBranches()
+    val remoteBranches = getRemoteBranches()
+    val recentCheckoutBranches = getRecentBranches()
 
     val localFavorites = project.service<GitBranchManager>().getFavoriteBranches(GitBranchType.LOCAL)
     val remoteFavorites = project.service<GitBranchManager>().getFavoriteBranches(GitBranchType.REMOTE)
@@ -69,6 +69,12 @@ open class GitBranchesTreeSingleRepoModel(
     initTags(matcher)
     treeStructureChanged(TreePath(arrayOf(root)), null, null)
   }
+
+  protected open fun getLocalBranches(): Collection<GitLocalBranch> = repository.localBranchesOrCurrent
+
+  protected open fun getRecentBranches(): Collection<GitLocalBranch> = repository.recentCheckoutBranches
+
+  protected open fun getRemoteBranches(): Collection<GitRemoteBranch> = repository.branches.remoteBranches
 
   override fun getRoot() = TreeRoot
 

@@ -36,6 +36,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 import static com.intellij.codeInsight.completion.JavaCompletionContributor.IN_CASE_LABEL_ELEMENT_LIST;
 import static com.intellij.openapi.util.Conditions.notInstanceOf;
@@ -838,6 +839,10 @@ public class JavaKeywordCompletion {
     if (PsiUtil.isAvailable(JavaFeature.STATIC_IMPORTS, file) && myPrevLeaf != null && myPrevLeaf.textMatches(PsiKeyword.IMPORT)) {
       addKeyword(new OverridableSpace(createKeyword(PsiKeyword.STATIC), TailTypes.humbleSpaceBeforeWordType()));
     }
+
+    if (PsiUtil.isAvailable(JavaFeature.MODULE_IMPORT_DECLARATIONS, file) && myPrevLeaf != null && myPrevLeaf.textMatches(PsiKeyword.IMPORT)) {
+      addKeyword(new OverridableSpace(createKeyword(PsiKeyword.MODULE), TailTypes.humbleSpaceBeforeWordType()));
+    }
   }
 
   private void addInstanceof() {
@@ -1184,6 +1189,22 @@ public class JavaKeywordCompletion {
       PsiSwitchBlock switchBlock = PsiTreeUtil.getParentOfType(position, PsiSwitchBlock.class);
       if (switchBlock != null && switchBlock.getExpression() != null) {
         JavaPatternCompletionUtil.suggestPrimitiveTypesForPattern(position, switchBlock.getExpression().getType(), result);
+      }
+      if (switchBlock != null && switchBlock.getExpression() != null) {
+        PsiType type = switchBlock.getExpression().getType();
+        if (PsiTypes.booleanType().equals(PsiPrimitiveType.getOptionallyUnboxedType(type))) {
+          Set<String> branches = SwitchUtils.getSwitchBranches(switchBlock).stream()
+            .map(branch -> branch instanceof PsiExpression expression ? ExpressionUtils.computeConstantExpression(expression) : null)
+            .filter(constant -> constant instanceof Boolean)
+            .map(branch -> branch.toString())
+            .collect(Collectors.toSet());
+          TailType tailType = JavaTailTypes.forSwitchLabel(switchBlock);
+          for (String keyword : List.of(PsiKeyword.TRUE, PsiKeyword.FALSE)) {
+            if(branches.contains(keyword)) continue;
+            result.accept(new JavaKeywordCompletion.OverridableSpace(
+              BasicExpressionCompletionContributor.createKeywordLookupItem(position, keyword), tailType));
+          }
+        }
       }
       return;
     }

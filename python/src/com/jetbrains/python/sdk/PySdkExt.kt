@@ -21,6 +21,7 @@ import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.PathManager
 import com.intellij.openapi.application.WriteAction
 import com.intellij.openapi.application.runInEdt
+import com.intellij.openapi.diagnostic.getOrLogException
 import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.module.Module
 import com.intellij.openapi.module.ModuleUtil
@@ -57,6 +58,7 @@ import com.jetbrains.python.sdk.flavors.VirtualEnvSdkFlavor
 import com.jetbrains.python.sdk.flavors.conda.CondaEnvSdkFlavor
 import com.jetbrains.python.target.PyTargetAwareAdditionalData
 import com.jetbrains.python.ui.PyUiUtil
+import org.jetbrains.annotations.ApiStatus
 import java.io.File
 import java.io.IOException
 import java.nio.file.Files
@@ -65,11 +67,10 @@ import java.nio.file.Paths
 import kotlin.io.path.div
 import kotlin.io.path.pathString
 
-private data class TargetAndPath(
+internal data class TargetAndPath(
   val target: TargetEnvironmentConfiguration?,
   val path: FullPathOnTarget?,
 )
-
 
 val BASE_DIR: Key<Path> = Key.create("PYTHON_PROJECT_BASE_PATH")
 
@@ -97,6 +98,17 @@ fun filterSystemWideSdks(existingSdks: List<Sdk>): List<Sdk> {
   return existingSdks.filter { it.sdkType is PythonSdkType && it.isSystemWide }
 }
 
+@ApiStatus.Internal
+fun configurePythonSdk(project: Project, module: Module, sdk: Sdk) {
+  // in case module contains root of the project we consider it as a project wide interpreter
+  if (project.basePath == module.basePath) {
+    project.pythonSdk = sdk
+  }
+
+  module.pythonSdk = sdk
+  module.excludeInnerVirtualEnv(sdk)
+}
+
 /**
  * @param context used to get [BASE_DIR] in [com.jetbrains.python.sdk.flavors.VirtualEnvSdkFlavor.suggestLocalHomePaths]
  */
@@ -115,19 +127,24 @@ fun detectSystemWideSdks(
                                          { it.homePath }).reversed())
 }
 
-private fun PythonSdkFlavor<*>.detectSdks(
-  module: Module?,
-  context: UserDataHolder,
-  targetModuleSitsOn: TargetConfigurationWithLocalFsAccess?,
-  existingPaths: HashSet<TargetAndPath>,
-): List<PyDetectedSdk> =
+private fun PythonSdkFlavor<*>.detectSdks(module: Module?,
+                                          context: UserDataHolder,
+                                          targetModuleSitsOn: TargetConfigurationWithLocalFsAccess?,
+                                          existingPaths: HashSet<TargetAndPath>): List<PyDetectedSdk> =
+  detectSdkPaths(module, context, targetModuleSitsOn, existingPaths)
+    .map { createDetectedSdk(it, targetModuleSitsOn?.asTargetConfig, this) }
+
+
+internal fun PythonSdkFlavor<*>.detectSdkPaths(module: Module?,
+                                              context: UserDataHolder,
+                                              targetModuleSitsOn: TargetConfigurationWithLocalFsAccess?,
+                                              existingPaths: HashSet<TargetAndPath>): List<String> =
   suggestLocalHomePaths(module, context)
     .mapNotNull {
       // If module sits on target, this target maps its path.
       if (targetModuleSitsOn == null) it.pathString else targetModuleSitsOn.getTargetPathIfLocalPathIsOnTarget(it)
     }
     .filter { TargetAndPath(targetModuleSitsOn?.asTargetConfig, it) !in existingPaths }
-    .map { createDetectedSdk(it, targetModuleSitsOn?.asTargetConfig, this) }
 
 fun resetSystemWideSdksDetectors() {
   PythonSdkFlavor.getApplicableFlavors(false).forEach(PythonSdkFlavor<*>::dropCaches)
@@ -153,7 +170,7 @@ fun createSdkByGenerateTask(
   baseSdk: Sdk?,
   associatedProjectPath: String?,
   suggestedSdkName: String?,
-): Sdk? {
+): Sdk {
   val homeFile = try {
     val homePath = ProgressManager.getInstance().run(generateSdkHomePath)
     StandardFileSystems.local().refreshAndFindFileByPath(homePath) ?: throw ExecutionException(
@@ -162,12 +179,16 @@ fun createSdkByGenerateTask(
   }
   catch (e: ExecutionException) {
     showSdkExecutionException(baseSdk, e, PyBundle.message("python.sdk.failed.to.create.interpreter.title"))
-    return null
+    throw e
   }
+
   val suggestedName = suggestedSdkName ?: suggestAssociatedSdkName(homeFile.path, associatedProjectPath)
-  return SdkConfigurationUtil.setupSdk(existingSdks.toTypedArray(), homeFile,
-                                       PythonSdkType.getInstance(),
-                                       null, suggestedName)
+  return SdkConfigurationUtil.setupSdk(
+    existingSdks.toTypedArray(),
+    homeFile,
+    PythonSdkType.getInstance(),
+    null,
+    suggestedName)
 }
 
 fun showSdkExecutionException(sdk: Sdk?, e: ExecutionException, @NlsContexts.DialogTitle title: String) {
@@ -177,11 +198,34 @@ fun showSdkExecutionException(sdk: Sdk?, e: ExecutionException, @NlsContexts.Dia
   }
 }
 
+@Deprecated("It doesn't persist changes", ReplaceWith("setAssociationToModule"))
 fun Sdk.associateWithModule(module: Module?, newProjectPath: String?) {
   getOrCreateAdditionalData().apply {
     when {
       newProjectPath != null -> associateWithModulePath(newProjectPath)
       module != null -> associateWithModule(module)
+    }
+  }
+}
+
+fun Sdk.setAssociationToModule(module: Module) {
+  setAssociationToPath(module.basePath)
+}
+
+fun Sdk.setAssociationToPath(path: String?) {
+  val data = getOrCreateAdditionalData().also {
+    when {
+      path != null -> it.associateWithModulePath(path)
+      else -> it.associatedModulePath = null
+    }
+  }
+
+  val modificator = sdkModificator
+  modificator.sdkAdditionalData = data
+
+  runInEdt {
+    ApplicationManager.getApplication().runWriteAction() {
+      modificator.commitChanges()
     }
   }
 }
@@ -217,27 +261,50 @@ fun PyDetectedSdk.setup(existingSdks: List<Sdk>): Sdk? {
   return SdkConfigurationUtil.setupSdk(existingSdks.toTypedArray(), homeDir, PythonSdkType.getInstance(), null, null)
 }
 
+// For Java only
+internal fun PyDetectedSdk.setupAssociatedLogged(existingSdks: List<Sdk>, associatedModulePath: String?, doAssociate: Boolean): Sdk? {
+  return setupAssociated(existingSdks, associatedModulePath, doAssociate).getOrLogException(LOGGER)
+}
 
-fun PyDetectedSdk.setupAssociated(existingSdks: List<Sdk>, associatedModulePath: String?): Sdk? {
-  if (!sdkSeemsValid) return null
-  val homePath = this.homePath ?: return null
-  val suggestedName = suggestAssociatedSdkName(homePath, associatedModulePath) ?: homePath
-  val sdk = SdkConfigurationUtil.createSdk(existingSdks, homePath, PythonSdkType.getInstance(), null, suggestedName)
-
-  targetEnvConfiguration?.let { targetConfig ->
-    // Target-based sdk, not local one
-    sdk.sdkModificator.let { modificator ->
-      modificator.sdkAdditionalData = PyTargetAwareAdditionalData(PyFlavorAndData.UNKNOWN_FLAVOR_DATA)
-        .also {
-          it.targetEnvironmentConfiguration = targetConfig
-        }
-      ApplicationManager.getApplication().runWriteAction {
-        modificator.commitChanges()
-      }
-    }
+fun PyDetectedSdk.setupAssociated(existingSdks: List<Sdk>, associatedModulePath: String?, doAssociate: Boolean): Result<Sdk> {
+  if (!sdkSeemsValid) {
+    return Result.failure(Throwable("sdk is not valid"))
   }
-  PythonSdkType.getInstance().setupSdkPaths(sdk)
-  return sdk
+
+  val homePath = this.homePath
+  if (homePath == null) {
+    // e.g. directory is not there anymore
+    return Result.failure(Throwable("homePath is null"))
+  }
+
+  val homeDir = this.homeDirectory
+  if (homeDir == null) {
+    return Result.failure(Throwable("homeDir is null"))
+  }
+
+  val suggestedName = if (doAssociate) {
+    suggestAssociatedSdkName(homePath, associatedModulePath)
+  }
+  else null
+
+  val data = targetEnvConfiguration?.let { targetConfig ->
+    PyTargetAwareAdditionalData(PyFlavorAndData.UNKNOWN_FLAVOR_DATA).also {
+      it.targetEnvironmentConfiguration = targetConfig
+    }
+  } ?: PythonSdkAdditionalData()
+
+  if (doAssociate && associatedModulePath != null) {
+    data.associateWithModulePath(associatedModulePath)
+  }
+
+  val sdk = SdkConfigurationUtil.setupSdk(
+    existingSdks.toTypedArray(),
+    homeDir,
+    PythonSdkType.getInstance(),
+    data,
+    suggestedName)
+
+  return Result.success(sdk)
 }
 
 var Module.pythonSdk: Sdk?
@@ -303,7 +370,7 @@ fun getInnerVirtualEnvRoot(sdk: Sdk): VirtualFile? {
   }
 }
 
-private fun suggestAssociatedSdkName(sdkHome: String, associatedPath: String?): String? {
+internal fun suggestAssociatedSdkName(sdkHome: String, associatedPath: String?): String? {
   // please don't forget to update com.jetbrains.python.inspections.PyInterpreterInspection.Visitor#getSuitableSdkFix
   // after changing this method
 
@@ -323,10 +390,7 @@ private fun suggestAssociatedSdkName(sdkHome: String, associatedPath: String?): 
   return "$baseSdkName ($associatedName)"
 }
 
-val File.isNotEmptyDirectory: Boolean
-  get() = exists() && isDirectory && list()?.isEmpty()?.not() ?: false
-
-private val Sdk.isSystemWide: Boolean
+internal val Sdk.isSystemWide: Boolean
   get() = !PythonSdkUtil.isRemote(this) && !PythonSdkUtil.isVirtualEnv(
     this) && !PythonSdkUtil.isCondaVirtualEnv(this)
 
@@ -390,8 +454,9 @@ private fun Sdk.containsModuleName(module: Module?): Boolean {
 fun Sdk.getOrCreateAdditionalData(): PythonSdkAdditionalData {
   val existingData = sdkAdditionalData as? PythonSdkAdditionalData
   if (existingData != null) return existingData
-  val flavor = PythonSdkFlavor.getFlavor(homePath)
-  val newData = PythonSdkAdditionalData(flavor?.let { if (it.supportsEmptyData()) it else null })
+  val homePath = Path.of(homePath ?: error("homePath is null for $this"))
+  val flavor = PythonSdkFlavor.tryDetectFlavorByLocalPath(homePath) ?: error("No flavor detected for $homePath sdk")
+  val newData = PythonSdkAdditionalData(if (flavor.supportsEmptyData()) flavor else null)
   val modificator = sdkModificator
   modificator.sdkAdditionalData = newData
   val application = ApplicationManager.getApplication()

@@ -1716,7 +1716,7 @@ com.intellij.codeInspection.lang.RefManagerExtension
 - getElementContainer(com.intellij.psi.PsiElement):com.intellij.psi.PsiNamedElement
 - a:getGroupName(com.intellij.codeInspection.reference.RefEntity):java.lang.String
 - a:getID():com.intellij.openapi.util.Key
-- a:getLanguage():com.intellij.lang.Language
+- getLanguage():com.intellij.lang.Language
 - getLanguages():java.util.Collection
 - a:getReference(java.lang.String,java.lang.String):com.intellij.codeInspection.reference.RefEntity
 - a:getRefinedElement(com.intellij.codeInspection.reference.RefEntity):com.intellij.codeInspection.reference.RefEntity
@@ -3278,12 +3278,15 @@ f:com.intellij.openapi.fileEditor.ex.FileEditorWithProvider
 com.intellij.openapi.fileEditor.ex.StructureViewFileEditorProvider
 - a:getStructureViewBuilder(com.intellij.openapi.project.Project,com.intellij.openapi.vfs.VirtualFile):com.intellij.ide.structureView.StructureViewBuilder
 a:com.intellij.openapi.roots.GeneratedSourcesFilter
+- sf:Companion:com.intellij.openapi.roots.GeneratedSourcesFilter$Companion
 - sf:EP_NAME:com.intellij.openapi.extensions.ExtensionPointName
 - <init>():V
 - getNotificationText(com.intellij.openapi.vfs.VirtualFile,com.intellij.openapi.project.Project):java.lang.String
 - getOriginalElements(com.intellij.psi.PsiElement):java.util.List
 - a:isGeneratedSource(com.intellij.openapi.vfs.VirtualFile,com.intellij.openapi.project.Project):Z
-- s:isGeneratedSourceByAnyFilter(com.intellij.openapi.vfs.VirtualFile,com.intellij.openapi.project.Project):Z
+- sf:isGeneratedSourceByAnyFilter(com.intellij.openapi.vfs.VirtualFile,com.intellij.openapi.project.Project):Z
+f:com.intellij.openapi.roots.GeneratedSourcesFilter$Companion
+- f:isGeneratedSourceByAnyFilter(com.intellij.openapi.vfs.VirtualFile,com.intellij.openapi.project.Project):Z
 com.intellij.openapi.ui.InputValidatorEx
 - com.intellij.openapi.ui.InputValidator
 - canClose(java.lang.String):Z

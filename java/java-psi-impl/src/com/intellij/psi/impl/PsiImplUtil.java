@@ -45,6 +45,7 @@ import java.util.*;
 public final class PsiImplUtil {
   private static final Logger LOG = Logger.getInstance(PsiImplUtil.class);
   private static final String JAVA_IO_IO = "java.io.IO";
+  private static final String JAVA_BASE = "java.base";
 
   private PsiImplUtil() { }
 
@@ -848,27 +849,38 @@ public final class PsiImplUtil {
   }
 
   /**
-   * Retrieves the implicit static imports for the given file.
+   * Retrieves the implicit imports for the given file (except packages).
    *
    * @param file the file for which to retrieve implicit static imports
    * @return an array of static members representing the implicit static imports
    */
   @ApiStatus.Experimental
-  public static @NotNull ImplicitlyImportedStaticMember @NotNull[] getImplicitStaticImports(@NotNull PsiFile file) {
-    List<ImplicitlyImportedStaticMember> staticImports = new ArrayList<>();
+  public static @NotNull ImplicitlyImportedElement @NotNull[] getImplicitImports(@NotNull PsiFile file) {
+    List<ImplicitlyImportedElement> implicitImports = new ArrayList<>();
+    Project project = file.getProject();
     // java.lang.StringTemplate.STR
     if (PsiUtil.isAvailable(JavaFeature.STRING_TEMPLATES, file)) {
-      staticImports.add(ImplicitlyImportedStaticMember.create(CommonClassNames.JAVA_LANG_STRING_TEMPLATE, "STR"));
+      implicitImports.add(ImplicitlyImportedStaticMember.create(project, CommonClassNames.JAVA_LANG_STRING_TEMPLATE, "STR"));
     }
 
     // java.io.IO.* for implicit classes
     if (PsiUtil.isAvailable(JavaFeature.IMPLICIT_IMPORT_IN_IMPLICIT_CLASSES, file) && file instanceof PsiJavaFile) {
       PsiClass[] classes = ((PsiJavaFile)file).getClasses();
       if (classes.length == 1 && classes[0] instanceof PsiImplicitClass) {
-        staticImports.add(ImplicitlyImportedStaticMember.create(JAVA_IO_IO, "*"));
+        implicitImports.add(ImplicitlyImportedStaticMember.create(project, JAVA_IO_IO, "*"));
       }
     }
 
-    return staticImports.toArray(ImplicitlyImportedStaticMember.EMPTY_ARRAY);
+    // import module java.base; for implicit classes
+    if (PsiUtil.isAvailable(JavaFeature.IMPLICIT_IMPORT_IN_IMPLICIT_CLASSES, file) &&
+        PsiUtil.isAvailable(JavaFeature.MODULE_IMPORT_DECLARATIONS, file) &&
+        file instanceof PsiJavaFile) {
+      PsiClass[] classes = ((PsiJavaFile)file).getClasses();
+      if (classes.length == 1 && classes[0] instanceof PsiImplicitClass) {
+        implicitImports.add(ImplicitlyImportedModule.create(project, JAVA_BASE));
+      }
+    }
+
+    return implicitImports.toArray(ImplicitlyImportedElement.EMPTY_ARRAY);
   }
 }

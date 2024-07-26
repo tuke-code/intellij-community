@@ -70,6 +70,11 @@ open class DumbServiceImpl @NonInjectable @VisibleForTesting constructor(private
   private inner class DumbTaskLauncher(private val modality: ModalityState) {
     private var launched = false
 
+    private val closed = AtomicBoolean(false)
+
+    @Volatile
+    private var closeTrace: Throwable? = null // for diagnostics
+
     fun cancel() {
       // only not launched tasks can be canceled
       if (!launched) {
@@ -79,18 +84,24 @@ open class DumbServiceImpl @NonInjectable @VisibleForTesting constructor(private
     }
 
     private fun close() {
-      if (application.isDispatchThread) {
-        dumbTaskLaunchers.remove(this)
-        // without redispatching, because it can be invoked from completeJustSubmittedTasks
-        decrementDumbCounter()
-      }
-      else {
-        scope.launch(modality.asContextElement() + Dispatchers.EDT) {
-          blockingContext {
-            dumbTaskLaunchers.remove(this@DumbTaskLauncher)
-            decrementDumbCounter()
+      if (closed.compareAndSet(false, true)) {
+        closeTrace = Throwable("Close trace")
+        if (application.isDispatchThread) {
+          dumbTaskLaunchers.remove(this)
+          // without redispatching, because it can be invoked from completeJustSubmittedTasks
+          decrementDumbCounter()
+        }
+        else {
+          scope.launch(modality.asContextElement() + Dispatchers.EDT) {
+            blockingContext {
+              dumbTaskLaunchers.remove(this@DumbTaskLauncher)
+              decrementDumbCounter()
+            }
           }
         }
+      }
+      else {
+        LOG.error("The task is already closed", Throwable("Current trace", closeTrace))
       }
     }
 
@@ -263,12 +274,13 @@ open class DumbServiceImpl @NonInjectable @VisibleForTesting constructor(private
       return block()
     }
     finally {
-      withContext(Dispatchers.EDT) {
+      // in the case of cancellation this block won't execute if NonCancellable is omitted
+      withContext(Dispatchers.EDT + NonCancellable) {
         blockingContext {
           decrementDumbCounter()
         }
+        LOG.info("[$project]: finished dumb task without visible indicator: $debugReason")
       }
-      LOG.info("[$project]: finished dumb task without visible indicator: $debugReason")
     }
   }
 
@@ -366,7 +378,11 @@ open class DumbServiceImpl @NonInjectable @VisibleForTesting constructor(private
       LOG.error("No indexing tasks should be created for default project: $task")
     }
     val trace = Throwable()
-    val modality = ModalityState.defaultModalityState()
+    var modality = ModalityState.defaultModalityState()
+    if (modality == ModalityState.any()) {
+      LOG.error("Unexpected modality: should not be ANY. Replace with NON_MODAL")
+      modality = ModalityState.nonModal()
+    }
     if (ApplicationManager.getApplication().isDispatchThread) {
       queueTaskOnEdt(task, modality, trace)
     }

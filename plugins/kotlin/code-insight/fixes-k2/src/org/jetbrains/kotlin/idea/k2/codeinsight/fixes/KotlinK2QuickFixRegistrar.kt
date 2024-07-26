@@ -124,6 +124,16 @@ class KotlinK2QuickFixRegistrar : KotlinQuickFixRegistrar() {
         registerFactory(RenameModToRemFixFactory.forbiddenBinaryModFactory)
         registerFactory(AddEmptyArgumentListFixFactory.addEmptyArgumentListFixFactory)
         registerFactory(KaFirDiagnostic.UnresolvedLabel::class, CreateLabelFixFactory.createLabelFixFactory)
+        registerFactory(AddDefaultConstructorFixFactory.addDefaultConstructorFixFactory)
+        registerFactory(MakeClassAnAnnotationClassFixFactory.makeClassAnAnnotationClassFixFactory)
+        registerFactory(WrongLongSuffixFixFactory.changeToCorrectLongSuffix)
+        registerFactory(ElseMisplacedInWhenFixFactory.moveWhenElseBranch)
+        registerFactory(TypeVarianceConflictErrorFixFactory.removeTypeVariance)
+        registerFactory(FinalUpperBoundFixFactory.removeFinalUpperBound)
+        registerFactory(WrongAnnotationTargetWithUseSiteTargetFixFactory.moveReceiverAnnotation)
+        registerFactory(IllegalEscapeFixFactory.convertToUnicodeEscape)
+        registerFactory(IsEnumEntryFixFactory.factory)
+        registerFactory(NoReturnInFunctionWithBlockBodyFixFactory.addReturnToLastExpression)
     }
 
     private val addAbstract = KtQuickFixesListBuilder.registerPsiQuickFix {
@@ -292,6 +302,8 @@ class KotlinK2QuickFixRegistrar : KotlinQuickFixRegistrar() {
         registerFactory(SimplifyComparisonFixFactory.simplifyComparisonFixFactory)
 
         registerFactory(SpecifyRemainingArgumentsByNameFixFactory.noValueForParameter)
+
+        registerFactory(AddConstructorParameterFromSuperTypeCallFixFactory.noValueForParameter)
     }
 
     private val whenStatements = KtQuickFixesListBuilder.registerPsiQuickFix {

@@ -72,7 +72,7 @@ public class CodeFragmentTableCellRenderer implements TableCellRenderer {
     }
 
     editorTextField.putClientProperty(ComboBox.IS_TABLE_CELL_EDITOR_PROPERTY, Boolean.TRUE);
-    editorTextField.setBorder((hasFocus || isSelected) ? BorderFactory.createLineBorder(table.getSelectionBackground()) : JBUI.Borders.empty(1));
+    editorTextField.setBorder(isSelected ? BorderFactory.createLineBorder(table.getSelectionBackground()) : JBUI.Borders.empty(5));
     editorTextField.setFont(EditorUtil.getEditorFont());
     if (isSelected && document != null) {
       final Color bg = table.getSelectionBackground();
@@ -80,6 +80,8 @@ public class CodeFragmentTableCellRenderer implements TableCellRenderer {
       editorTextField.setBackground(bg);
       editorTextField.setForeground(fg);
       editorTextField.setAsRendererWithSelection(bg, fg);
+    } else {
+      editorTextField.setBackground(table.getBackground());
     }
     return editorTextField;
   }

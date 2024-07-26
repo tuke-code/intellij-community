@@ -327,7 +327,7 @@ public final class FileBasedIndexImpl extends FileBasedIndexEx {
   }
 
   void setUpShutDownTask() {
-    myShutDownTask = new MyShutDownTask(true);
+    myShutDownTask = new ShutDownIndexesTask(/*byShutDownHook: */ true);
     ShutDownTracker.getInstance().registerCacheShutdownTask(myShutDownTask);
   }
 
@@ -1251,10 +1251,10 @@ public final class FileBasedIndexImpl extends FileBasedIndexEx {
     }
   }
 
-  static final class MyShutDownTask implements Runnable {
-    private final boolean myTermination;
+  static final class ShutDownIndexesTask implements Runnable {
+    private final boolean calledByShutdownHook;
 
-    MyShutDownTask(boolean termination) { myTermination = termination; }
+    ShutDownIndexesTask(boolean calledByShutdownHook) { this.calledByShutdownHook = calledByShutdownHook; }
 
     @Override
     public void run() {
@@ -1266,11 +1266,16 @@ public final class FileBasedIndexImpl extends FileBasedIndexEx {
       try {
         FileBasedIndex fileBasedIndex = app.getServiceIfCreated(FileBasedIndex.class);
         if (fileBasedIndex instanceof FileBasedIndexImpl fileBasedIndexImpl) {
+          if(calledByShutdownHook) {
+            //prevent unregistering the task from ShutDownTracker if we're already called from ShutDownTracker:
+            // (unregister fails if ShutDownTracker's executing is already triggered)
+            fileBasedIndexImpl.myShutDownTask = null;
+          }
           fileBasedIndexImpl.performShutdown(false, "IDE shutdown");
         }
       }
       finally {
-        if (!myTermination && !app.isUnitTestMode()) {
+        if (!calledByShutdownHook && !app.isUnitTestMode()) {
           StorageDiagnosticData.dumpOnShutdown();
         }
       }
@@ -1882,6 +1887,10 @@ public final class FileBasedIndexImpl extends FileBasedIndexEx {
     }
     myIndexableFilesFilterHolder.ensureFileIdPresent(fileId, () -> containingProjects);
     Project projectForFile = ContainerUtil.getFirstItem(containingProjects);
+    if (LOG.isTraceEnabled() && containingProjects.size() > 1) {
+      LOG.trace("File " + fileId + " belongs to " + containingProjects.size() + " projects. " +
+                "Indexing in " + projectForFile.getLocationHash());
+    }
 
     var indexingRequest = projectForFile.getService(ProjectIndexingDependenciesService.class).getLatestIndexingRequestToken();
     var indexingStamp = indexingRequest.getFileIndexingStamp(file);

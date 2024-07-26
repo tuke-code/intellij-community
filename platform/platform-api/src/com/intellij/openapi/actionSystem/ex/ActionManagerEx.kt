@@ -45,7 +45,7 @@ abstract class ActionManagerEx : ActionManager() {
     @Internal
     inline fun withLazyActionManager(scope: CoroutineScope?, crossinline task: (ActionManager) -> Unit) {
       val app = ApplicationManager.getApplication()
-      val created = app.serviceIfCreated<ActionManager>()
+      val created = app?.serviceIfCreated<ActionManager>()
       if (created == null) {
         (scope ?: (app as ComponentManagerEx).getCoroutineScope()).launch {
           val actionManager = app.serviceAsync<ActionManager>()
@@ -97,6 +97,7 @@ abstract class ActionManagerEx : ActionManager() {
               ReplaceWith("ActionUtil.performActionDumbAwareWithCallbacks"),
               DeprecationLevel.ERROR)
   fun fireAfterActionPerformed(action: AnAction, @Suppress("unused") dataContext: DataContext, event: AnActionEvent) {
+    @Suppress("DEPRECATION")
     fireAfterActionPerformed(action, event, AnActionResult.PERFORMED)
   }
 

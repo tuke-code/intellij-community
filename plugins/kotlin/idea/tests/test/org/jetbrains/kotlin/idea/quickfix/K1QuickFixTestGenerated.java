@@ -703,9 +703,19 @@ public abstract class K1QuickFixTestGenerated extends AbstractK1QuickFixTest {
             runTest("testData/quickfix/addDefaultConstructor/expectAnnotation3.kt");
         }
 
+        @TestMetadata("expectAnnotationWithUnresolvedParams.kt")
+        public void testExpectAnnotationWithUnresolvedParams() throws Exception {
+            runTest("testData/quickfix/addDefaultConstructor/expectAnnotationWithUnresolvedParams.kt");
+        }
+
         @TestMetadata("expectInterface.kt")
         public void testExpectInterface() throws Exception {
             runTest("testData/quickfix/addDefaultConstructor/expectInterface.kt");
+        }
+
+        @TestMetadata("expectWithUnresolvedParams.kt")
+        public void testExpectWithUnresolvedParams() throws Exception {
+            runTest("testData/quickfix/addDefaultConstructor/expectWithUnresolvedParams.kt");
         }
 
         @TestMetadata("interface.kt")
@@ -13519,6 +13529,11 @@ public abstract class K1QuickFixTestGenerated extends AbstractK1QuickFixTest {
             runTest("testData/quickfix/redundantIf/comment.kt");
         }
 
+        @TestMetadata("commentLiftedUpReturn.kt")
+        public void testCommentLiftedUpReturn() throws Exception {
+            runTest("testData/quickfix/redundantIf/commentLiftedUpReturn.kt");
+        }
+
         @TestMetadata("expression.kt")
         public void testExpression() throws Exception {
             runTest("testData/quickfix/redundantIf/expression.kt");
@@ -13532,6 +13547,11 @@ public abstract class K1QuickFixTestGenerated extends AbstractK1QuickFixTest {
         @TestMetadata("labeledReturn.kt")
         public void testLabeledReturn() throws Exception {
             runTest("testData/quickfix/redundantIf/labeledReturn.kt");
+        }
+
+        @TestMetadata("multiLineCommentLiftedUpReturn.kt")
+        public void testMultiLineCommentLiftedUpReturn() throws Exception {
+            runTest("testData/quickfix/redundantIf/multiLineCommentLiftedUpReturn.kt");
         }
 
         @TestMetadata("negate.kt")
@@ -19758,6 +19778,16 @@ public abstract class K1QuickFixTestGenerated extends AbstractK1QuickFixTest {
         @TestMetadata("addRemainingBranchesEnumStatement.kt")
         public void testAddRemainingBranchesEnumStatement() throws Exception {
             runTest("testData/quickfix/when/addRemainingBranchesEnumStatement.kt");
+        }
+
+        @TestMetadata("addRemainingBranchesGeneric.kt")
+        public void testAddRemainingBranchesGeneric() throws Exception {
+            runTest("testData/quickfix/when/addRemainingBranchesGeneric.kt");
+        }
+
+        @TestMetadata("addRemainingBranchesGeneric2.kt")
+        public void testAddRemainingBranchesGeneric2() throws Exception {
+            runTest("testData/quickfix/when/addRemainingBranchesGeneric2.kt");
         }
 
         @TestMetadata("addRemainingBranchesInNonDefaultPackage.kt")

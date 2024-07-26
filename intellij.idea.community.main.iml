@@ -211,6 +211,7 @@
     <orderEntry type="module" module-name="intellij.xml.xmlbeans" scope="TEST" />
     <orderEntry type="module" module-name="intellij.jsonpath" scope="TEST" />
     <orderEntry type="module" module-name="intellij.platform.ide.newUiOnboarding" scope="RUNTIME" />
+    <orderEntry type="module" module-name="intellij.platform.ide.newUsersOnboarding" scope="RUNTIME" />
     <orderEntry type="module" module-name="intellij.kotlin.onboarding-promoter" scope="RUNTIME" />
     <orderEntry type="module" module-name="intellij.execution.process.elevation" scope="RUNTIME" />
     <orderEntry type="module" module-name="intellij.vcs.github.community" scope="RUNTIME" />
@@ -220,5 +221,6 @@
     <orderEntry type="module" module-name="intellij.yaml.editing" scope="RUNTIME" />
     <orderEntry type="module" module-name="intellij.platform.whatsNew" scope="TEST" />
     <orderEntry type="module" module-name="intellij.java.compiler.charts" scope="RUNTIME" />
+    <orderEntry type="module" module-name="intellij.platform.compose" scope="RUNTIME" />
   </component>
 </module>

@@ -4076,18 +4076,6 @@ f:com.intellij.codeInsight.daemon.impl.LineMarkersPass
 - doCollectInformation(com.intellij.openapi.progress.ProgressIndicator):V
 - s:getMarkerProviders(com.intellij.lang.Language,com.intellij.openapi.project.Project):java.util.List
 - s:queryLineMarkers(com.intellij.psi.PsiFile,com.intellij.openapi.editor.Document):java.util.Collection
-f:com.intellij.codeInsight.daemon.impl.LocalInspectionsPass
-- com.intellij.codeInsight.daemon.impl.ProgressableTextEditorHighlightingPass
-- getInfos():java.util.List
-f:com.intellij.codeInsight.daemon.impl.LocalInspectionsPass$InspectionHighlightInfoType
-- com.intellij.codeInsight.daemon.impl.HighlightInfoType$HighlightInfoTypeImpl
-f:com.intellij.codeInsight.daemon.impl.LocalInspectionsPassFactory
-- com.intellij.codeHighlighting.MainHighlightingPassFactory
-- com.intellij.codeHighlighting.TextEditorHighlightingPassFactoryRegistrar
-- <init>():V
-- createHighlightingPass(com.intellij.psi.PsiFile,com.intellij.openapi.editor.Editor):com.intellij.codeHighlighting.TextEditorHighlightingPass
-- createMainHighlightingPass(com.intellij.psi.PsiFile,com.intellij.openapi.editor.Document,com.intellij.codeInsight.daemon.impl.HighlightInfoProcessor):com.intellij.codeHighlighting.TextEditorHighlightingPass
-- registerHighlightingPassFactory(com.intellij.codeHighlighting.TextEditorHighlightingPassRegistrar,com.intellij.openapi.project.Project):V
 f:com.intellij.codeInsight.daemon.impl.MainPassesRunner
 - <init>(com.intellij.openapi.project.Project,java.lang.String,com.intellij.codeInspection.InspectionProfile):V
 - runMainPasses(java.util.List):java.util.Map
@@ -4305,25 +4293,6 @@ f:com.intellij.codeInsight.daemon.impl.TrafficLightStatusItemMetadata
 - <init>(I,com.intellij.lang.annotation.HighlightSeverity):V
 - f:getCount():I
 - f:getSeverity():com.intellij.lang.annotation.HighlightSeverity
-f:com.intellij.codeInsight.daemon.impl.WolfTheProblemSolverImpl
-- com.intellij.problems.WolfTheProblemSolver
-- com.intellij.openapi.Disposable
-- clearProblems(com.intellij.openapi.vfs.VirtualFile):V
-- clearProblemsFromExternalSource(com.intellij.openapi.vfs.VirtualFile,java.lang.Object):V
-- convertToProblem(com.intellij.openapi.vfs.VirtualFile,I,I,java.lang.String[]):com.intellij.problems.Problem
-- s:createTestInstance(com.intellij.openapi.project.Project):com.intellij.problems.WolfTheProblemSolver
-- dispose():V
-- hasProblemFilesBeneath(com.intellij.openapi.module.Module):Z
-- hasProblemFilesBeneath(com.intellij.openapi.util.Condition):Z
-- hasSyntaxErrors(com.intellij.openapi.vfs.VirtualFile):Z
-- isProblemFile(com.intellij.openapi.vfs.VirtualFile):Z
-- processProblemFiles(com.intellij.util.Processor):Z
-- processProblemFilesFromExternalSources(com.intellij.util.Processor):Z
-- queue(com.intellij.openapi.vfs.VirtualFile):V
-- reportProblems(com.intellij.openapi.vfs.VirtualFile,java.util.Collection):V
-- reportProblemsFromExternalSource(com.intellij.openapi.vfs.VirtualFile,java.lang.Object):V
-- weHaveGotNonIgnorableProblems(com.intellij.openapi.vfs.VirtualFile,java.util.List):V
-- weHaveGotProblems(com.intellij.openapi.vfs.VirtualFile,java.util.List):V
 f:com.intellij.codeInsight.daemon.impl.actions.GotoNextElementUnderCaretUsageAction
 - com.intellij.codeInsight.CodeInsightActionHandler
 - com.intellij.codeInsight.actions.BaseCodeInsightAction
@@ -5607,10 +5576,19 @@ a:com.intellij.codeInsight.highlighting.AbstractCodeBlockSupportHandler
 f:com.intellij.codeInsight.highlighting.BackgroundHighlightingUtil
 - <init>():V
 f:com.intellij.codeInsight.highlighting.BraceHighlightingHandler
-- s:createLineMarkerRenderer(Z):com.intellij.openapi.editor.markup.LineMarkerRenderer
-- s:getLazyParsableHighlighterIfAny(com.intellij.openapi.project.Project,com.intellij.openapi.editor.Editor,com.intellij.psi.PsiFile):com.intellij.openapi.editor.highlighter.EditorHighlighter
-- s:lineMarkFragment(com.intellij.openapi.editor.ex.EditorEx,com.intellij.openapi.editor.Document,I,I,Z):V
-- s:showScopeHint(com.intellij.openapi.editor.Editor,com.intellij.psi.PsiFile,I,I):V
+- sf:Companion:com.intellij.codeInsight.highlighting.BraceHighlightingHandler$Companion
+- sf:LAYER:I
+- f:clearBraceHighlighters():V
+- sf:getLazyParsableHighlighterIfAny(com.intellij.openapi.project.Project,com.intellij.openapi.editor.Editor,com.intellij.psi.PsiFile):com.intellij.openapi.editor.highlighter.EditorHighlighter
+- f:highlightBraces(com.intellij.openapi.util.TextRange,com.intellij.openapi.util.TextRange,Z,Z,com.intellij.openapi.fileTypes.FileType):V
+- sf:lineMarkFragment(com.intellij.openapi.editor.ex.EditorEx,com.intellij.openapi.editor.Document,I,I,Z):V
+- sf:showScopeHint(com.intellij.openapi.editor.Editor,com.intellij.psi.PsiFile,I,I):V
+- f:updateBraces():V
+f:com.intellij.codeInsight.highlighting.BraceHighlightingHandler$Companion
+- f:createLineMarkerRenderer(Z):com.intellij.openapi.editor.markup.LineMarkerRenderer
+- f:getLazyParsableHighlighterIfAny(com.intellij.openapi.project.Project,com.intellij.openapi.editor.Editor,com.intellij.psi.PsiFile):com.intellij.openapi.editor.highlighter.EditorHighlighter
+- f:lineMarkFragment(com.intellij.openapi.editor.ex.EditorEx,com.intellij.openapi.editor.Document,I,I,Z):V
+- f:showScopeHint(com.intellij.openapi.editor.Editor,com.intellij.psi.PsiFile,I,I):V
 com.intellij.codeInsight.highlighting.BraceMatcher
 - sf:EP_NAME:com.intellij.openapi.extensions.ExtensionPointName
 - a:getBraceTokenGroupId(com.intellij.psi.tree.IElementType):I
@@ -6685,14 +6663,6 @@ f:com.intellij.codeInsight.hints.declarative.impl.InlayData
 - f:getTooltip():java.lang.String
 - f:getTree():com.intellij.codeInsight.hints.declarative.impl.util.TinyTree
 - hashCode():I
-f:com.intellij.codeInsight.hints.declarative.impl.InlayData$Externalizer
-- com.intellij.util.io.DataExternalizer
-- sf:Companion:com.intellij.codeInsight.hints.declarative.impl.InlayData$Externalizer$Companion
-- <init>():V
-- read(java.io.DataInput):com.intellij.codeInsight.hints.declarative.impl.InlayData
-- save(java.io.DataOutput,com.intellij.codeInsight.hints.declarative.impl.InlayData):V
-- serdeVersion():I
-f:com.intellij.codeInsight.hints.declarative.impl.InlayData$Externalizer$Companion
 f:com.intellij.codeInsight.hints.declarative.impl.InlayMouseArea
 - <init>(com.intellij.codeInsight.hints.declarative.InlayActionData):V
 - f:getActionData():com.intellij.codeInsight.hints.declarative.InlayActionData
@@ -7545,16 +7515,6 @@ c:com.intellij.codeInsight.intention.impl.ShowIntentionActionsHandler
 - invoke(com.intellij.openapi.project.Project,com.intellij.openapi.editor.Editor,com.intellij.psi.PsiFile,Z):V
 - p:showIntentionHint(com.intellij.openapi.project.Project,com.intellij.openapi.editor.Editor,com.intellij.psi.PsiFile,Z):V
 - startInWriteAction():Z
-c:com.intellij.codeInsight.intention.impl.config.ActionUsagePanel
-- javax.swing.JPanel
-- com.intellij.openapi.Disposable
-- pf:myEditor:com.intellij.openapi.editor.ex.EditorEx
-- pf:myRangeBlinker:com.intellij.util.ui.RangeBlinker
-- <init>():V
-- ps:createEditor(java.lang.String,I,I,I):com.intellij.openapi.editor.Editor
-- dispose():V
-- getEditor():com.intellij.openapi.editor.ex.EditorEx
-- reset(java.lang.String,com.intellij.openapi.fileTypes.FileType):V
 a:com.intellij.codeInsight.intention.impl.config.BeforeAfterActionMetaData
 - com.intellij.codeInsight.intention.impl.config.BeforeAfterMetaData
 - psf:DESCRIPTION_FILE_NAME:java.lang.String
@@ -7697,11 +7657,6 @@ f:com.intellij.codeInsight.intention.impl.config.PlainTextDescriptor
 com.intellij.codeInsight.intention.impl.config.TextDescriptor
 - a:getFileName():java.lang.String
 - a:getText():java.lang.String
-f:com.intellij.codeInsight.intention.impl.preview.IntentionPreviewComputable
-- java.util.concurrent.Callable
-- <init>(com.intellij.openapi.project.Project,com.intellij.codeInsight.intention.IntentionAction,com.intellij.psi.PsiFile,com.intellij.openapi.editor.Editor,I):V
-- call():com.intellij.codeInsight.intention.preview.IntentionPreviewInfo
-- f:generatePreview():com.intellij.codeInsight.intention.preview.IntentionPreviewInfo
 f:com.intellij.codeInsight.intention.impl.preview.IntentionPreviewComputableKt
 - sf:findCopyIntention(com.intellij.openapi.project.Project,com.intellij.openapi.editor.Editor,com.intellij.psi.PsiFile,com.intellij.codeInsight.intention.IntentionAction):com.intellij.codeInsight.intention.IntentionAction
 f:com.intellij.codeInsight.intention.impl.preview.IntentionPreviewDiffResult
@@ -7921,7 +7876,6 @@ c:com.intellij.codeInsight.lookup.impl.LookupImpl
 - com.intellij.codeInsight.lookup.LookupEx
 - com.intellij.openapi.Disposable
 - p:myShown:Z
-- <init>(com.intellij.openapi.project.Project,com.intellij.openapi.editor.Editor,com.intellij.codeInsight.lookup.LookupArranger):V
 - addAdvertisement(java.lang.String,javax.swing.Icon):V
 - addItem(com.intellij.codeInsight.lookup.LookupElement,com.intellij.codeInsight.completion.PrefixMatcher):Z
 - addLookupListener(com.intellij.codeInsight.lookup.LookupListener):V
@@ -8003,27 +7957,10 @@ c:com.intellij.codeInsight.lookup.impl.LookupImpl
 - setStartCompletionWhenNothingMatches(Z):V
 - showElementActions(java.awt.event.InputEvent):V
 - showLookup():Z
-- p:suppressHidingOnChange():Z
 - truncatePrefix(Z,I):V
 - truncatePrefix(Z,I,Z):V
 - updateLookupWidth():V
 - vetoesHiding():Z
-c:com.intellij.codeInsight.lookup.impl.LookupManagerImpl
-- com.intellij.codeInsight.lookup.LookupManager
-- sf:SUPPRESS_AUTOPOPUP_JAVADOC:com.intellij.openapi.util.Key
-- <init>(com.intellij.openapi.project.Project):V
-- addPropertyChangeListener(java.beans.PropertyChangeListener):V
-- addPropertyChangeListener(java.beans.PropertyChangeListener,com.intellij.openapi.Disposable):V
-- clearLookup():V
-- p:createLookup(com.intellij.openapi.editor.Editor,com.intellij.codeInsight.lookup.LookupArranger,com.intellij.openapi.project.Project):com.intellij.codeInsight.lookup.impl.LookupImpl
-- createLookup(com.intellij.openapi.editor.Editor,com.intellij.codeInsight.lookup.LookupElement[],java.lang.String,com.intellij.codeInsight.lookup.LookupArranger):com.intellij.codeInsight.lookup.impl.LookupImpl
-- forceSelection(C,I):V
-- forceSelection(C,com.intellij.codeInsight.lookup.LookupElement):V
-- getActiveLookup():com.intellij.codeInsight.lookup.LookupEx
-- hideActiveLookup():V
-- s:isAutoPopupJavadocSupportedBy(com.intellij.codeInsight.lookup.LookupElement):Z
-- removePropertyChangeListener(java.beans.PropertyChangeListener):V
-- showLookup(com.intellij.openapi.editor.Editor,com.intellij.codeInsight.lookup.LookupElement[],java.lang.String,com.intellij.codeInsight.lookup.LookupArranger):com.intellij.codeInsight.lookup.LookupEx
 f:com.intellij.codeInsight.lookup.impl.LookupOffsets
 - com.intellij.openapi.editor.event.DocumentListener
 - <init>(com.intellij.openapi.editor.Editor):V
@@ -10882,51 +10819,53 @@ c:com.intellij.execution.console.IdeConsoleRootType
 - com.intellij.execution.console.LanguageConsoleImpl
 - <init>(com.intellij.execution.console.LanguageConsoleBuilder$MyHelper,com.intellij.execution.console.GutterContentProvider):V
 - dispose():V
-- p:doAddPromptToHistory():V
+- doAddPromptToHistory():V
 - p:getMinHistoryLineCount():I
+- isHistoryViewerForceAdditionalColumnsUsage():Z
 - scrollToEnd():V
 *f:com.intellij.execution.console.LanguageConsoleBuilder$MyConsoleRootType
 - com.intellij.execution.console.ConsoleRootType
 - <init>(java.lang.String):V
 *f:com.intellij.execution.console.LanguageConsoleBuilder$MyHelper
 - com.intellij.execution.console.LanguageConsoleImpl$Helper
-- <init>(com.intellij.openapi.project.Project,java.lang.String,com.intellij.lang.Language,com.intellij.util.PairFunction):V
+- <init>(com.intellij.openapi.project.Project,java.lang.String,com.intellij.lang.Language,java.util.function.BiFunction):V
 - getFile():com.intellij.psi.PsiFile
 - setupEditor(com.intellij.openapi.editor.ex.EditorEx):V
 c:com.intellij.execution.console.LanguageConsoleImpl
 - com.intellij.execution.impl.ConsoleViewImpl
 - com.intellij.execution.console.LanguageConsoleView
 - com.intellij.openapi.actionSystem.DataProvider
+- sf:Companion:com.intellij.execution.console.LanguageConsoleImpl$Companion
 - <init>(com.intellij.execution.console.LanguageConsoleImpl$Helper):V
 - <init>(com.intellij.openapi.project.Project,java.lang.String,com.intellij.lang.Language):V
-- p:addTextRangeToHistory(com.intellij.openapi.util.TextRange,com.intellij.openapi.editor.ex.EditorEx,Z):java.lang.String
-- addToHistory(com.intellij.openapi.util.TextRange,com.intellij.openapi.editor.ex.EditorEx,Z):java.lang.String
-- p:addToHistoryInner(com.intellij.openapi.util.TextRange,com.intellij.openapi.editor.ex.EditorEx,Z,Z):java.lang.String
+- f:addTextRangeToHistory(com.intellij.openapi.util.TextRange,com.intellij.openapi.editor.ex.EditorEx,Z):java.lang.String
+- f:addToHistory(com.intellij.openapi.util.TextRange,com.intellij.openapi.editor.ex.EditorEx,Z):java.lang.String
+- pf:addToHistoryInner(com.intellij.openapi.util.TextRange,com.intellij.openapi.editor.ex.EditorEx,Z,Z):java.lang.String
 - p:closeFile():V
 - p:createCenterComponent():javax.swing.JComponent
 - dispose():V
-- pf:disposeEditor():V
-- p:doAddPromptToHistory():V
-- pf:doCreateConsoleEditor():com.intellij.openapi.editor.ex.EditorEx
+- p:disposeEditor():V
+- doAddPromptToHistory():V
+- p:doCreateConsoleEditor():com.intellij.openapi.editor.ex.EditorEx
 - p:doCreateHistoryEditor():com.intellij.openapi.editor.ex.EditorEx
-- s:duplicateHighlighters(com.intellij.openapi.editor.markup.MarkupModel,com.intellij.openapi.editor.markup.MarkupModel,I,com.intellij.openapi.util.TextRange,java.lang.String[]):V
-- f:getConsoleEditor():com.intellij.openapi.editor.ex.EditorEx
-- getConsolePromptDecorator():com.intellij.execution.console.ConsolePromptDecorator
+- getConsoleEditor():com.intellij.openapi.editor.ex.EditorEx
+- f:getConsolePromptDecorator():com.intellij.execution.console.ConsolePromptDecorator
 - getCurrentEditor():com.intellij.openapi.editor.ex.EditorEx
-- f:getEditorDocument():com.intellij.openapi.editor.Document
-- f:getFile():com.intellij.psi.PsiFile
-- f:getHistoryViewer():com.intellij.openapi.editor.ex.EditorEx
+- getEditorDocument():com.intellij.openapi.editor.Document
+- getFile():com.intellij.psi.PsiFile
+- getHistoryViewer():com.intellij.openapi.editor.ex.EditorEx
 - getLanguage():com.intellij.lang.Language
 - p:getMinHistoryLineCount():I
 - getPreferredFocusableComponent():javax.swing.JComponent
 - getPrompt():java.lang.String
 - getPromptAttributes():com.intellij.execution.ui.ConsoleViewContentType
 - getTitle():java.lang.String
-- f:getVirtualFile():com.intellij.openapi.vfs.VirtualFile
-- f:isConsoleEditorEnabled():Z
+- getVirtualFile():com.intellij.openapi.vfs.VirtualFile
+- isConsoleEditorEnabled():Z
 - isEditable():Z
-- prepareExecuteAction(Z,Z,Z):java.lang.String
-- s:printWithHighlighting(com.intellij.execution.console.LanguageConsoleView,com.intellij.openapi.editor.Editor,com.intellij.openapi.util.TextRange):java.lang.String
+- isHistoryViewerForceAdditionalColumnsUsage():Z
+- f:prepareExecuteAction(Z,Z,Z):java.lang.String
+- sf:printWithHighlighting(com.intellij.execution.console.LanguageConsoleView,com.intellij.openapi.editor.Editor,com.intellij.openapi.util.TextRange):java.lang.String
 - setConsoleEditorEnabled(Z):V
 - setEditable(Z):V
 - setInputText(java.lang.String):V
@@ -10934,25 +10873,30 @@ c:com.intellij.execution.console.LanguageConsoleImpl
 - setPrompt(java.lang.String):V
 - setPromptAttributes(com.intellij.execution.ui.ConsoleViewContentType):V
 - setTitle(java.lang.String):V
+f:com.intellij.execution.console.LanguageConsoleImpl$Companion
+- f:duplicateHighlighters(com.intellij.openapi.editor.markup.MarkupModel,com.intellij.openapi.editor.markup.MarkupModel,I,com.intellij.openapi.util.TextRange,java.lang.String[]):V
+- f:printWithHighlighting(com.intellij.execution.console.LanguageConsoleView,com.intellij.openapi.editor.Editor,com.intellij.openapi.util.TextRange):java.lang.String
 f:com.intellij.execution.console.LanguageConsoleImpl$ConsoleEditorsPanel
 - javax.swing.JPanel
 - <init>(com.intellij.execution.console.LanguageConsoleImpl):V
-- getConsole():com.intellij.execution.console.LanguageConsoleImpl
+- f:getConsole():com.intellij.execution.console.LanguageConsoleImpl
 c:com.intellij.execution.console.LanguageConsoleImpl$Helper
+- file:com.intellij.psi.PsiFile
 - f:project:com.intellij.openapi.project.Project
+- title:java.lang.String
 - f:virtualFile:com.intellij.openapi.vfs.VirtualFile
 - <init>(com.intellij.openapi.project.Project,com.intellij.openapi.vfs.VirtualFile):V
-- getDocument():com.intellij.openapi.editor.Document
-- p:getEditorData(com.intellij.openapi.editor.ex.EditorEx,java.lang.String):java.lang.Object
+- f:getDocument():com.intellij.openapi.editor.Document
+- pf:getEditorData(com.intellij.openapi.editor.ex.EditorEx,java.lang.String):java.lang.Object
 - getFile():com.intellij.psi.PsiFile
-- getFileSafe():com.intellij.psi.PsiFile
-- getTitle():java.lang.String
-- setLanguage(com.intellij.lang.Language):V
-- setTitle(java.lang.String):com.intellij.execution.console.LanguageConsoleImpl$Helper
+- f:getFileSafe():com.intellij.psi.PsiFile
+- f:setLanguage(com.intellij.lang.Language):V
+- f:setTitle(java.lang.String):com.intellij.execution.console.LanguageConsoleImpl$Helper
 - setupEditor(com.intellij.openapi.editor.ex.EditorEx):V
 com.intellij.execution.console.LanguageConsoleView
 - com.intellij.execution.ui.ConsoleView
 - com.intellij.openapi.Disposable
+- sf:Companion:com.intellij.execution.console.LanguageConsoleView$Companion
 - sf:EXECUTION_EDITOR_KEY:com.intellij.openapi.util.Key
 - a:getConsoleEditor():com.intellij.openapi.editor.ex.EditorEx
 - a:getCurrentEditor():com.intellij.openapi.editor.ex.EditorEx
@@ -10974,6 +10918,7 @@ com.intellij.execution.console.LanguageConsoleView
 - a:setPrompt(java.lang.String):V
 - a:setPromptAttributes(com.intellij.execution.ui.ConsoleViewContentType):V
 - a:setTitle(java.lang.String):V
+f:com.intellij.execution.console.LanguageConsoleView$Companion
 f:com.intellij.execution.console.MergedHorizontalScrollBarModel
 - javax.swing.DefaultBoundedRangeModel
 - <init>(javax.swing.JScrollBar,com.intellij.openapi.editor.ex.EditorEx,com.intellij.openapi.editor.ex.EditorEx):V
@@ -11053,17 +10998,17 @@ c:com.intellij.execution.impl.ConsoleViewImpl
 - com.intellij.ide.OccurenceNavigator
 - com.intellij.openapi.actionSystem.UiCompatibleDataProvider
 - sf:CONSOLE_VIEW_IN_EDITOR_VIEW:com.intellij.openapi.util.Key
+- sf:Companion:com.intellij.execution.impl.ConsoleViewImpl$Companion
 - sf:IS_CONSOLE_DOCUMENT:com.intellij.openapi.util.Key
-- p:myCancelStickToEnd:Z
-- p:myPredefinedFilters:java.util.List
+- p:predefinedFilters:java.util.List
 - p:<init>(com.intellij.openapi.project.Project,com.intellij.psi.search.GlobalSearchScope,Z,com.intellij.execution.impl.ConsoleState,Z):V
 - <init>(com.intellij.openapi.project.Project,com.intellij.psi.search.GlobalSearchScope,Z,Z):V
 - <init>(com.intellij.openapi.project.Project,Z):V
 - addChangeListener(com.intellij.execution.ui.ObservableConsoleView$ChangeListener,com.intellij.openapi.Disposable):V
-- addCustomConsoleAction(com.intellij.openapi.actionSystem.AnAction):V
+- f:addCustomConsoleAction(com.intellij.openapi.actionSystem.AnAction):V
 - f:addLayerToPane(javax.swing.JComponent):V
 - addMessageFilter(com.intellij.execution.filters.Filter):V
-- addNotificationComponent(javax.swing.JComponent):V
+- f:addNotificationComponent(javax.swing.JComponent):V
 - addNotify():V
 - allowHeavyFilters():V
 - attachToProcess(com.intellij.execution.process.ProcessHandler):V
@@ -11079,46 +11024,50 @@ c:com.intellij.execution.impl.ConsoleViewImpl
 - p:doClear():V
 - p:doCreateConsoleEditor():com.intellij.openapi.editor.ex.EditorEx
 - flushDeferredText():V
-- foldImmediately():V
+- f:foldImmediately():V
 - getComponent():javax.swing.JComponent
 - getContentSize():I
 - getEditor():com.intellij.openapi.editor.Editor
-- getHyperlinks():com.intellij.execution.impl.EditorHyperlinkSupport
+- f:getHyperlinks():com.intellij.execution.impl.EditorHyperlinkSupport
+- pf:getMyCancelStickToEnd():Z
 - getNextOccurenceActionName():java.lang.String
 - getPreferredFocusableComponent():javax.swing.JComponent
 - getPreviousOccurenceActionName():java.lang.String
-- getProject():com.intellij.openapi.project.Project
+- f:getProject():com.intellij.openapi.project.Project
+- f:getState():com.intellij.execution.impl.ConsoleState
 - p:getStateForUpdate():com.intellij.openapi.application.ModalityState
-- getText():java.lang.String
+- f:getText():java.lang.String
 - goNextOccurence():com.intellij.ide.OccurenceNavigator$OccurenceInfo
 - goPreviousOccurence():com.intellij.ide.OccurenceNavigator$OccurenceInfo
 - hasDeferredOutput():Z
 - hasNextOccurence():Z
 - hasPreviousOccurence():Z
-- invalidateFiltersExpirableTokens():V
+- f:invalidateFiltersExpirableTokens():V
 - isOutputPaused():Z
 - isRunning():Z
-- ps:isStickingToEnd(com.intellij.openapi.editor.ex.EditorEx):Z
 - performWhenNoDeferredOutput(java.lang.Runnable):V
 - print(java.lang.String,com.intellij.execution.ui.ConsoleViewContentType):V
-- p:print(java.lang.String,com.intellij.execution.ui.ConsoleViewContentType,com.intellij.execution.filters.HyperlinkInfo):V
+- print(java.lang.String,com.intellij.execution.ui.ConsoleViewContentType,com.intellij.execution.filters.HyperlinkInfo):V
 - printHyperlink(java.lang.String,com.intellij.execution.filters.HyperlinkInfo):V
 - rehighlightHyperlinksAndFoldings():V
 - removeNotify():V
 - requestScrollingToEnd():V
 - scrollTo(I):V
 - scrollToEnd():V
-- setEmulateCarriageReturn(Z):V
+- f:setEmulateCarriageReturn(Z):V
 - setHelpId(java.lang.String):V
+- pf:setMyCancelStickToEnd(Z):V
 - setOutputPaused(Z):V
-- setUpdateFoldingsEnabled(Z):V
-- p:type(com.intellij.openapi.editor.Editor,java.lang.String):V
+- f:setUpdateFoldingsEnabled(Z):V
+- type(com.intellij.openapi.editor.Editor,java.lang.String):V
 - uiDataSnapshot(com.intellij.openapi.actionSystem.DataSink):V
 - p:updateFoldings(I,I):V
-- waitAllRequests():V
-c:com.intellij.execution.impl.ConsoleViewImpl$ClearAllAction
+- f:waitAllRequests():V
+f:com.intellij.execution.impl.ConsoleViewImpl$ClearAllAction
 - com.intellij.execution.actions.ClearConsoleAction
 - <init>():V
+f:com.intellij.execution.impl.ConsoleViewImpl$Companion
+- f:isStickingToEnd(com.intellij.openapi.editor.ex.EditorEx):Z
 f:com.intellij.execution.impl.ConsoleViewRunningState
 - com.intellij.execution.impl.ConsoleState
 - <init>(com.intellij.execution.impl.ConsoleViewImpl,com.intellij.execution.process.ProcessHandler,com.intellij.execution.impl.ConsoleState,Z,Z):V
@@ -12357,7 +12306,7 @@ f:com.intellij.formatting.commandLine.CodeStyleProcessorBuildException$ShowUsage
 f:com.intellij.formatting.commandLine.CodeStyleProcessorBuilder
 - <init>(com.intellij.formatting.commandLine.MessageOutput):V
 - f:allowFactoryDefaults():com.intellij.formatting.commandLine.CodeStyleProcessorBuilder
-- f:build():com.intellij.formatting.commandLine.FileSetCodeStyleProcessor
+- f:build(com.intellij.openapi.project.Project):com.intellij.formatting.commandLine.FileSetCodeStyleProcessor
 - f:dryRun():com.intellij.formatting.commandLine.CodeStyleProcessorBuilder
 - f:getCharset():java.nio.charset.Charset
 - f:getEntries():java.util.ArrayList
@@ -12371,22 +12320,20 @@ f:com.intellij.formatting.commandLine.CodeStyleProcessorBuilder
 - f:withFileMasks(java.lang.String):com.intellij.formatting.commandLine.CodeStyleProcessorBuilder
 a:com.intellij.formatting.commandLine.FileSetCodeStyleProcessor
 - com.intellij.formatting.commandLine.FileSetProcessor
-- java.io.Closeable
-- <init>(com.intellij.formatting.commandLine.MessageOutput,Z,java.nio.charset.Charset,com.intellij.psi.codeStyle.CodeStyleSettings,com.intellij.psi.codeStyle.CodeStyleSettings):V
-- b:<init>(com.intellij.formatting.commandLine.MessageOutput,Z,java.nio.charset.Charset,com.intellij.psi.codeStyle.CodeStyleSettings,com.intellij.psi.codeStyle.CodeStyleSettings,I,kotlin.jvm.internal.DefaultConstructorMarker):V
-- close():V
+- <init>(com.intellij.formatting.commandLine.MessageOutput,Z,java.nio.charset.Charset,com.intellij.psi.codeStyle.CodeStyleSettings,com.intellij.psi.codeStyle.CodeStyleSettings,com.intellij.openapi.project.Project):V
+- b:<init>(com.intellij.formatting.commandLine.MessageOutput,Z,java.nio.charset.Charset,com.intellij.psi.codeStyle.CodeStyleSettings,com.intellij.psi.codeStyle.CodeStyleSettings,com.intellij.openapi.project.Project,I,kotlin.jvm.internal.DefaultConstructorMarker):V
 - f:getDefaultCodeStyle():com.intellij.psi.codeStyle.CodeStyleSettings
 - a:getOperationContinuous():java.lang.String
 - a:getOperationPerfect():java.lang.String
-- pf:getProject():com.intellij.openapi.project.Project
+- f:getProject():com.intellij.openapi.project.Project
 - isResultSuccessful():Z
 - printReport():V
 - a:processFileInternal(com.intellij.openapi.vfs.VirtualFile):java.lang.String
 - processVirtualFile(com.intellij.openapi.vfs.VirtualFile,com.intellij.psi.codeStyle.CodeStyleSettings):V
 f:com.intellij.formatting.commandLine.FileSetFormatValidator
 - com.intellij.formatting.commandLine.FileSetCodeStyleProcessor
-- <init>(com.intellij.formatting.commandLine.MessageOutput,Z,java.nio.charset.Charset,com.intellij.psi.codeStyle.CodeStyleSettings,com.intellij.psi.codeStyle.CodeStyleSettings):V
-- b:<init>(com.intellij.formatting.commandLine.MessageOutput,Z,java.nio.charset.Charset,com.intellij.psi.codeStyle.CodeStyleSettings,com.intellij.psi.codeStyle.CodeStyleSettings,I,kotlin.jvm.internal.DefaultConstructorMarker):V
+- <init>(com.intellij.formatting.commandLine.MessageOutput,Z,java.nio.charset.Charset,com.intellij.psi.codeStyle.CodeStyleSettings,com.intellij.psi.codeStyle.CodeStyleSettings,com.intellij.openapi.project.Project):V
+- b:<init>(com.intellij.formatting.commandLine.MessageOutput,Z,java.nio.charset.Charset,com.intellij.psi.codeStyle.CodeStyleSettings,com.intellij.psi.codeStyle.CodeStyleSettings,com.intellij.openapi.project.Project,I,kotlin.jvm.internal.DefaultConstructorMarker):V
 - getOperationContinuous():java.lang.String
 - getOperationPerfect():java.lang.String
 - isResultSuccessful():Z
@@ -12394,8 +12341,8 @@ f:com.intellij.formatting.commandLine.FileSetFormatValidator
 - processFileInternal(com.intellij.openapi.vfs.VirtualFile):java.lang.String
 f:com.intellij.formatting.commandLine.FileSetFormatter
 - com.intellij.formatting.commandLine.FileSetCodeStyleProcessor
-- <init>(com.intellij.formatting.commandLine.MessageOutput,Z,java.nio.charset.Charset,com.intellij.psi.codeStyle.CodeStyleSettings,com.intellij.psi.codeStyle.CodeStyleSettings):V
-- b:<init>(com.intellij.formatting.commandLine.MessageOutput,Z,java.nio.charset.Charset,com.intellij.psi.codeStyle.CodeStyleSettings,com.intellij.psi.codeStyle.CodeStyleSettings,I,kotlin.jvm.internal.DefaultConstructorMarker):V
+- <init>(com.intellij.formatting.commandLine.MessageOutput,Z,java.nio.charset.Charset,com.intellij.psi.codeStyle.CodeStyleSettings,com.intellij.psi.codeStyle.CodeStyleSettings,com.intellij.openapi.project.Project):V
+- b:<init>(com.intellij.formatting.commandLine.MessageOutput,Z,java.nio.charset.Charset,com.intellij.psi.codeStyle.CodeStyleSettings,com.intellij.psi.codeStyle.CodeStyleSettings,com.intellij.openapi.project.Project,I,kotlin.jvm.internal.DefaultConstructorMarker):V
 - getOperationContinuous():java.lang.String
 - getOperationPerfect():java.lang.String
 - processFileInternal(com.intellij.openapi.vfs.VirtualFile):java.lang.String
@@ -12424,8 +12371,8 @@ a:com.intellij.formatting.commandLine.FileSetProcessor
 - f:processFiles():V
 - a:processVirtualFile(com.intellij.openapi.vfs.VirtualFile,com.intellij.psi.codeStyle.CodeStyleSettings):V
 f:com.intellij.formatting.commandLine.FormatterStarterKt
-- sf:createFormatter(java.util.List,com.intellij.formatting.commandLine.MessageOutput):com.intellij.formatting.commandLine.FileSetCodeStyleProcessor
-- bs:createFormatter$default(java.util.List,com.intellij.formatting.commandLine.MessageOutput,I,java.lang.Object):com.intellij.formatting.commandLine.FileSetCodeStyleProcessor
+- sf:createBuilder(java.util.List,com.intellij.formatting.commandLine.MessageOutput):com.intellij.formatting.commandLine.CodeStyleProcessorBuilder
+- bs:createBuilder$default(java.util.List,com.intellij.formatting.commandLine.MessageOutput,I,java.lang.Object):com.intellij.formatting.commandLine.CodeStyleProcessorBuilder
 - sf:readSettings(java.io.File):com.intellij.psi.codeStyle.CodeStyleSettings
 c:com.intellij.formatting.commandLine.MessageOutput
 - <init>(java.io.PrintWriter,java.io.PrintWriter):V
@@ -16657,7 +16604,7 @@ f:com.intellij.ide.projectView.impl.ProjectViewToolWindowFactory
 - getIcon():javax.swing.Icon
 c:com.intellij.ide.projectView.impl.ProjectViewTree
 - com.intellij.ide.dnd.aware.DnDAwareTree
-- com.intellij.openapi.actionSystem.UiDataProvider
+- com.intellij.openapi.actionSystem.UiCompatibleDataProvider
 - com.intellij.ui.speedSearch.SpeedSearchSupply$SpeedSearchLocator
 - p:<init>(com.intellij.openapi.project.Project,javax.swing.tree.TreeModel):V
 - <init>(javax.swing.tree.TreeModel):V
@@ -20876,52 +20823,6 @@ a:com.intellij.openapi.projectRoots.impl.DependentSdkType
 com.intellij.openapi.projectRoots.impl.FixWithConsent
 - a:giveConsent():V
 - a:hasConsent():Z
-a:com.intellij.openapi.projectRoots.impl.JavaHomeFinder
-- sf:DEFAULT_JAVA_LINUX_PATHS:java.lang.String[]
-- <init>():V
-- s:defaultJavaLocation():java.lang.String
-- s:getFinder():com.intellij.openapi.projectRoots.impl.JavaHomeFinderBasic
-- s:suggestHomePaths():java.util.List
-- s:suggestHomePaths(Z):java.util.List
-c:com.intellij.openapi.projectRoots.impl.JavaHomeFinder$SystemInfoProvider
-- <init>():V
-- getEnvironmentVariable(java.lang.String):java.lang.String
-- getFsRoots():java.util.Collection
-- getPath(java.lang.String,java.lang.String[]):java.nio.file.Path
-- getPathSeparator():java.lang.String
-- getUserHome():java.nio.file.Path
-- isFileSystemCaseSensitive():Z
-c:com.intellij.openapi.projectRoots.impl.JavaHomeFinderBasic
-- <init>(com.intellij.openapi.projectRoots.impl.JavaHomeFinder$SystemInfoProvider):V
-- checkConfiguredJdks(Z):com.intellij.openapi.projectRoots.impl.JavaHomeFinderBasic
-- checkDefaultInstallDir(Z):com.intellij.openapi.projectRoots.impl.JavaHomeFinderBasic
-- checkEmbeddedJava(Z):com.intellij.openapi.projectRoots.impl.JavaHomeFinderBasic
-- checkSpecifiedPaths(java.lang.String[]):com.intellij.openapi.projectRoots.impl.JavaHomeFinderBasic
-- checkUsedInstallDirs(Z):com.intellij.openapi.projectRoots.impl.JavaHomeFinderBasic
-- f:findExistingJdks():java.util.Set
-- findInJavaHome():java.util.Set
-- p:getPathInUserHome(java.lang.String):java.nio.file.Path
-- p:getSystemInfo():com.intellij.openapi.projectRoots.impl.JavaHomeFinder$SystemInfoProvider
-- p:listPossibleJdkHomesFromInstallRoot(java.nio.file.Path):java.util.List
-- p:listPossibleJdkInstallRootsFromHomes(java.nio.file.Path):java.util.List
-- p:registerFinder(java.util.function.Supplier):V
-- p:scanAll(java.nio.file.Path,Z):java.util.Set
-- p:scanAll(java.util.Collection,Z):java.util.Set
-- p:scanFolder(java.nio.file.Path,Z,java.util.Collection):V
-c:com.intellij.openapi.projectRoots.impl.JavaHomeFinderMac
-- com.intellij.openapi.projectRoots.impl.JavaHomeFinderBasic
-- sf:JAVA_HOME_FIND_UTIL:java.lang.String
-- <init>(com.intellij.openapi.projectRoots.impl.JavaHomeFinder$SystemInfoProvider):V
-- p:getSystemDefaultJavaHome():java.nio.file.Path
-- p:listPossibleJdkHomesFromInstallRoot(java.nio.file.Path):java.util.List
-- p:listPossibleJdkInstallRootsFromHomes(java.nio.file.Path):java.util.List
-f:com.intellij.openapi.projectRoots.impl.JavaHomeFinderWindows
-- com.intellij.openapi.projectRoots.impl.JavaHomeFinderBasic
-- sf:Companion:com.intellij.openapi.projectRoots.impl.JavaHomeFinderWindows$Companion
-- sf:defaultJavaLocation:java.lang.String
-- <init>(Z,Z,com.intellij.openapi.projectRoots.impl.JavaHomeFinder$SystemInfoProvider):V
-f:com.intellij.openapi.projectRoots.impl.JavaHomeFinderWindows$Companion
-- f:gatherHomePaths(java.lang.CharSequence):java.util.Set
 f:com.intellij.openapi.projectRoots.impl.JdkFinderImpl
 - com.intellij.openapi.projectRoots.JdkFinder
 - <init>():V
@@ -21081,215 +20982,17 @@ com.intellij.openapi.projectRoots.impl.UnknownSdkTrackerTask
 - a:createCollector():com.intellij.openapi.projectRoots.impl.UnknownSdkCollector
 - a:onLookupCompleted(com.intellij.openapi.projectRoots.impl.UnknownSdkSnapshot):V
 f:com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkAuto
-- com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkDownloaderBase
 - com.intellij.openapi.roots.ui.configuration.UnknownSdkResolver
 - <init>():V
 - createResolver(com.intellij.openapi.project.Project,com.intellij.openapi.progress.ProgressIndicator):com.intellij.openapi.roots.ui.configuration.UnknownSdkResolver$UnknownSdkLookup
 - f:createResolverImpl(com.intellij.openapi.project.Project,com.intellij.openapi.progress.ProgressIndicator):com.intellij.openapi.roots.ui.configuration.UnknownSdkResolver$UnknownSdkLookup
 - supportsResolution(com.intellij.openapi.projectRoots.SdkTypeId):Z
-f:com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkDownloadDialogKt
-- sf:buildJdkDownloaderModel(java.util.List,kotlin.jvm.functions.Function1):com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkDownloaderModel
-- bs:buildJdkDownloaderModel$default(java.util.List,kotlin.jvm.functions.Function1,I,java.lang.Object):com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkDownloaderModel
-f:com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkDownloadTask
-- com.intellij.openapi.roots.ui.configuration.projectRoot.SdkDownloadTask
-- <init>(com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkItem,com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkInstallRequest,com.intellij.openapi.project.Project):V
-- doDownload(com.intellij.openapi.progress.ProgressIndicator):V
-- f:getJdkItem():com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkItem
-- getPlannedHomeDir():java.lang.String
-- getPlannedVersion():java.lang.String
-- getProductName():java.lang.String
-- f:getProject():com.intellij.openapi.project.Project
-- f:getRequest():com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkInstallRequest
-- getSuggestedSdkName():java.lang.String
-f:com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkDownloader
-- com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkDownloaderBase
-- com.intellij.openapi.roots.ui.configuration.projectRoot.SdkDownload
-- <init>():V
-- f:prepareDownloadTask(com.intellij.openapi.project.Project,com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkItem,java.nio.file.Path,java.util.function.Consumer):V
-- showDownloadUI(com.intellij.openapi.projectRoots.SdkTypeId,com.intellij.openapi.projectRoots.SdkModel,javax.swing.JComponent,com.intellij.openapi.project.Project,com.intellij.openapi.projectRoots.Sdk,java.util.function.Predicate,java.util.function.Consumer):V
-- showDownloadUI(com.intellij.openapi.projectRoots.SdkTypeId,com.intellij.openapi.projectRoots.SdkModel,javax.swing.JComponent,com.intellij.openapi.projectRoots.Sdk,java.util.function.Consumer):V
-- supportsDownload(com.intellij.openapi.projectRoots.SdkTypeId):Z
-com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkDownloaderBase
-- sf:Companion:com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkDownloaderBase$Companion
-f:com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkDownloaderBase$Companion
-- f:newDownloadTask(com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkItem,com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkInstallRequest,com.intellij.openapi.project.Project):com.intellij.openapi.roots.ui.configuration.projectRoot.SdkDownloadTask
-com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkDownloaderDialogHostExtension
-- allowWsl():Z
-- createMainPredicate():com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkPredicate
-- createWslPredicate():com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkPredicate
-- shouldIncludeItem(com.intellij.openapi.projectRoots.SdkTypeId,com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkItem):Z
-f:com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkDownloaderLogger
-- sf:INSTANCE:com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkDownloaderLogger
-- getGroup():com.intellij.internal.statistic.eventLog.EventLogGroup
-- sf:logDetected(org.jetbrains.jps.model.java.JdkVersionDetector$JdkVersionInfo):V
-- f:logDownload(Z):V
-- f:logSelected(com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkItem):V
-f:com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkDownloaderModel
-- <init>(java.util.List,com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkItem,com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkVersionItem,com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkVersionVendorItem):V
-- f:getDefaultItem():com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkItem
-- f:getDefaultVersion():com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkVersionItem
-- f:getDefaultVersionVendor():com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkVersionVendorItem
-- f:getVersionGroups():java.util.List
-com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkInstallRequest
-- a:getInstallDir():java.nio.file.Path
-- a:getItem():com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkItem
-- a:getJavaHome():java.nio.file.Path
-f:com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkInstallRequestInfo
-- com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkInstallRequest
-- <init>(com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkItem,java.nio.file.Path):V
-- f:component1():com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkItem
-- f:component2():java.nio.file.Path
-- f:copy(com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkItem,java.nio.file.Path):com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkInstallRequestInfo
-- bs:copy$default(com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkInstallRequestInfo,com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkItem,java.nio.file.Path,I,java.lang.Object):com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkInstallRequestInfo
-- equals(java.lang.Object):Z
-- getInstallDir():java.nio.file.Path
-- getItem():com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkItem
-- getJavaHome():java.nio.file.Path
-- hashCode():I
-f:com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkInstaller
-- com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkInstallerBase
-- sf:Companion:com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkInstaller$Companion
-- <init>():V
-- defaultInstallDir():java.nio.file.Path
-- f:defaultInstallDir(com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkItem,com.intellij.execution.wsl.WSLDistribution):java.nio.file.Path
-- defaultInstallDir(com.intellij.openapi.projectRoots.impl.jdkDownloader.WSLDistributionForJdkInstaller):java.nio.file.Path
-- bs:defaultInstallDir$default(com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkInstaller,com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkItem,com.intellij.execution.wsl.WSLDistribution,I,java.lang.Object):java.nio.file.Path
-- sf:getInstance():com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkInstaller
-- wslDistributionFromPath(java.nio.file.Path):com.intellij.openapi.projectRoots.impl.jdkDownloader.WSLDistributionForJdkInstaller
-f:com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkInstaller$Companion
-- f:getInstance():com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkInstaller
-a:com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkInstallerBase
-- <init>():V
-- a:defaultInstallDir():java.nio.file.Path
-- f:defaultInstallDir(com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkItem):java.nio.file.Path
-- defaultInstallDir(com.intellij.openapi.projectRoots.impl.jdkDownloader.WSLDistributionForJdkInstaller):java.nio.file.Path
-- pf:defaultInstallDir(java.nio.file.Path,com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkItem):java.nio.file.Path
-- p:findHistoryRoots(com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkItem):java.util.List
-- f:findJdkItemForInstalledJdk(java.lang.String):com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkItem
-- pf:getLOG():com.intellij.openapi.diagnostic.Logger
-- f:installJdk(com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkInstallRequest,com.intellij.openapi.progress.ProgressIndicator,com.intellij.openapi.project.Project):V
-- p:installJdkImpl(com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkInstallRequest,com.intellij.openapi.progress.ProgressIndicator,com.intellij.openapi.project.Project):V
-- f:prepareJdkInstallation(com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkItem,java.nio.file.Path):com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkInstallRequest
-- f:prepareJdkInstallationDirect(com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkItem,java.nio.file.Path):com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkInstallRequest
-- f:validateInstallDir(java.lang.String):kotlin.Pair
-- p:wslDistributionFromPath(java.nio.file.Path):com.intellij.openapi.projectRoots.impl.jdkDownloader.WSLDistributionForJdkInstaller
-com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkInstallerListener
-- onJdkDownloadFinished(com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkInstallRequest,com.intellij.openapi.project.Project):V
-- onJdkDownloadStarted(com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkInstallRequest,com.intellij.openapi.project.Project):V
-f:com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkInstallerState
-- com.intellij.openapi.components.BaseState
-- <init>():V
-- f:getInstalledItems():java.util.List
-- f:setInstalledItems(java.util.List):V
-f:com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkInstallerStateEntry
-- com.intellij.openapi.components.BaseState
-- <init>():V
-- f:copyForm(com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkItem,java.nio.file.Path):V
-- f:getFullText():java.lang.String
-- f:getInstallDir():java.lang.String
-- f:getInstallPath():java.nio.file.Path
-- f:getJavaHomePath():java.nio.file.Path
-- f:getSha256():java.lang.String
-- f:getUrl():java.lang.String
-- f:getVersionText():java.lang.String
-- f:matches(com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkItem):Z
-- f:setFullText(java.lang.String):V
-- f:setInstallDir(java.lang.String):V
-- f:setSha256(java.lang.String):V
-- f:setUrl(java.lang.String):V
-- f:setVersionText(java.lang.String):V
-f:com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkInstallerStore
-- com.intellij.openapi.components.SimplePersistentStateComponent
-- sf:Companion:com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkInstallerStore$Companion
-- <init>():V
-- f:findInstallations(com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkItem):java.util.List
-- sf:getInstance():com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkInstallerStore
-- f:listJdkInstallHomes():java.util.List
-- loadState(com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkInstallerState):V
-- f:registerInstall(com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkItem,java.nio.file.Path):V
-f:com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkInstallerStore$Companion
-- f:getInstance():com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkInstallerStore
-f:com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkInstallerWSL
-- sf:INSTANCE:com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkInstallerWSL
-- f:unpackJdkOnWsl(com.intellij.openapi.projectRoots.impl.jdkDownloader.WSLDistributionForJdkInstaller,com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkPackageType,java.nio.file.Path,java.nio.file.Path,java.lang.String):V
-f:com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkItem
-- <init>(com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkProduct,Z,Z,I,java.lang.String,java.lang.String,java.lang.String,java.lang.String,java.lang.String,com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkPackageType,java.lang.String,java.lang.String,J,J,java.lang.String,java.lang.String,java.lang.String,java.lang.String,java.util.List,kotlin.jvm.functions.Function1):V
-- b:<init>(com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkProduct,Z,Z,I,java.lang.String,java.lang.String,java.lang.String,java.lang.String,java.lang.String,com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkPackageType,java.lang.String,java.lang.String,J,J,java.lang.String,java.lang.String,java.lang.String,java.lang.String,java.util.List,kotlin.jvm.functions.Function1,I,kotlin.jvm.internal.DefaultConstructorMarker):V
-- f:component1():com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkProduct
-- f:component10():com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkPackageType
-- f:component11():java.lang.String
-- f:component12():java.lang.String
-- f:component13():J
-- f:component14():J
-- f:component15():java.lang.String
-- f:component16():java.lang.String
-- f:component17():java.lang.String
-- f:component18():java.lang.String
-- f:component19():java.util.List
-- f:component2():Z
-- f:component3():Z
-- f:component4():I
-- f:component5():java.lang.String
-- f:component6():java.lang.String
-- f:component7():java.lang.String
-- f:component8():java.lang.String
-- f:component9():java.lang.String
-- f:copy(com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkProduct,Z,Z,I,java.lang.String,java.lang.String,java.lang.String,java.lang.String,java.lang.String,com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkPackageType,java.lang.String,java.lang.String,J,J,java.lang.String,java.lang.String,java.lang.String,java.lang.String,java.util.List,kotlin.jvm.functions.Function1):com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkItem
-- bs:copy$default(com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkItem,com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkProduct,Z,Z,I,java.lang.String,java.lang.String,java.lang.String,java.lang.String,java.lang.String,com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkPackageType,java.lang.String,java.lang.String,J,J,java.lang.String,java.lang.String,java.lang.String,java.lang.String,java.util.List,kotlin.jvm.functions.Function1,I,java.lang.Object):com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkItem
-- equals(java.lang.Object):Z
-- f:getArch():java.lang.String
-- f:getArchiveFileName():java.lang.String
-- f:getArchiveSize():J
-- f:getArchiveSizeInMB():java.lang.String
-- f:getDownloadSizePresentationText():java.lang.String
-- f:getFullPresentationText():java.lang.String
-- f:getFullPresentationWithVendorText():java.lang.String
-- f:getInstallFolderName():java.lang.String
-- f:getJdkMajorVersion():I
-- f:getJdkVendorVersion():java.lang.String
-- f:getJdkVersion():java.lang.String
-- f:getOs():java.lang.String
-- f:getPackageRootPrefix():java.lang.String
-- f:getPackageToBinJavaPrefix():java.lang.String
-- f:getPackageType():com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkPackageType
-- f:getPresentableArchIfNeeded():java.lang.String
-- f:getPresentableMajorVersionString():java.lang.String
-- f:getPresentableVersionString():java.lang.String
-- f:getProduct():com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkProduct
-- f:getSha256():java.lang.String
-- f:getSharedIndexAliases():java.util.List
-- f:getSuggestedSdkName():java.lang.String
-- f:getUnpackedSize():J
-- f:getUrl():java.lang.String
-- f:getVersionPresentationText():java.lang.String
-- f:getVersionString():java.lang.String
-- hashCode():I
-- f:isDefaultItem():Z
-- f:isVisibleOnUI():Z
-- f:matchesVendor(java.lang.String):Z
-- f:resolveJavaHome(java.nio.file.Path):java.nio.file.Path
-- f:writeMarkerFile(java.nio.file.Path):V
 f:com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkListDownloader
-- com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkListDownloaderBase
 - sf:Companion:com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkListDownloader$Companion
 - <init>():V
 - sf:getInstance():com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkListDownloader
 f:com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkListDownloader$Companion
 - f:getInstance():com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkListDownloader
-a:com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkListDownloaderBase
-- <init>():V
-- f:downloadForUI(com.intellij.openapi.progress.ProgressIndicator,java.lang.String):java.util.List
-- f:downloadForUI(com.intellij.openapi.progress.ProgressIndicator,java.lang.String,com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkPredicate):java.util.List
-- bs:downloadForUI$default(com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkListDownloaderBase,com.intellij.openapi.progress.ProgressIndicator,java.lang.String,I,java.lang.Object):java.util.List
-- bs:downloadForUI$default(com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkListDownloaderBase,com.intellij.openapi.progress.ProgressIndicator,java.lang.String,com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkPredicate,I,java.lang.Object):java.util.List
-- f:downloadModelForJdkInstaller(com.intellij.openapi.progress.ProgressIndicator):java.util.List
-- f:downloadModelForJdkInstaller(com.intellij.openapi.progress.ProgressIndicator,com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkPredicate):java.util.List
-- pa:getFeedUrl():java.lang.String
-f:com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkListParser
-- sf:INSTANCE:com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkListParser
-- f:parseJdkItem(com.fasterxml.jackson.databind.node.ObjectNode,com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkPredicate):java.util.List
-- f:parseJdkList(com.fasterxml.jackson.databind.node.ObjectNode,com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkPredicate):java.util.List
-- f:readTree(B[]):com.fasterxml.jackson.databind.node.ObjectNode
 e:com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkPackageType
 - java.lang.Enum
 - sf:Companion:com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkPackageType$Companion
@@ -21302,254 +21005,29 @@ e:com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkPackageType
 - s:values():com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkPackageType[]
 f:com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkPackageType$Companion
 - f:findType(java.lang.String):com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkPackageType
-f:com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkPlatform
-- <init>(java.lang.String,java.lang.String):V
-- f:component1():java.lang.String
-- f:component2():java.lang.String
-- f:copy(java.lang.String,java.lang.String):com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkPlatform
-- bs:copy$default(com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkPlatform,java.lang.String,java.lang.String,I,java.lang.Object):com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkPlatform
-- equals(java.lang.Object):Z
-- f:getArch():java.lang.String
-- f:getOs():java.lang.String
-- hashCode():I
-f:com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkPredicate
-- sf:Companion:com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkPredicate$Companion
-- <init>(com.intellij.openapi.util.BuildNumber,java.util.Set):V
-- f:copy(com.intellij.openapi.util.BuildNumber,java.util.Set):com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkPredicate
-- bs:copy$default(com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkPredicate,com.intellij.openapi.util.BuildNumber,java.util.Set,I,java.lang.Object):com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkPredicate
-- equals(java.lang.Object):Z
-- hashCode():I
-- f:testJdkPackage(com.fasterxml.jackson.databind.node.ObjectNode):Z
-- f:testJdkProduct(com.fasterxml.jackson.databind.node.ObjectNode):Z
-- f:testPredicate(com.fasterxml.jackson.databind.JsonNode):java.lang.Boolean
-f:com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkPredicate$Companion
-- f:default():com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkPredicate
-- f:forCurrentProcess():com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkPredicate
-- f:forWSL(com.intellij.openapi.util.BuildNumber):com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkPredicate
-- bs:forWSL$default(com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkPredicate$Companion,com.intellij.openapi.util.BuildNumber,I,java.lang.Object):com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkPredicate
-- f:getCurrentArch():java.lang.String
-- f:getCurrentOS():java.lang.String
-- f:none():com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkPredicate
-f:com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkProduct
-- <init>(java.lang.String,java.lang.String,java.lang.String):V
-- f:component1():java.lang.String
-- f:component2():java.lang.String
-- f:component3():java.lang.String
-- f:copy(java.lang.String,java.lang.String,java.lang.String):com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkProduct
-- bs:copy$default(com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkProduct,java.lang.String,java.lang.String,java.lang.String,I,java.lang.Object):com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkProduct
-- equals(java.lang.Object):Z
-- f:getFlavour():java.lang.String
-- f:getPackagePresentationText():java.lang.String
-- f:getProduct():java.lang.String
-- f:getVendor():java.lang.String
-- hashCode():I
-com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkRequirement
-- a:matches(com.intellij.openapi.projectRoots.Sdk):Z
-- a:matches(com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkItem):Z
-- a:matches(com.intellij.openapi.roots.ui.configuration.UnknownSdkLocalSdkFix):Z
-f:com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkRequirements
-- sf:INSTANCE:com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkRequirements
-- f:parseRequirement(java.lang.String):com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkRequirement
-- f:parseRequirement(java.lang.String,java.util.function.Predicate,java.util.function.Predicate):com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkRequirement
 com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkUpdateCheckContributor
 - a:contributeJdks(com.intellij.openapi.project.Project):java.util.List
-f:com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkUpdateNotification
-- <init>(com.intellij.openapi.projectRoots.Sdk,com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkItem,com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkItem,kotlin.jvm.functions.Function1,Z):V
-- b:<init>(com.intellij.openapi.projectRoots.Sdk,com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkItem,com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkItem,kotlin.jvm.functions.Function1,Z,I,kotlin.jvm.internal.DefaultConstructorMarker):V
-- f:getJdk():com.intellij.openapi.projectRoots.Sdk
-- f:getNewItem():com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkItem
-- f:getOldItem():com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkItem
-- f:getPersistentId():java.lang.String
-- f:getUpdateAction():com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkUpdateNotification$JdkUpdateSuggestionAction
-- f:isTerminated():Z
-- f:isUpdateActionVisible():Z
-- f:reachTerminalState():V
-- f:tryReplaceWithNewerNotification(com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkUpdateNotification):Z
-- bs:tryReplaceWithNewerNotification$default(com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkUpdateNotification,com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkUpdateNotification,I,java.lang.Object):Z
-f:com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkUpdateNotification$InstallUpdateNotification
-- com.intellij.notification.NotificationAction
-- <init>(com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkUpdateNotification):V
-- actionPerformed(com.intellij.openapi.actionSystem.AnActionEvent,com.intellij.notification.Notification):V
-f:com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkUpdateNotification$JdkUpdateSuggestionAction
-- com.intellij.ide.actions.SettingsEntryPointAction$UpdateAction
-- <init>(com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkUpdateNotification):V
-- actionPerformed(com.intellij.openapi.actionSystem.AnActionEvent):V
-- getActionUpdateThread():com.intellij.openapi.actionSystem.ActionUpdateThread
-- f:getJdkUpdateNotification():com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkUpdateNotification
-- update(com.intellij.openapi.actionSystem.AnActionEvent):V
-f:com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkVersionItem
-- <init>(java.lang.String,com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkVersionVendorItem,java.util.List,java.util.List):V
-- f:getExcludedItems():java.util.List
-- f:getIncludedItems():java.util.List
-- f:getJdkVersion():java.lang.String
-- f:getModel():javax.swing.ComboBoxModel
-f:com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkVersionVendorItem
-- <init>(com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkItem):V
-- f:getCanBeSelected():Z
-- f:getItem():com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkItem
-- f:getParent():com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkVersionItem
-- f:getSelectItem():com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkVersionVendorItem
-- f:setParent(com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkVersionItem):V
 f:com.intellij.openapi.projectRoots.impl.jdkDownloader.RuntimeChooserAction
 - com.intellij.openapi.project.DumbAwareAction
 - <init>():V
 - actionPerformed(com.intellij.openapi.actionSystem.AnActionEvent):V
 - getActionUpdateThread():com.intellij.openapi.actionSystem.ActionUpdateThread
-f:com.intellij.openapi.projectRoots.impl.jdkDownloader.RuntimeChooserAddCustomItem
-- com.intellij.openapi.projectRoots.impl.jdkDownloader.RuntimeChooserItem
-- sf:INSTANCE:com.intellij.openapi.projectRoots.impl.jdkDownloader.RuntimeChooserAddCustomItem
-f:com.intellij.openapi.projectRoots.impl.jdkDownloader.RuntimeChooserCurrentItem
-- com.intellij.openapi.projectRoots.impl.jdkDownloader.RuntimeChooserItem
-- com.intellij.openapi.projectRoots.impl.jdkDownloader.RuntimeChooserItemWithFixedLocation
-- sf:Companion:com.intellij.openapi.projectRoots.impl.jdkDownloader.RuntimeChooserCurrentItem$Companion
-- <init>(Z,java.lang.String,java.lang.String,java.lang.String):V
-- f:component1():Z
-- f:component2():java.lang.String
-- f:component3():java.lang.String
-- f:component4():java.lang.String
-- f:copy(Z,java.lang.String,java.lang.String,java.lang.String):com.intellij.openapi.projectRoots.impl.jdkDownloader.RuntimeChooserCurrentItem
-- bs:copy$default(com.intellij.openapi.projectRoots.impl.jdkDownloader.RuntimeChooserCurrentItem,Z,java.lang.String,java.lang.String,java.lang.String,I,java.lang.Object):com.intellij.openapi.projectRoots.impl.jdkDownloader.RuntimeChooserCurrentItem
-- equals(java.lang.Object):Z
-- getDisplayName():java.lang.String
-- getHomeDir():java.lang.String
-- getVersion():java.lang.String
-- hashCode():I
-- f:isBundled():Z
-f:com.intellij.openapi.projectRoots.impl.jdkDownloader.RuntimeChooserCurrentItem$Companion
-f:com.intellij.openapi.projectRoots.impl.jdkDownloader.RuntimeChooserCurrentKt
-- sf:currentRuntime(com.intellij.openapi.projectRoots.impl.jdkDownloader.RuntimeChooserCurrentItem$Companion):com.intellij.openapi.projectRoots.impl.jdkDownloader.RuntimeChooserCurrentItem
-- sf:fetchCurrentRuntime(com.intellij.openapi.projectRoots.impl.jdkDownloader.RuntimeChooserModel):V
-f:com.intellij.openapi.projectRoots.impl.jdkDownloader.RuntimeChooserCustom
-- sf:INSTANCE:com.intellij.openapi.projectRoots.impl.jdkDownloader.RuntimeChooserCustom
-- f:createSdkChooserPopup(javax.swing.JComponent,com.intellij.openapi.projectRoots.impl.jdkDownloader.RuntimeChooserModel):com.intellij.openapi.roots.ui.configuration.SdkPopup
-- f:getJdkDownloaderExtensionProvider():com.intellij.openapi.actionSystem.DataProvider
-- f:getSdkType():com.intellij.openapi.projectRoots.SdkType
-- f:importDetectedItem(java.lang.String,com.intellij.openapi.projectRoots.impl.jdkDownloader.RuntimeChooserModel,Z):V
-- bs:importDetectedItem$default(com.intellij.openapi.projectRoots.impl.jdkDownloader.RuntimeChooserCustom,java.lang.String,com.intellij.openapi.projectRoots.impl.jdkDownloader.RuntimeChooserModel,Z,I,java.lang.Object):V
-- f:isActionAvailable():Z
-f:com.intellij.openapi.projectRoots.impl.jdkDownloader.RuntimeChooserCustomItem
-- com.intellij.openapi.projectRoots.impl.jdkDownloader.RuntimeChooserItem
-- com.intellij.openapi.projectRoots.impl.jdkDownloader.RuntimeChooserItemWithFixedLocation
-- <init>(java.lang.String,java.lang.String,java.lang.String):V
-- f:component1():java.lang.String
-- f:component2():java.lang.String
-- f:component3():java.lang.String
-- f:copy(java.lang.String,java.lang.String,java.lang.String):com.intellij.openapi.projectRoots.impl.jdkDownloader.RuntimeChooserCustomItem
-- bs:copy$default(com.intellij.openapi.projectRoots.impl.jdkDownloader.RuntimeChooserCustomItem,java.lang.String,java.lang.String,java.lang.String,I,java.lang.Object):com.intellij.openapi.projectRoots.impl.jdkDownloader.RuntimeChooserCustomItem
-- equals(java.lang.Object):Z
-- getDisplayName():java.lang.String
-- getHomeDir():java.lang.String
-- getVersion():java.lang.String
-- hashCode():I
-f:com.intellij.openapi.projectRoots.impl.jdkDownloader.RuntimeChooserDialog
-- com.intellij.openapi.ui.DialogWrapper
-- com.intellij.openapi.actionSystem.DataProvider
-- <init>(com.intellij.openapi.project.Project,com.intellij.openapi.projectRoots.impl.jdkDownloader.RuntimeChooserModel):V
-- getData(java.lang.String):java.lang.Object
-- f:showDialogAndGetResult():com.intellij.openapi.projectRoots.impl.jdkDownloader.RuntimeChooserDialogResult
-a:com.intellij.openapi.projectRoots.impl.jdkDownloader.RuntimeChooserDialogResult
-f:com.intellij.openapi.projectRoots.impl.jdkDownloader.RuntimeChooserDialogResult$Cancel
-- com.intellij.openapi.projectRoots.impl.jdkDownloader.RuntimeChooserDialogResult
-- sf:INSTANCE:com.intellij.openapi.projectRoots.impl.jdkDownloader.RuntimeChooserDialogResult$Cancel
-f:com.intellij.openapi.projectRoots.impl.jdkDownloader.RuntimeChooserDialogResult$DownloadAndUse
-- com.intellij.openapi.projectRoots.impl.jdkDownloader.RuntimeChooserDialogResult
-- <init>(com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkItem,java.nio.file.Path):V
-- f:component1():com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkItem
-- f:component2():java.nio.file.Path
-- f:copy(com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkItem,java.nio.file.Path):com.intellij.openapi.projectRoots.impl.jdkDownloader.RuntimeChooserDialogResult$DownloadAndUse
-- bs:copy$default(com.intellij.openapi.projectRoots.impl.jdkDownloader.RuntimeChooserDialogResult$DownloadAndUse,com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkItem,java.nio.file.Path,I,java.lang.Object):com.intellij.openapi.projectRoots.impl.jdkDownloader.RuntimeChooserDialogResult$DownloadAndUse
-- equals(java.lang.Object):Z
-- f:getItem():com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkItem
-- f:getPath():java.nio.file.Path
-- hashCode():I
-f:com.intellij.openapi.projectRoots.impl.jdkDownloader.RuntimeChooserDialogResult$UseCustomJdk
-- com.intellij.openapi.projectRoots.impl.jdkDownloader.RuntimeChooserDialogResult
-- <init>(java.lang.String,java.nio.file.Path):V
-- f:component1():java.lang.String
-- f:component2():java.nio.file.Path
-- f:copy(java.lang.String,java.nio.file.Path):com.intellij.openapi.projectRoots.impl.jdkDownloader.RuntimeChooserDialogResult$UseCustomJdk
-- bs:copy$default(com.intellij.openapi.projectRoots.impl.jdkDownloader.RuntimeChooserDialogResult$UseCustomJdk,java.lang.String,java.nio.file.Path,I,java.lang.Object):com.intellij.openapi.projectRoots.impl.jdkDownloader.RuntimeChooserDialogResult$UseCustomJdk
-- equals(java.lang.Object):Z
-- f:getName():java.lang.String
-- f:getPath():java.nio.file.Path
-- hashCode():I
-f:com.intellij.openapi.projectRoots.impl.jdkDownloader.RuntimeChooserDialogResult$UseDefault
-- com.intellij.openapi.projectRoots.impl.jdkDownloader.RuntimeChooserDialogResult
-- sf:INSTANCE:com.intellij.openapi.projectRoots.impl.jdkDownloader.RuntimeChooserDialogResult$UseDefault
-f:com.intellij.openapi.projectRoots.impl.jdkDownloader.RuntimeChooserDownloadableItem
-- com.intellij.openapi.projectRoots.impl.jdkDownloader.RuntimeChooserItem
-- <init>(com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkItem):V
-- f:component1():com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkItem
-- f:copy(com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkItem):com.intellij.openapi.projectRoots.impl.jdkDownloader.RuntimeChooserDownloadableItem
-- bs:copy$default(com.intellij.openapi.projectRoots.impl.jdkDownloader.RuntimeChooserDownloadableItem,com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkItem,I,java.lang.Object):com.intellij.openapi.projectRoots.impl.jdkDownloader.RuntimeChooserDownloadableItem
-- equals(java.lang.Object):Z
-- f:getItem():com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkItem
-- hashCode():I
-f:com.intellij.openapi.projectRoots.impl.jdkDownloader.RuntimeChooserDownloader
-- <init>():V
-- f:downloadAndUse(com.intellij.openapi.progress.ProgressIndicator,com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkItem,java.nio.file.Path):java.nio.file.Path
-a:com.intellij.openapi.projectRoots.impl.jdkDownloader.RuntimeChooserItem
-- <init>():V
 com.intellij.openapi.projectRoots.impl.jdkDownloader.RuntimeChooserItemWithFixedLocation
 - a:getDisplayName():java.lang.String
 - a:getHomeDir():java.lang.String
 - a:getVersion():java.lang.String
-f:com.intellij.openapi.projectRoots.impl.jdkDownloader.RuntimeChooserJbrInstaller
-- com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkInstallerBase
-- <init>():V
-- defaultInstallDir():java.nio.file.Path
-f:com.intellij.openapi.projectRoots.impl.jdkDownloader.RuntimeChooserJbrKt
-- sf:fetchAvailableJbrs(com.intellij.openapi.projectRoots.impl.jdkDownloader.RuntimeChooserModel):V
-f:com.intellij.openapi.projectRoots.impl.jdkDownloader.RuntimeChooserJreValidator
-- sf:INSTANCE:com.intellij.openapi.projectRoots.impl.jdkDownloader.RuntimeChooserJreValidator
-- f:isSupportedSdkItem(com.intellij.openapi.projectRoots.Sdk):Z
-- f:isSupportedSdkItem(com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkItem):Z
-- f:isSupportedSdkItem(com.intellij.openapi.roots.ui.configuration.SdkPopupBuilder$SuggestedSdk):Z
-- f:testNewJdkUnderProgress(Z,kotlin.jvm.functions.Function0,com.intellij.openapi.projectRoots.impl.jdkDownloader.RuntimeChooserJreValidatorCallback,Z):java.lang.Object
-- bs:testNewJdkUnderProgress$default(com.intellij.openapi.projectRoots.impl.jdkDownloader.RuntimeChooserJreValidator,Z,kotlin.jvm.functions.Function0,com.intellij.openapi.projectRoots.impl.jdkDownloader.RuntimeChooserJreValidatorCallback,Z,I,java.lang.Object):java.lang.Object
-com.intellij.openapi.projectRoots.impl.jdkDownloader.RuntimeChooserJreValidatorCallback
-- a:onError(java.lang.String):java.lang.Object
-- a:onSdkResolved(java.lang.String,java.lang.String,java.nio.file.Path):java.lang.Object
 f:com.intellij.openapi.projectRoots.impl.jdkDownloader.RuntimeChooserMessages
 - sf:INSTANCE:com.intellij.openapi.projectRoots.impl.jdkDownloader.RuntimeChooserMessages
 - f:showErrorMessage(java.lang.String,javax.swing.JComponent):V
 - bs:showErrorMessage$default(com.intellij.openapi.projectRoots.impl.jdkDownloader.RuntimeChooserMessages,java.lang.String,javax.swing.JComponent,I,java.lang.Object):V
 - f:showRestartMessage(java.lang.String):V
-f:com.intellij.openapi.projectRoots.impl.jdkDownloader.RuntimeChooserModel
-- <init>():V
-- f:addExistingSdkItem(com.intellij.openapi.projectRoots.impl.jdkDownloader.RuntimeChooserCustomItem):V
-- f:getAdvancedDownloadItems():java.util.List
-- f:getCurrentRuntime():com.intellij.openapi.observable.properties.GraphProperty
-- f:getCustomJdks():java.util.List
-- f:getDefaultInstallPathFor(com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkItem):java.lang.String
-- f:getDownloadableJbs():java.util.List
-- f:getInstallPathFromText(com.intellij.openapi.projectRoots.impl.jdkDownloader.JdkItem,java.lang.String):java.nio.file.Path
-- f:getMainComboBoxModel():javax.swing.ComboBoxModel
-- f:setDownloadableJbs(java.util.List):V
-- f:updateCurrentRuntime(com.intellij.openapi.projectRoots.impl.jdkDownloader.RuntimeChooserCurrentItem):V
-- f:updateDownloadJbrList(java.util.List):V
 f:com.intellij.openapi.projectRoots.impl.jdkDownloader.RuntimeChooserPaths
 - <init>():V
 - f:installCustomJdk(java.lang.String,kotlin.jvm.functions.Function1):V
 - f:resetCustomJdk():V
-a:com.intellij.openapi.projectRoots.impl.jdkDownloader.RuntimeChooserPresenter
-- com.intellij.ui.GroupedComboBoxRenderer
-- sf:Companion:com.intellij.openapi.projectRoots.impl.jdkDownloader.RuntimeChooserPresenter$Companion
-- <init>():V
-- customize(com.intellij.ui.SimpleColoredComponent,com.intellij.openapi.projectRoots.impl.jdkDownloader.RuntimeChooserItem,I,Z,Z):V
-f:com.intellij.openapi.projectRoots.impl.jdkDownloader.RuntimeChooserPresenter$Companion
-- f:presentJbrItem(com.intellij.ui.SimpleColoredComponent,com.intellij.openapi.projectRoots.impl.jdkDownloader.RuntimeChooserDownloadableItem):V
-- f:presetCurrentRuntime(com.intellij.ui.SimpleColoredComponent,com.intellij.openapi.projectRoots.impl.jdkDownloader.RuntimeChooserCurrentItem):V
-- f:presetRuntime(com.intellij.ui.SimpleColoredComponent,com.intellij.openapi.projectRoots.impl.jdkDownloader.RuntimeChooserItemWithFixedLocation):V
-f:com.intellij.openapi.projectRoots.impl.jdkDownloader.RuntimeChooserSelectRuntimeItem
-- com.intellij.openapi.projectRoots.impl.jdkDownloader.RuntimeChooserItem
-- sf:INSTANCE:com.intellij.openapi.projectRoots.impl.jdkDownloader.RuntimeChooserSelectRuntimeItem
 f:com.intellij.openapi.projectRoots.impl.jdkDownloader.RuntimeChooserUtil
 - sf:INSTANCE:com.intellij.openapi.projectRoots.impl.jdkDownloader.RuntimeChooserUtil
 - f:showRuntimeChooserPopup():V
-com.intellij.openapi.projectRoots.impl.jdkDownloader.WSLDistributionForJdkInstaller
-- a:executeOnWsl(java.util.List,java.lang.String,I):com.intellij.execution.process.ProcessOutput
-- a:getWslPath(java.nio.file.Path):java.lang.String
 f:com.intellij.openapi.projectRoots.ui.Util
 - <init>():V
 - s:showSpecifyJavadocUrlDialog(javax.swing.JComponent):com.intellij.openapi.vfs.VirtualFile
@@ -28130,7 +27608,7 @@ f:com.intellij.usageView.impl.UsageContextCallHierarchyPanel
 - com.intellij.usages.impl.UsageContextPanelBase
 - <init>(com.intellij.usages.UsageViewPresentation):V
 - dispose():V
-- updateLayoutLater(com.intellij.openapi.project.Project,java.util.List):V
+- updateLayoutLater(java.util.List):V
 f:com.intellij.usageView.impl.UsageContextCallHierarchyPanel$Provider
 - com.intellij.usages.UsageContextPanel$Provider
 - <init>():V
@@ -28179,16 +27657,6 @@ a:com.intellij.util.TextFieldCompletionProviderDumbAware
 *f:com.intellij.util.gist.GistAstMarker
 - <init>(com.intellij.openapi.fileTypes.FileType,java.lang.String,kotlin.jvm.functions.Function1):V
 - f:accepts(com.intellij.openapi.project.Project,com.intellij.openapi.vfs.VirtualFile):Z
-f:com.intellij.util.gist.GistManagerImpl
-- com.intellij.util.gist.GistManager
-- <init>():V
-- clearQueueInTests():V
-- invalidateData():V
-- invalidateData(com.intellij.openapi.vfs.VirtualFile):V
-- newPsiFileGist(java.lang.String,I,com.intellij.util.io.DataExternalizer,com.intellij.util.NullableFunction):com.intellij.util.gist.PsiFileGist
-- newVirtualFileGist(java.lang.String,I,com.intellij.util.io.DataExternalizer,com.intellij.util.gist.VirtualFileGist$GistCalculator):com.intellij.util.gist.VirtualFileGist
-- resetReindexCount():V
-- runWithMergingDependentCacheInvalidations(java.lang.Runnable):V
 *f:com.intellij.util.gist.GistModificationTracker
 - com.intellij.openapi.util.ModificationTracker
 - <init>(com.intellij.openapi.vfs.VirtualFile):V

@@ -1681,7 +1681,6 @@ f:com.intellij.concurrency.AsyncFutureResultImpl
 - set(java.lang.Object):V
 - setException(java.lang.Throwable):V
 f:com.intellij.concurrency.JobLauncherImpl
-- <init>():V
 - invokeConcurrentlyUnderProgress(java.util.List,com.intellij.openapi.progress.ProgressIndicator,Z,Z,com.intellij.util.Processor):Z
 - submitToJobThread(java.lang.Runnable,java.util.function.Consumer):com.intellij.concurrency.Job
 com.intellij.configurationStore.BatchUpdateListener
@@ -3786,7 +3785,6 @@ f:com.intellij.ide.IdeEventQueue
 - f:addPostprocessor(com.intellij.ide.IdeEventQueue$EventDispatcher,com.intellij.openapi.Disposable):V
 - f:addPostprocessor(com.intellij.ide.IdeEventQueue$EventDispatcher,kotlinx.coroutines.CoroutineScope):V
 - f:addPreprocessor(com.intellij.ide.IdeEventQueue$EventDispatcher,com.intellij.openapi.Disposable):V
-- sf:applicationClose():V
 - f:blockNextEvents(java.awt.event.MouseEvent):V
 - f:blockNextEvents(java.awt.event.MouseEvent,com.intellij.ide.IdeEventQueue$BlockMode):V
 - bs:blockNextEvents$default(com.intellij.ide.IdeEventQueue,java.awt.event.MouseEvent,com.intellij.ide.IdeEventQueue$BlockMode,I,java.lang.Object):V
@@ -3826,7 +3824,6 @@ e:com.intellij.ide.IdeEventQueue$BlockMode
 - s:valueOf(java.lang.String):com.intellij.ide.IdeEventQueue$BlockMode
 - s:values():com.intellij.ide.IdeEventQueue$BlockMode[]
 f:com.intellij.ide.IdeEventQueue$Companion
-- f:applicationClose():V
 - f:getInstance():com.intellij.ide.IdeEventQueue
 com.intellij.ide.IdeEventQueue$EventDispatcher
 - a:dispatch(java.awt.AWTEvent):Z
@@ -4616,7 +4613,7 @@ f:com.intellij.ide.actions.HelpTopicsAction
 - <init>():V
 - actionPerformed(com.intellij.openapi.actionSystem.AnActionEvent):V
 - getActionUpdateThread():com.intellij.openapi.actionSystem.ActionUpdateThread
-- isAvailable():Z
+- update(com.intellij.openapi.actionSystem.AnActionEvent):V
 f:com.intellij.ide.actions.ImportSettingsFilenameFilter
 - java.io.Serializable
 - java.util.function.Predicate
@@ -4634,7 +4631,7 @@ f:com.intellij.ide.actions.JetBrainsTvAction
 - <init>():V
 - actionPerformed(com.intellij.openapi.actionSystem.AnActionEvent):V
 - getActionUpdateThread():com.intellij.openapi.actionSystem.ActionUpdateThread
-- isAvailable():Z
+- update(com.intellij.openapi.actionSystem.AnActionEvent):V
 c:com.intellij.ide.actions.JumpToLastEditAction
 - com.intellij.openapi.actionSystem.AnAction
 - com.intellij.openapi.project.DumbAware
@@ -4728,7 +4725,7 @@ f:com.intellij.ide.actions.OnlineDocAction
 - <init>():V
 - actionPerformed(com.intellij.openapi.actionSystem.AnActionEvent):V
 - getActionUpdateThread():com.intellij.openapi.actionSystem.ActionUpdateThread
-- isAvailable():Z
+- update(com.intellij.openapi.actionSystem.AnActionEvent):V
 c:com.intellij.ide.actions.OpenFileAction
 - com.intellij.ide.lightEdit.LightEditCompatible
 - com.intellij.openapi.actionSystem.AnAction
@@ -8379,7 +8376,7 @@ a:com.intellij.ide.plugins.newui.PluginsGroupComponentWithProgress
 - stopLoading():V
 a:com.intellij.ide.plugins.newui.PluginsTab
 - f:mySearchListener:com.intellij.ui.components.labels.LinkListener
-- p:mySearchTextField:com.intellij.ide.plugins.newui.PluginSearchTextField
+- p:searchTextField:com.intellij.ide.plugins.newui.PluginSearchTextField
 - <init>():V
 - clearSearchPanel(java.lang.String):V
 - pa:createDetailsPanel(com.intellij.ui.components.labels.LinkListener):com.intellij.ide.plugins.newui.PluginDetailsPageComponent
@@ -12753,9 +12750,6 @@ f:com.intellij.openapi.editor.actions.ResetFontSizeGlobalAction
 - sf:PREVIOUS_COLOR_SCHEME:java.lang.String
 - <init>():V
 - update(com.intellij.openapi.actionSystem.AnActionEvent):V
-f:com.intellij.openapi.editor.actions.ReverseLinesAction
-- com.intellij.openapi.editor.actionSystem.EditorAction
-- <init>():V
 f:com.intellij.openapi.editor.actions.ScrollDownAction
 - com.intellij.openapi.editor.actions.InactiveEditorAction
 - <init>():V
@@ -12816,9 +12810,6 @@ f:com.intellij.openapi.editor.actions.SimplePasteAction
 - com.intellij.openapi.editor.actionSystem.EditorAction
 - <init>():V
 - update(com.intellij.openapi.actionSystem.AnActionEvent):V
-f:com.intellij.openapi.editor.actions.SortLinesAction
-- com.intellij.openapi.editor.actionSystem.EditorAction
-- <init>():V
 f:com.intellij.openapi.editor.actions.SplitLineAction
 - com.intellij.openapi.editor.actionSystem.EditorAction
 - s:SPLIT_LINE_KEY:com.intellij.openapi.util.Key
@@ -19841,6 +19832,7 @@ a:com.intellij.openapi.wm.impl.AbstractToolbarCombo
 - f:setText(java.lang.String):V
 - f:setTextCutStrategy(com.intellij.openapi.wm.impl.TextCutStrategy):V
 - f:setTransparentHoverBackground(java.awt.Color):V
+- updateFromPresentation(com.intellij.openapi.actionSystem.Presentation):V
 - updateUI():V
 f:com.intellij.openapi.wm.impl.AltStateManager
 - java.awt.event.AWTEventListener
@@ -25582,7 +25574,6 @@ f:com.intellij.ui.colorpicker.ColorValuePanel
 - f:getColorField3():com.intellij.ui.colorpicker.ColorValueField
 - f:getColorFormatButtonPanel():com.intellij.ui.colorpicker.ButtonPanel
 - f:getHexField():com.intellij.ui.colorpicker.ColorValueField
-- f:getUpdateAlarm():com.intellij.util.Alarm
 - insertUpdate(javax.swing.event.DocumentEvent):V
 - removeUpdate(javax.swing.event.DocumentEvent):V
 - requestFocusInWindow():Z

@@ -5,8 +5,10 @@ import com.intellij.java.compiler.charts.CompilationChartsViewModel
 import com.intellij.java.compiler.charts.CompilationChartsViewModel.CpuMemoryStatisticsType
 import com.intellij.java.compiler.charts.CompilationChartsViewModel.CpuMemoryStatisticsType.CPU
 import com.intellij.java.compiler.charts.CompilationChartsViewModel.CpuMemoryStatisticsType.MEMORY
+import com.intellij.openapi.diagnostic.Logger
 import com.intellij.ui.components.JBPanelWithEmptyText
 import com.intellij.ui.table.JBTable
+import com.intellij.util.concurrency.AppExecutorUtil
 import com.intellij.util.ui.UIUtil
 import java.awt.BorderLayout
 import java.awt.Dimension
@@ -14,16 +16,21 @@ import java.awt.Graphics
 import java.awt.Graphics2D
 import java.awt.image.BufferedImage
 import java.util.concurrent.ConcurrentSkipListSet
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 import javax.swing.JButton
 import javax.swing.JViewport
 import javax.swing.SwingUtilities
 import kotlin.math.exp
 
-class CompilationChartsDiagramsComponent(private val vm: CompilationChartsViewModel,
-                                         private val zoom: Zoom,
-                                         private val viewport: JViewport) : JBPanelWithEmptyText(BorderLayout()) {
+class CompilationChartsDiagramsComponent(
+  private val vm: CompilationChartsViewModel,
+  private val zoom: Zoom,
+  private val viewport: JViewport,
+) : JBPanelWithEmptyText(BorderLayout()) {
   companion object {
     val ROW_HEIGHT = JBTable().rowHeight * 1.5
+    val LOG = Logger.getInstance(CompilationChartsDiagramsComponent::class.java)
   }
 
   val modules: CompilationChartsViewModel.ViewModules = CompilationChartsViewModel.ViewModules()
@@ -36,6 +43,9 @@ class CompilationChartsDiagramsComponent(private val vm: CompilationChartsViewMo
   private val mouseAdapter: CompilationChartsMouseAdapter
   private var image: BufferedImage? = null
   private val charts: Charts
+
+  private val isRepaintScheduled = AtomicBoolean(false)
+
   private val focusableEmptyButton = JButton().apply {
     preferredSize = Dimension(0, 0)
     isFocusable = true
@@ -65,7 +75,7 @@ class CompilationChartsDiagramsComponent(private val vm: CompilationChartsViewMo
     addMouseWheelListener { e ->
       if (e.isControlDown) {
         zoom.adjustUser(viewport, e.x, exp(e.preciseWheelRotation * -0.05))
-        updateView()
+        forceRepaint()
       }
       else {
         e.component.parent.dispatchEvent(e)
@@ -110,12 +120,25 @@ class CompilationChartsDiagramsComponent(private val vm: CompilationChartsViewMo
         mouse = mouseAdapter
       }
     }
+
+    AppExecutorUtil.createBoundedScheduledExecutorService("Compilation charts component", 1).scheduleWithFixedDelay(
+      {
+        if (isRepaintScheduled.compareAndSet(true, false)) {
+          forceRepaint()
+        }
+      }, 0, 1, TimeUnit.SECONDS)
+  }
+
+  private fun forceRepaint() {
+    shouldRepaint = true
+    revalidate()
+    repaint()
   }
 
   override fun paintComponent(g2d: Graphics) {
     if (g2d !is Graphics2D) return
-    cached(g2d) {
-      return@cached charts.model {
+    tryCacheImage(g2d) { saveToImage ->
+      return@tryCacheImage charts.model {
         progress {
           data(modules.data.getAndClean())
           filter = modules.filter
@@ -132,26 +155,35 @@ class CompilationChartsDiagramsComponent(private val vm: CompilationChartsViewMo
           this@CompilationChartsDiagramsComponent.preferredSize = size
           this@CompilationChartsDiagramsComponent.revalidate()
         }
-        return@draw UIUtil.createImage(this@CompilationChartsDiagramsComponent, width().toInt(), height().toInt(), BufferedImage.TYPE_INT_ARGB)
+        if (saveToImage) {
+          UIUtil.createImage(this@CompilationChartsDiagramsComponent, width().toInt(), height().toInt(), BufferedImage.TYPE_INT_ARGB)
+        }
+        else {
+          g2d.setupRenderingHints()
+          null
+        }
       }
     }
   }
 
-  private fun cached(g2d: Graphics2D, init: () -> BufferedImage) {
-    if (!shouldRepaint) {
-      image?.let { img -> g2d.drawImage(img, this) }
-      return
-    }
+  private fun tryCacheImage(g2d: Graphics2D, draw: (saveToImage: Boolean) -> BufferedImage?) {
+    if (zoom.shouldCacheImage()) {
+      if (!shouldRepaint) {
+        image?.let { img -> g2d.drawImage(img, this) }
+        return
+      }
 
-    shouldRepaint = false
-    image?.flush()
-    image = init()
+      shouldRepaint = false
+      image?.flush()
+      image = draw(true)
+    }
+    else {
+      draw(false)
+    }
   }
 
   internal fun updateView() {
-    shouldRepaint = true
-    revalidate()
-    repaint()
+    isRepaintScheduled.set(true)
   }
 
   internal fun setFocus() {
@@ -160,9 +192,9 @@ class CompilationChartsDiagramsComponent(private val vm: CompilationChartsViewMo
     }
   }
 
+
   override fun addNotify() {
     super.addNotify()
     setFocus()
   }
-
 }
