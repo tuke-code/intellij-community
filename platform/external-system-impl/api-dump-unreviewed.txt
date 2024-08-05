@@ -121,7 +121,7 @@ a:com.intellij.openapi.externalSystem.dependency.analyzer.ExternalSystemDependen
 - f:linkToExistingProjectAsync(com.intellij.openapi.vfs.VirtualFile,com.intellij.openapi.project.Project,kotlin.coroutines.Continuation):java.lang.Object
 - f:linkToExistingProjectAsync(java.lang.String,com.intellij.openapi.project.Project,kotlin.coroutines.Continuation):java.lang.Object
 - openProject(com.intellij.openapi.vfs.VirtualFile,com.intellij.openapi.project.Project,Z,kotlin.coroutines.Continuation):java.lang.Object
-- pf:unlinkAllLinkedProjects(com.intellij.openapi.project.Project,com.intellij.openapi.vfs.VirtualFile,kotlin.coroutines.Continuation):java.lang.Object
+- pf:unlinkOtherLinkedProjects(com.intellij.openapi.project.Project,com.intellij.openapi.vfs.VirtualFile,kotlin.coroutines.Continuation):java.lang.Object
 - unlinkProject(com.intellij.openapi.project.Project,java.lang.String,kotlin.coroutines.Continuation):java.lang.Object
 *f:com.intellij.openapi.externalSystem.importing.AbstractOpenProjectProvider$Companion
 a:com.intellij.openapi.externalSystem.importing.ExternalProjectStructureCustomizer
@@ -141,6 +141,7 @@ f:com.intellij.openapi.externalSystem.model.ExternalSystemDataKeys
 - sf:EXTERNAL_SYSTEM_ID:com.intellij.openapi.actionSystem.DataKey
 - sf:NEWLY_CREATED_PROJECT:com.intellij.openapi.util.Key
 - sf:NEWLY_IMPORTED_PROJECT:com.intellij.openapi.util.Key
+- sf:NEWLY_OPENED_PROJECT_WITH_IDE_CACHES:com.intellij.openapi.util.Key
 - sf:NOTIFICATION_GROUP:com.intellij.openapi.actionSystem.DataKey
 - sf:PROJECTS_TREE:com.intellij.openapi.actionSystem.DataKey
 - sf:SELECTED_NODES:com.intellij.openapi.actionSystem.DataKey
@@ -1633,7 +1634,6 @@ c:com.intellij.openapi.externalSystem.view.ExternalProjectsViewAdapter
 f:com.intellij.openapi.externalSystem.view.ExternalProjectsViewImpl
 - com.intellij.openapi.ui.SimpleToolWindowPanel
 - com.intellij.openapi.Disposable
-- com.intellij.openapi.actionSystem.DataProvider
 - com.intellij.openapi.externalSystem.view.ExternalProjectsView
 - sf:LOG:com.intellij.openapi.diagnostic.Logger
 - <init>(com.intellij.openapi.project.Project,com.intellij.openapi.wm.ex.ToolWindowEx,com.intellij.openapi.externalSystem.model.ProjectSystemId):V

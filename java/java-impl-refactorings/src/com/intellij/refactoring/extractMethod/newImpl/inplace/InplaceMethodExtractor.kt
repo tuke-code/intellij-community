@@ -4,23 +4,33 @@ package com.intellij.refactoring.extractMethod.newImpl.inplace
 import com.intellij.codeInsight.template.impl.TemplateManagerImpl
 import com.intellij.codeInsight.template.impl.TemplateState
 import com.intellij.ide.util.PropertiesComponent
+import com.intellij.openapi.application.EDT
+import com.intellij.openapi.application.readAction
 import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.command.impl.FinishMarkAction
 import com.intellij.openapi.command.impl.StartMarkAction
+import com.intellij.openapi.command.writeCommandAction
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.editor.RangeMarker
 import com.intellij.openapi.editor.asTextRange
 import com.intellij.openapi.editor.event.CaretEvent
 import com.intellij.openapi.editor.event.CaretListener
 import com.intellij.openapi.editor.ex.util.EditorUtil
+import com.intellij.openapi.editor.impl.EditorImpl
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.util.Key
 import com.intellij.openapi.util.TextRange
-import com.intellij.psi.*
+import com.intellij.psi.PsiDocumentManager
+import com.intellij.psi.PsiFile
+import com.intellij.psi.PsiMethod
+import com.intellij.psi.PsiMethodCallExpression
 import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.refactoring.JavaRefactoringSettings
 import com.intellij.refactoring.extractMethod.ExtractMethodDialog
 import com.intellij.refactoring.extractMethod.ExtractMethodHandler
+import com.intellij.refactoring.extractMethod.newImpl.CodeFragmentAnalyzer
+import com.intellij.refactoring.extractMethod.newImpl.ExtractMethodPipeline
+import com.intellij.refactoring.extractMethod.newImpl.ExtractMethodService
 import com.intellij.refactoring.extractMethod.newImpl.ExtractSelector
 import com.intellij.refactoring.extractMethod.newImpl.MethodExtractor
 import com.intellij.refactoring.extractMethod.newImpl.inplace.InplaceExtractUtils.addInlaySettingsElement
@@ -33,12 +43,14 @@ import com.intellij.refactoring.extractMethod.newImpl.inplace.InplaceExtractUtil
 import com.intellij.refactoring.extractMethod.newImpl.inplace.InplaceExtractUtils.findElementAt
 import com.intellij.refactoring.extractMethod.newImpl.inplace.InplaceExtractUtils.showInEditor
 import com.intellij.refactoring.rename.inplace.InplaceRefactoring
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
-class InplaceMethodExtractor(private val editor: Editor,
+internal class InplaceMethodExtractor(private val editor: Editor,
                              private val range: TextRange,
-                             private val targetClass: PsiClass,
                              private val popupProvider: ExtractMethodPopupProvider,
-                             private val initialMethodName: String) {
+                             private val defaultExtractor: DuplicatesMethodExtractor) {
 
   companion object {
     private val INPLACE_METHOD_EXTRACTOR = Key<InplaceMethodExtractor>("InplaceMethodExtractor")
@@ -52,15 +64,9 @@ class InplaceMethodExtractor(private val editor: Editor,
     }
   }
 
-  private val file: PsiFile = targetClass.containingFile
-
-  private fun createExtractor(): DuplicatesMethodExtractor {
-    val elements = ExtractSelector().suggestElementsToExtract(file, range)
-    val shouldBeStatic = popupProvider.makeStatic ?: false
-    return DuplicatesMethodExtractor.create(targetClass, elements, initialMethodName, shouldBeStatic)
-  }
-
   private val extractor: DuplicatesMethodExtractor = createExtractor()
+
+  private val file: PsiFile = defaultExtractor.targetClass.containingFile
 
   private val editorState = EditorState(file.project, editor)
 
@@ -72,55 +78,80 @@ class InplaceMethodExtractor(private val editor: Editor,
 
   private val project = file.project
 
-  fun extractAndRunTemplate(suggestedNames: LinkedHashSet<String>) {
-    try {
-      val startMarkAction = StartMarkAction.start(editor, project, ExtractMethodHandler.getRefactoringName())
-      Disposer.register(disposable) { FinishMarkAction.finish(project, editor, startMarkAction) }
-      val elements = ExtractSelector().suggestElementsToExtract(file, range)
-      MethodExtractor.sendRefactoringStartedEvent(elements.toTypedArray())
-      val (callElements, method) = extractor.extract()
+  private fun createExtractor(): DuplicatesMethodExtractor {
+    val elements = ExtractSelector().suggestElementsToExtract(defaultExtractor.targetClass.containingFile, range)
+    var options = defaultExtractor.extractOptions
+    if (popupProvider.makeStatic == true) {
+      val analyzer = CodeFragmentAnalyzer(options.elements)
+      options = ExtractMethodPipeline.withForcedStatic(analyzer, options) ?: throw IllegalStateException()
+    }
+    return DuplicatesMethodExtractor(options, defaultExtractor.targetClass, elements)
+  }
 
-      val callExpression = PsiTreeUtil.findChildOfType(callElements.firstOrNull(), PsiMethodCallExpression::class.java, false)
-      val callIdentifier = callExpression?.methodExpression?.referenceNameElement
-      callIdentifierRange = if (callIdentifier != null) createGreedyRangeMarker(editor.document, callIdentifier.textRange) else null
+  suspend fun extractAndRunTemplate(suggestedNames: List<String>) {
+    try {
+      val elements = readAction { ExtractSelector().suggestElementsToExtract(file, range) }
+      readAction { MethodExtractor.sendRefactoringStartedEvent(elements.toTypedArray()) }
+      val (callElements, method) = writeCommandAction(project, ExtractMethodHandler.getRefactoringName()) {
+        val startMarkAction = StartMarkAction.start(editor, project, ExtractMethodHandler.getRefactoringName())
+        Disposer.register(disposable) {
+          WriteCommandAction.writeCommandAction(project).withName(ExtractMethodHandler.getRefactoringName()).run<Throwable> {
+            FinishMarkAction.finish(project, editor, startMarkAction)
+          }
+        }
+        extractor.extract()
+      }
+
+      val callExpression = readAction {
+        PsiTreeUtil.findChildOfType(callElements.firstOrNull(), PsiMethodCallExpression::class.java, false)
+      }
+      val callIdentifier = readAction {
+        callExpression?.methodExpression?.referenceNameElement
+      }
+      callIdentifierRange = readAction {
+        if (callIdentifier != null) createGreedyRangeMarker(editor.document, callIdentifier.textRange) else null
+      }
       val callRange = if (callElements.isNotEmpty()) {
-        TextRange(callElements.first().textRange.startOffset, callElements.last().textRange.endOffset)
+        readAction { TextRange(callElements.first().textRange.startOffset, callElements.last().textRange.endOffset) }
       } else {
         null
       }
 
-      val methodIdentifier = method.nameIdentifier ?: throw IllegalStateException()
-      methodIdentifierRange = createGreedyRangeMarker(editor.document, methodIdentifier.textRange)
-      val codePreview = createPreview(editor, method.textRange, methodIdentifier.textRange.endOffset, callRange,
-                                      callIdentifierRange?.textRange?.endOffset)
-      Disposer.register(disposable, codePreview)
+      val methodIdentifier = readAction { method.nameIdentifier } ?: throw IllegalStateException()
+      methodIdentifierRange = readAction { createGreedyRangeMarker(editor.document, methodIdentifier.textRange) }
 
-      val templateField = if (callIdentifier != null) {
-        TemplateField(callIdentifier.textRange, listOf(methodIdentifier.textRange))
-      } else {
-        TemplateField(methodIdentifier.textRange)
+      withContext(Dispatchers.EDT) {
+        val codePreview = createPreview(editor, method.textRange, methodIdentifier.textRange.endOffset, callRange, callIdentifierRange?.textRange?.endOffset)
+        Disposer.register(disposable, codePreview)
+
+        val templateField = if (callIdentifier != null) {
+          TemplateField(callIdentifier.textRange, listOf(methodIdentifier.textRange))
+        }
+        else {
+          TemplateField(methodIdentifier.textRange)
+        }
+        val templateFieldWithSettings = templateField
+          .withCompletionNames(suggestedNames)
+          .withCompletionHint(InplaceRefactoring.getPopupOptionsAdvertisement())
+          .withValidation { variableRange -> checkReferenceIdentifier(editor, file, variableRange) }
+        val templateState = ExtractMethodTemplateBuilder(editor, ExtractMethodHandler.getRefactoringName())
+          .enableRestartForHandler(ExtractMethodHandler::class.java)
+          .onBroken {
+            editorState.revert()
+          }
+          .onSuccess {
+            val range = callIdentifierRange?.asTextRange ?: return@onSuccess
+            val methodName = editor.document.getText(range)
+            val extractedMethod = findElementAt<PsiMethod>(file, methodIdentifierRange) ?: return@onSuccess
+            InplaceExtractMethodCollector.executed.log(defaultExtractor.extractOptions.methodName != methodName)
+            installGotItTooltips(editor, callIdentifierRange?.asTextRange, methodIdentifierRange?.asTextRange)
+            MethodExtractor.sendRefactoringDoneEvent(extractedMethod)
+            extractor.replaceDuplicates(editor, extractedMethod)
+          }
+          .disposeWithTemplate(disposable)
+          .createTemplate(file, listOf(templateFieldWithSettings))
+        afterTemplateStart(templateState)
       }
-      val templateFieldWithSettings = templateField
-        .withCompletionNames(suggestedNames.toList())
-        .withCompletionHint(InplaceRefactoring.getPopupOptionsAdvertisement())
-        .withValidation { variableRange -> checkReferenceIdentifier(editor, file, variableRange) }
-      val templateState = ExtractMethodTemplateBuilder(editor, ExtractMethodHandler.getRefactoringName())
-        .enableRestartForHandler(ExtractMethodHandler::class.java)
-        .onBroken {
-          editorState.revert()
-        }
-        .onSuccess {
-          val range = callIdentifierRange?.asTextRange ?: return@onSuccess
-          val methodName = editor.document.getText(range)
-          val extractedMethod = findElementAt<PsiMethod>(file, methodIdentifierRange) ?: return@onSuccess
-          InplaceExtractMethodCollector.executed.log(initialMethodName != methodName)
-          installGotItTooltips(editor, callIdentifierRange?.asTextRange, methodIdentifierRange?.asTextRange)
-          MethodExtractor.sendRefactoringDoneEvent(extractedMethod)
-          extractor.replaceDuplicates(editor, extractedMethod)
-        }
-        .disposeWithTemplate(disposable)
-        .createTemplate(file, listOf(templateFieldWithSettings))
-      afterTemplateStart(templateState)
     } catch (e: Throwable) {
       Disposer.dispose(disposable)
       throw e
@@ -157,7 +188,9 @@ class InplaceMethodExtractor(private val editor: Editor,
       if (!popupProvider.staticPassFields && makeStatic != null) {
         JavaRefactoringSettings.getInstance().EXTRACT_STATIC_METHOD = makeStatic
       }
-      restartInplace()
+      ExtractMethodService.getInstance(project).scope.launch {
+        restartInplace()
+      }
     }
     popupProvider.setShowDialogAction { actionEvent -> restartInDialog(actionEvent == null) }
     addInlaySettingsElement(templateState, popupProvider)?.also { inlay ->
@@ -180,24 +213,49 @@ class InplaceMethodExtractor(private val editor: Editor,
     val methodName = if (methodRange != null) editor.document.getText(methodRange) else ""
     InplaceExtractMethodCollector.openExtractDialog.log(project, isLinkUsed)
     TemplateManagerImpl.getTemplateState(editor)?.gotoEnd(true)
-    val elements = ExtractSelector().suggestElementsToExtract(targetClass.containingFile, range)
-    extractInDialog(targetClass, elements, methodName, popupProvider.makeStatic ?: extractor.extractOptions.isStatic)
+    val elements = ExtractSelector().suggestElementsToExtract(extractor.targetClass.containingFile, range)
+    extractInDialog(extractor.targetClass, elements, methodName, popupProvider.makeStatic ?: extractor.extractOptions.isStatic)
   }
 
-  private fun restartInplace() {
+  private suspend fun restartInplace() {
     val startTime = System.currentTimeMillis()
-    val identifierRange = callIdentifierRange?.asTextRange
-    val methodName = if (identifierRange != null) editor.document.getText(identifierRange) else null
-    TemplateManagerImpl.getTemplateState(editor)?.gotoEnd(true)
-    WriteCommandAction.writeCommandAction(project).withName(ExtractMethodHandler.getRefactoringName()).run<Throwable> {
-      val inplaceExtractor = InplaceMethodExtractor(editor, range, targetClass, popupProvider, initialMethodName)
-      inplaceExtractor.extractAndRunTemplate(linkedSetOf())
+    val identifierRange = readAction { callIdentifierRange?.asTextRange }
+    val methodName = if (identifierRange != null) readAction { editor.document.getText(identifierRange) } else null
+
+    runWithDumbEditor(editor) {
+      withContext(Dispatchers.EDT) {
+        TemplateManagerImpl.getTemplateState(editor)?.gotoEnd(true)
+      }
+      val inplaceExtractor = readAction { InplaceMethodExtractor(editor, range, popupProvider, defaultExtractor) }
+      inplaceExtractor.extractAndRunTemplate(emptyList())
       if (methodName != null) {
-        inplaceExtractor.setMethodName(methodName)
+        writeCommandAction(project, ExtractMethodHandler.getRefactoringName()) {
+          inplaceExtractor.setMethodName(methodName)
+        }
       }
     }
+
     val endTime = System.currentTimeMillis()
     InplaceExtractMethodCollector.previewUpdated.log(endTime - startTime)
+  }
+
+  private suspend fun runWithDumbEditor(editor: Editor, action: suspend () -> Unit) {
+    val editorImpl = editor as? EditorImpl
+    if (editorImpl == null) {
+      action.invoke()
+      return
+    }
+    withContext(Dispatchers.EDT) {
+      editorImpl.startDumb()
+    }
+    try {
+      action.invoke()
+    }
+    finally {
+      withContext(Dispatchers.EDT) {
+        editor.stopDumbLater()
+      }
+    }
   }
 
 }

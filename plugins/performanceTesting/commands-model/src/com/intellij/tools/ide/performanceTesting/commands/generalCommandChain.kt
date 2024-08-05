@@ -382,6 +382,14 @@ fun <T : CommandChain> T.pressKey(key: Keys): T = apply {
   addCommand("${CMD_PREFIX}pressKey", key.name)
 }
 
+fun <T : CommandChain> T.pressKey(vararg key: Keys): T = apply {
+  key.forEach { addCommand("${CMD_PREFIX}pressKey", it.name) }
+}
+
+fun <T : CommandChain> T.pressKey(key: Keys, times: Int): T = apply {
+  repeat((1..times).count()) { addCommand("${CMD_PREFIX}pressKey", key.name) }
+}
+
 /**
  * @see [com.jetbrains.performancePlugin.commands.DelayTypeCommand]
  */
@@ -1071,6 +1079,10 @@ fun <T : CommandChain> T.gitCommitFile(pathToFile: String, commitMessage: String
   addCommand("${CMD_PREFIX}gitCommit ${pathToFile},${commitMessage}")
 }
 
+fun <T : CommandChain> T.gitRollbackFile(pathToFile: String): T = apply {
+  addCommand("${CMD_PREFIX}gitRollback ${pathToFile}")
+}
+
 fun <T : CommandChain> T.replaceText(startOffset: Int? = null, endOffset: Int? = null, newText: String? = null): T = apply {
   val options = StringBuilder()
   if (startOffset != null) {
@@ -1162,4 +1174,12 @@ fun <T : CommandChain> T.waitForProjectView(): T = apply {
  */
 fun <T : CommandChain> T.expandProjectView(relativePath: String): T = apply {
   addCommand("${CMD_PREFIX}expandProjectView $relativePath")
+}
+
+/**
+ *  The first call will create and start span.
+ *  The second call with the same spanName will stop span.
+ * */
+fun <T : CommandChain> T.handleSpan(spanName: String): T = apply {
+  addCommand("${CMD_PREFIX}handleSpan $spanName")
 }

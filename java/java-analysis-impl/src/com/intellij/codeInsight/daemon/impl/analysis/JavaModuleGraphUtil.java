@@ -1,7 +1,12 @@
 // Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.codeInsight.daemon.impl.analysis;
 
+import com.intellij.ide.highlighter.JavaClassFileType;
+import com.intellij.ide.highlighter.JavaFileType;
+import com.intellij.lang.Language;
+import com.intellij.lang.java.JavaLanguage;
 import com.intellij.lang.jvm.JvmLanguage;
+import com.intellij.openapi.fileTypes.FileType;
 import com.intellij.openapi.fileTypes.FileTypeRegistry;
 import com.intellij.openapi.fileTypes.LanguageFileType;
 import com.intellij.openapi.module.Module;
@@ -16,9 +21,11 @@ import com.intellij.openapi.vfs.JarFileSystem;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.pom.java.JavaFeature;
 import com.intellij.psi.*;
+import com.intellij.psi.impl.PsiImplUtil;
 import com.intellij.psi.impl.PsiJavaModuleModificationTracker;
 import com.intellij.psi.impl.java.stubs.index.JavaModuleNameIndex;
 import com.intellij.psi.impl.light.LightJavaModule;
+import com.intellij.psi.impl.source.resolve.JavaResolveUtil;
 import com.intellij.psi.search.FilenameIndex;
 import com.intellij.psi.search.GlobalSearchScope;
 import com.intellij.psi.search.ProjectScope;
@@ -225,7 +232,11 @@ public final class JavaModuleGraphUtil {
   }
 
   public static @NotNull Set<PsiJavaModule> getAllDependencies(PsiJavaModule source) {
-    return getRequiresGraph(source).getAllDependencies(source);
+    return getRequiresGraph(source).getAllDependencies(source, false);
+  }
+
+  public static @NotNull Set<PsiJavaModule> getAllTransitiveDependencies(PsiJavaModule source) {
+    return getRequiresGraph(source).getAllDependencies(source, true);
   }
 
   public static @Nullable Trinity<String, PsiJavaModule, PsiJavaModule> findConflict(@NotNull PsiJavaModule module) {
@@ -564,18 +575,18 @@ public final class JavaModuleGraphUtil {
       return module.getName() + '/' + exporter.getName();
     }
 
-    public @NotNull Set<PsiJavaModule> getAllDependencies(@NotNull PsiJavaModule module) {
+    public @NotNull Set<PsiJavaModule> getAllDependencies(@NotNull PsiJavaModule module, boolean transitive) {
       Set<PsiJavaModule> requires = new HashSet<>();
-      collectDependencies(module, requires);
+      collectDependencies(module, requires, transitive);
       return requires;
     }
 
-    private void collectDependencies(@NotNull PsiJavaModule module, @NotNull Set<PsiJavaModule> dependencies) {
+    private void collectDependencies(@NotNull PsiJavaModule module, @NotNull Set<PsiJavaModule> dependencies, boolean transitive) {
       for (Iterator<PsiJavaModule> iterator = myGraph.getIn(module); iterator.hasNext();) {
         PsiJavaModule dependency = iterator.next();
-        if (!dependencies.contains(dependency)) {
+        if (!dependencies.contains(dependency) && (!transitive || myTransitiveEdges.contains(key(dependency, module)))) {
           dependencies.add(dependency);
-          collectDependencies(dependency, dependencies);
+          collectDependencies(dependency, dependencies, transitive);
         }
       }
     }
@@ -613,21 +624,36 @@ public final class JavaModuleGraphUtil {
   }
 
   public static class JavaModuleScope extends GlobalSearchScope {
-    @NotNull private final PsiJavaModule myModule;
+    @NotNull private final MultiMap<String, VirtualFile> myModules;
     private final boolean myIncludeLibraries;
     private final boolean myIsInTests;
 
-    private JavaModuleScope(@NotNull Project project, @NotNull PsiJavaModule module, @NotNull VirtualFile moduleFile) {
+    private JavaModuleScope(@NotNull Project project, @NotNull Set<PsiJavaModule> modules) {
       super(project);
-      myModule = module;
+      myModules = new MultiMap<>();
+      for (PsiJavaModule module : modules) {
+        myModules.putValue(module.getName(), PsiImplUtil.getModuleVirtualFile(module));
+      }
       ProjectFileIndex fileIndex = ProjectFileIndex.getInstance(project);
-      myIncludeLibraries = fileIndex.isInLibrary(moduleFile);
-      myIsInTests = !myIncludeLibraries && fileIndex.isInTestSourceContent(moduleFile);
+      myIncludeLibraries = ContainerUtil.or(modules, m -> {
+        PsiFile containingFile = m.getContainingFile();
+        if (containingFile == null) return true;
+        VirtualFile moduleFile = containingFile.getVirtualFile();
+        if (moduleFile == null) return true;
+        return fileIndex.isInLibrary(moduleFile);
+      });
+      myIsInTests = !myIncludeLibraries && ContainerUtil.or(modules, m -> {
+        PsiFile containingFile = m.getContainingFile();
+        if (containingFile == null) return true;
+        VirtualFile moduleFile = containingFile.getVirtualFile();
+        if (moduleFile == null) return true;
+        return fileIndex.isInTestSourceContent(moduleFile);
+      });
     }
 
     @Override
     public boolean isSearchInModuleContent(@NotNull Module aModule) {
-      return findDescriptorByModule(aModule, myIsInTests) == myModule;
+      return contains(findDescriptorByModule(aModule, myIsInTests));
     }
 
     @Override
@@ -641,15 +667,31 @@ public final class JavaModuleGraphUtil {
       if (project == null) return false;
       if (!isJvmLanguageFile(file)) return false;
       ProjectFileIndex index = ProjectFileIndex.getInstance(project);
-      if (index.isInLibrary(file)) return myIncludeLibraries && myModule.equals(findDescriptorInLibrary(project, index, file));
+      if (index.isInLibrary(file)) return myIncludeLibraries && contains(findDescriptorInLibrary(project, index, file));
       Module module = index.getModuleForFile(file);
-      return myModule.equals(findDescriptorByModule(module, myIsInTests));
+      return contains(findDescriptorByModule(module, myIsInTests));
+    }
+
+    private boolean contains(@Nullable PsiJavaModule module) {
+      if (module == null || !module.isValid()) return false;
+      Collection<VirtualFile> myFiles = myModules.get(module.getName());
+      VirtualFile file = PsiImplUtil.getModuleVirtualFile(module);
+      return myFiles.contains(file);
     }
 
     private static boolean isJvmLanguageFile(@NotNull VirtualFile file) {
       FileTypeRegistry fileTypeRegistry = FileTypeRegistry.getInstance();
-      LanguageFileType languageFileType = ObjectUtils.tryCast(fileTypeRegistry.getFileTypeByFileName(file.getName()), LanguageFileType.class);
-      return languageFileType != null && languageFileType.getLanguage() instanceof JvmLanguage;
+      FileType fileType = fileTypeRegistry.getFileTypeByFileName(file.getName());
+      if (fileType == JavaClassFileType.INSTANCE ||
+          fileType == JavaFileType.INSTANCE) {
+        return true;
+      }
+      LanguageFileType languageFileType = ObjectUtils.tryCast(fileType, LanguageFileType.class);
+      if(languageFileType == null) return false;
+      Language language = languageFileType.getLanguage();
+      return language.isKindOf(JavaLanguage.INSTANCE) ||
+             language instanceof JvmLanguage ||
+             language.getID().equals("kotlin");
     }
 
     public static @Nullable JavaModuleScope moduleScope(@NotNull PsiJavaModule module) {
@@ -657,7 +699,19 @@ public final class JavaModuleGraphUtil {
       if (moduleFile == null) return null;
       VirtualFile virtualFile = moduleFile.getVirtualFile();
       if (virtualFile == null) return null;
-      return new JavaModuleScope(module.getProject(), module, virtualFile);
+      return new JavaModuleScope(module.getProject(), Set.of(module));
+    }
+
+    /**
+     * Creates a JavaModuleScope that includes the given module and all transitive modules.
+     *
+     * @param module the base PsiJavaModule for which to create the scope, must not be null
+     * @return a new JavaModuleScope including all transitive modules of the given module, or null if the moduleFile is null or no transitive modules are found
+     */
+    public static @Nullable JavaModuleScope moduleWithTransitiveScope(@NotNull PsiJavaModule module) {
+      Set<PsiJavaModule> allModules = JavaResolveUtil.getAllTransitiveModulesIncludeCurrent(module);
+      if (allModules.isEmpty()) return null;
+      return new JavaModuleScope(module.getProject(), allModules);
     }
   }
 }

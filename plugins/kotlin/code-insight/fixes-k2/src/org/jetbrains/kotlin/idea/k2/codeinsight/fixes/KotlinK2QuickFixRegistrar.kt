@@ -9,7 +9,7 @@ import org.jetbrains.kotlin.idea.codeinsights.impl.base.quickFix.AddDependencyQu
 import org.jetbrains.kotlin.idea.codeinsights.impl.base.quickFix.ChangeVariableMutabilityFix
 import org.jetbrains.kotlin.idea.core.overrideImplement.MemberNotImplementedQuickfixFactories
 import org.jetbrains.kotlin.idea.inspections.RemoveAnnotationFix
-import org.jetbrains.kotlin.idea.k2.codeinsight.fixes.imprt.ImportQuickFix
+import org.jetbrains.kotlin.idea.k2.codeinsight.fixes.imprt.ImportQuickFixFactories
 import org.jetbrains.kotlin.idea.k2.codeinsight.fixes.replaceWith.DeprecationFixFactory
 import org.jetbrains.kotlin.idea.quickfix.*
 
@@ -134,6 +134,11 @@ class KotlinK2QuickFixRegistrar : KotlinQuickFixRegistrar() {
         registerFactory(IllegalEscapeFixFactory.convertToUnicodeEscape)
         registerFactory(IsEnumEntryFixFactory.factory)
         registerFactory(NoReturnInFunctionWithBlockBodyFixFactory.addReturnToLastExpression)
+        registerFactory(InlineClassDeprecatedFixFactory.replaceWithValue)
+        registerFactory(MisplacedTypeParameterConstraintsFixFactory.moveConstraintToWhereClause)
+        registerFactory(AbstractFunctionWithBodyFixFactory.removeFunctionBody)
+        registerFactory(SenselessNullInWhenFixFactory.removeCondition)
+        registerFactory(SubclassCantCallCompanionProtectedNonStaticFixFactory.addJvmStaticAnnotation)
     }
 
     private val addAbstract = KtQuickFixesListBuilder.registerPsiQuickFix {
@@ -222,7 +227,7 @@ class KotlinK2QuickFixRegistrar : KotlinQuickFixRegistrar() {
     }
 
     private val imports = KtQuickFixesListBuilder.registerPsiQuickFix {
-        registerFactory(ImportQuickFix.invisibleReferenceFactory)
+        registerFactory(ImportQuickFixFactories.invisibleReferenceFactory)
         registerPsiQuickFixes(KaFirDiagnostic.ConflictingImport::class, RemovePsiElementSimpleFix.RemoveImportFactory)
         registerPsiQuickFixes(KaFirDiagnostic.UnresolvedImport::class, AddDependencyQuickFixHelper)
     }
@@ -435,6 +440,8 @@ class KotlinK2QuickFixRegistrar : KotlinQuickFixRegistrar() {
         registerFactory(DeprecationFixFactory.deprecatedAliasWarning)
 
         registerFactory(ChangeMemberFunctionSignatureFixFactory.nothingToOverrideFixFactory)
+
+        registerFactory(ReplaceJvmFieldWithConstFixFactory.inapplicableJvmField)
     }
 
     private val optIn = KtQuickFixesListBuilder.registerPsiQuickFix {
@@ -521,7 +528,7 @@ class KotlinK2QuickFixRegistrar : KotlinQuickFixRegistrar() {
     )
 
     override val importOnTheFlyList: KotlinQuickFixesList = KtQuickFixesListBuilder.registerPsiQuickFix {
-        registerFactory(ImportQuickFix.unresolvedReferenceFactory)
-        registerFactory(ImportQuickFix.invisibleReferenceFactory)
+        registerFactory(ImportQuickFixFactories.unresolvedReferenceFactory)
+        registerFactory(ImportQuickFixFactories.invisibleReferenceFactory)
     }
 }
